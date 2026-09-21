@@ -31,8 +31,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
 
-const EXPECTED_SUPABASE_HOST = 'zexlxabdcsjefptmjhuq.supabase.co';
-const EXPECTED_FACEBOOK_APP_ID = '2154021471813673';
+const EXPECTED_SUPABASE_HOST = 'vmskleqlszoupgjkyxqs.supabase.co';
+const EXPECTED_FACEBOOK_APP_ID = '1438623708121685';
 const EXPECTED_FACEBOOK_OAUTH_CALLBACK_PATH = '/auth/v1/callback';
 
 const colors = {
@@ -231,8 +231,8 @@ async function main() {
       } else if (res.status === 200) {
         log('pass', `Production site ${siteUrl} returns 200 (not behind Vercel SSO)`);
       } else {
-        log('warn', `Production site ${siteUrl} returned ${res.status}, final URL: ${finalUrl}`);
-        warned++;
+        log('fail', `Production site ${siteUrl} returned ${res.status}, final URL: ${finalUrl}`);
+        failed++;
       }
     } catch (e) {
       log('warn', `Production probe failed: ${e?.message || e}`);

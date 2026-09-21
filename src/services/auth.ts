@@ -12,6 +12,7 @@ import {
   updateDirectProfile,
 } from './directSupabase';
 import { getAuthCallbackUrl, getConfig, resolveAuthRedirectOrigin } from '../utils/env';
+import { supabase } from '../utils/supabase/client';
 
 function getDirectFallbackError(operation: string): Error {
   return getSecureBackendFallbackError(operation);
@@ -96,7 +97,6 @@ function normalizeAuthError(
 }
 
 async function requireSupabase() {
-  const { supabase } = await import('../utils/supabase/client');
   if (!supabase) {
     throw new Error(
       'Supabase auth is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.',

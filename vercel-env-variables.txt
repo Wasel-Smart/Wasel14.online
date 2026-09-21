@@ -1,13 +1,13 @@
 # Vercel Environment Variables
 # Copy these to: Vercel Dashboard → Settings → Environment Variables
 
-VITE_SUPABASE_URL=https://zexlxabdcsjefptmjhuq.supabase.co
+VITE_SUPABASE_URL=https://vmskleqlszoupgjkyxqs.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_PUBLISHABLE_KEY_HERE
 VITE_APP_URL=https://www.wasel14.online
 VITE_APP_NAME=Wasel
 VITE_EDGE_FUNCTION_NAME=make-server-0b1f4071
-VITE_EDGE_FUNCTIONS_BASE_URL=https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1
+VITE_EDGE_FUNCTIONS_BASE_URL=https://vmskleqlszoupgjkyxqs.supabase.co/functions/v1
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 VITE_GOOGLE_CLIENT_ID=996572320648-78phqf40lhhg589q6j0rflkuhs8hf7dj.apps.googleusercontent.com
 VITE_FACEBOOK_APP_ID=1438623708121685

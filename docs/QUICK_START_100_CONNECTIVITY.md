@@ -51,7 +51,7 @@ bash scripts/deploy-edge-function.sh
 **Expected Output:**
 ```
 ✅ Deployment Complete!
-Edge Function URL: https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071
+Edge Function URL: https://vmskleqlszoupgjkyxqs.supabase.co/functions/v1/make-server-0b1f4071
 ✓ Edge function is healthy (HTTP 200)
 ```
 
@@ -194,7 +194,7 @@ bash scripts/configure-production.sh
 bash scripts/verify-connectivity.sh
 
 # Test edge function
-curl https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/health
+curl https://vmskleqlszoupgjkyxqs.supabase.co/functions/v1/make-server-0b1f4071/health
 
 # Deploy to Vercel
 vercel --prod

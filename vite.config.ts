@@ -79,7 +79,6 @@ export default defineConfig(({ mode }) => ({
           ) return 'data-layer';
 
             if (id.includes('/node_modules/leaflet/')) return 'maps';
-            if (id.includes('/node_modules/recharts/')) return 'charts';
             if (
               id.includes('/node_modules/motion/') ||
               id.includes('/node_modules/framer-motion/')

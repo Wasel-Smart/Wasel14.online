@@ -426,9 +426,8 @@ export async function updateRideBooking (
 async function resolvePassengerNames ( passengerIds: string[] ): Promise<Map<string, string>> {
   const nameMap = new Map<string, string>();
   try {
-    const { supabase: db } = await import( '../utils/supabase/client' );
-    if ( db ) {
-      const { data: profiles } = await db
+    if ( supabase ) {
+      const { data: profiles } = await supabase
         .from( 'profiles' )
         .select( 'id, full_name, email' )
         .in( 'id', passengerIds );

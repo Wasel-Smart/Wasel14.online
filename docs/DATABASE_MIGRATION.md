@@ -2,10 +2,10 @@
 
 ## Run this SQL in Supabase Dashboard
 
-**Project:** Wasel14.online (`zexlxabdcsjefptmjhuq`)
+**Project:** Wasel14.online (`vmskleqlszoupgjkyxqs`)
 
 ### Step 1: Open SQL Editor
-1. Go to https://app.supabase.com/project/zexlxabdcsjefptmjhuq/editor
+1. Go to https://app.supabase.com/project/vmskleqlszoupgjkyxqs/editor
 2. Click **SQL Editor** in the left sidebar
 3. Click **New query**
 

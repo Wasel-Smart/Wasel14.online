@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL || 'https://zexlxabdcsjefptmjhuq.supabase.co';
+  process.env.VITE_SUPABASE_URL || 'https://vmskleqlszoupgjkyxqs.supabase.co';
 const SUPABASE_KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_t2cOnKt1HH-l2KmvJIAwcg_8fpCWdN0';
-const APP_URL = process.env.VITE_APP_URL || 'https://wasel14.online';
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const APP_URL = process.env.VITE_APP_URL || 'https://www.wasel14.online';
 const TEST_PHONE = process.env.AUTH_PROVIDER_TEST_PHONE || '+962792084333';
 
 const ALLOWED_DOMAINS = ['supabase.co', 'supabase.net', 'wasel14.online', 'localhost'];
