@@ -188,18 +188,18 @@ function isChunkLoadFailure(value: unknown): boolean {
 }
 
 function reloadAfterServiceWorkerUpdate(): void {
-  if (serviceWorkerReloadScheduled) return;
+  if (serviceWorkerReloadScheduled) {return;}
   serviceWorkerReloadScheduled = true;
   window.location.reload();
 }
 
 async function waselHardRecover(): Promise<void> {
-  if (chunkRecoveryInProgress) return;
+  if (chunkRecoveryInProgress) {return;}
   chunkRecoveryInProgress = true;
 
   try {
     const recoveryKey = getChunkRecoveryKey();
-    if (window.sessionStorage.getItem(recoveryKey)) return;
+    if (window.sessionStorage.getItem(recoveryKey)) {return;}
     window.sessionStorage.setItem(recoveryKey, '1');
   } catch {
     // Storage can be unavailable in hardened browser contexts.
@@ -225,13 +225,13 @@ async function waselHardRecover(): Promise<void> {
 
 if (import.meta.env.PROD && import.meta.env.MODE !== 'test') {
   window.addEventListener('unhandledrejection', (event) => {
-    if (!isChunkLoadFailure(event.reason)) return;
+    if (!isChunkLoadFailure(event.reason)) {return;}
     event.preventDefault();
     void waselHardRecover();
   });
 
   window.addEventListener('error', (event) => {
-    if (!isChunkLoadFailure(event.message)) return;
+    if (!isChunkLoadFailure(event.message)) {return;}
     void waselHardRecover();
   });
 }
@@ -346,7 +346,7 @@ if (environmentIsValid) {
 
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
-          if (!newWorker) return;
+          if (!newWorker) {return;}
 
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed') {

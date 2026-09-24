@@ -12,7 +12,7 @@ vi.mock('../../../hooks/useIframeSafeNavigate', () => ({
   useIframeSafeNavigate: () => navigateMock,
 }));
 
-const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
 vi.mock('sonner', () => ({ toast: toastMock }));
 
 let mockAuthUser: { id: string } | null = { id: 'user-1' };
@@ -137,12 +137,8 @@ describe('useWalletDashboardController', () => {
     });
 
     it('redirects to checkout and does NOT refetch the wallet when a checkoutUrl is returned', async () => {
-      const originalLocation = window.location;
       const assignSpy = vi.fn();
-      Object.defineProperty(window, 'location', {
-        configurable: true,
-        value: { ...originalLocation, assign: assignSpy },
-      });
+      vi.stubGlobal('location', { ...window.location, assign: assignSpy });
       walletApiMocks.topUp.mockResolvedValue({ payment: { checkoutUrl: 'https://checkout.example/abc' } });
 
       const { result } = renderController();
@@ -154,7 +150,7 @@ describe('useWalletDashboardController', () => {
 
       expect(assignSpy).toHaveBeenCalledWith('https://checkout.example/abc');
       expect(walletApiMocks.getWallet).not.toHaveBeenCalled();
-      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+      vi.unstubAllGlobals();
     });
 
     it('shows a success toast, resets the form, and refetches when there is no checkoutUrl', async () => {
@@ -179,7 +175,10 @@ describe('useWalletDashboardController', () => {
       const { result } = renderController();
       await waitFor(() => expect(result.current.loading).toBe(false));
 
-      act(() => result.current.setTopUpAmount('25'));
+      act(() => {
+        result.current.setShowTopUp(true);
+        result.current.setTopUpAmount('25');
+      });
       await act(async () => { await result.current.handleTopUp(); });
 
       expect(toastMock.error).toHaveBeenCalledWith('Card declined');
@@ -220,6 +219,21 @@ describe('useWalletDashboardController', () => {
   describe('handleAutoTopUpToggle — optimistic update', () => {
     it('applies the change immediately and confirms it on success', async () => {
       walletApiMocks.setAutoTopUp.mockResolvedValue({ success: true });
+      walletApiMocks.getWallet.mockResolvedValue(
+        makeWallet({
+          wallet: {
+            id: 'w1',
+            userId: 'user-1',
+            status: 'active',
+            currency: 'JOD',
+            autoTopUp: true,
+            autoTopUpAmount: 20,
+            autoTopUpThreshold: 5,
+            paymentMethods: [],
+            createdAt: null,
+          },
+        }),
+      );
       const { result } = renderController();
       await waitFor(() => expect(result.current.loading).toBe(false));
 

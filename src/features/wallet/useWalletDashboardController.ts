@@ -15,6 +15,12 @@ import { resolveWalletRuntimeMode } from './walletRuntime';
 const WALLET_BACKEND_READY = Boolean(projectId && publicAnonKey);
 const WALLET_LOCAL_FALLBACK_READY = typeof window !== 'undefined';
 
+export const walletLocation = {
+  assign: (url: string) => {
+    window.location.assign(url);
+  },
+};
+
 export function useWalletDashboardController() {
   const location = useLocation();
   const { user } = useAuth();
@@ -180,7 +186,7 @@ export function useWalletDashboardController() {
       if (checkoutUrl) {
         toast.success(t.redirectingToPaymentCheckout);
         setShowTopUp(false);
-        window.location.assign(checkoutUrl);
+        walletLocation.assign(checkoutUrl);
         return;
       }
 
@@ -318,7 +324,7 @@ export function useWalletDashboardController() {
         toast.success(
           t.redirectingToSubscriptionCheckout ?? 'Redirecting to secure subscription checkout',
         );
-        window.location.assign(checkoutUrl);
+        walletLocation.assign(checkoutUrl);
         return;
       }
 
