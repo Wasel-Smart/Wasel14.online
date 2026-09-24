@@ -376,12 +376,12 @@ export default function WaselAuth () {
 
   const { signIn, register, loading, isSubmitting, user } = useLocalAuth();
   const busy = loading || Boolean( isSubmitting );
-  const { resetPassword, signInWithGoogle, signInWithFacebook, signInWithMicrosoft, signInWithApple } = useAuth();
+  const { resetPassword, signInWithGoogle, signInWithFacebook } = useAuth();
   const nav = useIframeSafeNavigate();
   const mountedRef = useRef( true );
   const { supportWhatsAppNumber } = getConfig();
   const [ oauthConfigWarning, setOauthConfigWarning ] = useState( '' );
-  const [ activeProvider, setActiveProvider ] = useState<null | 'google' | 'facebook' | 'microsoft' | 'apple'>( null );
+  const [ activeProvider, setActiveProvider ] = useState<null | 'google' | 'facebook' | never>( null );
 
   const safeReturnTo = normalizeReturnToPath( params.get( 'returnTo' ) );
 
@@ -646,7 +646,7 @@ export default function WaselAuth () {
   };
 
   const runOAuth = async (
-    provider: 'google' | 'facebook' | 'microsoft' | 'apple',
+    provider: 'google' | 'facebook' | never,
     signIn: ( returnTo?: string ) => Promise<{ error: AuthOperationError }>,
   ) => {
     setError( '' );
@@ -672,14 +672,6 @@ export default function WaselAuth () {
     void runOAuth( 'facebook', signInWithFacebook );
   };
 
-  const handleMicrosoftSignIn = () => {
-    void runOAuth( 'microsoft', signInWithMicrosoft );
-  };
-
-  const handleAppleSignIn = () => {
-    void runOAuth( 'apple', signInWithApple );
-  };
-
   const handleWhatsAppHelp = () => {
     if ( !supportWhatsAppNumber ) {
       setError( tx( 'waselAuth.error_whatsapp_not_configured' ) );
@@ -691,7 +683,7 @@ export default function WaselAuth () {
   /**
    * Enhance OAuth error messages with actionable recovery steps
    */
-  const enhanceOAuthError = ( error: string, provider: 'google' | 'facebook' | 'microsoft' | 'apple' ): string => {
+  const enhanceOAuthError = ( error: string, provider: 'google' | 'facebook' | never ): string => {
     const lower = error.toLowerCase();
     const providerName = provider.charAt( 0 ).toUpperCase() + provider.slice( 1 );
 
@@ -708,15 +700,13 @@ export default function WaselAuth () {
   };
 
   const socialButtons: Array<{
-    key: 'google' | 'facebook' | 'microsoft' | 'apple' | 'whatsapp';
+    key: 'google' | 'facebook' | never | 'whatsapp';
     label: string;
     color: string;
     onClick: () => void;
   }> = [
     { key: 'google', label: 'Google', color: '#4285F4', onClick: handleGoogleSignIn },
     { key: 'facebook', label: 'Facebook', color: '#1877F2', onClick: handleFacebookSignIn },
-    { key: 'microsoft', label: 'Microsoft', color: '#00A4EF', onClick: handleMicrosoftSignIn },
-    { key: 'apple', label: 'Apple', color: '#000000', onClick: handleAppleSignIn },
     ...( supportWhatsAppNumber
       ? [ { key: 'whatsapp' as const, label: 'WhatsApp', color: '#25D366', onClick: handleWhatsAppHelp } ]
       : [] ),
