@@ -185,4 +185,37 @@ describe('auth.test.ts', () => {
     const callArgs = mockSupabase.auth.signUp.mock.calls[0];
     expect((callArgs as unknown as any[])[0].options.data).toEqual({ full_name: 'John Doe' });
   });
+
+  it('signIn reports network/CSP failures instead of a generic message', async () => {
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: null,
+      error: { message: 'Failed to fetch' },
+    });
+
+    const { authAPI: api } = await import('../../src/services/auth');
+    await expect(api.signIn('test@example.com', 'password')).rejects.toThrow('Cannot reach the sign-in service');
+  });
+
+  it('signUp rejects an already-registered email that Supabase masks with empty identities', async () => {
+    mockSupabase.auth.signUp.mockResolvedValue({
+      data: { user: { id: 'user-1', identities: [] }, session: null },
+      error: null,
+    });
+
+    const { authAPI: api } = await import('../../src/services/auth');
+    await expect(
+      api.signUp({ email: 'taken@example.com', password: 'Password1!', firstName: 'J', lastName: 'D', phone: '' }),
+    ).rejects.toThrow('This email is already registered.');
+  });
+
+  it('signUp accepts a fresh user that has identities', async () => {
+    mockSupabase.auth.signUp.mockResolvedValue({
+      data: { user: { id: 'user-2', identities: [{ id: 'identity-1' }] }, session: null },
+      error: null,
+    });
+
+    const { authAPI: api } = await import('../../src/services/auth');
+    const result = await api.signUp({ email: 'new@example.com', password: 'Password1!', firstName: 'J', lastName: 'D', phone: '' });
+    expect(result.user?.id).toBe('user-2');
+  });
 });

@@ -360,13 +360,13 @@ if (environmentIsValid) {
     });
   }
 
-  function isStandalonePWA(): boolean {
+  const isStandalonePWA = (): boolean => {
     if (typeof window === 'undefined') {return false;}
     const mediaQuery = window.matchMedia('(display-mode: standalone)');
     if (mediaQuery.matches) {return true;}
     if ((navigator as Navigator & { standalone?: boolean }).standalone === true) {return true;}
     return false;
-  }
+  };
 
   if (isStandalonePWA()) {
     document.documentElement.classList.add('pwa-standalone');
@@ -374,7 +374,7 @@ if (environmentIsValid) {
 
   type ServiceWorkerMessage = { type: 'NAVIGATE'; url: string } | { type: 'BACKGROUND_SYNC' } | { type: 'SW_UPDATED' };
 
-  function handleServiceWorkerMessage(event: MessageEvent<ServiceWorkerMessage>) {
+  const handleServiceWorkerMessage = (event: MessageEvent<ServiceWorkerMessage>) => {
     const message = event.data;
 
     if (!message) {return;}
@@ -390,7 +390,7 @@ if (environmentIsValid) {
     if (message.type === 'SW_UPDATED') {
       reloadAfterServiceWorkerUpdate();
     }
-  }
+  };
 
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);

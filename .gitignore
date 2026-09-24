@@ -129,6 +129,9 @@ docs/wasel-planning-with-ai.json
 Backup-codes-*.txt
 backup-codes*.txt
 *-backup-codes.txt
+*backup_code*.txt
+*backup-code*.txt
+stripe_backup_code.txt
 client_secret_*.json
 *.pem
 *.p8

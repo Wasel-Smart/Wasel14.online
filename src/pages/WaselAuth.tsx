@@ -28,7 +28,7 @@ import { useIframeSafeNavigate } from '../hooks/useIframeSafeNavigate';
 import { checkRateLimit, resetRateLimit, validateEmail, validatePhone } from '../utils/security';
 import { useAuth } from '../contexts/AuthContext';
 import type { AuthOperationError } from '../contexts/authContextHelpers';
-import { getConfig, getWhatsAppSupportUrl, normalizeReturnToPath } from '../utils/env';
+import { getAuthCallbackUrl, getConfig, getWhatsAppSupportUrl, normalizeReturnToPath, resolveAuthRedirectOrigin } from '../utils/env';
 import { friendlyAuthError, pwStrength } from '../utils/authHelpers';
 import { getProviderSetupInstructions } from '../utils/oauthValidator';
 import { supabase } from '../utils/supabase/client';
@@ -38,6 +38,23 @@ import { tx } from '../locales/tx';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = 'signin' | 'signup';
+
+// ─── Shared validation helpers ────────────────────────────────────────────────
+type PasswordRuleIssue = 'min_length' | 'requirements' | null;
+
+/** Single source of truth for signup password rules (used live and on submit). */
+function getPasswordRuleIssue ( password: string ): PasswordRuleIssue {
+  if ( password.length < 8 ) { return 'min_length'; }
+  if ( !/[a-z]/.test( password ) || !/[A-Z]/.test( password ) || !/\d/.test( password ) || !/[^a-zA-Z0-9]/.test( password ) ) {
+    return 'requirements';
+  }
+  return null;
+}
+
+/** Strip spaces/dashes/brackets so "+962 79 123 4567" is accepted and sent as E.164. */
+function normalizePhoneInput ( value: string ): string {
+  return value.replace( /[\s\-().]/g, '' );
+}
 
 // ─── Feature list for the brand panel ────────────────────────────────────────
 const BRAND_FEATURES = [
@@ -354,8 +371,11 @@ export default function WaselAuth () {
   const [ passwordError, setPasswordError ] = useState( '' );
   const [ nameError, setNameError ] = useState( '' );
   const [ phoneError, setPhoneError ] = useState( '' );
+  const [ needsConfirmation, setNeedsConfirmation ] = useState( false );
+  const [ resending, setResending ] = useState( false );
 
-  const { signIn, register, loading, user } = useLocalAuth();
+  const { signIn, register, loading, isSubmitting, user } = useLocalAuth();
+  const busy = loading || Boolean( isSubmitting );
   const { resetPassword, signInWithGoogle, signInWithFacebook, signInWithMicrosoft, signInWithApple } = useAuth();
   const nav = useIframeSafeNavigate();
   const mountedRef = useRef( true );
@@ -379,9 +399,16 @@ export default function WaselAuth () {
   };
 
   const validatePasswordRealtime = ( value: string ) => {
-    if ( tab === 'signup' && value.length > 0 && value.length < 8 ) {
-      setPasswordError( ar ? 'كلمة المرور يجب أن تكون 8 أحرف على الأقل' : 'Password must be at least 8 characters' );
-      return false;
+    if ( tab === 'signup' && value.length > 0 ) {
+      const issue = getPasswordRuleIssue( value );
+      if ( issue === 'min_length' ) {
+        setPasswordError( tx( 'waselAuth.error_password_min_length' ) );
+        return false;
+      }
+      if ( issue === 'requirements' ) {
+        setPasswordError( tx( 'waselAuth.error_password_requirements' ) );
+        return false;
+      }
     }
     setPasswordError( '' );
     return true;
@@ -397,7 +424,7 @@ export default function WaselAuth () {
   };
 
   const validatePhoneRealtime = ( value: string ) => {
-    if ( tab === 'signup' && value.trim() && !validatePhone( value ) ) {
+    if ( tab === 'signup' && value.trim() && !validatePhone( normalizePhoneInput( value ) ) ) {
       setPhoneError( ar ? 'صيغة رقم الهاتف غير صحيحة (مثال: +962791234567)' : 'Invalid phone format (e.g. +962791234567)' );
       return false;
     }
@@ -501,6 +528,7 @@ export default function WaselAuth () {
     const { error: signInError } = await signIn( email, password );
     if ( signInError ) {
       setError( friendlyAuthError( signInError, tx( 'waselAuth.error_signin_failed' ) ) );
+      setNeedsConfirmation( signInError.toLowerCase().includes( 'confirm your email' ) );
       return;
     }
     resetRateLimit( `signin:${ email }` );
@@ -524,24 +552,31 @@ export default function WaselAuth () {
       setError( tx( 'waselAuth.error_enter_valid_email' ) );
       return;
     }
-    if ( password.length < 8 ) {
+    const passwordIssue = getPasswordRuleIssue( password );
+    if ( passwordIssue === 'min_length' ) {
       setError( tx( 'waselAuth.error_password_min_length' ) );
       return;
     }
-    if ( !/[a-z]/.test( password ) || !/[A-Z]/.test( password ) || !/\d/.test( password ) || !/[^a-zA-Z0-9]/.test( password ) ) {
+    if ( passwordIssue === 'requirements' ) {
       setError( tx( 'waselAuth.error_password_requirements' ) );
+      return;
+    }
+    const normalizedPhone = normalizePhoneInput( phone );
+    if ( normalizedPhone && !validatePhone( normalizedPhone ) ) {
+      setError( ar ? 'صيغة رقم الهاتف غير صحيحة (مثال: +962791234567)' : 'Invalid phone format (e.g. +962791234567)' );
       return;
     }
     if ( !checkRateLimit( `signup:${ email }`, { maxRequests: 3, windowMs: 60_000 } ) ) {
       setError( tx( 'waselAuth.error_too_many_attempts' ) );
       return;
     }
-    const registration = await register({ name, email, password, phone, returnTo: safeReturnTo });
+    const registration = await register({ name: name.trim(), email, password, phone: normalizedPhone, returnTo: safeReturnTo });
     if ( registration.error ) {
       setError( friendlyAuthError( registration.error, tx( 'waselAuth.error_signup_failed' ) ) );
       return;
     }
     if ( registration.requiresEmailConfirmation ) {
+      setNeedsConfirmation( true );
       setPassword( '' );
       setNotice(
         tx( 'waselAuth.confirm_email_notice', { email: registration.email ?? email } ),
@@ -552,6 +587,44 @@ export default function WaselAuth () {
     }
     resetRateLimit( `signup:${ email }` );
     pushSuccessRedirect();
+  };
+
+  const handleResendConfirmation = async () => {
+    if ( !supabase ) {
+      setError( ar ? 'الخدمة غير مهيأة حالياً.' : 'Sign-in service is not configured.' );
+      return;
+    }
+    if ( !email.trim() || !validateEmail( email ) ) {
+      setError( tx( 'waselAuth.error_enter_valid_email' ) );
+      return;
+    }
+    if ( !checkRateLimit( `resend:${ email }`, { maxRequests: 2, windowMs: 60_000 } ) ) {
+      setError( tx( 'waselAuth.error_too_many_attempts' ) );
+      return;
+    }
+    setResending( true );
+    try {
+      const { error: resendError } = await supabase.auth.resend( {
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: getAuthCallbackUrl(
+            resolveAuthRedirectOrigin(),
+            safeReturnTo ? { returnTo: safeReturnTo } : undefined,
+          ),
+        },
+      } );
+      if ( resendError ) {
+        setError( friendlyAuthError( resendError, ar ? 'تعذر إرسال رسالة التأكيد.' : 'Could not resend the confirmation email.' ) );
+        return;
+      }
+      setError( '' );
+      toast.success( ar ? `تم إرسال رسالة التأكيد إلى ${ email }` : `Confirmation email sent to ${ email }` );
+    } catch {
+      setError( ar ? 'تعذر إرسال رسالة التأكيد.' : 'Could not resend the confirmation email.' );
+    } finally {
+      if ( mountedRef.current ) { setResending( false ); }
+    }
   };
 
   const handleForgotPassword = async () => {
@@ -581,7 +654,7 @@ export default function WaselAuth () {
     try {
       const { error: oauthError } = await signIn( safeReturnTo );
       if ( oauthError && mountedRef.current ) {
-        const enhancedMessage = enhanceOAuthError( String( oauthError ), provider );
+        const enhancedMessage = enhanceOAuthError( oauthError.message, provider );
         setError( friendlyAuthError( enhancedMessage, tx( `waselAuth.error_${ provider }_failed` ) ) );
       }
     } finally {
@@ -836,6 +909,31 @@ export default function WaselAuth () {
             ) }
           </AnimatePresence>
 
+          { tab === 'signin' && needsConfirmation && !success && (
+            <div style={ { marginBottom: SPACE[ 5 ], textAlign: 'center' } }>
+              <button
+                type="button"
+                onClick={ () => { void handleResendConfirmation(); } }
+                disabled={ resending || busy }
+                style={ {
+                  background: 'none',
+                  border: 'none',
+                  color: C.cyan,
+                  fontSize: TYPE.size.sm,
+                  fontFamily: F,
+                  cursor: resending || busy ? 'not-allowed' : 'pointer',
+                  opacity: resending || busy ? 0.6 : 1,
+                  padding: 0,
+                  textDecoration: 'underline',
+                } }
+              >
+                { resending
+                  ? ( ar ? 'جارٍ الإرسال...' : 'Sending...' )
+                  : ( ar ? 'لم تصلك رسالة التأكيد؟ أعد الإرسال' : "Didn't get the email? Resend confirmation" ) }
+              </button>
+            </div>
+          ) }
+
           {/* Success banner */ }
           <AnimatePresence>
             { success && (
@@ -900,7 +998,7 @@ export default function WaselAuth () {
                     description={ tx( 'waselAuth.used_for_sign_in' ) }
                     type="email"
                     value={ email }
-                    onChange={ value => { setEmail( value ); validateEmailRealtime( value ); } }
+                    onChange={ value => { const next = value.trim(); setEmail( next ); validateEmailRealtime( next ); } }
                     placeholder={ tx( 'waselAuth.you_example_com' ) }
                     icon={ <Mail size={ 16 } /> }
                   />
@@ -986,7 +1084,7 @@ export default function WaselAuth () {
                   variant="primary"
                   size="lg"
                   fullWidth
-                  loading={ loading }
+                  loading={ busy }
                   disabled={ success }
                   type="submit"
                   aria-label={ tab === 'signin' ? tx( 'waselAuth.submit_signin' ) : tx( 'waselAuth.submit_signup' ) }
@@ -1008,7 +1106,7 @@ export default function WaselAuth () {
                 <div style={ { display: 'flex', gap: SPACE[ 2 ], flexWrap: 'wrap' } }>
                   { socialButtons.map( social => {
                     const isActive = activeProvider === social.key;
-                    const disabled = loading || success || ( activeProvider !== null && !isActive );
+                    const disabled = busy || success || ( activeProvider !== null && !isActive );
                     return (
                       <motion.button
                         key={ social.key }

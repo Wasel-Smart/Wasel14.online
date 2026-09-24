@@ -49,7 +49,10 @@ const ERROR_RULES: Array<{
   },
   {
     test: (lower, code) =>
-      code === 'over_request_rate_limit' || lower.includes('too many requests'),
+      code === 'over_request_rate_limit' ||
+      code === 'over_email_send_rate_limit' ||
+      lower.includes('too many requests') ||
+      lower.includes('rate limit'),
     message: 'Too many attempts. Please wait a moment and try again.',
   },
   {
@@ -78,6 +81,15 @@ const ERROR_RULES: Array<{
   {
     test: (lower, code) => code === 'phone_exists' || lower.includes('phone already exists'),
     message: 'This phone number is already registered.',
+  },
+  {
+    // Network failures and CSP-blocked requests both surface as "Failed to fetch".
+    test: (lower) =>
+      lower.includes('failed to fetch') ||
+      lower.includes('load failed') ||
+      lower.includes('networkerror') ||
+      lower.includes('network request failed'),
+    message: 'Cannot reach the sign-in service. Check your connection and try again.',
   },
 ];
 
@@ -223,6 +235,14 @@ export const authAPI = {
 
     if (error) {
       throw new Error(normalizeAuthError(error.message, error.code, 'signup'));
+    }
+
+    // With email confirmation enabled, Supabase does NOT return an error for an
+    // already-registered email (anti-enumeration). It returns a placeholder user
+    // with an empty `identities` array and sends no email, so the UI would say
+    // "check your inbox" forever. Surface it as an explicit error instead.
+    if (data?.user?.identities?.length === 0) {
+      throw new Error('This email is already registered.');
     }
 
     return data;

@@ -23,9 +23,7 @@ export function PWAInstallPrompt() {
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync standalone state on mount
     setIsStandalone(isStandaloneMode);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync installed state on mount
     if (isStandaloneMode) {
       setState('installed');
     }

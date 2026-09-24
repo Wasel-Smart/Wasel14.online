@@ -13,7 +13,7 @@ export const waselAuth = {
       you_example_com: 'you@example.com',
       used_for_sign_in: 'Used for sign in',
       your_account_password: 'Your account password', // nosec CWE-798 CWE-259 - UI translation label, not a credential
-      minimum_8_characters: 'Minimum 8 characters',
+      minimum_8_characters: '8+ characters with upper & lower case, a number, and a symbol',
       enter_your_password: 'Enter your password', // nosec CWE-798 CWE-259 - UI translation label, not a credential
       create_a_secure_password: 'Create a secure password', // nosec CWE-798 CWE-259 - UI translation label, not a credential
       forgot_password: 'Forgot password?', // nosec CWE-798 CWE-259 - UI translation label, not a credential
@@ -39,6 +39,8 @@ export const waselAuth = {
       error_signup_failed: 'Sign up failed. Please try again.',
       error_google_failed: 'Google sign in failed. Please try again.',
       error_facebook_failed: 'Facebook sign in failed. Please try again.',
+      error_microsoft_failed: 'Microsoft sign in failed. Please try again.',
+      error_apple_failed: 'Apple sign in failed. Please try again.',
       error_reset_failed: 'Password reset failed.', // nosec CWE-798 CWE-259 - UI translation label, not a credential
       sign_in: 'Sign in',
       create_account: 'Create account',
@@ -57,7 +59,7 @@ export const waselAuth = {
       you_example_com: 'you@example.com',
       used_for_sign_in: 'يُستخدم لتسجيل الدخول',
       your_account_password: 'كلمة مرور حسابك', // nosec CWE-798 CWE-259 - UI translation label, not a credential
-      minimum_8_characters: '8 أحرف على الأقل',
+      minimum_8_characters: '8 أحرف على الأقل مع حرف كبير وصغير ورقم ورمز',
       enter_your_password: 'أدخل كلمة المرور', // nosec CWE-798 CWE-259 - UI translation label, not a credential
       create_a_secure_password: 'أنشئ كلمة مرور آمنة', // nosec CWE-798 CWE-259 - UI translation label, not a credential
       forgot_password: 'نسيت كلمة المرور؟', // nosec CWE-798 CWE-259 - UI translation label, not a credential
@@ -83,6 +85,8 @@ export const waselAuth = {
       error_signup_failed: 'فشل إنشاء الحساب. الرجاء المحاولة مرة أخرى.',
       error_google_failed: 'فشل تسجيل الدخول عبر جوجل. الرجاء المحاولة مرة أخرى.',
       error_facebook_failed: 'فشل تسجيل الدخول عبر فيسبوك. الرجاء المحاولة مرة أخرى.',
+      error_microsoft_failed: 'فشل تسجيل الدخول عبر مايكروسوفت. الرجاء المحاولة مرة أخرى.',
+      error_apple_failed: 'فشل تسجيل الدخول عبر أبل. الرجاء المحاولة مرة أخرى.',
       error_reset_failed: 'فشلت إعادة تعيين كلمة المرور.', // nosec CWE-798 CWE-259 - UI translation label, not a credential
       sign_in: 'تسجيل الدخول',
       create_account: 'إنشاء حساب',

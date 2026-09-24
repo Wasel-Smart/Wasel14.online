@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AuthChangeEvent, Session, User } from '@supabase/auth-js';
 import { getAuthCallbackUrl, resolveAuthRedirectOrigin } from '../../utils/env';
+import { authAPI } from '../../services/auth';
 import { sanitizeLogMessage } from '../../utils/sanitization';
 import { parseOAuthError } from '../../utils/oauthErrors';
 import { sessionManager } from '../../utils/sessionManager';
@@ -117,7 +118,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       ).trim();
 
       try {
-        const { authAPI } = await import('../../services/auth');
         await authAPI.createProfile({
           userId: activeUser.id,
           email: activeUser.email ?? '',
@@ -299,7 +299,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setIsSubmitting(true);
       try {
-        const { authAPI } = await import('../../services/auth');
         const data = await authAPI.signUp({
           email, password,
           firstName,
@@ -333,7 +332,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     async (email: string, password: string): Promise<{ error: AuthOperationError }> => {
       setIsSubmitting(true);
       try {
-        const { authAPI } = await import('../../services/auth');
         const data = await authAPI.signIn(email, password);
         const authUser = data.user ?? data.session?.user ?? null;
 
@@ -395,7 +393,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = useCallback(async () => {
     setIsSubmitting(true);
     try {
-      const { authAPI } = await import('../../services/auth');
       await authAPI.signOut();
       setUser(null);
       setProfile(null);
@@ -418,7 +415,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setIsSubmitting(true);
       try {
-        const { authAPI } = await import('../../services/auth');
         const result = await authAPI.updateProfile(updates);
         if (result.success) {
           setProfile(prev => (prev ? { ...prev, ...updates } : prev));
