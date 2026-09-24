@@ -61,34 +61,34 @@ alter table public.data_export_requests enable row level security;
 alter table public.data_deletion_requests enable row level security;
 
 -- RLS Policies for user_consents
-create policy "Users can view their own consents"
-  on public.user_consents for select
+DROP POLICY IF EXISTS "Users can view their own consents" ON public.user_consents;
+CREATE POLICY "Users can view their own consents" ON public.user_consents for select
   using (auth.uid() = user_id);
 
-create policy "Users can insert their own consents"
-  on public.user_consents for insert
+DROP POLICY IF EXISTS "Users can insert their own consents" ON public.user_consents;
+CREATE POLICY "Users can insert their own consents" ON public.user_consents for insert
   with check (auth.uid() = user_id);
 
 -- RLS Policies for data_export_requests
-create policy "Users can view their own export requests"
-  on public.data_export_requests for select
+DROP POLICY IF EXISTS "Users can view their own export requests" ON public.data_export_requests;
+CREATE POLICY "Users can view their own export requests" ON public.data_export_requests for select
   using (auth.uid() = user_id);
 
-create policy "Users can create export requests"
-  on public.data_export_requests for insert
+DROP POLICY IF EXISTS "Users can create export requests" ON public.data_export_requests;
+CREATE POLICY "Users can create export requests" ON public.data_export_requests for insert
   with check (auth.uid() = user_id);
 
 -- RLS Policies for data_deletion_requests
-create policy "Users can view their own deletion requests"
-  on public.data_deletion_requests for select
+DROP POLICY IF EXISTS "Users can view their own deletion requests" ON public.data_deletion_requests;
+CREATE POLICY "Users can view their own deletion requests" ON public.data_deletion_requests for select
   using (auth.uid() = user_id);
 
-create policy "Users can create deletion requests"
-  on public.data_deletion_requests for insert
+DROP POLICY IF EXISTS "Users can create deletion requests" ON public.data_deletion_requests;
+CREATE POLICY "Users can create deletion requests" ON public.data_deletion_requests for insert
   with check (auth.uid() = user_id);
 
-create policy "Users can cancel their deletion requests"
-  on public.data_deletion_requests for update
+DROP POLICY IF EXISTS "Users can cancel their deletion requests" ON public.data_deletion_requests;
+CREATE POLICY "Users can cancel their deletion requests" ON public.data_deletion_requests for update
   using (auth.uid() = user_id and status = 'pending')
   with check (status = 'cancelled');
 

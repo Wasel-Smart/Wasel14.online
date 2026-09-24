@@ -21,7 +21,8 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_trigger WHERE tgname = 'trg_notifications_updated_at'
   ) THEN
-    CREATE TRIGGER trg_notifications_updated_at
+    DROP TRIGGER IF EXISTS trg_notifications_updated_at ON public.notifications;
+CREATE TRIGGER trg_notifications_updated_at
     BEFORE UPDATE ON public.notifications
     FOR EACH ROW
     EXECUTE FUNCTION public.set_updated_at();

@@ -9,6 +9,85 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
+
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'trips') THEN
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS rider_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS vehicle_id UUID REFERENCES public.vehicles(id);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS trip_type TEXT DEFAULT 'ride';
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS pickup_location GEOGRAPHY(POINT);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS pickup_address TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS dropoff_location GEOGRAPHY(POINT);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS dropoff_address TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS actual_dropoff_location GEOGRAPHY(POINT);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS route_polyline TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS distance_km DECIMAL(10, 2);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS estimated_duration_minutes INTEGER;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS actual_duration_minutes INTEGER;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS base_fare DECIMAL(10, 2) DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS distance_fare DECIMAL(10, 2) DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS time_fare DECIMAL(10, 2) DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS surge_multiplier DECIMAL(3, 2) DEFAULT 1.00;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10, 2) DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS promo_code TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS total_fare DECIMAL(10, 2) DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS commission DECIMAL(10, 2) DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS driver_earnings DECIMAL(10, 2) DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'JOD';
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'cash';
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'pending';
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS payment_intent_id TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS requested_at TIMESTAMPTZ DEFAULT NOW();
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS pickup_at TIMESTAMPTZ;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS rider_rating INTEGER;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS driver_rating INTEGER;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS rider_review TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS driver_review TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS special_requirements JSONB DEFAULT '{}';
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS passenger_count INTEGER DEFAULT 1;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS luggage_count INTEGER DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles') THEN
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'rider';
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS first_name TEXT;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_name TEXT;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
+    ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'transactions') THEN
+    ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS trip_id UUID REFERENCES public.trips(id);
+    ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS stripe_charge_id TEXT;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'reviews') THEN
+    ALTER TABLE public.reviews ADD COLUMN IF NOT EXISTS rating INTEGER;
+    ALTER TABLE public.reviews ADD COLUMN IF NOT EXISTS review TEXT;
+    ALTER TABLE public.reviews ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT FALSE;
+    ALTER TABLE public.reviews ADD COLUMN IF NOT EXISTS review_type TEXT;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'messages') THEN
+    ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS message TEXT;
+    ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'notifications') THEN
+    ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS data JSONB DEFAULT '{}';
+  END IF;
+
+END $$;
+
 -- ─────────────────────────────────────────────────────────────
 -- 👤 Users & Profiles
 -- ─────────────────────────────────────────────────────────────
@@ -87,6 +166,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
 );
 
 -- Add FK from drivers to vehicles
+ALTER TABLE drivers DROP CONSTRAINT IF EXISTS fk_drivers_vehicle;
 ALTER TABLE drivers ADD CONSTRAINT fk_drivers_vehicle 
   FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE SET NULL;
 
@@ -165,11 +245,11 @@ CREATE TABLE IF NOT EXISTS trips (
 );
 
 -- Indexes for trip queries
-CREATE INDEX idx_trips_rider_id ON trips(rider_id);
-CREATE INDEX idx_trips_driver_id ON trips(driver_id);
-CREATE INDEX idx_trips_status ON trips(status);
-CREATE INDEX idx_trips_created_at ON trips(created_at DESC);
-CREATE INDEX idx_trips_pickup_location ON trips USING GIST(pickup_location);
+CREATE INDEX IF NOT EXISTS idx_trips_rider_id ON trips(rider_id);
+CREATE INDEX IF NOT EXISTS idx_trips_driver_id ON trips(driver_id);
+CREATE INDEX IF NOT EXISTS idx_trips_status ON trips(status);
+CREATE INDEX IF NOT EXISTS idx_trips_created_at ON trips(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_trips_pickup_location ON trips USING GIST(pickup_location);
 
 -- ─────────────────────────────────────────────────────────────
 -- 💳 Payments & Transactions
@@ -192,9 +272,9 @@ CREATE TABLE IF NOT EXISTS transactions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_transactions_user_id ON transactions(user_id);
-CREATE INDEX idx_transactions_trip_id ON transactions(trip_id);
-CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_trip_id ON transactions(trip_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────
 -- 💰 Wallets
@@ -233,7 +313,7 @@ CREATE TABLE IF NOT EXISTS promo_codes (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_promo_codes_code ON promo_codes(code);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_code ON promo_codes(code);
 
 -- ─────────────────────────────────────────────────────────────
 -- ⭐ Reviews & Ratings
@@ -252,8 +332,8 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_reviews_reviewee_id ON reviews(reviewee_id);
-CREATE INDEX idx_reviews_rating ON reviews(rating);
+CREATE INDEX IF NOT EXISTS idx_reviews_reviewee_id ON reviews(reviewee_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON reviews(rating);
 
 -- ─────────────────────────────────────────────────────────────
 -- 💬 Chat & Messaging
@@ -284,8 +364,8 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
-CREATE INDEX idx_messages_created_at ON messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS typing_indicators (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -312,8 +392,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS push_tokens (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -427,7 +507,7 @@ CREATE TABLE IF NOT EXISTS api_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_api_logs_created_at ON api_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_logs_created_at ON api_logs(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS error_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -439,8 +519,8 @@ CREATE TABLE IF NOT EXISTS error_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_error_logs_severity ON error_logs(severity);
-CREATE INDEX idx_error_logs_created_at ON error_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_error_logs_severity ON error_logs(severity);
+CREATE INDEX IF NOT EXISTS idx_error_logs_created_at ON error_logs(created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────
 -- ⚙️ System Tables
@@ -478,15 +558,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply to all tables with updated_at
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_drivers_updated_at ON drivers;
 CREATE TRIGGER update_drivers_updated_at BEFORE UPDATE ON drivers
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_vehicles_updated_at ON vehicles;
 CREATE TRIGGER update_vehicles_updated_at BEFORE UPDATE ON vehicles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_trips_updated_at ON trips;
 CREATE TRIGGER update_trips_updated_at BEFORE UPDATE ON trips
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -510,6 +594,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -528,31 +613,31 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: Users can read all profiles, but only update their own
-CREATE POLICY "Public profiles are viewable by everyone"
-  ON profiles FOR SELECT
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
+CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT
   USING (true);
 
-CREATE POLICY "Users can update own profile"
-  ON profiles FOR UPDATE
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE
   USING (auth.uid() = id);
 
 -- Trips: Users can see their own trips
-CREATE POLICY "Users can view own trips"
-  ON trips FOR SELECT
+DROP POLICY IF EXISTS "Users can view own trips" ON trips;
+CREATE POLICY "Users can view own trips" ON trips FOR SELECT
   USING (auth.uid() = rider_id OR auth.uid() = driver_id);
 
 -- Messages: Users can see messages in their conversations
-CREATE POLICY "Users can view own messages"
-  ON messages FOR SELECT
+DROP POLICY IF EXISTS "Users can view own messages" ON messages;
+CREATE POLICY "Users can view own messages" ON messages FOR SELECT
   USING (auth.uid() = sender_id OR auth.uid() = recipient_id);
 
-CREATE POLICY "Users can send messages"
-  ON messages FOR INSERT
+DROP POLICY IF EXISTS "Users can send messages" ON messages;
+CREATE POLICY "Users can send messages" ON messages FOR INSERT
   WITH CHECK (auth.uid() = sender_id);
 
 -- Notifications: Users can see their own notifications
-CREATE POLICY "Users can view own notifications"
-  ON notifications FOR SELECT
+DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;
+CREATE POLICY "Users can view own notifications" ON notifications FOR SELECT
   USING (auth.uid() = user_id);
 
 -- ═══════════════════════════════════════════════════════════

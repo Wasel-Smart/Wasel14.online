@@ -340,7 +340,7 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_bookings_prevent_deleted_trip on public.bookings;
+DROP TRIGGER IF EXISTS trg_bookings_prevent_deleted_trip ON public.bookings;
 create trigger trg_bookings_prevent_deleted_trip
   before insert on public.bookings
   for each row
@@ -360,7 +360,7 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_trips_prevent_past_departure on public.trips;
+DROP TRIGGER IF EXISTS trg_trips_prevent_past_departure ON public.trips;
 create trigger trg_trips_prevent_past_departure
   before insert on public.trips
   for each row
@@ -507,8 +507,8 @@ on conflict (item_name) do nothing;
 
 alter table public.deployment_checklist enable row level security;
 
-create policy "Only admins can manage deployment checklist"
-  on public.deployment_checklist for all
+DROP POLICY IF EXISTS "Only admins can manage deployment checklist" ON public.deployment_checklist;
+CREATE POLICY "Only admins can manage deployment checklist" ON public.deployment_checklist for all
   using (public.is_admin())
   with check (public.is_admin());
 

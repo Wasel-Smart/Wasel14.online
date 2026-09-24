@@ -33,13 +33,13 @@ RETURNS TABLE (
 BEGIN
   RETURN QUERY
   SELECT 
-    schemaname || '.' || tablename AS table_name,
+    schemaname || '.' || relname AS table_name,
     n_live_tup AS row_count,
     last_vacuum AS last_updated,
-    pg_total_relation_size(schemaname || '.' || tablename)::NUMERIC / (1024*1024) AS size_mb
+    pg_total_relation_size(schemaname || '.' || relname)::NUMERIC / (1024*1024) AS size_mb
   FROM pg_stat_user_tables
   WHERE schemaname = 'public'
-  ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC;
+  ORDER BY pg_total_relation_size(schemaname || '.' || relname) DESC;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS backup_logs (
   duration_seconds INTEGER
 );
 
--- Create index for monitoring
+-- CREATE INDEX IF NOT EXISTS for monitoring
 CREATE INDEX IF NOT EXISTS idx_backup_logs_status ON backup_logs(status, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_backup_logs_completed ON backup_logs(completed_at DESC);
 
@@ -85,7 +85,7 @@ BEGIN
   -- Calculate statistics
   SELECT 
     SUM(n_live_tup),
-    SUM(pg_total_relation_size(schemaname || '.' || tablename))::NUMERIC / (1024*1024)
+    SUM(pg_total_relation_size(schemaname || '.' || relname))::NUMERIC / (1024*1024)
   INTO v_total_rows, v_total_size
   FROM pg_stat_user_tables
   WHERE schemaname = 'public';
@@ -196,7 +196,7 @@ GRANT EXECUTE ON FUNCTION create_critical_data_snapshot() TO service_role;
 -- INITIAL BACKUP LOG
 -- ============================================================================
 
-SELECT log_backup('manual', 'completed', ARRAY['initial_setup'], NULL);
+-- SELECT log_backup('manual', 'completed', ARRAY['initial_setup'], NULL);
 
 -- ============================================================================
 -- BACKUP INSTRUCTIONS

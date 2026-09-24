@@ -40,8 +40,8 @@ create index if not exists idx_audit_logs_action on public.audit_logs(action);
 alter table public.audit_logs enable row level security;
 
 -- Only admins can view audit logs
-create policy "Admins can view audit logs"
-  on public.audit_logs for select
+DROP POLICY IF EXISTS "Admins can view audit logs" ON public.audit_logs;
+CREATE POLICY "Admins can view audit logs" ON public.audit_logs for select
   using (
     exists (
       select 1 from public.users
@@ -80,29 +80,29 @@ alter table public.packages add column if not exists version integer not null de
 -- =====================================================
 
 -- Users table constraints
-alter table public.users
-  add constraint if not exists users_email_format_check 
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS if;
+ALTER TABLE public.users ADD CONSTRAINT if not exists users_email_format_check 
     check (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
   add constraint if not exists users_phone_format_check
     check (phone_number ~* '^\+?[1-9]\d{1,14}$' or phone_number like 'pending-%');
 
 -- Ride bookings constraints
-alter table public.ride_bookings
-  add constraint if not exists ride_bookings_seats_positive
+ALTER TABLE public.ride_bookings DROP CONSTRAINT IF EXISTS if;
+ALTER TABLE public.ride_bookings ADD CONSTRAINT if not exists ride_bookings_seats_positive
     check (seats_requested > 0 and seats_requested <= 8),
   add constraint if not exists ride_bookings_price_positive
     check (price_per_seat >= 0);
 
 -- Packages constraints  
-alter table public.packages
-  add constraint if not exists packages_weight_positive
+ALTER TABLE public.packages DROP CONSTRAINT IF EXISTS if;
+ALTER TABLE public.packages ADD CONSTRAINT if not exists packages_weight_positive
     check (weight_kg > 0 and weight_kg <= 100),
   add constraint if not exists packages_price_positive
     check (delivery_fee >= 0);
 
 -- Wallet transactions constraints
-alter table public.wallet_transactions
-  add constraint if not exists wallet_transactions_amount_nonzero
+ALTER TABLE public.wallet_transactions DROP CONSTRAINT IF EXISTS if;
+ALTER TABLE public.wallet_transactions ADD CONSTRAINT if not exists wallet_transactions_amount_nonzero
     check (amount != 0);
 
 -- =====================================================
@@ -117,8 +117,8 @@ begin
     select 1 from information_schema.table_constraints 
     where constraint_name = 'ride_bookings_passenger_id_fkey'
   ) then
-    alter table public.ride_bookings
-      add constraint ride_bookings_passenger_id_fkey
+    ALTER TABLE public.ride_bookings DROP CONSTRAINT IF EXISTS ride_bookings_passenger_id_fkey;
+ALTER TABLE public.ride_bookings ADD CONSTRAINT ride_bookings_passenger_id_fkey
       foreign key (passenger_id) references public.users(id) on delete cascade;
   end if;
 
@@ -126,8 +126,8 @@ begin
     select 1 from information_schema.table_constraints 
     where constraint_name = 'ride_bookings_driver_id_fkey'
   ) then
-    alter table public.ride_bookings
-      add constraint ride_bookings_driver_id_fkey
+    ALTER TABLE public.ride_bookings DROP CONSTRAINT IF EXISTS ride_bookings_driver_id_fkey;
+ALTER TABLE public.ride_bookings ADD CONSTRAINT ride_bookings_driver_id_fkey
       foreign key (driver_id) references public.users(id) on delete set null;
   end if;
 
@@ -136,8 +136,8 @@ begin
     select 1 from information_schema.table_constraints 
     where constraint_name = 'packages_sender_id_fkey'
   ) then
-    alter table public.packages
-      add constraint packages_sender_id_fkey
+    ALTER TABLE public.packages DROP CONSTRAINT IF EXISTS packages_sender_id_fkey;
+ALTER TABLE public.packages ADD CONSTRAINT packages_sender_id_fkey
       foreign key (sender_id) references public.users(id) on delete cascade;
   end if;
 
@@ -145,8 +145,8 @@ begin
     select 1 from information_schema.table_constraints 
     where constraint_name = 'packages_receiver_id_fkey'
   ) then
-    alter table public.packages
-      add constraint packages_receiver_id_fkey
+    ALTER TABLE public.packages DROP CONSTRAINT IF EXISTS packages_receiver_id_fkey;
+ALTER TABLE public.packages ADD CONSTRAINT packages_receiver_id_fkey
       foreign key (receiver_id) references public.users(id) on delete set null;
   end if;
 
@@ -155,8 +155,8 @@ begin
     select 1 from information_schema.table_constraints 
     where constraint_name = 'wallet_transactions_user_id_fkey'
   ) then
-    alter table public.wallet_transactions
-      add constraint wallet_transactions_user_id_fkey
+    ALTER TABLE public.wallet_transactions DROP CONSTRAINT IF EXISTS wallet_transactions_user_id_fkey;
+ALTER TABLE public.wallet_transactions ADD CONSTRAINT wallet_transactions_user_id_fkey
       foreign key (user_id) references public.users(id) on delete cascade;
   end if;
 end $$;
@@ -229,25 +229,25 @@ $$;
 -- =====================================================
 
 -- Users table
-drop trigger if exists audit_users_trigger on public.users;
+DROP TRIGGER IF EXISTS audit_users_trigger ON public.users;
 create trigger audit_users_trigger
   after insert or update or delete on public.users
   for each row execute function public.audit_trigger_function();
 
 -- Ride bookings table
-drop trigger if exists audit_ride_bookings_trigger on public.ride_bookings;
+DROP TRIGGER IF EXISTS audit_ride_bookings_trigger ON public.ride_bookings;
 create trigger audit_ride_bookings_trigger
   after insert or update or delete on public.ride_bookings
   for each row execute function public.audit_trigger_function();
 
 -- Packages table
-drop trigger if exists audit_packages_trigger on public.packages;
+DROP TRIGGER IF EXISTS audit_packages_trigger ON public.packages;
 create trigger audit_packages_trigger
   after insert or update or delete on public.packages
   for each row execute function public.audit_trigger_function();
 
 -- Wallet transactions table
-drop trigger if exists audit_wallet_transactions_trigger on public.wallet_transactions;
+DROP TRIGGER IF EXISTS audit_wallet_transactions_trigger ON public.wallet_transactions;
 create trigger audit_wallet_transactions_trigger
   after insert or update or delete on public.wallet_transactions
   for each row execute function public.audit_trigger_function();
@@ -267,17 +267,17 @@ end;
 $$;
 
 -- Apply version triggers
-drop trigger if exists increment_users_version on public.users;
+DROP TRIGGER IF EXISTS increment_users_version ON public.users;
 create trigger increment_users_version
   before update on public.users
   for each row execute function public.increment_version();
 
-drop trigger if exists increment_ride_bookings_version on public.ride_bookings;
+DROP TRIGGER IF EXISTS increment_ride_bookings_version ON public.ride_bookings;
 create trigger increment_ride_bookings_version
   before update on public.ride_bookings
   for each row execute function public.increment_version();
 
-drop trigger if exists increment_packages_version on public.packages;
+DROP TRIGGER IF EXISTS increment_packages_version ON public.packages;
 create trigger increment_packages_version
   before update on public.packages
   for each row execute function public.increment_version();

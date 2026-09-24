@@ -18,8 +18,8 @@ begin
   end if;
 end $$;
 
-alter table public.wallets
-  add constraint wallets_currency_code_check
+ALTER TABLE public.wallets DROP CONSTRAINT IF EXISTS wallets_currency_code_check;
+ALTER TABLE public.wallets ADD CONSTRAINT wallets_currency_code_check
   check (currency_code in ('JOD', 'IQD', 'USD', 'EUR'));
 
 -- ── Region config table ───────────────────────────────────────────────────────
@@ -49,12 +49,12 @@ on conflict (region_code) do update set
 
 alter table public.region_config enable row level security;
 
-create policy "Anyone can read active regions"
-  on public.region_config for select
+DROP POLICY IF EXISTS "Anyone can read active regions" ON public.region_config;
+CREATE POLICY "Anyone can read active regions" ON public.region_config for select
   using (is_active = true);
 
-create policy "Admins manage regions"
-  on public.region_config for all
+DROP POLICY IF EXISTS "Admins manage regions" ON public.region_config;
+CREATE POLICY "Admins manage regions" ON public.region_config for all
   using (public.is_admin())
   with check (public.is_admin());
 
@@ -106,8 +106,8 @@ create index if not exists idx_supported_cities_region
 
 alter table public.supported_cities enable row level security;
 
-create policy "Anyone can read active cities"
-  on public.supported_cities for select
+DROP POLICY IF EXISTS "Anyone can read active cities" ON public.supported_cities;
+CREATE POLICY "Anyone can read active cities" ON public.supported_cities for select
   using (is_active = true);
 
 grant select on public.supported_cities to anon, authenticated;

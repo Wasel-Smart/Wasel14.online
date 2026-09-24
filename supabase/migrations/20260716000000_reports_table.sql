@@ -17,12 +17,12 @@ create index if not exists idx_reports_status on public.reports(status, created_
 
 alter table public.reports enable row level security;
 
-create policy "Reporters can insert their own reports"
-  on public.reports for insert
+DROP POLICY IF EXISTS "Reporters can insert their own reports" ON public.reports;
+CREATE POLICY "Reporters can insert their own reports" ON public.reports for insert
   with check (reporter_id = auth.uid());
 
-create policy "Reporters can view their own reports"
-  on public.reports for select
+DROP POLICY IF EXISTS "Reporters can view their own reports" ON public.reports;
+CREATE POLICY "Reporters can view their own reports" ON public.reports for select
   using (reporter_id = auth.uid());
 
 grant select, insert on public.reports to authenticated;

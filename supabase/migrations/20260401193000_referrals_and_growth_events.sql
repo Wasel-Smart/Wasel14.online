@@ -27,9 +27,8 @@ create index if not exists referrals_code_idx on public.referrals (referral_code
 
 alter table public.referrals enable row level security;
 
-drop policy if exists "referrals_select_own" on public.referrals;
-create policy "referrals_select_own"
-on public.referrals
+DROP POLICY IF EXISTS "referrals_select_own" ON public.referrals;
+CREATE POLICY "referrals_select_own" ON public.referrals
 for select
 using (
   auth.uid() in (
@@ -39,9 +38,8 @@ using (
   )
 );
 
-drop policy if exists "referrals_insert_referee" on public.referrals;
-create policy "referrals_insert_referee"
-on public.referrals
+DROP POLICY IF EXISTS "referrals_insert_referee" ON public.referrals;
+CREATE POLICY "referrals_insert_referee" ON public.referrals
 for insert
 with check (
   auth.uid() in (
@@ -49,9 +47,8 @@ with check (
   )
 );
 
-drop policy if exists "referrals_update_participants" on public.referrals;
-create policy "referrals_update_participants"
-on public.referrals
+DROP POLICY IF EXISTS "referrals_update_participants" ON public.referrals;
+CREATE POLICY "referrals_update_participants" ON public.referrals
 for update
 using (
   auth.uid() in (
@@ -79,9 +76,8 @@ create index if not exists growth_events_service_idx on public.growth_events (se
 
 alter table public.growth_events enable row level security;
 
-drop policy if exists "growth_events_select_own" on public.growth_events;
-create policy "growth_events_select_own"
-on public.growth_events
+DROP POLICY IF EXISTS "growth_events_select_own" ON public.growth_events;
+CREATE POLICY "growth_events_select_own" ON public.growth_events
 for select
 using (
   user_id is null
@@ -90,9 +86,8 @@ using (
   )
 );
 
-drop policy if exists "growth_events_insert_own" on public.growth_events;
-create policy "growth_events_insert_own"
-on public.growth_events
+DROP POLICY IF EXISTS "growth_events_insert_own" ON public.growth_events;
+CREATE POLICY "growth_events_insert_own" ON public.growth_events
 for insert
 with check (
   user_id is null

@@ -20,6 +20,7 @@ CREATE INDEX IF NOT EXISTS dead_letter_messages_topic_idx
 ALTER TABLE public.dead_letter_messages ENABLE ROW LEVEL SECURITY;
 
 -- Only service-role (via edge functions) may insert dead letters.
+DROP POLICY IF EXISTS "deny_direct_client_access" ON public.dead_letter_messages;
 CREATE POLICY "deny_direct_client_access" ON public.dead_letter_messages
   FOR ALL TO anon, authenticated
   USING (false);

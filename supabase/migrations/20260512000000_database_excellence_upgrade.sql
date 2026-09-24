@@ -210,8 +210,8 @@ create index if not exists idx_rate_limits_blocked_until
 
 alter table public.rate_limits enable row level security;
 
-create policy "Users can view their own rate limits"
-  on public.rate_limits for select
+DROP POLICY IF EXISTS "Users can view their own rate limits" ON public.rate_limits;
+CREATE POLICY "Users can view their own rate limits" ON public.rate_limits for select
   using (user_id = public.current_user_id());
 
 -- Rate limiting function
@@ -313,18 +313,18 @@ create index if not exists idx_drivers_pending_approval
 -- =====================================================
 
 -- Add NOT VALID constraints first (no table lock)
-alter table public.users
-  add constraint if not exists users_phone_e164_format
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS if;
+ALTER TABLE public.users ADD CONSTRAINT if not exists users_phone_e164_format
   check (phone_number ~ '^\+?[1-9]\d{1,14}$' or phone_number like 'pending-%')
   not valid;
 
-alter table public.bookings
-  add constraint if not exists bookings_amount_matches_calculation
+ALTER TABLE public.bookings DROP CONSTRAINT IF EXISTS if;
+ALTER TABLE public.bookings ADD CONSTRAINT if not exists bookings_amount_matches_calculation
   check (amount = price_per_seat * seats_requested)
   not valid;
 
-alter table public.transactions
-  add constraint if not exists transactions_metadata_is_object
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS if;
+ALTER TABLE public.transactions ADD CONSTRAINT if not exists transactions_metadata_is_object
   check (jsonb_typeof(metadata) = 'object')
   not valid;
 
@@ -473,8 +473,8 @@ create index if not exists idx_slow_query_log_execution_time
 
 alter table public.slow_query_log enable row level security;
 
-create policy "Only admins can view slow queries"
-  on public.slow_query_log for select
+DROP POLICY IF EXISTS "Only admins can view slow queries" ON public.slow_query_log;
+CREATE POLICY "Only admins can view slow queries" ON public.slow_query_log for select
   using (public.is_admin());
 
 -- Function to log slow queries (called by application)
@@ -530,7 +530,7 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_wallets_prevent_negative on public.wallets;
+DROP TRIGGER IF EXISTS trg_wallets_prevent_negative ON public.wallets;
 create trigger trg_wallets_prevent_negative
   before update on public.wallets
   for each row
@@ -559,7 +559,7 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_trips_validate_capacity on public.trips;
+DROP TRIGGER IF EXISTS trg_trips_validate_capacity ON public.trips;
 create trigger trg_trips_validate_capacity
   before insert or update on public.trips
   for each row
@@ -594,8 +594,8 @@ on conflict (table_name) do nothing;
 
 alter table public.data_retention_policies enable row level security;
 
-create policy "Only admins can manage retention policies"
-  on public.data_retention_policies for all
+DROP POLICY IF EXISTS "Only admins can manage retention policies" ON public.data_retention_policies;
+CREATE POLICY "Only admins can manage retention policies" ON public.data_retention_policies for all
   using (public.is_admin())
   with check (public.is_admin());
 

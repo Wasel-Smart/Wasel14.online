@@ -48,7 +48,8 @@ begin
       and trigger_name        = 'trg_wallets_updated_at'
   ) then
     execute $t$
-      create trigger trg_wallets_updated_at
+      DROP TRIGGER IF EXISTS trg_wallets_updated_at ON public.wallets;
+create trigger trg_wallets_updated_at
         before update on public.wallets
         for each row
         execute function public.set_updated_at()

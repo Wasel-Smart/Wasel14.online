@@ -34,8 +34,8 @@ create table if not exists public.subscriptions (
 
 alter table public.subscriptions enable row level security;
 
-drop policy if exists subscriptions_owner_select on public.subscriptions;
-create policy subscriptions_owner_select on public.subscriptions
+DROP POLICY IF EXISTS subscriptions_owner_select ON public.subscriptions;
+CREATE POLICY subscriptions_owner_select ON public.subscriptions
   for select
   using (user_id = public.current_user_id() or public.is_admin());
 

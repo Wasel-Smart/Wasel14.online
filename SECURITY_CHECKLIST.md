@@ -20,10 +20,10 @@ sensitive values were found in local environment files.
 | `STRIPE_SECRET_KEY` | Stripe Dashboard → Developers → API Keys → reveal & rotate | ❌ Rotate now |
 | `STRIPE_WEBHOOK_SECRET` | Stripe Dashboard → Developers → Webhooks → rotate | ❌ Rotate now |
 | `VITE_GOOGLE_CLIENT_ID` / `SUPABASE_AUTH_GOOGLE_CLIENT_ID` | [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) | ❌ Verify scope |
-| `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET` | Google Cloud Console → OAuth Client → regenerate | ❌ Rotate now |
+| `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET` | Google Cloud Console → OAuth Client → regenerate | ⚠️ Redacted from `.env`/`.env.production` working tree 2026-09-21 (placeholder now) — old value may still be LIVE until you regenerate it in Google Cloud Console |
 | `docs/wasel-planning-with-ai.json` (service account private key) | [Google Cloud Console → IAM → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) → delete key → create new key | ❌ Rotate & remove from repo |
 | `VITE_FACEBOOK_APP_ID` / `SUPABASE_AUTH_FACEBOOK_CLIENT_ID` | [Meta for Developers → App Settings → Security](https://developers.facebook.com/) | ❌ Verify scope |
-| `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET` | Meta for Developers → regenerate | ❌ Rotate now |
+| `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET` | Meta for Developers → regenerate | ⚠️ Redacted from `.env`/`.env.production` working tree 2026-09-21 (placeholder now) — old value may still be LIVE until you regenerate it in Meta for Developers |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/_/settings/api) | ❌ Roll key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Settings → API → regenerate | ❌ Rotate now |
 | `VERCEL_OIDC_TOKEN` (full JWT in `.env.local`) | Vercel Dashboard → Settings → Tokens | ❌ Revoke & regenerate |
@@ -62,18 +62,22 @@ sensitive values were found in local environment files.
 
 ---
 
-## Session update (file-level verification only, no exec access)
+## Session update — 2026-09-21 (file-level verification only, no exec access)
 
 - `docs/wasel-planning-with-ai.json` (the real service account key) is
-  **no longer present in the working tree** — only the `.example` placeholder
+  **still not present in the working tree** — only the `.example` placeholder
   remains. It may still be in git history; the `git filter-repo`/BFG
   commands above under "Repository hardening" still need to be run and
   confirmed by a human with push access.
-- The Google OAuth `client_secret_*.json` sits in
-  `_SECRETS_NEEDS_ROTATION_THEN_DELETE/` — never committed to git (lower
-  severity than the service-account key), but still on disk inside a
-  OneDrive-synced folder.
-- Full status tracker for that specific file lives at
-  `_SECRETS_NEEDS_ROTATION_THEN_DELETE/ROTATION_CHECKLIST.md` (short pointer
-  back to this document — this file remains the canonical checklist).
-- No credential in this table has been confirmed rotated as of this session.
+- `_SECRETS_NEEDS_ROTATION_THEN_DELETE/` **no longer exists** — confirmed
+  deleted from the working tree (the two conflicting notes about this in the
+  prior version of this file are resolved: it is gone, full stop).
+- The two live secrets that actually remained on disk — the Google and
+  Facebook OAuth client secrets in root `.env` and `.env.production` — have
+  been redacted to placeholders in the working tree. **This is not
+  rotation.** The old values are unchanged in Google Cloud Console / Meta
+  for Developers and will keep working until you regenerate them there.
+- No credential in this table has been confirmed rotated (i.e. invalidated
+  at the provider) as of this session — redaction from local files and
+  provider-side rotation are two different things, and only the first one
+  has been done here.

@@ -15,8 +15,8 @@
 ALTER TABLE kv_store_0b1f4071 ENABLE ROW LEVEL SECURITY;
 
 -- Allow users to access their own KV data
-CREATE POLICY "Users can access their own KV data"
-  ON kv_store_0b1f4071 FOR ALL
+DROP POLICY IF EXISTS "Users can access their own KV data" ON kv_store_0b1f4071;
+CREATE POLICY "Users can access their own KV data" ON kv_store_0b1f4071 FOR ALL
   USING (
     key LIKE 'user:' || auth.uid()::TEXT || ':%' OR
     key LIKE 'profile:' || auth.uid()::TEXT OR
@@ -25,8 +25,8 @@ CREATE POLICY "Users can access their own KV data"
   );
 
 -- Allow system to access shared/public KV data
-CREATE POLICY "System can access shared KV data"
-  ON kv_store_0b1f4071 FOR ALL
+DROP POLICY IF EXISTS "System can access shared KV data" ON kv_store_0b1f4071;
+CREATE POLICY "System can access shared KV data" ON kv_store_0b1f4071 FOR ALL
   USING (
     key LIKE 'system:%' OR
     key LIKE 'trip:%' OR
@@ -37,8 +37,8 @@ CREATE POLICY "System can access shared KV data"
   );
 
 -- Allow service role to access everything
-CREATE POLICY "Service role can access all KV data"
-  ON kv_store_0b1f4071 FOR ALL
+DROP POLICY IF EXISTS "Service role can access all KV data" ON kv_store_0b1f4071;
+CREATE POLICY "Service role can access all KV data" ON kv_store_0b1f4071 FOR ALL
   TO service_role
   USING (true);
 
@@ -52,29 +52,29 @@ DROP POLICY IF EXISTS "Users can update their own trips" ON trips;
 DROP POLICY IF EXISTS "Users can delete their own trips" ON trips;
 
 -- Public can view published and active trips only
-CREATE POLICY "Public can view published trips"
-  ON trips FOR SELECT
+DROP POLICY IF EXISTS "Public can view published trips" ON trips;
+CREATE POLICY "Public can view published trips" ON trips FOR SELECT
   USING (status IN ('published', 'active') AND deleted_at IS NULL);
 
 -- Users can view their own trips (all statuses)
-CREATE POLICY "Users can view their own trips"
-  ON trips FOR SELECT
+DROP POLICY IF EXISTS "Users can view their own trips" ON trips;
+CREATE POLICY "Users can view their own trips" ON trips FOR SELECT
   USING (user_id = auth.uid());
 
 -- Users can create trips
-CREATE POLICY "Users can create trips"
-  ON trips FOR INSERT
+DROP POLICY IF EXISTS "Users can create trips" ON trips;
+CREATE POLICY "Users can create trips" ON trips FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
 -- Users can only update their own trips
-CREATE POLICY "Users can update their own trips"
-  ON trips FOR UPDATE
+DROP POLICY IF EXISTS "Users can update their own trips" ON trips;
+CREATE POLICY "Users can update their own trips" ON trips FOR UPDATE
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
 -- Users can only delete their own trips
-CREATE POLICY "Users can delete their own trips"
-  ON trips FOR DELETE
+DROP POLICY IF EXISTS "Users can delete their own trips" ON trips;
+CREATE POLICY "Users can delete their own trips" ON trips FOR DELETE
   USING (user_id = auth.uid());
 
 -- ── Bookings Table Security ─────────────────────────────────────────────────
@@ -88,25 +88,25 @@ DROP POLICY IF EXISTS "Trip owners can update booking status" ON bookings;
 DROP POLICY IF EXISTS "Passengers can cancel their bookings" ON bookings;
 
 -- Drivers can view bookings for their trips
-CREATE POLICY "Drivers can view bookings for their trips"
-  ON bookings FOR SELECT
+DROP POLICY IF EXISTS "Drivers can view bookings for their trips" ON bookings;
+CREATE POLICY "Drivers can view bookings for their trips" ON bookings FOR SELECT
   USING (
     trip_id IN (SELECT id FROM trips WHERE user_id = auth.uid())
   );
 
 -- Passengers can view their own bookings
-CREATE POLICY "Passengers can view their own bookings"
-  ON bookings FOR SELECT
+DROP POLICY IF EXISTS "Passengers can view their own bookings" ON bookings;
+CREATE POLICY "Passengers can view their own bookings" ON bookings FOR SELECT
   USING (passenger_id = auth.uid());
 
 -- Passengers can create bookings
-CREATE POLICY "Passengers can create bookings"
-  ON bookings FOR INSERT
+DROP POLICY IF EXISTS "Passengers can create bookings" ON bookings;
+CREATE POLICY "Passengers can create bookings" ON bookings FOR INSERT
   WITH CHECK (passenger_id = auth.uid() AND status = 'pending');
 
 -- Only trip owner can accept/reject bookings
-CREATE POLICY "Trip owners can update booking status"
-  ON bookings FOR UPDATE
+DROP POLICY IF EXISTS "Trip owners can update booking status" ON bookings;
+CREATE POLICY "Trip owners can update booking status" ON bookings FOR UPDATE
   USING (
     trip_id IN (SELECT id FROM trips WHERE user_id = auth.uid())
   )
@@ -116,8 +116,8 @@ CREATE POLICY "Trip owners can update booking status"
   );
 
 -- Passengers can cancel their own pending bookings
-CREATE POLICY "Passengers can cancel their bookings"
-  ON bookings FOR UPDATE
+DROP POLICY IF EXISTS "Passengers can cancel their bookings" ON bookings;
+CREATE POLICY "Passengers can cancel their bookings" ON bookings FOR UPDATE
   USING (
     passenger_id = auth.uid() AND 
     status = 'pending'
@@ -134,19 +134,19 @@ DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
 
 -- Public can view basic profile info (for trust scores, reviews)
-CREATE POLICY "Public profiles are viewable by everyone"
-  ON profiles FOR SELECT
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone" ON profiles;
+CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT
   USING (true);
 
 -- Users can update their own profile
-CREATE POLICY "Users can update their own profile"
-  ON profiles FOR UPDATE
+DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
+CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE
   USING (id = auth.uid())
   WITH CHECK (id = auth.uid());
 
 -- Users can insert their own profile (signup)
-CREATE POLICY "Users can insert their own profile"
-  ON profiles FOR INSERT
+DROP POLICY IF EXISTS "Users can insert their own profile" ON profiles;
+CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT
   WITH CHECK (id = auth.uid());
 
 -- ── Messages Table Security ─────────────────────────────────────────────────
@@ -156,16 +156,16 @@ DROP POLICY IF EXISTS "Users can view their messages" ON messages;
 DROP POLICY IF EXISTS "Users can send messages" ON messages;
 
 -- Users can view messages where they are sender or recipient
-CREATE POLICY "Users can view their messages"
-  ON messages FOR SELECT
+DROP POLICY IF EXISTS "Users can view their messages" ON messages;
+CREATE POLICY "Users can view their messages" ON messages FOR SELECT
   USING (
     sender_id = auth.uid() OR 
     recipient_id = auth.uid()
   );
 
 -- Users can send messages
-CREATE POLICY "Users can send messages"
-  ON messages FOR INSERT
+DROP POLICY IF EXISTS "Users can send messages" ON messages;
+CREATE POLICY "Users can send messages" ON messages FOR INSERT
   WITH CHECK (sender_id = auth.uid());
 
 -- ── Notifications Table Security ────────────────────────────────────────────
@@ -176,19 +176,19 @@ DROP POLICY IF EXISTS "System can create notifications" ON notifications;
 DROP POLICY IF EXISTS "Users can update their notifications" ON notifications;
 
 -- Users can view their own notifications
-CREATE POLICY "Users can view their notifications"
-  ON notifications FOR SELECT
+DROP POLICY IF EXISTS "Users can view their notifications" ON notifications;
+CREATE POLICY "Users can view their notifications" ON notifications FOR SELECT
   USING (user_id = auth.uid());
 
 -- Users can mark notifications as read
-CREATE POLICY "Users can update their notifications"
-  ON notifications FOR UPDATE
+DROP POLICY IF EXISTS "Users can update their notifications" ON notifications;
+CREATE POLICY "Users can update their notifications" ON notifications FOR UPDATE
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
 -- System (service role) can create notifications for anyone
-CREATE POLICY "System can create notifications"
-  ON notifications FOR INSERT
+DROP POLICY IF EXISTS "System can create notifications" ON notifications;
+CREATE POLICY "System can create notifications" ON notifications FOR INSERT
   TO service_role
   WITH CHECK (true);
 
@@ -199,13 +199,13 @@ DROP POLICY IF EXISTS "Public can view reviews" ON reviews;
 DROP POLICY IF EXISTS "Users can create reviews" ON reviews;
 
 -- Public can view all reviews (for trust scores)
-CREATE POLICY "Public can view reviews"
-  ON reviews FOR SELECT
+DROP POLICY IF EXISTS "Public can view reviews" ON reviews;
+CREATE POLICY "Public can view reviews" ON reviews FOR SELECT
   USING (true);
 
 -- Users can create reviews for trips they participated in
-CREATE POLICY "Users can create reviews"
-  ON reviews FOR INSERT
+DROP POLICY IF EXISTS "Users can create reviews" ON reviews;
+CREATE POLICY "Users can create reviews" ON reviews FOR INSERT
   WITH CHECK (
     reviewer_id = auth.uid() AND
     (

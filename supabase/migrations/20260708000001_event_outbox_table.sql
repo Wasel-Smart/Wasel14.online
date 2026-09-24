@@ -24,6 +24,7 @@ ALTER TABLE public.event_outbox ENABLE ROW LEVEL SECURITY;
 
 -- Service role bypasses RLS automatically; no explicit policy needed for it.
 -- Deny all direct client access — all writes go through the proxy edge function.
+DROP POLICY IF EXISTS "deny_direct_client_access" ON public.event_outbox;
 CREATE POLICY "deny_direct_client_access" ON public.event_outbox
   FOR ALL TO anon, authenticated
   USING (false);

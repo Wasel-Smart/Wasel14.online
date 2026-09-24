@@ -6,7 +6,91 @@
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+
+-- Add any missing columns to profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_trips INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS trips_as_driver INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS trips_as_passenger INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS rating_as_driver NUMERIC(3,2) DEFAULT 0.00;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS rating_as_passenger NUMERIC(3,2) DEFAULT 0.00;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_ratings_received INTEGER DEFAULT 0;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS smoking_allowed BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS pets_allowed BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS music_allowed BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'ar';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'JOD';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS wallet_balance NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_earned NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS total_spent NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notification_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS location_sharing_enabled BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_notifications BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS push_notifications BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_status TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_plan TEXT DEFAULT 'free';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_ends_at TIMESTAMPTZ;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS id_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS driver_license_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS background_check_status TEXT DEFAULT 'pending';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Add any missing columns to trips
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS from_lat NUMERIC(10,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS from_lng NUMERIC(11,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS to_lat NUMERIC(10,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS to_lng NUMERIC(11,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS distance_km NUMERIC(8,2);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS route_polyline TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS departure_date DATE;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS departure_time TIME;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS estimated_arrival TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS actual_departure TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS actual_arrival TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS total_seats INTEGER DEFAULT 4;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS available_seats INTEGER DEFAULT 4;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS price_per_seat NUMERIC(8,2) DEFAULT 0;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'JOD';
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published';
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS smoking_allowed BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS pets_allowed BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS music_allowed BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS luggage_space TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS vehicle_make TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS vehicle_model TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS vehicle_year INTEGER;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS vehicle_color TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS vehicle_plate TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Add any missing columns to bookings
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS pickup_lat NUMERIC(10,8);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS pickup_lng NUMERIC(11,8);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS dropoff_lat NUMERIC(10,8);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS dropoff_lng NUMERIC(11,8);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_earnings NUMERIC(10,2);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS stripe_payment_intent_id TEXT;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS passenger_rating INTEGER;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_rating INTEGER;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS passenger_feedback TEXT;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_feedback TEXT;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+
 
 -- ==================== PROFILES TABLE ====================
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -69,27 +153,27 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own profile
-CREATE POLICY "Users can view own profile"
-  ON public.profiles FOR SELECT
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT
   USING (auth.uid() = id);
 
 -- Users can update their own profile
-CREATE POLICY "Users can update own profile"
-  ON public.profiles FOR UPDATE
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
 -- Public can view basic profile info (for driver details in trips)
-CREATE POLICY "Public can view basic profiles"
-  ON public.profiles FOR SELECT
+DROP POLICY IF EXISTS "Public can view basic profiles" ON public.profiles;
+CREATE POLICY "Public can view basic profiles" ON public.profiles FOR SELECT
   USING (TRUE);
 
 -- Indexes for profiles
-CREATE INDEX idx_profiles_email ON public.profiles(email) WHERE deleted_at IS NULL;
-CREATE INDEX idx_profiles_stripe_customer ON public.profiles(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
-CREATE INDEX idx_profiles_subscription_status ON public.profiles(subscription_status) WHERE subscription_status = 'active';
-CREATE INDEX idx_profiles_phone ON public.profiles(phone) WHERE phone IS NOT NULL;
-CREATE INDEX idx_profiles_last_active ON public.profiles(last_active_at DESC);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_profiles_stripe_customer ON public.profiles(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_profiles_subscription_status ON public.profiles(subscription_status) WHERE subscription_status = 'active';
+CREATE INDEX IF NOT EXISTS idx_profiles_phone ON public.profiles(phone) WHERE phone IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_profiles_last_active ON public.profiles(last_active_at DESC);
 
 -- ==================== TRIPS TABLE ====================
 CREATE TABLE IF NOT EXISTS public.trips (
@@ -152,44 +236,44 @@ CREATE TABLE IF NOT EXISTS public.trips (
 ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
 
 -- Everyone can view published trips
-CREATE POLICY "Published trips are viewable by all"
-  ON public.trips FOR SELECT
+DROP POLICY IF EXISTS "Published trips are viewable by all" ON public.trips;
+CREATE POLICY "Published trips are viewable by all" ON public.trips FOR SELECT
   USING (status = 'published' AND deleted_at IS NULL);
 
 -- Drivers can view their own trips (any status)
-CREATE POLICY "Drivers can view own trips"
-  ON public.trips FOR SELECT
+DROP POLICY IF EXISTS "Drivers can view own trips" ON public.trips;
+CREATE POLICY "Drivers can view own trips" ON public.trips FOR SELECT
   USING (driver_id = auth.uid());
 
 -- Drivers can create trips
-CREATE POLICY "Drivers can create trips"
-  ON public.trips FOR INSERT
+DROP POLICY IF EXISTS "Drivers can create trips" ON public.trips;
+CREATE POLICY "Drivers can create trips" ON public.trips FOR INSERT
   WITH CHECK (driver_id = auth.uid());
 
 -- Drivers can update their own trips
-CREATE POLICY "Drivers can update own trips"
-  ON public.trips FOR UPDATE
+DROP POLICY IF EXISTS "Drivers can update own trips" ON public.trips;
+CREATE POLICY "Drivers can update own trips" ON public.trips FOR UPDATE
   USING (driver_id = auth.uid())
   WITH CHECK (driver_id = auth.uid());
 
 -- Drivers can soft delete their own trips
-CREATE POLICY "Drivers can delete own trips"
-  ON public.trips FOR UPDATE
+DROP POLICY IF EXISTS "Drivers can delete own trips" ON public.trips;
+CREATE POLICY "Drivers can delete own trips" ON public.trips FOR UPDATE
   USING (driver_id = auth.uid())
   WITH CHECK (driver_id = auth.uid() AND deleted_at IS NOT NULL);
 
 -- Indexes for trips
-CREATE INDEX idx_trips_driver ON public.trips(driver_id) WHERE deleted_at IS NULL;
-CREATE INDEX idx_trips_status ON public.trips(status) WHERE status = 'published' AND deleted_at IS NULL;
-CREATE INDEX idx_trips_departure ON public.trips(departure_date, departure_time) WHERE deleted_at IS NULL;
-CREATE INDEX idx_trips_available_seats ON public.trips(available_seats) WHERE available_seats > 0 AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trips_driver ON public.trips(driver_id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trips_status ON public.trips(status) WHERE status = 'published' AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trips_departure ON public.trips(departure_date, departure_time) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trips_available_seats ON public.trips(available_seats) WHERE available_seats > 0 AND deleted_at IS NULL;
 
 -- Composite index for search optimization
-CREATE INDEX idx_trips_search ON public.trips(from_location, to_location, departure_date, available_seats) 
+CREATE INDEX IF NOT EXISTS idx_trips_search ON public.trips(from_location, to_location, departure_date, available_seats) 
   WHERE status = 'published' AND deleted_at IS NULL;
 
 -- GIN index for full-text search on locations
-CREATE INDEX idx_trips_locations_gin ON public.trips USING GIN (to_tsvector('english', from_location || ' ' || to_location));
+CREATE INDEX IF NOT EXISTS idx_trips_locations_gin ON public.trips USING GIN (to_tsvector('english', from_location || ' ' || to_location));
 
 -- ==================== BOOKINGS TABLE ====================
 CREATE TABLE IF NOT EXISTS public.bookings (
@@ -236,9 +320,7 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   completed_at TIMESTAMPTZ,
   cancelled_at TIMESTAMPTZ,
   
-  CONSTRAINT no_self_booking CHECK (
-    passenger_id != (SELECT driver_id FROM public.trips WHERE id = trip_id)
-  ),
+  
   CONSTRAINT unique_active_booking UNIQUE(trip_id, passenger_id) DEFERRABLE INITIALLY DEFERRED
 );
 
@@ -246,13 +328,13 @@ CREATE TABLE IF NOT EXISTS public.bookings (
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 
 -- Passengers can view their own bookings
-CREATE POLICY "Passengers can view own bookings"
-  ON public.bookings FOR SELECT
+DROP POLICY IF EXISTS "Passengers can view own bookings" ON public.bookings;
+CREATE POLICY "Passengers can view own bookings" ON public.bookings FOR SELECT
   USING (passenger_id = auth.uid());
 
 -- Drivers can view bookings for their trips
-CREATE POLICY "Drivers can view trip bookings"
-  ON public.bookings FOR SELECT
+DROP POLICY IF EXISTS "Drivers can view trip bookings" ON public.bookings;
+CREATE POLICY "Drivers can view trip bookings" ON public.bookings FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM public.trips
@@ -262,13 +344,13 @@ CREATE POLICY "Drivers can view trip bookings"
   );
 
 -- Passengers can create bookings
-CREATE POLICY "Passengers can create bookings"
-  ON public.bookings FOR INSERT
+DROP POLICY IF EXISTS "Passengers can create bookings" ON public.bookings;
+CREATE POLICY "Passengers can create bookings" ON public.bookings FOR INSERT
   WITH CHECK (passenger_id = auth.uid());
 
 -- Passengers and drivers can update bookings (status changes)
-CREATE POLICY "Bookings updatable by passenger or driver"
-  ON public.bookings FOR UPDATE
+DROP POLICY IF EXISTS "Bookings updatable by passenger or driver" ON public.bookings;
+CREATE POLICY "Bookings updatable by passenger or driver" ON public.bookings FOR UPDATE
   USING (
     passenger_id = auth.uid() 
     OR EXISTS (
@@ -279,11 +361,11 @@ CREATE POLICY "Bookings updatable by passenger or driver"
   );
 
 -- Indexes for bookings
-CREATE INDEX idx_bookings_trip ON public.bookings(trip_id);
-CREATE INDEX idx_bookings_passenger ON public.bookings(passenger_id);
-CREATE INDEX idx_bookings_status ON public.bookings(status);
-CREATE INDEX idx_bookings_payment_intent ON public.bookings(stripe_payment_intent_id) WHERE stripe_payment_intent_id IS NOT NULL;
-CREATE INDEX idx_bookings_payment_status ON public.bookings(payment_status) WHERE payment_status IN ('pending', 'failed');
+CREATE INDEX IF NOT EXISTS idx_bookings_trip ON public.bookings(trip_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_passenger ON public.bookings(passenger_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON public.bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_payment_intent ON public.bookings(stripe_payment_intent_id) WHERE stripe_payment_intent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON public.bookings(payment_status) WHERE payment_status IN ('pending', 'failed');
 
 -- ==================== SUBSCRIPTIONS TABLE ====================
 CREATE TABLE IF NOT EXISTS public.subscriptions (
@@ -317,15 +399,15 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
 -- RLS for subscriptions
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own subscriptions"
-  ON public.subscriptions FOR SELECT
+DROP POLICY IF EXISTS "Users can view own subscriptions" ON public.subscriptions;
+CREATE POLICY "Users can view own subscriptions" ON public.subscriptions FOR SELECT
   USING (user_id = auth.uid());
 
 -- Indexes
-CREATE INDEX idx_subscriptions_user ON public.subscriptions(user_id);
-CREATE INDEX idx_subscriptions_stripe_sub ON public.subscriptions(stripe_subscription_id);
-CREATE INDEX idx_subscriptions_status ON public.subscriptions(status);
-CREATE INDEX idx_subscriptions_period_end ON public.subscriptions(current_period_end) WHERE status IN ('active', 'trialing');
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON public.subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_sub ON public.subscriptions(stripe_subscription_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON public.subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_period_end ON public.subscriptions(current_period_end) WHERE status IN ('active', 'trialing');
 
 -- ==================== STRIPE EVENTS TABLE (Idempotency) ====================
 CREATE TABLE IF NOT EXISTS public.processed_stripe_events (
@@ -339,7 +421,7 @@ CREATE TABLE IF NOT EXISTS public.processed_stripe_events (
 );
 
 -- Index for cleanup
-CREATE INDEX idx_stripe_events_processed_at ON public.processed_stripe_events(processed_at);
+CREATE INDEX IF NOT EXISTS idx_stripe_events_processed_at ON public.processed_stripe_events(processed_at);
 
 -- Auto-cleanup old events (>90 days) - requires pg_cron
 -- SELECT cron.schedule('cleanup-old-stripe-events', '0 3 * * 0', 
@@ -380,14 +462,14 @@ CREATE TABLE IF NOT EXISTS public.wallet_transactions (
 -- RLS for wallet transactions
 ALTER TABLE public.wallet_transactions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own transactions"
-  ON public.wallet_transactions FOR SELECT
+DROP POLICY IF EXISTS "Users can view own transactions" ON public.wallet_transactions;
+CREATE POLICY "Users can view own transactions" ON public.wallet_transactions FOR SELECT
   USING (user_id = auth.uid());
 
 -- Indexes
-CREATE INDEX idx_wallet_transactions_user ON public.wallet_transactions(user_id, created_at DESC);
-CREATE INDEX idx_wallet_transactions_type ON public.wallet_transactions(type, created_at DESC);
-CREATE INDEX idx_wallet_transactions_booking ON public.wallet_transactions(related_booking_id) WHERE related_booking_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_user ON public.wallet_transactions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_type ON public.wallet_transactions(type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wallet_transactions_booking ON public.wallet_transactions(related_booking_id) WHERE related_booking_id IS NOT NULL;
 
 -- ==================== NOTIFICATIONS TABLE ====================
 CREATE TABLE IF NOT EXISTS public.notifications (
@@ -420,18 +502,18 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 -- RLS
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own notifications"
-  ON public.notifications FOR SELECT
+DROP POLICY IF EXISTS "Users can view own notifications" ON public.notifications;
+CREATE POLICY "Users can view own notifications" ON public.notifications FOR SELECT
   USING (user_id = auth.uid());
 
-CREATE POLICY "Users can update own notifications"
-  ON public.notifications FOR UPDATE
+DROP POLICY IF EXISTS "Users can update own notifications" ON public.notifications;
+CREATE POLICY "Users can update own notifications" ON public.notifications FOR UPDATE
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
 -- Indexes
-CREATE INDEX idx_notifications_user_unread ON public.notifications(user_id, created_at DESC) WHERE read = FALSE;
-CREATE INDEX idx_notifications_expires ON public.notifications(expires_at) WHERE expires_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON public.notifications(user_id, created_at DESC) WHERE read = FALSE;
+CREATE INDEX IF NOT EXISTS idx_notifications_expires ON public.notifications(expires_at) WHERE expires_at IS NOT NULL;
 
 -- ==================== RATINGS TABLE ====================
 CREATE TABLE IF NOT EXISTS public.ratings (
@@ -453,12 +535,12 @@ CREATE TABLE IF NOT EXISTS public.ratings (
 -- RLS
 ALTER TABLE public.ratings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view ratings about them"
-  ON public.ratings FOR SELECT
+DROP POLICY IF EXISTS "Users can view ratings about them" ON public.ratings;
+CREATE POLICY "Users can view ratings about them" ON public.ratings FOR SELECT
   USING (to_user_id = auth.uid() OR from_user_id = auth.uid());
 
-CREATE POLICY "Users can create ratings for completed bookings"
-  ON public.ratings FOR INSERT
+DROP POLICY IF EXISTS "Users can create ratings for completed bookings" ON public.ratings;
+CREATE POLICY "Users can create ratings for completed bookings" ON public.ratings FOR INSERT
   WITH CHECK (
     from_user_id = auth.uid() AND
     EXISTS (
@@ -472,9 +554,9 @@ CREATE POLICY "Users can create ratings for completed bookings"
   );
 
 -- Indexes
-CREATE INDEX idx_ratings_to_user ON public.ratings(to_user_id, created_at DESC);
-CREATE INDEX idx_ratings_from_user ON public.ratings(from_user_id, created_at DESC);
-CREATE INDEX idx_ratings_booking ON public.ratings(booking_id);
+CREATE INDEX IF NOT EXISTS idx_ratings_to_user ON public.ratings(to_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ratings_from_user ON public.ratings(from_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ratings_booking ON public.ratings(booking_id);
 
 -- ==================== FUNCTIONS ====================
 
@@ -504,6 +586,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_trip_stats ON public.bookings;
 CREATE TRIGGER trigger_update_trip_stats
   AFTER UPDATE ON public.bookings
   FOR EACH ROW
@@ -552,6 +635,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_profile_rating ON public.ratings;
 CREATE TRIGGER trigger_update_profile_rating
   AFTER INSERT ON public.ratings
   FOR EACH ROW
@@ -571,6 +655,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_wallet_balance ON public.wallet_transactions;
 CREATE TRIGGER trigger_update_wallet_balance
   AFTER INSERT ON public.wallet_transactions
   FOR EACH ROW
@@ -586,15 +671,19 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply to all tables with updated_at
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_trips_updated_at ON public.trips;
 CREATE TRIGGER update_trips_updated_at BEFORE UPDATE ON public.trips
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_bookings_updated_at ON public.bookings;
 CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON public.bookings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_subscriptions_updated_at ON public.subscriptions;
 CREATE TRIGGER update_subscriptions_updated_at BEFORE UPDATE ON public.subscriptions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -629,12 +718,12 @@ WHERE t.status = 'published'
   AND t.deleted_at IS NULL
   AND t.departure_date >= CURRENT_DATE;
 
--- Create unique index for concurrent refresh
-CREATE UNIQUE INDEX idx_trip_search_cache_id ON public.trip_search_cache(id);
+-- CREATE unique INDEX IF NOT EXISTS for concurrent refresh
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_search_cache_id ON public.trip_search_cache(id);
 
 -- Composite indexes for search
-CREATE INDEX idx_trip_search_cache_route ON public.trip_search_cache(from_location, to_location, departure_date);
-CREATE INDEX idx_trip_search_cache_date ON public.trip_search_cache(departure_date, departure_time);
+CREATE INDEX IF NOT EXISTS idx_trip_search_cache_route ON public.trip_search_cache(from_location, to_location, departure_date);
+CREATE INDEX IF NOT EXISTS idx_trip_search_cache_date ON public.trip_search_cache(departure_date, departure_time);
 
 -- Refresh function
 CREATE OR REPLACE FUNCTION refresh_trip_search_cache()

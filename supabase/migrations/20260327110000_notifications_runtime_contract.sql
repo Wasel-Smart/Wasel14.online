@@ -60,8 +60,8 @@ begin
     where conname = 'notifications_user_id_fkey'
   ) then
     begin
-      alter table public.notifications
-        add constraint notifications_user_id_fkey
+      ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_user_id_fkey;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_user_id_fkey
         foreign key (user_id) references public.users(id) on delete cascade not valid;
     exception
       when duplicate_object then
@@ -75,8 +75,8 @@ begin
     where conname = 'notifications_related_booking_id_fkey'
   ) then
     begin
-      alter table public.notifications
-        add constraint notifications_related_booking_id_fkey
+      ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_related_booking_id_fkey;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_related_booking_id_fkey
         foreign key (related_booking_id) references public.bookings(booking_id) on delete set null not valid;
     exception
       when duplicate_object then
@@ -90,8 +90,8 @@ begin
     where conname = 'notifications_related_trip_id_fkey'
   ) then
     begin
-      alter table public.notifications
-        add constraint notifications_related_trip_id_fkey
+      ALTER TABLE public.notifications DROP CONSTRAINT IF EXISTS notifications_related_trip_id_fkey;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_related_trip_id_fkey
         foreign key (related_trip_id) references public.trips(trip_id) on delete set null not valid;
     exception
       when duplicate_object then
@@ -109,7 +109,7 @@ create index if not exists idx_notifications_type
 
 alter table public.notifications enable row level security;
 
-drop trigger if exists trg_notifications_updated_at on public.notifications;
+DROP TRIGGER IF EXISTS trg_notifications_updated_at ON public.notifications;
 create trigger trg_notifications_updated_at
 before update on public.notifications
 for each row execute function public.set_updated_at();

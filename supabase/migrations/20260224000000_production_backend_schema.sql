@@ -61,7 +61,82 @@ EXCEPTION
 END $$;
 
 -- ============================================================================
+
+
+
+-- Reconcile columns for existing tables
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'trips') THEN
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS origin TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS origin_lat DECIMAL(10,8);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS origin_lng DECIMAL(11,8);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS destination TEXT;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS destination_lat DECIMAL(10,8);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS destination_lng DECIMAL(11,8);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS departure_time TIMESTAMPTZ;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS arrival_time TIMESTAMPTZ;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS duration_minutes INTEGER;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS distance_km DECIMAL(10,2);
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS booked_seats INTEGER DEFAULT 0;
+    ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS luggage_allowed BOOLEAN DEFAULT TRUE;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'bookings') THEN
+    ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS seats_booked INTEGER DEFAULT 1;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'messages') THEN
+    ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS conversation_id UUID;
+    ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS receiver_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+    ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS attachment_url TEXT;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'notifications') THEN
+    ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+    ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ratings') THEN
+    ALTER TABLE public.ratings ADD COLUMN IF NOT EXISTS rater_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.ratings ADD COLUMN IF NOT EXISTS rated_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.ratings ADD COLUMN IF NOT EXISTS comment TEXT;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'vehicles') THEN
+    ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.profiles(id);
+    ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS air_conditioning BOOLEAN DEFAULT TRUE;
+    ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS bluetooth BOOLEAN DEFAULT TRUE;
+    ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+    ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+  END IF;
+END $$;
+
 -- TABLES
+
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.profiles(id);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.profiles(id);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS origin TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS origin_lat DECIMAL(10,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS origin_lng DECIMAL(11,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS destination TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS destination_lat DECIMAL(10,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS destination_lng DECIMAL(11,8);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS departure_time TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS arrival_time TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS duration_minutes INTEGER;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS distance_km DECIMAL(10,2);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS booked_seats INTEGER DEFAULT 0;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS luggage_allowed BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'wasel';
+
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES public.profiles(id);
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS seats_booked INTEGER DEFAULT 1;
+
 -- ============================================================================
 
 -- Profiles Table (extends auth.users)
@@ -476,51 +551,65 @@ ALTER TABLE driver_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
+DROP POLICY IF EXISTS "Users can view their own profile" ON profiles;
 CREATE POLICY "Users can view their own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
 CREATE POLICY "Users can update their own profile" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Anyone can view public profile data" ON profiles;
 CREATE POLICY "Anyone can view public profile data" ON profiles
   FOR SELECT USING (true);
 
 -- Trips policies
+DROP POLICY IF EXISTS "Users can view all published trips" ON trips;
 CREATE POLICY "Users can view all published trips" ON trips
   FOR SELECT USING (status = 'published' OR user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can create their own trips" ON trips;
 CREATE POLICY "Users can create their own trips" ON trips
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update their own trips" ON trips;
 CREATE POLICY "Users can update their own trips" ON trips
   FOR UPDATE USING (user_id = auth.uid());
 
 -- Bookings policies
+DROP POLICY IF EXISTS "Users can view their bookings" ON bookings;
 CREATE POLICY "Users can view their bookings" ON bookings
   FOR SELECT USING (passenger_id = auth.uid() OR driver_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can create bookings" ON bookings;
 CREATE POLICY "Users can create bookings" ON bookings
   FOR INSERT WITH CHECK (passenger_id = auth.uid());
 
 -- Payments policies
+DROP POLICY IF EXISTS "Users can view their payments" ON payments;
 CREATE POLICY "Users can view their payments" ON payments
   FOR SELECT USING (user_id = auth.uid());
 
 -- Messages policies
+DROP POLICY IF EXISTS "Users can view their messages" ON messages;
 CREATE POLICY "Users can view their messages" ON messages
   FOR SELECT USING (sender_id = auth.uid() OR receiver_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can send messages" ON messages;
 CREATE POLICY "Users can send messages" ON messages
   FOR INSERT WITH CHECK (sender_id = auth.uid());
 
 -- Notifications policies
+DROP POLICY IF EXISTS "Users can view their notifications" ON notifications;
 CREATE POLICY "Users can view their notifications" ON notifications
   FOR SELECT USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update their notifications" ON notifications;
 CREATE POLICY "Users can update their notifications" ON notifications
   FOR UPDATE USING (user_id = auth.uid());
 
 -- FCM Tokens policies
+DROP POLICY IF EXISTS "Users can manage their FCM tokens" ON fcm_tokens;
 CREATE POLICY "Users can manage their FCM tokens" ON fcm_tokens
   FOR ALL USING (user_id = auth.uid());
 
@@ -538,18 +627,23 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply updated_at trigger to all relevant tables
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_trips_updated_at ON trips;
 CREATE TRIGGER update_trips_updated_at BEFORE UPDATE ON trips
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_bookings_updated_at ON bookings;
 CREATE TRIGGER update_bookings_updated_at BEFORE UPDATE ON bookings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_vehicles_updated_at ON vehicles;
 CREATE TRIGGER update_vehicles_updated_at BEFORE UPDATE ON vehicles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -579,6 +673,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_trip_stats ON trips;
 CREATE TRIGGER update_trip_stats AFTER UPDATE ON trips
   FOR EACH ROW EXECUTE FUNCTION update_user_trip_stats();
 
@@ -596,21 +691,43 @@ CREATE TRIGGER update_trip_stats AFTER UPDATE ON trips
 -- View for trip search with driver info
 CREATE OR REPLACE VIEW trip_search_view AS
 SELECT 
-  t.*,
+  t.id,
+  t.user_id,
+  t.driver_id,
+  t.status,
+  t.origin,
+  t.origin_lat,
+  t.origin_lng,
+  t.destination,
+  t.destination_lat,
+  t.destination_lng,
+  t.departure_date,
+  t.departure_time,
+  t.arrival_time,
+  t.duration_minutes,
+  t.distance_km,
+  t.available_seats,
+  t.booked_seats,
+  t.price_per_seat,
+  t.currency,
+  t.smoking_allowed,
+  t.pets_allowed,
+  t.created_at,
+  t.updated_at,
   p.full_name as driver_name,
   p.avatar_url as driver_avatar,
   p.rating_as_driver as driver_rating,
   p.total_trips as driver_total_trips,
-  v.make as vehicle_make,
-  v.model as vehicle_model,
-  v.year as vehicle_year,
-  v.color as vehicle_color
+  COALESCE(v.make, t.vehicle_make) as vehicle_make,
+  COALESCE(v.model, t.vehicle_model) as vehicle_model,
+  COALESCE(v.year, t.vehicle_year) as vehicle_year,
+  COALESCE(v.color, t.vehicle_color) as vehicle_color
 FROM trips t
-LEFT JOIN profiles p ON t.user_id = p.id
+LEFT JOIN profiles p ON COALESCE(t.user_id, t.driver_id) = p.id
 LEFT JOIN vehicles v ON v.user_id = t.user_id
 WHERE t.status = 'published'
-AND t.available_seats > t.booked_seats
-AND t.departure_time > NOW();
+AND t.available_seats > COALESCE(t.booked_seats, 0)
+AND (t.departure_date >= CURRENT_DATE OR t.departure_date IS NULL);
 
 -- View for user dashboard stats
 CREATE OR REPLACE VIEW user_dashboard_stats AS

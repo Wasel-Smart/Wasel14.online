@@ -47,9 +47,8 @@ create index if not exists communication_deliveries_status_idx
 alter table public.communication_preferences enable row level security;
 alter table public.communication_deliveries enable row level security;
 
-drop policy if exists communication_preferences_select_own on public.communication_preferences;
-create policy communication_preferences_select_own
-  on public.communication_preferences
+DROP POLICY IF EXISTS communication_preferences_select_own ON public.communication_preferences;
+CREATE POLICY communication_preferences_select_own ON public.communication_preferences
   for select
   to authenticated
   using (
@@ -58,9 +57,8 @@ create policy communication_preferences_select_own
     )
   );
 
-drop policy if exists communication_preferences_insert_own on public.communication_preferences;
-create policy communication_preferences_insert_own
-  on public.communication_preferences
+DROP POLICY IF EXISTS communication_preferences_insert_own ON public.communication_preferences;
+CREATE POLICY communication_preferences_insert_own ON public.communication_preferences
   for insert
   to authenticated
   with check (
@@ -69,9 +67,8 @@ create policy communication_preferences_insert_own
     )
   );
 
-drop policy if exists communication_preferences_update_own on public.communication_preferences;
-create policy communication_preferences_update_own
-  on public.communication_preferences
+DROP POLICY IF EXISTS communication_preferences_update_own ON public.communication_preferences;
+CREATE POLICY communication_preferences_update_own ON public.communication_preferences
   for update
   to authenticated
   using (
@@ -85,9 +82,8 @@ create policy communication_preferences_update_own
     )
   );
 
-drop policy if exists communication_deliveries_select_own on public.communication_deliveries;
-create policy communication_deliveries_select_own
-  on public.communication_deliveries
+DROP POLICY IF EXISTS communication_deliveries_select_own ON public.communication_deliveries;
+CREATE POLICY communication_deliveries_select_own ON public.communication_deliveries
   for select
   to authenticated
   using (
@@ -96,9 +92,8 @@ create policy communication_deliveries_select_own
     )
   );
 
-drop policy if exists communication_deliveries_insert_own on public.communication_deliveries;
-create policy communication_deliveries_insert_own
-  on public.communication_deliveries
+DROP POLICY IF EXISTS communication_deliveries_insert_own ON public.communication_deliveries;
+CREATE POLICY communication_deliveries_insert_own ON public.communication_deliveries
   for insert
   to authenticated
   with check (

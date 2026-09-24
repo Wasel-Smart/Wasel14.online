@@ -594,60 +594,60 @@ CREATE TABLE promo_code_usage (
 -- =====================================================
 
 -- Users
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_phone ON users(phone);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_referral_code ON users(referral_code);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code);
 
 -- Driver profiles
-CREATE INDEX idx_driver_status ON driver_profiles(status);
-CREATE INDEX idx_driver_location ON driver_profiles USING GIST(current_location);
+CREATE INDEX IF NOT EXISTS idx_driver_status ON driver_profiles(status);
+CREATE INDEX IF NOT EXISTS idx_driver_location ON driver_profiles USING GIST(current_location);
 
 -- Trips
-CREATE INDEX idx_trips_mode ON trips(mode);
-CREATE INDEX idx_trips_status ON trips(status);
-CREATE INDEX idx_trips_driver ON trips(driver_id);
-CREATE INDEX idx_trips_created_by ON trips(created_by);
-CREATE INDEX idx_trips_departure ON trips(departure_time);
-CREATE INDEX idx_trips_corridor ON trips(corridor_id);
-CREATE INDEX idx_trips_origin ON trips USING GIST(origin_location);
-CREATE INDEX idx_trips_destination ON trips USING GIST(destination_location);
-CREATE INDEX idx_trips_created_at ON trips(created_at);
+CREATE INDEX IF NOT EXISTS idx_trips_mode ON trips(mode);
+CREATE INDEX IF NOT EXISTS idx_trips_status ON trips(status);
+CREATE INDEX IF NOT EXISTS idx_trips_driver ON trips(driver_id);
+CREATE INDEX IF NOT EXISTS idx_trips_created_by ON trips(created_by);
+CREATE INDEX IF NOT EXISTS idx_trips_departure ON trips(departure_time);
+CREATE INDEX IF NOT EXISTS idx_trips_corridor ON trips(corridor_id);
+CREATE INDEX IF NOT EXISTS idx_trips_origin ON trips USING GIST(origin_location);
+CREATE INDEX IF NOT EXISTS idx_trips_destination ON trips USING GIST(destination_location);
+CREATE INDEX IF NOT EXISTS idx_trips_created_at ON trips(created_at);
 
 -- Trip bookings
-CREATE INDEX idx_bookings_trip ON trip_bookings(trip_id);
-CREATE INDEX idx_bookings_passenger ON trip_bookings(passenger_id);
-CREATE INDEX idx_bookings_status ON trip_bookings(status);
+CREATE INDEX IF NOT EXISTS idx_bookings_trip ON trip_bookings(trip_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_passenger ON trip_bookings(passenger_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON trip_bookings(status);
 
 -- Packages
-CREATE INDEX idx_packages_tracking ON packages(tracking_number);
-CREATE INDEX idx_packages_sender ON packages(sender_id);
-CREATE INDEX idx_packages_trip ON packages(trip_id);
-CREATE INDEX idx_packages_status ON packages(status);
+CREATE INDEX IF NOT EXISTS idx_packages_tracking ON packages(tracking_number);
+CREATE INDEX IF NOT EXISTS idx_packages_sender ON packages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_packages_trip ON packages(trip_id);
+CREATE INDEX IF NOT EXISTS idx_packages_status ON packages(status);
 
 -- Driver locations
-CREATE INDEX idx_driver_locations ON driver_locations USING GIST(location);
-CREATE INDEX idx_driver_locations_updated ON driver_locations(updated_at);
+CREATE INDEX IF NOT EXISTS idx_driver_locations ON driver_locations USING GIST(location);
+CREATE INDEX IF NOT EXISTS idx_driver_locations_updated ON driver_locations(updated_at);
 
 -- Payments
-CREATE INDEX idx_payments_user ON payments(user_id);
-CREATE INDEX idx_payments_trip ON payments(trip_id);
-CREATE INDEX idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_trip ON payments(trip_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 
 -- Notifications
-CREATE INDEX idx_notifications_user ON notifications(user_id);
-CREATE INDEX idx_notifications_read ON notifications(read);
-CREATE INDEX idx_notifications_created ON notifications(created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
 
 -- Messages
-CREATE INDEX idx_messages_sender ON messages(sender_id);
-CREATE INDEX idx_messages_receiver ON messages(receiver_id);
-CREATE INDEX idx_messages_trip ON messages(trip_id);
-CREATE INDEX idx_messages_created ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id);
+CREATE INDEX IF NOT EXISTS idx_messages_trip ON messages(trip_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
 
 -- Reviews
-CREATE INDEX idx_reviews_trip ON reviews(trip_id);
-CREATE INDEX idx_reviews_reviewee ON reviews(reviewee_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_trip ON reviews(trip_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_reviewee ON reviews(reviewee_id);
 
 -- =====================================================
 -- FUNCTIONS
@@ -770,21 +770,27 @@ $$ LANGUAGE plpgsql;
 -- =====================================================
 
 -- Auto-update updated_at
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_driver_profiles_updated_at ON driver_profiles;
 CREATE TRIGGER update_driver_profiles_updated_at BEFORE UPDATE ON driver_profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_trips_updated_at ON trips;
 CREATE TRIGGER update_trips_updated_at BEFORE UPDATE ON trips
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_trip_bookings_updated_at ON trip_bookings;
 CREATE TRIGGER update_trip_bookings_updated_at BEFORE UPDATE ON trip_bookings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_packages_updated_at ON packages;
 CREATE TRIGGER update_packages_updated_at BEFORE UPDATE ON packages
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -806,20 +812,25 @@ ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE safety_incidents ENABLE ROW LEVEL SECURITY;
 
 -- Users: Can view own profile, admins can view all
+DROP POLICY IF EXISTS users_select_own ON users;
 CREATE POLICY users_select_own ON users
   FOR SELECT USING (auth.uid() = id OR auth.jwt() ->> 'role' = 'admin');
 
+DROP POLICY IF EXISTS users_update_own ON users;
 CREATE POLICY users_update_own ON users
   FOR UPDATE USING (auth.uid() = id);
 
 -- Driver profiles: Public read, driver can update own
+DROP POLICY IF EXISTS driver_profiles_select_all ON driver_profiles;
 CREATE POLICY driver_profiles_select_all ON driver_profiles
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS driver_profiles_update_own ON driver_profiles;
 CREATE POLICY driver_profiles_update_own ON driver_profiles
   FOR UPDATE USING (auth.uid() = user_id);
 
 -- Trips: Public read for available trips, participants can view their trips
+DROP POLICY IF EXISTS trips_select_available ON trips;
 CREATE POLICY trips_select_available ON trips
   FOR SELECT USING (
     status IN ('posted', 'requested') OR
@@ -828,9 +839,11 @@ CREATE POLICY trips_select_available ON trips
     auth.jwt() ->> 'role' = 'admin'
   );
 
+DROP POLICY IF EXISTS trips_insert_own ON trips;
 CREATE POLICY trips_insert_own ON trips
   FOR INSERT WITH CHECK (created_by = auth.uid());
 
+DROP POLICY IF EXISTS trips_update_own ON trips;
 CREATE POLICY trips_update_own ON trips
   FOR UPDATE USING (
     driver_id = auth.uid() OR
@@ -838,16 +851,19 @@ CREATE POLICY trips_update_own ON trips
   );
 
 -- Trip bookings: Users can view their own bookings
+DROP POLICY IF EXISTS bookings_select_own ON trip_bookings;
 CREATE POLICY bookings_select_own ON trip_bookings
   FOR SELECT USING (
     passenger_id = auth.uid() OR
     trip_id IN (SELECT id FROM trips WHERE driver_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS bookings_insert_own ON trip_bookings;
 CREATE POLICY bookings_insert_own ON trip_bookings
   FOR INSERT WITH CHECK (passenger_id = auth.uid());
 
 -- Packages: Sender and carrier can view
+DROP POLICY IF EXISTS packages_select_own ON packages;
 CREATE POLICY packages_select_own ON packages
   FOR SELECT USING (
     sender_id = auth.uid() OR
@@ -855,45 +871,56 @@ CREATE POLICY packages_select_own ON packages
     auth.jwt() ->> 'role' = 'admin'
   );
 
+DROP POLICY IF EXISTS packages_insert_own ON packages;
 CREATE POLICY packages_insert_own ON packages
   FOR INSERT WITH CHECK (sender_id = auth.uid());
 
 -- Driver locations: Public read, driver can update own
+DROP POLICY IF EXISTS driver_locations_select_all ON driver_locations;
 CREATE POLICY driver_locations_select_all ON driver_locations
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS driver_locations_upsert_own ON driver_locations;
 CREATE POLICY driver_locations_upsert_own ON driver_locations
   FOR ALL USING (auth.uid() = driver_id);
 
 -- Payments: Users can view their own payments
+DROP POLICY IF EXISTS payments_select_own ON payments;
 CREATE POLICY payments_select_own ON payments
   FOR SELECT USING (user_id = auth.uid() OR auth.jwt() ->> 'role' = 'admin');
 
 -- Notifications: Users can view their own notifications
+DROP POLICY IF EXISTS notifications_select_own ON notifications;
 CREATE POLICY notifications_select_own ON notifications
   FOR SELECT USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS notifications_update_own ON notifications;
 CREATE POLICY notifications_update_own ON notifications
   FOR UPDATE USING (user_id = auth.uid());
 
 -- Messages: Users can view their own messages
+DROP POLICY IF EXISTS messages_select_own ON messages;
 CREATE POLICY messages_select_own ON messages
   FOR SELECT USING (
     sender_id = auth.uid() OR
     receiver_id = auth.uid()
   );
 
+DROP POLICY IF EXISTS messages_insert_own ON messages;
 CREATE POLICY messages_insert_own ON messages
   FOR INSERT WITH CHECK (sender_id = auth.uid());
 
 -- Reviews: Public read, users can create reviews for trips they participated in
+DROP POLICY IF EXISTS reviews_select_all ON reviews;
 CREATE POLICY reviews_select_all ON reviews
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS reviews_insert_own ON reviews;
 CREATE POLICY reviews_insert_own ON reviews
   FOR INSERT WITH CHECK (reviewer_id = auth.uid());
 
 -- Safety incidents: Users can report incidents
+DROP POLICY IF EXISTS incidents_select_own ON safety_incidents;
 CREATE POLICY incidents_select_own ON safety_incidents
   FOR SELECT USING (
     reported_by = auth.uid() OR
@@ -901,6 +928,7 @@ CREATE POLICY incidents_select_own ON safety_incidents
     auth.jwt() ->> 'role' = 'admin'
   );
 
+DROP POLICY IF EXISTS incidents_insert_own ON safety_incidents;
 CREATE POLICY incidents_insert_own ON safety_incidents
   FOR INSERT WITH CHECK (reported_by = auth.uid());
 
@@ -947,7 +975,7 @@ JOIN driver_profiles dp ON t.driver_id = dp.user_id
 WHERE
   t.status = 'posted'
   AND t.available_seats > 0
-  AND t.departure_time > NOW();
+  AND (t.departure_date >= CURRENT_DATE OR t.departure_date IS NULL);
 
 -- User trip history
 CREATE OR REPLACE VIEW user_trip_history AS

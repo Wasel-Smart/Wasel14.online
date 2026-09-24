@@ -116,7 +116,7 @@ begin
 end;
 $$;
 
-drop trigger if exists on_auth_user_synced_to_canonical on auth.users;
+DROP TRIGGER IF EXISTS on_auth_user_synced_to_canonical ON auth.users;
 create trigger on_auth_user_synced_to_canonical
   after insert or update on auth.users
   for each row execute function public.sync_auth_user_to_canonical_user();

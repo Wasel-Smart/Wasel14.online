@@ -221,6 +221,11 @@ eslint-current*.json
 eslint-all.json
 eslint-warnings.txt
 remaining-warnings.txt
+lint-out.txt
+lint-output.txt
+
+# ---- Copy-paste env cheat sheets (should never hold real values, but never commit them) ----
+vercel-env-variables.txt
 
 # ---- Root-level scratch fix/test scripts ----
 fix-all-handlers.cjs

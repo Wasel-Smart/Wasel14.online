@@ -22,9 +22,9 @@ CREATE TABLE IF NOT EXISTS driver_locations (
 );
 
 -- Geospatial index for efficient nearby queries
-CREATE INDEX idx_driver_locations_location ON driver_locations USING GIST(location);
-CREATE INDEX idx_driver_locations_driver_trip ON driver_locations(driver_id, trip_id);
-CREATE INDEX idx_driver_locations_updated ON driver_locations(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_driver_locations_location ON driver_locations USING GIST(location);
+CREATE INDEX IF NOT EXISTS idx_driver_locations_driver_trip ON driver_locations(driver_id, trip_id);
+CREATE INDEX IF NOT EXISTS idx_driver_locations_updated ON driver_locations(updated_at DESC);
 
 -- Enable realtime updates
 ALTER PUBLICATION supabase_realtime ADD TABLE driver_locations;
@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS promo_code_usage (
   UNIQUE(promo_code_id, user_id, trip_id)
 );
 
-CREATE INDEX idx_promo_usage_user ON promo_code_usage(user_id);
-CREATE INDEX idx_promo_usage_promo ON promo_code_usage(promo_code_id);
+CREATE INDEX IF NOT EXISTS idx_promo_usage_user ON promo_code_usage(user_id);
+CREATE INDEX IF NOT EXISTS idx_promo_usage_promo ON promo_code_usage(promo_code_id);
 
 -- ─────────────────────────────────────────────────────────────
 -- 📊 Trip Analytics Cache
@@ -67,8 +67,8 @@ CREATE TABLE IF NOT EXISTS trip_analytics (
   UNIQUE(date, hour, location_zone)
 );
 
-CREATE INDEX idx_trip_analytics_date ON trip_analytics(date DESC);
-CREATE INDEX idx_trip_analytics_zone ON trip_analytics(location_zone);
+CREATE INDEX IF NOT EXISTS idx_trip_analytics_date ON trip_analytics(date DESC);
+CREATE INDEX IF NOT EXISTS idx_trip_analytics_zone ON trip_analytics(location_zone);
 
 -- ─────────────────────────────────────────────────────────────
 -- 🚦 Driver Status History (for analytics)
@@ -83,8 +83,8 @@ CREATE TABLE IF NOT EXISTS driver_status_history (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_driver_status_history_driver ON driver_status_history(driver_id, created_at DESC);
-CREATE INDEX idx_driver_status_history_created ON driver_status_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_driver_status_history_driver ON driver_status_history(driver_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_driver_status_history_created ON driver_status_history(created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────
 -- 💬 Chat Media Files
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS chat_media (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_chat_media_message ON chat_media(message_id);
+CREATE INDEX IF NOT EXISTS idx_chat_media_message ON chat_media(message_id);
 
 -- ─────────────────────────────────────────────────────────────
 -- 🎯 Marketing Campaigns
@@ -129,8 +129,8 @@ CREATE TABLE IF NOT EXISTS campaigns (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_campaigns_status ON campaigns(status);
-CREATE INDEX idx_campaigns_scheduled ON campaigns(scheduled_for);
+CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+CREATE INDEX IF NOT EXISTS idx_campaigns_scheduled ON campaigns(scheduled_for);
 
 -- ─────────────────────────────────────────────────────────────
 -- 📱 Device Tracking (for push notifications)
@@ -149,8 +149,8 @@ CREATE TABLE IF NOT EXISTS devices (
   UNIQUE(user_id, device_id)
 );
 
-CREATE INDEX idx_devices_user ON devices(user_id);
-CREATE INDEX idx_devices_last_active ON devices(last_active DESC);
+CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_devices_last_active ON devices(last_active DESC);
 
 -- ─────────────────────────────────────────────────────────────
 -- 🔐 Audit Logs (for compliance)
@@ -168,9 +168,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at DESC);
-CREATE INDEX idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
-CREATE INDEX idx_audit_logs_created ON audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────
 -- 🚨 Safety Incidents
@@ -193,9 +193,9 @@ CREATE TABLE IF NOT EXISTS safety_incidents (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_safety_incidents_trip ON safety_incidents(trip_id);
-CREATE INDEX idx_safety_incidents_status ON safety_incidents(status);
-CREATE INDEX idx_safety_incidents_severity ON safety_incidents(severity);
+CREATE INDEX IF NOT EXISTS idx_safety_incidents_trip ON safety_incidents(trip_id);
+CREATE INDEX IF NOT EXISTS idx_safety_incidents_status ON safety_incidents(status);
+CREATE INDEX IF NOT EXISTS idx_safety_incidents_severity ON safety_incidents(severity);
 
 -- ─────────────────────────────────────────────────────────────
 -- 💰 Driver Payouts
@@ -221,8 +221,8 @@ CREATE TABLE IF NOT EXISTS driver_payouts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_driver_payouts_driver ON driver_payouts(driver_id, period_end DESC);
-CREATE INDEX idx_driver_payouts_status ON driver_payouts(status);
+CREATE INDEX IF NOT EXISTS idx_driver_payouts_driver ON driver_payouts(driver_id, period_end DESC);
+CREATE INDEX IF NOT EXISTS idx_driver_payouts_status ON driver_payouts(status);
 
 -- ─────────────────────────────────────────────────────────────
 -- 🎓 University Partnerships (for student discounts)
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS universities (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_universities_active ON universities(is_active);
+CREATE INDEX IF NOT EXISTS idx_universities_active ON universities(is_active);
 
 -- Seed some universities
 INSERT INTO universities (name, name_ar, city, email_domains, discount_percentage) VALUES
@@ -268,8 +268,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE typing_indicators;
 -- Driver Locations: Only visible to active trips
 ALTER TABLE driver_locations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view driver location for their trips"
-  ON driver_locations FOR SELECT
+DROP POLICY IF EXISTS "Users can view driver location for their trips" ON driver_locations;
+CREATE POLICY "Users can view driver location for their trips" ON driver_locations FOR SELECT
   USING (
     trip_id IN (
       SELECT id FROM trips 
@@ -277,26 +277,26 @@ CREATE POLICY "Users can view driver location for their trips"
     )
   );
 
-CREATE POLICY "Drivers can update own location"
-  ON driver_locations FOR ALL
+DROP POLICY IF EXISTS "Drivers can update own location" ON driver_locations;
+CREATE POLICY "Drivers can update own location" ON driver_locations FOR ALL
   USING (driver_id = auth.uid());
 
 -- Promo Code Usage: Users can view own usage
 ALTER TABLE promo_code_usage ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own promo usage"
-  ON promo_code_usage FOR SELECT
+DROP POLICY IF EXISTS "Users can view own promo usage" ON promo_code_usage;
+CREATE POLICY "Users can view own promo usage" ON promo_code_usage FOR SELECT
   USING (user_id = auth.uid());
 
 -- Safety Incidents: Participants can view
 ALTER TABLE safety_incidents ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own safety incidents"
-  ON safety_incidents FOR SELECT
+DROP POLICY IF EXISTS "Users can view own safety incidents" ON safety_incidents;
+CREATE POLICY "Users can view own safety incidents" ON safety_incidents FOR SELECT
   USING (reporter_id = auth.uid());
 
-CREATE POLICY "Users can report safety incidents"
-  ON safety_incidents FOR INSERT
+DROP POLICY IF EXISTS "Users can report safety incidents" ON safety_incidents;
+CREATE POLICY "Users can report safety incidents" ON safety_incidents FOR INSERT
   WITH CHECK (reporter_id = auth.uid());
 
 -- ═══════════════════════════════════════════════════════════

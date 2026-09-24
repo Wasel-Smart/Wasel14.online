@@ -23,21 +23,18 @@ create index if not exists idx_ratings_rider
 
 alter table public.ratings enable row level security;
 
-drop policy if exists ratings_select_authenticated on public.ratings;
-create policy ratings_select_authenticated
-  on public.ratings for select
+DROP POLICY IF EXISTS ratings_select_authenticated ON public.ratings;
+CREATE POLICY ratings_select_authenticated ON public.ratings for select
   to authenticated
   using (true);
 
-drop policy if exists ratings_insert_own_completed_booking on public.ratings;
-create policy ratings_insert_own_completed_booking
-  on public.ratings for insert
+DROP POLICY IF EXISTS ratings_insert_own_completed_booking ON public.ratings;
+CREATE POLICY ratings_insert_own_completed_booking ON public.ratings for insert
   to authenticated
   with check (rider_id = auth.uid());
 
-drop policy if exists ratings_update_own_recent on public.ratings;
-create policy ratings_update_own_recent
-  on public.ratings for update
+DROP POLICY IF EXISTS ratings_update_own_recent ON public.ratings;
+CREATE POLICY ratings_update_own_recent ON public.ratings for update
   to authenticated
   using (rider_id = auth.uid())
   with check (rider_id = auth.uid());
@@ -53,7 +50,7 @@ begin
 end;
 $$;
 
-drop trigger if exists set_ratings_updated_at on public.ratings;
+DROP TRIGGER IF EXISTS set_ratings_updated_at ON public.ratings;
 create trigger set_ratings_updated_at
   before update on public.ratings
   for each row execute function public.set_ratings_updated_at();
@@ -105,7 +102,7 @@ begin
 end;
 $$;
 
-drop trigger if exists update_driver_rating_summary on public.ratings;
+DROP TRIGGER IF EXISTS update_driver_rating_summary ON public.ratings;
 create trigger update_driver_rating_summary
   after insert or update or delete on public.ratings
   for each row execute function public.update_driver_rating_summary();

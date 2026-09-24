@@ -20,8 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_demand_alerts_status ON demand_alerts(status);
 ALTER TABLE demand_alerts ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Demand alerts are readable by owners" ON demand_alerts;
-CREATE POLICY "Demand alerts are readable by owners"
-ON demand_alerts
+CREATE POLICY "Demand alerts are readable by owners" ON demand_alerts
 FOR SELECT
 USING (
   user_id IS NULL
@@ -34,8 +33,7 @@ USING (
 );
 
 DROP POLICY IF EXISTS "Demand alerts are insertable by owners" ON demand_alerts;
-CREATE POLICY "Demand alerts are insertable by owners"
-ON demand_alerts
+CREATE POLICY "Demand alerts are insertable by owners" ON demand_alerts
 FOR INSERT
 WITH CHECK (
   user_id IS NULL
@@ -48,8 +46,7 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "Demand alerts are updatable by owners" ON demand_alerts;
-CREATE POLICY "Demand alerts are updatable by owners"
-ON demand_alerts
+CREATE POLICY "Demand alerts are updatable by owners" ON demand_alerts
 FOR UPDATE
 USING (
   user_id IS NULL

@@ -52,27 +52,28 @@ CREATE TABLE scheduled_pickups (
   cancellation_reason TEXT
 );
 
-CREATE INDEX idx_scheduled_pickups_user ON scheduled_pickups(user_id, scheduled_at DESC);
-CREATE INDEX idx_scheduled_pickups_status ON scheduled_pickups(status, scheduled_at);
-CREATE INDEX idx_scheduled_pickups_date ON scheduled_pickups(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_pickups_user ON scheduled_pickups(user_id, scheduled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_scheduled_pickups_status ON scheduled_pickups(status, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_pickups_date ON scheduled_pickups(scheduled_at);
 
+DROP TRIGGER IF EXISTS set_updated_at ON scheduled_pickups;
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON scheduled_pickups 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 ALTER TABLE scheduled_pickups ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own scheduled pickups"
-  ON scheduled_pickups FOR SELECT
+DROP POLICY IF EXISTS "Users can view own scheduled pickups" ON scheduled_pickups;
+CREATE POLICY "Users can view own scheduled pickups" ON scheduled_pickups FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert own scheduled pickups"
-  ON scheduled_pickups FOR INSERT
+DROP POLICY IF EXISTS "Users can insert own scheduled pickups" ON scheduled_pickups;
+CREATE POLICY "Users can insert own scheduled pickups" ON scheduled_pickups FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update own scheduled pickups"
-  ON scheduled_pickups FOR UPDATE
+DROP POLICY IF EXISTS "Users can update own scheduled pickups" ON scheduled_pickups;
+CREATE POLICY "Users can update own scheduled pickups" ON scheduled_pickups FOR UPDATE
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can delete own scheduled pickups"
-  ON scheduled_pickups FOR DELETE
+DROP POLICY IF EXISTS "Users can delete own scheduled pickups" ON scheduled_pickups;
+CREATE POLICY "Users can delete own scheduled pickups" ON scheduled_pickups FOR DELETE
   USING (auth.uid() = user_id);

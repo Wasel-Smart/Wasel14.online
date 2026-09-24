@@ -1,46 +1,36 @@
 -- Database hardening for production scoring
 -- Focus: integrity rules, default-payment safety, and audit-friendly indexes.
 
-alter table public.trips
-  drop constraint if exists chk_trips_package_slots_bounds;
-alter table public.trips
-  add constraint chk_trips_package_slots_bounds
+ALTER TABLE public.trips DROP CONSTRAINT IF EXISTS chk_trips_package_slots_bounds;
+ALTER TABLE public.trips ADD CONSTRAINT chk_trips_package_slots_bounds
   check (package_slots_remaining >= 0 and package_slots_remaining <= package_capacity);
 
-alter table public.trips
-  drop constraint if exists chk_trips_package_mode_consistency;
-alter table public.trips
-  add constraint chk_trips_package_mode_consistency
+ALTER TABLE public.trips DROP CONSTRAINT IF EXISTS chk_trips_package_mode_consistency;
+ALTER TABLE public.trips ADD CONSTRAINT chk_trips_package_mode_consistency
   check (
     (allow_packages = true and package_capacity >= 0)
     or
     (allow_packages = false and package_capacity = 0 and package_slots_remaining = 0)
   );
 
-alter table public.packages
-  drop constraint if exists chk_packages_delivery_state;
-alter table public.packages
-  add constraint chk_packages_delivery_state
+ALTER TABLE public.packages DROP CONSTRAINT IF EXISTS chk_packages_delivery_state;
+ALTER TABLE public.packages ADD CONSTRAINT chk_packages_delivery_state
   check (
     (package_status = 'delivered' and delivered_at is not null)
     or
     (package_status <> 'delivered' and delivered_at is null)
   );
 
-alter table public.transactions
-  drop constraint if exists chk_transactions_reference_pair;
-alter table public.transactions
-  add constraint chk_transactions_reference_pair
+ALTER TABLE public.transactions DROP CONSTRAINT IF EXISTS chk_transactions_reference_pair;
+ALTER TABLE public.transactions ADD CONSTRAINT chk_transactions_reference_pair
   check (
     (reference_id is null and reference_type is null)
     or
     (reference_id is not null and reference_type is not null)
   );
 
-alter table public.payment_methods
-  drop constraint if exists chk_payment_methods_status;
-alter table public.payment_methods
-  add constraint chk_payment_methods_status
+ALTER TABLE public.payment_methods DROP CONSTRAINT IF EXISTS chk_payment_methods_status;
+ALTER TABLE public.payment_methods ADD CONSTRAINT chk_payment_methods_status
   check (status in ('active', 'inactive', 'expired', 'revoked'));
 
 create unique index if not exists uq_users_email_lower
@@ -90,7 +80,7 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_payment_methods_single_default on public.payment_methods;
+DROP TRIGGER IF EXISTS trg_payment_methods_single_default ON public.payment_methods;
 create trigger trg_payment_methods_single_default
 before insert or update on public.payment_methods
 for each row execute function public.ensure_single_default_payment_method();

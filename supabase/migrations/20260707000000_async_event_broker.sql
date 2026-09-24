@@ -57,43 +57,43 @@ alter table public.ops_aggregates enable row level security;
 -- authenticated role owns queue operations. Service-role keys keep full
 -- access server-side. Tighten these policies if a dedicated worker backend
 -- is introduced later.
-create policy "authenticated can write outbox"
-  on public.event_outbox for insert
+DROP POLICY IF EXISTS "authenticated can write outbox" ON public.event_outbox;
+CREATE POLICY "authenticated can write outbox" ON public.event_outbox for insert
   to authenticated
   with check (true);
 
-create policy "authenticated can read outbox"
-  on public.event_outbox for select
+DROP POLICY IF EXISTS "authenticated can read outbox" ON public.event_outbox;
+CREATE POLICY "authenticated can read outbox" ON public.event_outbox for select
   to authenticated
   using (true);
 
-create policy "authenticated can update outbox"
-  on public.event_outbox for update
+DROP POLICY IF EXISTS "authenticated can update outbox" ON public.event_outbox;
+CREATE POLICY "authenticated can update outbox" ON public.event_outbox for update
   to authenticated
   using (true);
 
-create policy "authenticated can write dead_letter"
-  on public.dead_letter_messages for insert
+DROP POLICY IF EXISTS "authenticated can write dead_letter" ON public.dead_letter_messages;
+CREATE POLICY "authenticated can write dead_letter" ON public.dead_letter_messages for insert
   to authenticated
   with check (true);
 
-create policy "authenticated can read dead_letter"
-  on public.dead_letter_messages for select
+DROP POLICY IF EXISTS "authenticated can read dead_letter" ON public.dead_letter_messages;
+CREATE POLICY "authenticated can read dead_letter" ON public.dead_letter_messages for select
   to authenticated
   using (true);
 
-create policy "authenticated can write ops_aggregates"
-  on public.ops_aggregates for insert
+DROP POLICY IF EXISTS "authenticated can write ops_aggregates" ON public.ops_aggregates;
+CREATE POLICY "authenticated can write ops_aggregates" ON public.ops_aggregates for insert
   to authenticated
   with check (true);
 
-create policy "authenticated can upsert ops_aggregates"
-  on public.ops_aggregates for update
+DROP POLICY IF EXISTS "authenticated can upsert ops_aggregates" ON public.ops_aggregates;
+CREATE POLICY "authenticated can upsert ops_aggregates" ON public.ops_aggregates for update
   to authenticated
   using (true);
 
-create policy "authenticated can read ops_aggregates"
-  on public.ops_aggregates for select
+DROP POLICY IF EXISTS "authenticated can read ops_aggregates" ON public.ops_aggregates;
+CREATE POLICY "authenticated can read ops_aggregates" ON public.ops_aggregates for select
   to authenticated
   using (true);
 

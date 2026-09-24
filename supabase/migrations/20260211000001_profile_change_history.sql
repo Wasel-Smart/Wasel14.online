@@ -18,22 +18,22 @@ CREATE TABLE IF NOT EXISTS public.profile_change_history (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_profile_change_history_user_id ON public.profile_change_history(user_id);
-CREATE INDEX idx_profile_change_history_changed_at ON public.profile_change_history(changed_at DESC);
-CREATE INDEX idx_profile_change_history_field_name ON public.profile_change_history(field_name);
+CREATE INDEX IF NOT EXISTS idx_profile_change_history_user_id ON public.profile_change_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_profile_change_history_changed_at ON public.profile_change_history(changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_profile_change_history_field_name ON public.profile_change_history(field_name);
 
 -- Enable Row Level Security
 ALTER TABLE public.profile_change_history ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their own change history
-CREATE POLICY profile_change_history_select_own
-  ON public.profile_change_history
+DROP POLICY IF EXISTS profile_change_history_select_own ON public.profile_change_history;
+CREATE POLICY profile_change_history_select_own ON public.profile_change_history
   FOR SELECT
   USING (auth.uid() = user_id);
 
 -- RLS Policy: System can insert change records
-CREATE POLICY profile_change_history_insert_system
-  ON public.profile_change_history
+DROP POLICY IF EXISTS profile_change_history_insert_system ON public.profile_change_history;
+CREATE POLICY profile_change_history_insert_system ON public.profile_change_history
   FOR INSERT
   WITH CHECK (auth.uid() = changed_by);
 

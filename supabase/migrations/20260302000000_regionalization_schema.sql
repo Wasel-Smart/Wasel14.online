@@ -55,9 +55,9 @@ CREATE TABLE IF NOT EXISTS countries (
 );
 
 -- Index for fast lookups
-CREATE INDEX idx_countries_iso_alpha2 ON countries(iso_alpha2);
-CREATE INDEX idx_countries_status ON countries(status);
-CREATE INDEX idx_countries_priority ON countries(priority);
+CREATE INDEX IF NOT EXISTS idx_countries_iso_alpha2 ON countries(iso_alpha2);
+CREATE INDEX IF NOT EXISTS idx_countries_status ON countries(status);
+CREATE INDEX IF NOT EXISTS idx_countries_priority ON countries(priority);
 
 -- Update trigger
 CREATE OR REPLACE FUNCTION update_countries_updated_at()
@@ -68,6 +68,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_countries_updated_at ON countries;
 CREATE TRIGGER trigger_update_countries_updated_at
   BEFORE UPDATE ON countries
   FOR EACH ROW
@@ -101,11 +102,12 @@ CREATE TABLE IF NOT EXISTS country_configs (
 );
 
 -- Indexes
-CREATE INDEX idx_country_configs_country_id ON country_configs(country_id);
-CREATE INDEX idx_country_configs_key ON country_configs(key);
-CREATE INDEX idx_country_configs_type ON country_configs(config_type);
+CREATE INDEX IF NOT EXISTS idx_country_configs_country_id ON country_configs(country_id);
+CREATE INDEX IF NOT EXISTS idx_country_configs_key ON country_configs(key);
+CREATE INDEX IF NOT EXISTS idx_country_configs_type ON country_configs(config_type);
 
 -- Update trigger
+DROP TRIGGER IF EXISTS trigger_update_country_configs_updated_at ON country_configs;
 CREATE TRIGGER trigger_update_country_configs_updated_at
   BEFORE UPDATE ON country_configs
   FOR EACH ROW
@@ -140,8 +142,8 @@ CREATE TABLE IF NOT EXISTS currencies (
 );
 
 -- Indexes
-CREATE INDEX idx_currencies_code ON currencies(code);
-CREATE INDEX idx_currencies_active ON currencies(is_active);
+CREATE INDEX IF NOT EXISTS idx_currencies_code ON currencies(code);
+CREATE INDEX IF NOT EXISTS idx_currencies_active ON currencies(is_active);
 
 -- ============================================================================
 -- 4. EXCHANGE_RATES TABLE (Real-time Currency Conversion)
@@ -171,9 +173,9 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 );
 
 -- Indexes
-CREATE INDEX idx_exchange_rates_pair ON exchange_rates(from_currency_code, to_currency_code);
-CREATE INDEX idx_exchange_rates_fetched_at ON exchange_rates(fetched_at DESC);
-CREATE INDEX idx_exchange_rates_active ON exchange_rates(is_active);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_pair ON exchange_rates(from_currency_code, to_currency_code);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_fetched_at ON exchange_rates(fetched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_active ON exchange_rates(is_active);
 
 -- ============================================================================
 -- 5. SERVICE_ZONES (Geo-Fencing & Service Areas)
@@ -207,10 +209,10 @@ CREATE TABLE IF NOT EXISTS service_zones (
 );
 
 -- Spatial indexes (PostGIS)
-CREATE INDEX idx_service_zones_polygon ON service_zones USING GIST(zone_polygon);
-CREATE INDEX idx_service_zones_center ON service_zones USING GIST(center_point);
-CREATE INDEX idx_service_zones_country ON service_zones(country_id);
-CREATE INDEX idx_service_zones_service_type ON service_zones(service_type);
+CREATE INDEX IF NOT EXISTS idx_service_zones_polygon ON service_zones USING GIST(zone_polygon);
+CREATE INDEX IF NOT EXISTS idx_service_zones_center ON service_zones USING GIST(center_point);
+CREATE INDEX IF NOT EXISTS idx_service_zones_country ON service_zones(country_id);
+CREATE INDEX IF NOT EXISTS idx_service_zones_service_type ON service_zones(service_type);
 
 -- ============================================================================
 -- 6. ROUTE_RESTRICTIONS (Cross-Border Logic)
@@ -240,8 +242,8 @@ CREATE TABLE IF NOT EXISTS route_restrictions (
 );
 
 -- Indexes
-CREATE INDEX idx_route_restrictions_from ON route_restrictions(from_country_id);
-CREATE INDEX idx_route_restrictions_to ON route_restrictions(to_country_id);
+CREATE INDEX IF NOT EXISTS idx_route_restrictions_from ON route_restrictions(from_country_id);
+CREATE INDEX IF NOT EXISTS idx_route_restrictions_to ON route_restrictions(to_country_id);
 
 -- ============================================================================
 -- 7. PRICING_ZONES (Dynamic Pricing per Zone)
@@ -269,9 +271,9 @@ CREATE TABLE IF NOT EXISTS pricing_zones (
 );
 
 -- Indexes
-CREATE INDEX idx_pricing_zones_polygon ON pricing_zones USING GIST(zone_polygon);
-CREATE INDEX idx_pricing_zones_country ON pricing_zones(country_id);
-CREATE INDEX idx_pricing_zones_active ON pricing_zones(is_active);
+CREATE INDEX IF NOT EXISTS idx_pricing_zones_polygon ON pricing_zones USING GIST(zone_polygon);
+CREATE INDEX IF NOT EXISTS idx_pricing_zones_country ON pricing_zones(country_id);
+CREATE INDEX IF NOT EXISTS idx_pricing_zones_active ON pricing_zones(is_active);
 
 -- ============================================================================
 -- 8. COUNTRY_SERVICES (Feature Flags per Country)
@@ -303,8 +305,8 @@ CREATE TABLE IF NOT EXISTS country_services (
 );
 
 -- Indexes
-CREATE INDEX idx_country_services_country ON country_services(country_id);
-CREATE INDEX idx_country_services_enabled ON country_services(enabled);
+CREATE INDEX IF NOT EXISTS idx_country_services_country ON country_services(country_id);
+CREATE INDEX IF NOT EXISTS idx_country_services_enabled ON country_services(enabled);
 
 -- ============================================================================
 -- 9. COUNTRY_FEATURE_FLAGS (Feature Toggle System)
@@ -335,9 +337,9 @@ CREATE TABLE IF NOT EXISTS country_feature_flags (
 );
 
 -- Indexes
-CREATE INDEX idx_country_feature_flags_country ON country_feature_flags(country_id);
-CREATE INDEX idx_country_feature_flags_key ON country_feature_flags(flag_key);
-CREATE INDEX idx_country_feature_flags_enabled ON country_feature_flags(enabled);
+CREATE INDEX IF NOT EXISTS idx_country_feature_flags_country ON country_feature_flags(country_id);
+CREATE INDEX IF NOT EXISTS idx_country_feature_flags_key ON country_feature_flags(flag_key);
+CREATE INDEX IF NOT EXISTS idx_country_feature_flags_enabled ON country_feature_flags(enabled);
 
 -- ============================================================================
 -- 10. USER_REGIONAL_PREFERENCES (User-Specific Country Settings)
@@ -369,8 +371,8 @@ CREATE TABLE IF NOT EXISTS user_regional_preferences (
 );
 
 -- Indexes
-CREATE INDEX idx_user_regional_prefs_user ON user_regional_preferences(user_id);
-CREATE INDEX idx_user_regional_prefs_country ON user_regional_preferences(country_iso);
+CREATE INDEX IF NOT EXISTS idx_user_regional_prefs_user ON user_regional_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_regional_prefs_country ON user_regional_preferences(country_iso);
 
 -- ============================================================================
 -- 11. CONFIG_AUDIT_LOG (Full Audit Trail)
@@ -406,10 +408,10 @@ CREATE TABLE IF NOT EXISTS config_audit_log (
 );
 
 -- Indexes
-CREATE INDEX idx_config_audit_table ON config_audit_log(table_name);
-CREATE INDEX idx_config_audit_record ON config_audit_log(record_id);
-CREATE INDEX idx_config_audit_user ON config_audit_log(user_id);
-CREATE INDEX idx_config_audit_changed_at ON config_audit_log(changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_config_audit_table ON config_audit_log(table_name);
+CREATE INDEX IF NOT EXISTS idx_config_audit_record ON config_audit_log(record_id);
+CREATE INDEX IF NOT EXISTS idx_config_audit_user ON config_audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_config_audit_changed_at ON config_audit_log(changed_at DESC);
 
 -- ============================================================================
 -- SEED DATA: Initial 10 MENA Countries
@@ -492,38 +494,38 @@ ALTER TABLE user_regional_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE config_audit_log ENABLE ROW LEVEL SECURITY;
 
 -- Public read access for countries, currencies, exchange rates
-CREATE POLICY "Public read access to active countries"
-  ON countries FOR SELECT
+DROP POLICY IF EXISTS "Public read access to active countries" ON countries;
+CREATE POLICY "Public read access to active countries" ON countries FOR SELECT
   USING (status = 'active' OR status = 'coming_soon');
 
-CREATE POLICY "Public read access to currencies"
-  ON currencies FOR SELECT
+DROP POLICY IF EXISTS "Public read access to currencies" ON currencies;
+CREATE POLICY "Public read access to currencies" ON currencies FOR SELECT
   USING (is_active = true);
 
-CREATE POLICY "Public read access to exchange rates"
-  ON exchange_rates FOR SELECT
+DROP POLICY IF EXISTS "Public read access to exchange rates" ON exchange_rates;
+CREATE POLICY "Public read access to exchange rates" ON exchange_rates FOR SELECT
   USING (is_active = true);
 
 -- Users can read their own preferences
-CREATE POLICY "Users can read own regional preferences"
-  ON user_regional_preferences FOR SELECT
+DROP POLICY IF EXISTS "Users can read own regional preferences" ON user_regional_preferences;
+CREATE POLICY "Users can read own regional preferences" ON user_regional_preferences FOR SELECT
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can update own regional preferences"
-  ON user_regional_preferences FOR UPDATE
+DROP POLICY IF EXISTS "Users can update own regional preferences" ON user_regional_preferences;
+CREATE POLICY "Users can update own regional preferences" ON user_regional_preferences FOR UPDATE
   USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert own regional preferences"
-  ON user_regional_preferences FOR INSERT
+DROP POLICY IF EXISTS "Users can insert own regional preferences" ON user_regional_preferences;
+CREATE POLICY "Users can insert own regional preferences" ON user_regional_preferences FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- Admin-only policies for config tables
-CREATE POLICY "Admins can manage country_configs"
-  ON country_configs FOR ALL
+DROP POLICY IF EXISTS "Admins can manage country_configs" ON country_configs;
+CREATE POLICY "Admins can manage country_configs" ON country_configs FOR ALL
   USING (auth.jwt() ->> 'role' = 'admin');
 
-CREATE POLICY "Admins can manage service_zones"
-  ON service_zones FOR ALL
+DROP POLICY IF EXISTS "Admins can manage service_zones" ON service_zones;
+CREATE POLICY "Admins can manage service_zones" ON service_zones FOR ALL
   USING (auth.jwt() ->> 'role' = 'admin');
 
 -- ============================================================================

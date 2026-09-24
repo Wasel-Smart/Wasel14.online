@@ -21,13 +21,13 @@ create index if not exists idx_payment_idempotency_expires
 
 alter table public.payment_idempotency_keys enable row level security;
 
-create policy "Users can read their own idempotency keys"
-  on public.payment_idempotency_keys for select
+DROP POLICY IF EXISTS "Users can read their own idempotency keys" ON public.payment_idempotency_keys;
+CREATE POLICY "Users can read their own idempotency keys" ON public.payment_idempotency_keys for select
   using (user_id = public.current_user_id());
 
 -- Service role only for insert/update (called from edge functions)
-create policy "Service role manages idempotency keys"
-  on public.payment_idempotency_keys for all
+DROP POLICY IF EXISTS "Service role manages idempotency keys" ON public.payment_idempotency_keys;
+CREATE POLICY "Service role manages idempotency keys" ON public.payment_idempotency_keys for all
   to service_role
   using (true)
   with check (true);
@@ -65,12 +65,12 @@ create index if not exists idx_payment_events_type
 alter table public.payment_events enable row level security;
 
 -- Users can see their own payment events; admins see all
-create policy "Users see own payment events"
-  on public.payment_events for select
+DROP POLICY IF EXISTS "Users see own payment events" ON public.payment_events;
+CREATE POLICY "Users see own payment events" ON public.payment_events for select
   using (user_id = public.current_user_id() or public.is_admin());
 
-create policy "Service role manages payment events"
-  on public.payment_events for all
+DROP POLICY IF EXISTS "Service role manages payment events" ON public.payment_events;
+CREATE POLICY "Service role manages payment events" ON public.payment_events for all
   to service_role
   using (true)
   with check (true);
@@ -97,8 +97,8 @@ create index if not exists idx_fraud_events_unresolved
 
 alter table public.fraud_events enable row level security;
 
-create policy "Only admins can view fraud events"
-  on public.fraud_events for all
+DROP POLICY IF EXISTS "Only admins can view fraud events" ON public.fraud_events;
+CREATE POLICY "Only admins can view fraud events" ON public.fraud_events for all
   using (public.is_admin())
   with check (public.is_admin());
 

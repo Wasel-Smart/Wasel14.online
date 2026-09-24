@@ -210,10 +210,8 @@ create table if not exists public.trip_presence (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
-alter table public.drivers
-  drop constraint if exists drivers_vehicle_id_fkey;
-alter table public.drivers
-  add constraint drivers_vehicle_id_fkey
+ALTER TABLE public.drivers DROP CONSTRAINT IF EXISTS drivers_vehicle_id_fkey;
+ALTER TABLE public.drivers ADD CONSTRAINT drivers_vehicle_id_fkey
   foreign key (vehicle_id) references public.vehicles(vehicle_id) on delete set null;
 
 create index if not exists idx_users_role on public.users(role);
@@ -240,31 +238,31 @@ begin
 end;
 $$;
 
-drop trigger if exists trg_users_create_wallet on public.users;
+DROP TRIGGER IF EXISTS trg_users_create_wallet ON public.users;
 create trigger trg_users_create_wallet after insert on public.users
 for each row execute function public.create_wallet_for_user();
 
-drop trigger if exists trg_users_updated_at on public.users;
+DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users;
 create trigger trg_users_updated_at before update on public.users for each row execute function public.set_updated_at();
-drop trigger if exists trg_drivers_updated_at on public.drivers;
+DROP TRIGGER IF EXISTS trg_drivers_updated_at ON public.drivers;
 create trigger trg_drivers_updated_at before update on public.drivers for each row execute function public.set_updated_at();
-drop trigger if exists trg_vehicles_updated_at on public.vehicles;
+DROP TRIGGER IF EXISTS trg_vehicles_updated_at ON public.vehicles;
 create trigger trg_vehicles_updated_at before update on public.vehicles for each row execute function public.set_updated_at();
-drop trigger if exists trg_wallets_updated_at on public.wallets;
+DROP TRIGGER IF EXISTS trg_wallets_updated_at ON public.wallets;
 create trigger trg_wallets_updated_at before update on public.wallets for each row execute function public.set_updated_at();
-drop trigger if exists trg_trips_updated_at on public.trips;
+DROP TRIGGER IF EXISTS trg_trips_updated_at ON public.trips;
 create trigger trg_trips_updated_at before update on public.trips for each row execute function public.set_updated_at();
-drop trigger if exists trg_bookings_updated_at on public.bookings;
+DROP TRIGGER IF EXISTS trg_bookings_updated_at ON public.bookings;
 create trigger trg_bookings_updated_at before update on public.bookings for each row execute function public.set_updated_at();
-drop trigger if exists trg_packages_updated_at on public.packages;
+DROP TRIGGER IF EXISTS trg_packages_updated_at ON public.packages;
 create trigger trg_packages_updated_at before update on public.packages for each row execute function public.set_updated_at();
-drop trigger if exists trg_transactions_updated_at on public.transactions;
+DROP TRIGGER IF EXISTS trg_transactions_updated_at ON public.transactions;
 create trigger trg_transactions_updated_at before update on public.transactions for each row execute function public.set_updated_at();
-drop trigger if exists trg_verification_records_updated_at on public.verification_records;
+DROP TRIGGER IF EXISTS trg_verification_records_updated_at ON public.verification_records;
 create trigger trg_verification_records_updated_at before update on public.verification_records for each row execute function public.set_updated_at();
-drop trigger if exists trg_payment_methods_updated_at on public.payment_methods;
+DROP TRIGGER IF EXISTS trg_payment_methods_updated_at ON public.payment_methods;
 create trigger trg_payment_methods_updated_at before update on public.payment_methods for each row execute function public.set_updated_at();
-drop trigger if exists trg_trip_presence_updated_at on public.trip_presence;
+DROP TRIGGER IF EXISTS trg_trip_presence_updated_at ON public.trip_presence;
 create trigger trg_trip_presence_updated_at before update on public.trip_presence for each row execute function public.set_updated_at();
 
 create or replace function public.current_user_id()
@@ -712,24 +710,24 @@ alter table public.payment_methods enable row level security;
 alter table public.package_events enable row level security;
 alter table public.trip_presence enable row level security;
 
-drop policy if exists users_self_or_admin_select on public.users;
-create policy users_self_or_admin_select on public.users
+DROP POLICY IF EXISTS users_self_or_admin_select ON public.users;
+CREATE POLICY users_self_or_admin_select ON public.users
 for select using (id = public.current_user_id() or public.is_admin());
 
-drop policy if exists users_self_or_admin_update on public.users;
-create policy users_self_or_admin_update on public.users
+DROP POLICY IF EXISTS users_self_or_admin_update ON public.users;
+CREATE POLICY users_self_or_admin_update ON public.users
 for update using (id = public.current_user_id() or public.is_admin());
 
-drop policy if exists drivers_self_or_admin_select on public.drivers;
-create policy drivers_self_or_admin_select on public.drivers
+DROP POLICY IF EXISTS drivers_self_or_admin_select ON public.drivers;
+CREATE POLICY drivers_self_or_admin_select ON public.drivers
 for select using (user_id = public.current_user_id() or public.is_admin());
 
-drop policy if exists drivers_self_or_admin_update on public.drivers;
-create policy drivers_self_or_admin_update on public.drivers
+DROP POLICY IF EXISTS drivers_self_or_admin_update ON public.drivers;
+CREATE POLICY drivers_self_or_admin_update ON public.drivers
 for update using (user_id = public.current_user_id() or public.is_admin());
 
-drop policy if exists vehicles_driver_or_admin_access on public.vehicles;
-create policy vehicles_driver_or_admin_access on public.vehicles
+DROP POLICY IF EXISTS vehicles_driver_or_admin_access ON public.vehicles;
+CREATE POLICY vehicles_driver_or_admin_access ON public.vehicles
 for all using (
   exists (
     select 1 from public.drivers d
@@ -738,23 +736,23 @@ for all using (
   )
 );
 
-drop policy if exists trips_public_open_select on public.trips;
-create policy trips_public_open_select on public.trips
+DROP POLICY IF EXISTS trips_public_open_select ON public.trips;
+CREATE POLICY trips_public_open_select ON public.trips
 for select using (
   trip_status in ('open', 'booked', 'in_progress')
   or public.is_admin()
   or exists (select 1 from public.drivers d where d.driver_id = trips.driver_id and d.user_id = public.current_user_id())
 );
 
-drop policy if exists trips_driver_or_admin_write on public.trips;
-create policy trips_driver_or_admin_write on public.trips
+DROP POLICY IF EXISTS trips_driver_or_admin_write ON public.trips;
+CREATE POLICY trips_driver_or_admin_write ON public.trips
 for all using (
   public.is_admin()
   or exists (select 1 from public.drivers d where d.driver_id = trips.driver_id and d.user_id = public.current_user_id())
 );
 
-drop policy if exists bookings_owner_driver_admin_access on public.bookings;
-create policy bookings_owner_driver_admin_access on public.bookings
+DROP POLICY IF EXISTS bookings_owner_driver_admin_access ON public.bookings;
+CREATE POLICY bookings_owner_driver_admin_access ON public.bookings
 for all using (
   passenger_id = public.current_user_id()
   or public.is_admin()
@@ -767,8 +765,8 @@ for all using (
   )
 );
 
-drop policy if exists packages_sender_driver_admin_access on public.packages;
-create policy packages_sender_driver_admin_access on public.packages
+DROP POLICY IF EXISTS packages_sender_driver_admin_access ON public.packages;
+CREATE POLICY packages_sender_driver_admin_access ON public.packages
 for all using (
   sender_id = public.current_user_id()
   or receiver_id = public.current_user_id()
@@ -782,12 +780,12 @@ for all using (
   )
 );
 
-drop policy if exists wallets_owner_admin_access on public.wallets;
-create policy wallets_owner_admin_access on public.wallets
+DROP POLICY IF EXISTS wallets_owner_admin_access ON public.wallets;
+CREATE POLICY wallets_owner_admin_access ON public.wallets
 for select using (user_id = public.current_user_id() or public.is_admin());
 
-drop policy if exists transactions_owner_admin_access on public.transactions;
-create policy transactions_owner_admin_access on public.transactions
+DROP POLICY IF EXISTS transactions_owner_admin_access ON public.transactions;
+CREATE POLICY transactions_owner_admin_access ON public.transactions
 for select using (
   public.is_admin()
   or exists (
@@ -797,24 +795,24 @@ for select using (
   )
 );
 
-drop policy if exists verification_self_admin_access on public.verification_records;
-create policy verification_self_admin_access on public.verification_records
+DROP POLICY IF EXISTS verification_self_admin_access ON public.verification_records;
+CREATE POLICY verification_self_admin_access ON public.verification_records
 for all using (user_id = public.current_user_id() or public.is_admin());
 
-drop policy if exists admin_logs_admin_only on public.admin_logs;
-create policy admin_logs_admin_only on public.admin_logs
+DROP POLICY IF EXISTS admin_logs_admin_only ON public.admin_logs;
+CREATE POLICY admin_logs_admin_only ON public.admin_logs
 for all using (public.is_admin());
 
-drop policy if exists otp_owner_admin_access on public.otp_sessions;
-create policy otp_owner_admin_access on public.otp_sessions
+DROP POLICY IF EXISTS otp_owner_admin_access ON public.otp_sessions;
+CREATE POLICY otp_owner_admin_access ON public.otp_sessions
 for select using (user_id = public.current_user_id() or public.is_admin());
 
-drop policy if exists payment_methods_owner_admin_access on public.payment_methods;
-create policy payment_methods_owner_admin_access on public.payment_methods
+DROP POLICY IF EXISTS payment_methods_owner_admin_access ON public.payment_methods;
+CREATE POLICY payment_methods_owner_admin_access ON public.payment_methods
 for all using (user_id = public.current_user_id() or public.is_admin());
 
-drop policy if exists package_events_access on public.package_events;
-create policy package_events_access on public.package_events
+DROP POLICY IF EXISTS package_events_access ON public.package_events;
+CREATE POLICY package_events_access ON public.package_events
 for select using (
   public.is_admin()
   or exists (
@@ -824,8 +822,8 @@ for select using (
   )
 );
 
-drop policy if exists trip_presence_driver_admin_access on public.trip_presence;
-create policy trip_presence_driver_admin_access on public.trip_presence
+DROP POLICY IF EXISTS trip_presence_driver_admin_access ON public.trip_presence;
+CREATE POLICY trip_presence_driver_admin_access ON public.trip_presence
 for all using (
   public.is_admin()
   or exists (
