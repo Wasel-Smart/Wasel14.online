@@ -85,6 +85,9 @@ export function useLiveUserStats(): { stats: LiveUserStats | null; loading: bool
     if (fetchingRef.current) {return;}
     fetchingRef.current = true;
     setLoading(true);
+    // NOTE: fetchingRef is reset inside the function body (not before the timer
+    // fires) so rapid re-renders that cancel and reschedule the effect cannot
+    // leave fetchingRef stuck at true while load is not running.
 
     const connectedStats = getConnectedStats();
     const baseStats: LiveUserStats = {
@@ -119,9 +122,16 @@ export function useLiveUserStats(): { stats: LiveUserStats | null; loading: bool
   }, [authUserId, localTrips, localRating, localBalance]);
 
   useEffect(() => {
+    // Reset the guard when deps change so the next scheduled load is not
+    // blocked by a stale true value from a previous render cycle.
     fetchingRef.current = false;
     const timer = setTimeout(() => void load(), 0);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Cancel any in-flight fetch when deps change so stale results are
+      // never applied after a rapid auth state transition.
+      fetchingRef.current = false;
+    };
   }, [load]);
 
   return { stats, loading };

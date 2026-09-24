@@ -79,6 +79,13 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
+function isE2ELocalAuthMode(): boolean {
+  // Set by scripts/start-playwright-dev.mjs for every Playwright run.
+  // Allows E2E tests to seed a localStorage session even when a real
+  // Supabase project is configured in the environment.
+  return import.meta.env.VITE_E2E_LOCAL_AUTH === 'true';
+}
+
 function readLocalE2ESession(): WaselUser | null {
   if (typeof window === 'undefined') {return null;}
   const storageKey = (import.meta?.env?.VITE_LOCAL_AUTH_STORAGE_KEY) || 'wasel_user_session';
@@ -147,13 +154,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const client = getSupabaseClient();
         if (!mounted) {return;}
 
+        // In E2E mode the test runner seeds a WaselUser into localStorage.
+        // Check this BEFORE attempting Supabase so the demo session is always
+        // honoured, even when a real Supabase project is configured.
+        if (isE2ELocalAuthMode()) {
+          const localSession = readLocalE2ESession();
+          if (localSession) {
+            const authUser = createLocalAuthUser(localSession);
+            const localProfile = createLocalAuthProfile(localSession);
+            setUser(authUser);
+            setProfile(localProfile);
+            setSession(null);
+            setIsBackendConnected(false);
+            setInitializing(false);
+            return;
+          }
+        }
+
         if (!client) {
           const localSession = readLocalE2ESession();
           if (localSession) {
             const authUser = createLocalAuthUser(localSession);
-            const profile = createLocalAuthProfile(localSession);
+            const localProfile = createLocalAuthProfile(localSession);
             setUser(authUser);
-            setProfile(profile);
+            setProfile(localProfile);
             setSession(null);
             setIsBackendConnected(false);
             setInitializing(false);
