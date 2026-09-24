@@ -1,4 +1,4 @@
-﻿import { motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   ArrowRight,
   ArrowLeft,
@@ -101,9 +101,9 @@ export function ProofSection({ ar, onNavigate }: SectionNavigationProps) {
   return (
     <motion.section initial={false} className="wasel-home-section">
       <SectionHeader
-        title={ar ? 'إثبات قبل التسجيل' : 'Proof before signup'}
+        title={tx('homeContent.proof_section_title')}
         icon="P"
-        action={ar ? 'افتح الثقة' : 'Open trust'}
+        action={tx('homeContent.proof_section_action')}
         onAction={() => onNavigate('/app/trust', 'proof_trust')}
       />
       <div
@@ -125,19 +125,13 @@ export function ProofSection({ ar, onNavigate }: SectionNavigationProps) {
             style={{ color: C.cyan }}
           >
             <ShieldCheck size={14} />
-            {ar ? 'مصداقية مدمجة' : 'Built-in credibility'}
+            {tx('homeContent.proof_hero_badge')}
           </div>
-          <h2
-            className="wasel-home-proof-hero-title"
-          >
-            {ar
-              ? 'الثقة والدعم واقتصاديات المسار واضحة قبل أن يلتزم المستخدم.'
-              : 'Trust, support, and route economics are visible before users commit.'}
+          <h2 className="wasel-home-proof-hero-title">
+            {tx('homeContent.proof_hero_title')}
           </h2>
           <p className="wasel-home-proof-hero-desc">
-            {ar
-              ? 'لا يطلب Wasel من الناس تنسيق الحركة بلا وضوح. يعرض المنتج سياق المسار وجاهزية الثقة ومسارات الدعم وضوابط الخصوصية في نفس نقاط قرار الحجز أو العرض أو الإرسال.'
-              : 'Wasel does not ask people to coordinate movement blindly. The product exposes route context, trust readiness, support paths, and privacy controls at the same points where users decide whether to book, offer, or send.'}
+            {tx('homeContent.proof_hero_desc')}
           </p>
           <div className="wasel-home-proof-hero-actions">
             <WaselButton
@@ -146,7 +140,7 @@ export function ProofSection({ ar, onNavigate }: SectionNavigationProps) {
               iconEnd={ar ? <ArrowLeft size={15} /> : <ArrowRight size={15} />}
               onClick={() => { void onNavigate('/app/auth?tab=register', 'proof_register'); }}
             >
-              {ar ? 'أنشئ حسابا موثوقا' : 'Create trusted account'}
+              {tx('homeContent.proof_cta_register')}
             </WaselButton>
             <WaselButton
               type="button"
@@ -154,7 +148,7 @@ export function ProofSection({ ar, onNavigate }: SectionNavigationProps) {
               onClick={() => { void onNavigate('/app/security', 'proof_security'); }}
               style={{ background: C.elevated, color: C.text }}
             >
-              {ar ? 'راجع الأمان' : 'Review security'}
+              {tx('homeContent.proof_cta_security')}
             </WaselButton>
           </div>
         </div>
@@ -194,9 +188,9 @@ export function OnboardingDemoSection({ ar, onNavigate }: SectionNavigationProps
   return (
     <motion.section initial={false} className="wasel-home-section">
       <SectionHeader
-        title={ar ? 'تدفق تجريبي موجه' : 'Guided demo flow'}
+        title={tx('homeContent.demo_section_title')}
         icon="D"
-        action={ar ? 'ابدأ التجربة' : 'Start demo'}
+        action={tx('homeContent.demo_section_action')}
         onAction={() => onNavigate('/find-ride?demo=1', 'demo_start_header')}
       />
       <div
@@ -260,7 +254,7 @@ export function OnboardingDemoSection({ ar, onNavigate }: SectionNavigationProps
               <div style={{ marginTop: 'auto', paddingTop: 16 }}>
                 <ArrowCta
                   ar={ar}
-                  label={index === 0 ? (ar ? 'ابدأ هنا' : 'Begin here') : ar ? 'مشمول' : 'Included'}
+                  label={index === 0 ? tx('homeContent.step_begin_here') : tx('homeContent.step_included')}
                   accent={index === 0 ? C.cyan : C.textDim}
                 />
               </div>
@@ -285,9 +279,7 @@ export function OnboardingDemoSection({ ar, onNavigate }: SectionNavigationProps
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: C.textMuted }}>
           <MousePointerClick size={16} color={C.cyan} />
           <span style={{ fontSize: '0.84rem', lineHeight: 1.55 }}>
-            {ar
-              ? 'يحافظ وضع التجربة على تدفق بسيط: المسار أولا، ثم قرار واضح في كل خطوة.'
-              : 'Demo mode keeps the flow low-friction: route first, then one clear decision at a time.'}
+            {tx('homeContent.demo_footer_note')}
           </span>
         </div>
         <WaselButton
@@ -297,7 +289,7 @@ export function OnboardingDemoSection({ ar, onNavigate }: SectionNavigationProps
           onClick={() => { void onNavigate('/find-ride?demo=1', 'demo_start_footer'); }}
           style={{ background: C.card, color: C.text }}
         >
-          {ar ? 'جرب البداية الموجهة' : 'Try the guided start'}
+          {tx('homeContent.demo_footer_cta')}
         </WaselButton>
       </div>
     </motion.section>
@@ -309,7 +301,7 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
 
   return (
     <motion.section initial={false} className="wasel-home-section">
-      <SectionHeader title={ar ? 'نتائج المنتج' : 'Product outcomes'} icon="O" />
+      <SectionHeader title={tx('homeContent.outcomes_section_title')} icon="O" />
       <div
         className="wasel-home-outcome-grid"
         style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}
@@ -472,7 +464,7 @@ export function TrustPagesSection({ ar, onNavigate }: SectionNavigationProps) {
 
   return (
     <motion.section initial={false} className="wasel-home-section">
-      <SectionHeader title={ar ? 'صفحات الثقة' : 'Trust pages'} icon="S" />
+      <SectionHeader title={tx('homeContent.trust_section_title')} icon="S" />
       <div
         className="wasel-home-trust-grid"
         style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(0, 1fr))', gap: 12 }}
@@ -517,7 +509,7 @@ export function TrustPagesSection({ ar, onNavigate }: SectionNavigationProps) {
                 {tx(link.detailKey)}
               </div>
               <div style={{ marginTop: 'auto', paddingTop: 16 }}>
-                <ArrowCta ar={ar} label={ar ? 'افتح الصفحة' : 'Open page'} accent={link.accent} />
+                <ArrowCta ar={ar} label={tx('homeContent.trust_open_page')} accent={link.accent} />
               </div>
             </button>
           );

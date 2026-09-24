@@ -13,6 +13,8 @@ const child = spawn(command, commandArgs, {
   env: {
     ...process.env,
     VITE_ENABLE_DEMO_DATA: useDemoData ? 'true' : 'false',
+    // Signal to AuthContext to honour the localStorage session seed
+    // even when a real Supabase project is configured in the environment.
     VITE_E2E_LOCAL_AUTH: 'true',
   },
 });

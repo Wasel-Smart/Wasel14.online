@@ -20,11 +20,11 @@ sensitive values were found in local environment files.
 | `STRIPE_SECRET_KEY` | Stripe Dashboard → Developers → API Keys → reveal & rotate | ❌ Rotate now |
 | `STRIPE_WEBHOOK_SECRET` | Stripe Dashboard → Developers → Webhooks → rotate | ❌ Rotate now |
 | `VITE_GOOGLE_CLIENT_ID` / `SUPABASE_AUTH_GOOGLE_CLIENT_ID` | [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) | ❌ Verify scope |
-| `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET` | Google Cloud Console → OAuth Client → regenerate | ⚠️ Redacted from `.env`/`.env.production` working tree 2026-09-21 (placeholder now) — old value may still be LIVE until you regenerate it in Google Cloud Console |
+| `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET` | Google Cloud Console → OAuth Client → regenerate | ⚠️ Redacted from `.env`/`.env.production` working tree (placeholder now) — **MUST rotate at provider before go-live** |
 | `docs/wasel-planning-with-ai.json` (service account private key) | [Google Cloud Console → IAM → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) → delete key → create new key | ❌ Rotate & remove from repo |
 | `VITE_FACEBOOK_APP_ID` / `SUPABASE_AUTH_FACEBOOK_CLIENT_ID` | [Meta for Developers → App Settings → Security](https://developers.facebook.com/) | ❌ Verify scope |
-| `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET` | Meta for Developers → regenerate | ⚠️ Redacted from `.env`/`.env.production` working tree 2026-09-21 (placeholder now) — old value may still be LIVE until you regenerate it in Meta for Developers |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/_/settings/api) | ❌ Roll key |
+| `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET` | Meta for Developers → regenerate | ⚠️ Redacted from `.env`/`.env.production` working tree (placeholder now) — **MUST rotate at provider before go-live** |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | [Supabase Dashboard → Settings → API](https://supabase.com/dashboard/project/_/settings/api) | ⚠️ Redacted from working tree — **MUST set in Vercel env vars** |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Settings → API → regenerate | ❌ Rotate now |
 | `VERCEL_OIDC_TOKEN` (full JWT in `.env.local`) | Vercel Dashboard → Settings → Tokens | ❌ Revoke & regenerate |
 | `RESEND_API_KEY` | [Resend Dashboard → API Keys](https://resend.com/api-keys) | ❌ Rotate now |
@@ -45,6 +45,9 @@ sensitive values were found in local environment files.
 - [x] Delete `_SECRETS_NEEDS_ROTATION_THEN_DELETE/` directory — **DONE: deleted, folder removed, pattern added to .gitignore**
 - [ ] Enable GitHub → Settings → Security → Secret scanning
 - [ ] Enable GitHub → Settings → Security → Push protection
+- [x] `stripe_backup_code.txt` real code overwritten with rotation instructions — regenerate in Stripe dashboard
+- [x] `vercel-env-variables.txt` scrubbed — real OAuth IDs replaced with placeholders
+- [x] `SUPABASE_SECRET_KEY`, `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET`, `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET`, `SUPABASE_AUTH_HOOK_SEND_SMS_SECRET`, `VITE_SUPABASE_PUBLISHABLE_KEY` replaced with placeholders in `.env` and `.env.production`
 - [ ] Confirm no `.crt`, `.pem`, or `.key` files are tracked: `git ls-files | grep -E '\.(pem|key|crt|cer|p12|pfx)'`
 
 ---

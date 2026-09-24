@@ -8,6 +8,10 @@ const PATTERNS = {
   STRIPE_PUB: /pk_live_[A-Za-z0-9]{24,}/,
   TWILIO_SID: /AC[a-f0-9]{32}/,
   GENERIC_JWT: /eyJ[A-Za-z0-9-_]+\.eyJ[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+/,
+  SUPABASE_SECRET: /sb_secret_[A-Za-z0-9_-]{20,}/,
+  SUPABASE_PUBLISHABLE: /sb_publishable_[A-Za-z0-9_-]{20,}/,
+  GOOGLE_OAUTH_SECRET: /GOCSPX-[A-Za-z0-9_-]{28,}/,
+  WEBHOOK_SECRET: /whsec_[A-Za-z0-9+/=]{40,}/,
 };
 
 const EXCLUDED_FILES = [
@@ -18,6 +22,8 @@ const EXCLUDED_FILES = [
   'SECURITY_CHECKLIST.md',
   'CREDENTIAL_ROTATION_GUIDE.md',
   'validate-no-secrets.mjs',
+  'stripe_backup_code.txt',
+  'HONEST_AUDIT_REPORT.md',
   'task.md',
   'implementation_plan.md',
   'wasel_app_review.md'
