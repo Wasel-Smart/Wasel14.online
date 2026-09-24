@@ -9,3 +9,10 @@ coverage
 .env
 .env.local
 npm-debug.log
+
+.env.production*
+.vercel/
+supabase/.temp/
+.devcontainer/
+docs/
+.env.example

@@ -87,8 +87,8 @@ sensitive values were found in local environment files.
 - The Google and Facebook OAuth credentials in `.env.production`
   (gitignored, local only) are now populated with the **current** live
   values as of 2026-09-24:
-  - Google client `414388773369-7gvd1bpav52esknp3u8lg0natjp2l75p.apps.googleusercontent.com` / secret `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`
-  - Facebook app `2154021471813673` / secret `f2fa652f2ab7a764f1fff3e60f484cf6`
+  - Google client `[REDACTED]` / secret `[REDACTED]`
+  - Facebook app `[REDACTED]` / secret `[REDACTED]`
   - The older Google client `631682127784-...` that was previously in this
     file is **no longer referenced** — confirm it has been deleted or
     rotated in the Google Cloud Console so it cannot be abused.
