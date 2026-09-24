@@ -1,0 +1,25 @@
+/* Critical pre-render styles — loaded via <link> in index.html to avoid
+   the Vite 6 + @tailwindcss/vite inline-CSS proxy conflict. */
+html,
+body,
+#root {
+  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+html {
+  background: #071521;
+}
+
+body {
+  margin: 0;
+  background: #071521;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+}

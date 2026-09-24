@@ -9,18 +9,19 @@ vi.mock('../core', () => ({
   API_URL: '',
 }));
 
-class MockBackendRequestError extends Error {
-  status?: number;
-  constructor(message: string, status?: number) {
-    super(message);
-    this.status = status;
+vi.mock('../backendWorkflow', () => {
+  class MockBackendRequestError extends Error {
+    status?: number;
+    constructor(message: string, status?: number) {
+      super(message);
+      this.status = status;
+    }
   }
-}
-
-vi.mock('../backendWorkflow', () => ({
-  requestEdgeJson: vi.fn(),
-  BackendRequestError: MockBackendRequestError,
-}));
+  return {
+    requestEdgeJson: vi.fn(),
+    BackendRequestError: MockBackendRequestError,
+  };
+});
 
 const getConfigMock = vi.fn();
 vi.mock('../../utils/env', () => ({
