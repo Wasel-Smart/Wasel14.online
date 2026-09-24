@@ -27,11 +27,8 @@ import {
   mapBookingRow,
   mapPackageRow,
   fetchDriverProfiles,
-  authorizeTripOwner,
   buildTrustStatus,
   ensureMobilitySeed,
-  handleWalletDispatch,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';

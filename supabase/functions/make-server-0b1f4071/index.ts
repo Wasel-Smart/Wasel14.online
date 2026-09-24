@@ -31,7 +31,6 @@ import {
   buildTrustStatus,
   ensureMobilitySeed,
   handleWalletDispatch,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './_handlers/shared.ts';
@@ -50,7 +49,7 @@ import './_handlers/payments.ts';
 import './_handlers/trips.ts';
 import './_handlers/trust.ts';
 import './_handlers/wallet.ts';
-import './_handlers/webhooks.ts';
+import { handleStripeWebhook, handleCliqWebhook, handleSanadWebhook, handleResendWebhook, handleTwilioWebhook, handleSendSmsHook } from './_handlers/webhooks.ts';
 
 interface RouteDescriptor {
   id: string;
@@ -319,6 +318,12 @@ const ROUTES: RouteDescriptor[] = [
     methods: [ 'POST' ],
     test: ( path ) => /^\/admin\/drivers\/[^/]+\/approve$/.test( path ),
     handle: ( request, path ) => handleAdminApproveDriver( request, decodeURIComponent( path.split( '/' )[ 3 ] ) ),
+  },
+  {
+    id: 'auth-hook-send-sms',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/auth/hooks/send-sms',
+    handle: ( request ) => handleSendSmsHook( request ),
   },
   {
     id: 'payments-webhook-stripe',

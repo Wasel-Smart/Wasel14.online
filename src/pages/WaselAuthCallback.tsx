@@ -106,7 +106,8 @@ export default function WaselAuthCallback() {
         if (window.opener && !window.opener.closed) {
           setState('closing');
           setMessage('Sign-in complete. You can return to Wasel.');
-          window.opener.postMessage({ type: 'wasel-auth-complete' }, window.location.origin);
+          const nonce = sessionStorage.getItem('wasel_oauth_nonce') ?? '';
+          window.opener.postMessage({ type: 'wasel-auth-complete', nonce }, window.location.origin);
           window.close();
           return;
         }

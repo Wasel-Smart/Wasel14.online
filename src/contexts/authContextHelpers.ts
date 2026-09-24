@@ -111,6 +111,11 @@ export async function signInWithOAuthProvider(
       returnTo ? { returnTo } : undefined,
     );
 
+    // Generate and store a one-time nonce so the AuthContext message listener
+    // can verify the wasel-auth-complete postMessage came from our own callback.
+    const nonce = crypto.randomUUID();
+    sessionStorage.setItem('wasel_oauth_nonce', nonce);
+
     const scopes =
       provider === 'facebook'
         ? 'email,public_profile'

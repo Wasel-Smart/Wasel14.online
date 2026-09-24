@@ -66,6 +66,7 @@ export const SANAD_CLIENT_SECRET = Deno.env.get( 'SANAD_CLIENT_SECRET' ) ?? '';
 export const SANAD_WEBHOOK_SECRET = Deno.env.get( 'SANAD_WEBHOOK_SECRET' ) ?? '';
 export const SANAD_VERIFICATION_ENDPOINT = Deno.env.get( 'SANAD_VERIFICATION_ENDPOINT' ) ?? '/identity/verifications';
 export const STRIPE_WASEL_PLUS_PRICE_ID = Deno.env.get( 'STRIPE_WASEL_PLUS_PRICE_ID' ) ?? '';
+export const SUPABASE_AUTH_HOOK_SEND_SMS_SECRET = Deno.env.get( 'SUPABASE_AUTH_HOOK_SEND_SMS_SECRET' ) ?? '';
 export const ADDITIONAL_ALLOWED_ORIGINS = Deno.env.get( 'ALLOWED_ORIGINS' ) ?? '';
 // Localhost origins are only permitted when explicitly enabled (local dev).
 // In production this MUST stay false so dev origins cannot call the API.
@@ -363,6 +364,7 @@ export const WEBHOOK_PATH_PREFIXES = [
   '/sanad/webhook',
   '/communications/webhook',
   '/webhooks/',
+  '/auth/hooks/',
 ];
 
 export function isWebhookRoute ( path: string ): boolean {
@@ -1504,7 +1506,7 @@ export function buildSubscriptionRecord (
   };
 }
 
-export async getCanonicalUserIdForSubscription (
+export async function getCanonicalUserIdForSubscription (
   admin: ReturnType<typeof getAdminClient>,
   subscription: Record<string, unknown>,
 ): Promise<string | null> {

@@ -62,52 +62,7 @@ This guide walks you through configuring Google and Facebook OAuth for Wasel aut
 
      ```
      # For local Supabase CLI (if used): http://localhost:54321/auth/v1/callback
-     https://djccmatubyyudeosrngm.supabase.co/auth/v1/callback
-     ```
-
-5. Click **Create**
-6. Copy **Client ID** and **Client Secret**
-
-### Step 5: Add to Environment Variables
-
-Add to `.env`:
-
-```bash
-VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-SUPABASE_AUTH_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-SUPABASE_AUTH_GOOGLE_CLIENT_SECRET=your-client-secret
-```
-
----
-
-## Facebook OAuth Setup
-
-### Step 1: Create Facebook App
-
-1. Go to [Facebook Developers](https://developers.facebook.com/)
-2. Click **My Apps** > **Create App**
-3. Select **Consumer** as app type
-4. Fill in:
-   - **App name**: Wasel
-   - **App contact email**: <support@wasel14.online>
-5. Click **Create App**
-
-### Step 2: Add Facebook Login Product
-
-1. In your app dashboard, click **Add Product**
-2. Find **Facebook Login** and click **Set Up**
-3. Select **Web** platform
-4. Enter site URL: `https://wasel14.online`
-
-### Step 3: Configure Facebook Login Settings
-
-1. Go to **Facebook Login** > **Settings**
-2. Add **Valid OAuth Redirect URIs**:
-
-   ```
-   # Note: Only the supabase.co URL is needed for the default local setup.
-   # The localhost URL is for developers running the Supabase stack locally via Docker.
-   https://djccmatubyyudeosrngm.supabase.co/auth/v1/callback
+     https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback
    ```
 
 3. Save changes
@@ -141,7 +96,7 @@ SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET=your-facebook-app-secret
 ### Option 1: Supabase Dashboard (Recommended for Production)
 
 1. Go to [Supabase Dashboard](https://app.supabase.com/)
-2. Select your project: `djccmatubyyudeosrngm`
+2. Select your project: `zexlxabdcsjefptmjhuq`
 3. Navigate to **Authentication** > **Providers**
 
 #### Enable Google
@@ -195,19 +150,7 @@ npm run supabase:start
 
 ```bash
 # Supabase
-VITE_SUPABASE_URL=https://djccmatubyyudeosrngm.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-key
-
-# Google OAuth
-VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-SUPABASE_AUTH_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-SUPABASE_AUTH_GOOGLE_CLIENT_SECRET=your-client-secret
-
-# Facebook OAuth
-VITE_FACEBOOK_APP_ID=your-facebook-app-id
-SUPABASE_AUTH_FACEBOOK_CLIENT_ID=your-facebook-app-id
-SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET=your-facebook-app-secret
+VITE_SUPABASE_URL=https://zexlxabdcsjefptmjhuq.supabase.co
 
 # Auth Callback
 VITE_AUTH_CALLBACK_PATH=/app/auth/callback
@@ -258,7 +201,7 @@ Ensure your **Valid OAuth Redirect URIs** contains the Supabase callback URL. Th
 <!-- Note: The project ID here seems to be different from the one used in the Supabase config section. Verify which one is correct. -->
 ```bash
 VITE_APP_URL=https://wasel14.online
-VITE_SUPABASE_URL=https://djccmatubyyudeosrngm.supabase.co
+VITE_SUPABASE_URL=https://zexlxabdcsjefptmjhuq.supabase.co
 # ... rest of production credentials
 ```
 

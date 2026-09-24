@@ -27,11 +27,8 @@ import {
   mapBookingRow,
   mapPackageRow,
   fetchDriverProfiles,
-  authorizeTripOwner,
   buildTrustStatus,
   ensureMobilitySeed,
-  handleWalletDispatch,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
@@ -550,7 +547,7 @@ async function handleWalletPay ( request: Request, requestedUserId: string ) {
   }
 }
 
-async function handleWalletDispatch ( request: Request, path: string ): Promise<Response | undefined> {
+export async function handleWalletDispatch ( request: Request, path: string ): Promise<Response | undefined> {
   const walletRoute = parseWalletRoute( path );
   if ( !walletRoute ) return undefined;
 

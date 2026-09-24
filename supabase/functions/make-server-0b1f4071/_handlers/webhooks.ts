@@ -34,6 +34,9 @@ import {
   resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
+  SUPABASE_AUTH_HOOK_SEND_SMS_SECRET,
+  deliveryEnv,
+  constantTimeEquals,
 } from './shared.ts';
 
 async function handleStripeWebhook ( request: Request ) {
@@ -352,4 +355,62 @@ async function handleTwilioWebhook ( request: Request ) {
 
   if ( error ) return json( { error: error.message }, 500 );
   return json( { received: true, status } );
+}
+
+export async function handleSendSmsHook ( request: Request ): Promise<Response> {
+  if ( !SUPABASE_AUTH_HOOK_SEND_SMS_SECRET ) {
+    return json( { error: 'SMS hook secret is not configured.' }, 503 );
+  }
+
+  // Verify Supabase webhook signature: Authorization: Bearer <whsec_...>
+  const authHeader = request.headers.get( 'authorization' ) ?? '';
+  const token = authHeader.startsWith( 'Bearer ' ) ? authHeader.slice( 7 ).trim() : '';
+  if ( !token || !constantTimeEquals( token, SUPABASE_AUTH_HOOK_SEND_SMS_SECRET ) ) {
+    return json( { error: 'Invalid webhook signature.' }, 401 );
+  }
+
+  const body = await request.json().catch( () => null );
+  if ( !body || typeof body !== 'object' ) {
+    return json( { error: 'Invalid request body.' }, 400 );
+  }
+
+  const phone = String( ( body as Record<string, unknown> ).phone ?? '' ).trim();
+  const otp = String( ( body as Record<string, unknown> ).otp ?? '' ).trim();
+
+  if ( !phone || !otp ) {
+    return json( { error: 'Missing phone or otp in hook payload.' }, 400 );
+  }
+
+  const accountSid = deliveryEnv.twilioAccountSid ?? '';
+  const authToken = deliveryEnv.twilioAuthToken ?? '';
+  const from = deliveryEnv.twilioSmsFrom ?? '';
+
+  if ( !accountSid || !authToken || !from ) {
+    return json( { error: 'Twilio is not configured.' }, 503 );
+  }
+
+  const params = new URLSearchParams( {
+    To: phone,
+    From: from,
+    Body: `Your Wasel verification code is: ${ otp }`,
+  } );
+
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${ accountSid }/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${ btoa( `${ accountSid }:${ authToken }` ) }`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    },
+  );
+
+  if ( !response.ok ) {
+    const err = await response.json().catch( () => ( {} ) );
+    return json( { error: String( err?.message ?? `Twilio error ${ response.status }` ) }, 502 );
+  }
+
+  return json( { success: true } );
 }
