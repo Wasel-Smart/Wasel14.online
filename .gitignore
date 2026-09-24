@@ -226,6 +226,12 @@ lint-output.txt
 
 # ---- Copy-paste env cheat sheets (should never hold real values, but never commit them) ----
 vercel-env-variables.txt
+scripts/check-vercel-env.mjs
+scripts/extract-vercel-env.mjs
+scripts/generate-all-vercel-env.mjs
+
+# ---- Local CA certs (dev-only, never commit) ----
+prod-ca-*.crt
 
 # ---- Root-level scratch fix/test scripts ----
 fix-all-handlers.cjs

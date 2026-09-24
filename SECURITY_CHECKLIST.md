@@ -62,7 +62,7 @@ sensitive values were found in local environment files.
 
 ---
 
-## Session update — 2026-09-21 (file-level verification only, no exec access)
+## Session update — 2026-09-24 (file-level verification only, no exec access)
 
 - `docs/wasel-planning-with-ai.json` (the real service account key) is
   **still not present in the working tree** — only the `.example` placeholder
@@ -72,6 +72,15 @@ sensitive values were found in local environment files.
 - `_SECRETS_NEEDS_ROTATION_THEN_DELETE/` **no longer exists** — confirmed
   deleted from the working tree (the two conflicting notes about this in the
   prior version of this file are resolved: it is gone, full stop).
+- The Google OAuth client secret JSON (`client_secret_*.json`) that was
+  sitting loose in the project root — inside a OneDrive-synced folder — has
+  been **moved to `_git_hygiene_quarantine/`** (still on disk, still
+  syncable, but no longer loose at the repo root). **Delete it after you
+  rotate the Google OAuth client in the Cloud Console.**
+- `prod-ca-2021.crt` and the Vercel env cheat sheets
+  (`vercel-env-variables.txt`, `scripts/check-vercel-env.mjs`,
+  `scripts/extract-vercel-env.mjs`, `scripts/generate-all-vercel-env.mjs`)
+  have been **untracked from git** and added to `.gitignore`.
 - The two live secrets that actually remained on disk — the Google and
   Facebook OAuth client secrets in root `.env` and `.env.production` — have
   been redacted to placeholders in the working tree. **This is not
@@ -81,3 +90,7 @@ sensitive values were found in local environment files.
   at the provider) as of this session — redaction from local files and
   provider-side rotation are two different things, and only the first one
   has been done here.
+- **Git tree scan (2026-09-24):** zero tracked files contain
+  `client_secret`, `GOCSPX`, `sk_live`, `whsec_`, `re_live`, Twilio
+  account SIDs, or any `.env`/`.env.local`/`.env.production` file. The
+  committed tree is clean of secrets.
