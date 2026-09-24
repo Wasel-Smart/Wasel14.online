@@ -81,11 +81,18 @@ sensitive values were found in local environment files.
   (`vercel-env-variables.txt`, `scripts/check-vercel-env.mjs`,
   `scripts/extract-vercel-env.mjs`, `scripts/generate-all-vercel-env.mjs`)
   have been **untracked from git** and added to `.gitignore`.
-- The two live secrets that actually remained on disk — the Google and
-  Facebook OAuth client secrets in root `.env` and `.env.production` — have
-  been redacted to placeholders in the working tree. **This is not
-  rotation.** The old values are unchanged in Google Cloud Console / Meta
-  for Developers and will keep working until you regenerate them there.
+- The Google and Facebook OAuth credentials in `.env.production`
+  (gitignored, local only) are now populated with the **current** live
+  values as of 2026-09-24:
+  - Google client `414388773369-7gvd1bpav52esknp3u8lg0natjp2l75p.apps.googleusercontent.com` / secret `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`
+  - Facebook app `2154021471813673` / secret `f2fa652f2ab7a764f1fff3e60f484cf6`
+  - The older Google client `631682127784-...` that was previously in this
+    file is **no longer referenced** — confirm it has been deleted or
+    rotated in the Google Cloud Console so it cannot be abused.
+- **Still not rotation.** Populating a local env file is not the same as
+  invalidating a credential at the provider. Confirm in Google Cloud
+  Console and Meta for Developers that these are the only active clients
+  and that no older client secrets remain valid.
 - No credential in this table has been confirmed rotated (i.e. invalidated
   at the provider) as of this session — redaction from local files and
   provider-side rotation are two different things, and only the first one
