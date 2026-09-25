@@ -40,7 +40,10 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
 
   resolve: {
-    alias: [{ find: '@', replacement: path.resolve(__dirname, './src') }],
+    alias: [
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+      { find: '@wasel/rbac', replacement: path.resolve(__dirname, './packages/rbac/src/index.ts') },
+    ],
   },
 
   build: {
