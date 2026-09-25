@@ -1,0 +1,606 @@
+openapi: 3.0.3
+info:
+  title: Wasel Wallet Service API
+  version: 1.0.0
+  description: |
+    Wallet and payment management for Wasel platform.
+    Handles balance, transactions, PIN, auto top-up, withdrawals, and peer-to-peer transfers.
+    Uses database-backed rate limiting for sensitive operations (withdraw, send).
+  contact:
+    name: Wasel Platform Team
+    email: platform@wasel.jo
+servers:
+  - url: https://wasel14.online/functions/v1/wallet-service
+    description: Production
+  - url: https://wasel14-staging.supabase.co/functions/v1/wallet-service
+    description: Staging
+  - url: http://localhost:54321/functions/v1/wallet-service
+    description: Local development (Supabase CLI)
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT access token
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Insufficient wallet balance."
+      required: [error]
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        note:
+          type: string
+          maxLength: 200
+          description: Optional note for transfers
+
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, limited, frozen, closed, unavailable]
+        currency:
+          type: string
+          example: "JOD"
+        autoTopUp:
+          type: boolean
+        autoTopUpAmount:
+          type: number
+          format: decimal
+        autoTopUpThreshold:
+          type: number
+          format: decimal
+        paymentMethods:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              type:
+                type: string
+                enum: [card, bank_transfer, wallet_balance]
+              isDefault:
+                type: boolean
+              last4:
+                type: string
+              brand:
+                type: string
+              expiryMonth:
+                type: integer
+              expiryYear:
+                type: integer
+              createdAt:
+                type: string
+                format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, status, currency, autoTopUp, autoTopUpAmount, autoTopUpThreshold, paymentMethods, createdAt]
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [wallet, top_up, withdrawal, send, receive, refund, trip_payment, package_payment]
+        amount:
+          type: number
+          format: decimal
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, amount, createdAt]
+
+    WalletResponse:
+      type: object
+      properties:
+        wallet:
+          $ref: '#/components/schemas/Wallet'
+        balance:
+          type: number
+          format: decimal
+        pendingBalance:
+          type: number
+          format: decimal
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+      required: [wallet, balance, pendingBalance, transactions]
+
+    TransactionsResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+      required: [transactions]
+
+    PinRequest:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+          pattern: "^\\d{4}$"
+          example: "1234"
+          description: 4-digit wallet PIN
+
+    PinVerifyResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+      required: [verified]
+
+    AutoTopUpRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        amount:
+          type: number
+          format: decimal
+          minimum: 1
+          default: 20
+          description: Top-up amount in JOD
+        threshold:
+          type: number
+          format: decimal
+          minimum: 0
+          default: 5
+          description: Balance threshold to trigger auto top-up
+
+    WithdrawRequest:
+      type: object
+      required: [amount, bankAccount]
+      properties:
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.001
+          example: 50.000
+          description: Amount in JOD (3 decimal precision)
+        bankAccount:
+          type: string
+          maxLength: 100
+          example: "JO32ABCD1234567890123456"
+          description: IBAN or bank account identifier
+
+    SendRequest:
+      type: object
+      required: [amount, recipientId]
+      properties:
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.001
+          example: 25.500
+          description: Amount in JOD (3 decimal precision)
+        recipientId:
+          type: string
+          description: Recipient user ID, email, or phone number
+        note:
+          type: string
+          maxLength: 200
+          description: Optional transfer note
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          example: wallet-service
+        timestamp:
+          type: string
+          format: date-time
+
+  parameters:
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Wallet owner user ID (must match authenticated user)
+
+    ActionParam:
+      name: action
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [transactions, set-pin, verify-pin, auto-top-up, withdraw, send]
+      description: Wallet action
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid auth token"
+    Forbidden:
+      description: Not authorized for this wallet
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Wallet route is not authorized for this user."
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Recipient wallet was not found."
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            invalid_pin:
+              summary: Invalid PIN format
+              value:
+                error: "Wallet PIN must be four digits."
+            insufficient_balance:
+              summary: Insufficient balance
+              value:
+                error: "Insufficient wallet balance."
+            self_transfer:
+              summary: Cannot send to self
+              value:
+                error: "Cannot send wallet funds to the same account."
+    RateLimited:
+      description: Rate limit exceeded (DB-backed, fails closed)
+      headers:
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            withdraw:
+              summary: Withdrawal rate limited
+              value:
+                error: "Too many withdrawal attempts. Try again later."
+            send:
+              summary: Send rate limited
+              value:
+                error: "Too many send attempts. Try again later."
+    InternalError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+
+paths:
+  /wallet/{userId}:
+    get:
+      summary: Get wallet details
+      description: |
+        Returns wallet info, balance, pending balance, payment methods, and recent transactions.
+        Requires authenticated user matching userId.
+      operationId: getWallet
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Wallet details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/{userId}/transactions:
+    get:
+      summary: Get wallet transactions
+      description: Returns paginated transaction history for the wallet
+      operationId: getWalletTransactions
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/{userId}/set-pin:
+    post:
+      summary: Set wallet PIN
+      description: |
+        Set or update the 4-digit wallet PIN for sensitive operations.
+        Uses PBKDF2 with 210,000 iterations.
+      operationId: setWalletPin
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PinRequest'
+            examples:
+              standard:
+                value:
+                  pin: "1234"
+      responses:
+        '200':
+          description: PIN set successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/{userId}/verify-pin:
+    post:
+      summary: Verify wallet PIN
+      description: Verify the 4-digit wallet PIN
+      operationId: verifyWalletPin
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PinRequest'
+            examples:
+              standard:
+                value:
+                  pin: "1234"
+      responses:
+        '200':
+          description: PIN verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PinVerifyResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/{userId}/auto-top-up:
+    post:
+      summary: Configure auto top-up
+      description: |
+        Enable/disable and configure automatic wallet top-up when balance falls below threshold.
+      operationId: setAutoTopUp
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoTopUpRequest'
+            examples:
+              enable:
+                summary: Enable auto top-up
+                value:
+                  enabled: true
+                  amount: 20
+                  threshold: 5
+              disable:
+                summary: Disable auto top-up
+                value:
+                  enabled: false
+      responses:
+        '200':
+          description: Auto top-up configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/{userId}/withdraw:
+    post:
+      summary: Withdraw funds to bank account
+      description: |
+        Withdraw wallet balance to a bank account.
+        **Rate limited**: 3 attempts per hour per user (DB-backed, fails closed).
+        Requires sufficient balance.
+      operationId: withdrawFunds
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawRequest'
+            examples:
+              standard:
+                value:
+                  amount: 50.000
+                  bankAccount: "JO32ABCD1234567890123456"
+      responses:
+        '200':
+          description: Withdrawal initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/{userId}/send:
+    post:
+      summary: Send funds to another user
+      description: |
+        Transfer wallet funds to another Wasel user by user ID, email, or phone.
+        **Rate limited**: 10 attempts per hour per user (DB-backed, fails closed).
+        Cannot send to self.
+      operationId: sendFunds
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendRequest'
+            examples:
+              by_user_id:
+                summary: Send by user ID
+                value:
+                  amount: 25.500
+                  recipientId: "550e8400-e29b-41d4-a716-446655440000"
+                  note: "Dinner split"
+              by_email:
+                summary: Send by email
+                value:
+                  amount: 10.000
+                  recipientId: "ahmad@example.com"
+              by_phone:
+                summary: Send by phone
+                value:
+                  amount: 15.000
+                  recipientId: "+962790000000"
+      responses:
+        '200':
+          description: Transfer successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          headers:
+            X-Api-Version:
+              schema:
+                type: string
+              example: v1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'

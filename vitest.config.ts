@@ -20,6 +20,7 @@ export default defineConfig( {
     alias: [
       { find: '@', replacement: path.resolve( __dirname, './src' ) },
       { find: '$deno', replacement: path.resolve( __dirname, './supabase/functions' ) },
+      { find: '@wasel/rbac', replacement: path.resolve( __dirname, './packages/rbac/src' ) },
     ],
   },
 

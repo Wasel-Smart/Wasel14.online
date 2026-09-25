@@ -1,0 +1,40 @@
+{
+  "name": "@wasel/rbac",
+  "version": "1.0.0",
+  "description": "Wasel RBAC - Single source of truth for roles and permissions",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./deno": {
+      "import": "./deno/index.ts",
+      "types": "./deno/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc && cp src/index.ts deno/index.ts",
+    "dev": "tsc -w",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "files": [
+    "dist",
+    "deno"
+  ],
+  "keywords": [
+    "rbac",
+    "authorization",
+    "wasel"
+  ],
+  "author": "Wasel Platform Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

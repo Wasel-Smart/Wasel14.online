@@ -11,7 +11,7 @@
  */
 import React, { memo, Suspense, useEffect } from 'react';
 import { AlertTriangle, LoaderCircle, SearchX } from 'lucide-react';
-import { createBrowserRouter, isRouteErrorResponse, Navigate, useLocation, useRouteError, type RouteObject } from 'react-router';
+import { createBrowserRouter, isRouteErrorResponse, Navigate, useRouteError, type RouteObject } from 'react-router';
 import { Button } from './components/ui/button';
 import { WaselStateCard } from './components/system/WaselStateCard';
 import { useLanguage } from './contexts/LanguageContext';
@@ -59,12 +59,6 @@ function lazy(
 
 // ── Utility redirects ─────────────────────────────────────────────────────────
 const RedirectTo = memo(({ to }: { to: string }) => <Navigate to={to} replace />);
-
-const RedirectToPreserveQuery = memo(({ to }: { to: string }) => {
-  const location = useLocation();
-  const preservedSearch = location.search ? `${to}${location.search}` : to;
-  return <Navigate to={preservedSearch} replace />;
-});
 
 const NotFound = memo(() => {
   const { language } = useLanguage();
@@ -186,44 +180,6 @@ const RouteErrorFallback = memo(() => {
     />
   );
 });
-
-const LEGACY_APP_ALIASES = [
-  '/auth',
-  '/dashboard',
-  '/home',
-  '/find-ride',
-  '/offer-ride',
-  '/post-ride',
-  '/my-trips',
-  '/booking-requests',
-  '/live-trip',
-  '/routes',
-  '/bus',
-  '/packages',
-  '/awasel/send',
-  '/awasel/track',
-  '/raje3',
-  '/services/raje3',
-  '/services/corporate',
-  '/services/school',
-  '/innovation-hub',
-  '/analytics',
-  '/mobility-os',
-  '/ai-intelligence',
-  '/wallet',
-  '/plus',
-  '/payments',
-  '/profile',
-  '/settings',
-  '/notifications',
-  '/driver',
-  '/privacy',
-  '/terms',
-  '/legal/privacy',
-  '/legal/terms',
-  '/moderation',
-  '/schedule',
-] as const;
 
 // ── Route children factory ────────────────────────────────────────────────────
 const buildMainChildren = (): RouteObject[] => [
@@ -393,12 +349,6 @@ const buildMainChildren = (): RouteObject[] => [
   { path: '*', Component: NotFound },
 ];
 
-const buildLegacyAliases = () =>
-  LEGACY_APP_ALIASES.map(path => ({
-    path,
-    Component: () => <RedirectToPreserveQuery to={`/app${path}`} />,
-  }));
-
 // ── Router ────────────────────────────────────────────────────────────────────
 export const waselRouter = createBrowserRouter([
   {
@@ -417,7 +367,6 @@ export const waselRouter = createBrowserRouter([
     ],
   },
   { path: '/security', Component: () => <RedirectTo to="/app/security" /> },
-  ...buildLegacyAliases(),
   {
     path: '/app',
     Component: WaselRoot,

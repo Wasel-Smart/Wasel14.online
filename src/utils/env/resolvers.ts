@@ -96,6 +96,12 @@ export function resolveAppUrl(envSource: EnvSource = readEnvSource()): string {
     return browserOrigin;
   }
 
+  // When running locally (dev server) but VITE_APP_URL points to production,
+  // use the browser origin so OAuth redirect URIs match the actual origin.
+  if (isLocalHttpUrl(browserOrigin) && !isLocalHttpUrl(configuredAppUrl)) {
+    return browserOrigin;
+  }
+
   if (isLocalHttpUrl(configuredAppUrl) && !isLocalHttpUrl(browserOrigin)) {
     return browserOrigin;
   }

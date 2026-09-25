@@ -11,7 +11,9 @@
     "moduleResolution": "Bundler",
     "paths": {
       "*": ["./*"],
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@wasel/rbac": ["./packages/rbac/src/index.ts"],
+      "@wasel/rbac/*": ["./packages/rbac/src/*"]
     },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,

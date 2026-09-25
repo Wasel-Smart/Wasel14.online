@@ -1,0 +1,452 @@
+openapi: 3.0.3
+info:
+  title: Wasel Package Service API
+  version: 1.0.0
+  description: |
+    Package delivery management for Wasel platform.
+    Handles package creation, tracking, assignment, and delivery confirmation.
+  contact:
+    name: Wasel Platform Team
+    email: platform@wasel.jo
+servers:
+  - url: https://wasel14.online/functions/v1/package-service
+    description: Production
+  - url: https://wasel14-staging.supabase.co/functions/v1/package-service
+    description: Staging
+  - url: http://localhost:54321/functions/v1/package-service
+    description: Local development (Supabase CLI)
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT access token
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Package not found"
+      required: [error]
+
+    Package:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Package ID
+        package_id:
+          type: string
+          format: uuid
+        tracking_number:
+          type: string
+          pattern: "^WSL-PKG-[A-Z0-9]{8}$"
+          example: "WSL-PKG-A1B2C3D4"
+        qr_code:
+          type: string
+          pattern: "^WSL-PKG-[A-Z0-9]{8}$"
+        sender_id:
+          type: string
+          format: uuid
+        carrier_id:
+          type: string
+          format: uuid
+          nullable: true
+        trip_id:
+          type: string
+          format: uuid
+          nullable: true
+        receiver_name:
+          type: string
+        receiver_phone:
+          type: string
+        origin_name:
+          type: string
+        origin_location:
+          type: string
+          nullable: true
+          description: PostGIS POINT geometry
+        destination_name:
+          type: string
+        destination_location:
+          type: string
+          nullable: true
+          description: PostGIS POINT geometry
+        size:
+          type: string
+          enum: [small, medium, large]
+        weight_kg:
+          type: number
+          format: decimal
+          minimum: 0
+        description:
+          type: string
+        declared_value:
+          type: number
+          format: decimal
+          minimum: 0
+        fragile:
+          type: boolean
+        delivery_fee:
+          type: number
+          format: decimal
+        status:
+          type: string
+          enum: [posted, assigned, picked_up, delivered, cancelled]
+        created_at:
+          type: string
+          format: date-time
+        picked_up_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, package_id, tracking_number, sender_id, receiver_name, receiver_phone, origin_name, destination_name, size, weight_kg, description, declared_value, fragile, delivery_fee, status, created_at]
+
+    CreatePackageRequest:
+      type: object
+      required: [receiver_name, receiver_phone, origin_name, destination_name]
+      properties:
+        receiver_name:
+          type: string
+          maxLength: 255
+        receiver_phone:
+          type: string
+          pattern: "^\\+?[1-9]\\d{1,14}$"
+          example: "+962790000000"
+        origin_name:
+          type: string
+          maxLength: 255
+        origin_coords:
+          type: object
+          properties:
+            lat:
+              type: number
+              format: double
+              minimum: -90
+              maximum: 90
+            lng:
+              type: number
+              format: double
+              minimum: -180
+              maximum: 180
+          required: [lat, lng]
+          description: Optional origin coordinates for auto-assignment
+        destination_name:
+          type: string
+          maxLength: 255
+        destination_coords:
+          type: object
+          properties:
+            lat:
+              type: number
+              format: double
+              minimum: -90
+              maximum: 90
+            lng:
+              type: number
+              format: double
+              minimum: -180
+              maximum: 180
+          required: [lat, lng]
+          description: Optional destination coordinates for auto-assignment
+        size:
+          type: string
+          enum: [small, medium, large]
+          default: medium
+        weight:
+          type: number
+          format: decimal
+          minimum: 0
+          default: 0
+          description: Weight in kg
+        description:
+          type: string
+          default: ""
+        declared_value:
+          type: number
+          format: decimal
+          minimum: 0
+          default: 0
+        fragile:
+          type: boolean
+          default: false
+        base_price:
+          type: number
+          format: decimal
+          default: 5
+          description: Base delivery price (overrides calculated price)
+
+    PackageDeliveryRequest:
+      type: object
+      properties:
+        # Empty body - delivery confirmed by carrier or sender
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          example: package-service
+        timestamp:
+          type: string
+          format: date-time
+
+  parameters:
+    PackageIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Package UUID
+
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: User UUID (sender)
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid auth token"
+    Forbidden:
+      description: Not authorized to access this package
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not authorized to view this package."
+    NotFound:
+      description: Package not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Package not found"
+    InternalError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+paths:
+  /packages:
+    post:
+      summary: Create a new package
+      description: |
+        Create a package for delivery. Auto-assigns to available trip with package capacity.
+        Requires authenticated sender.
+      operationId: createPackage
+      tags: [Packages]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePackageRequest'
+            examples:
+              standard:
+                summary: Standard package
+                value:
+                  receiver_name: "Ahmad Al-Masri"
+                  receiver_phone: "+962790000000"
+                  origin_name: "Amman - 7th Circle"
+                  destination_name: "Zarqa - Main Station"
+                  size: medium
+                  weight: 2.5
+                  description: "Documents"
+                  declared_value: 50
+                  fragile: false
+              with_coords:
+                summary: Package with coordinates for better matching
+                value:
+                  receiver_name: "Ahmad Al-Masri"
+                  receiver_phone: "+962790000000"
+                  origin_name: "Amman - 7th Circle"
+                  origin_coords:
+                    lat: 31.9539
+                    lng: 35.9106
+                  destination_name: "Zarqa - Main Station"
+                  destination_coords:
+                    lat: 32.0732
+                    lng: 36.0926
+                  size: small
+                  weight: 0.5
+                  fragile: true
+      responses:
+        '200':
+          description: Package created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  package:
+                    $ref: '#/components/schemas/Package'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      summary: List packages (requires userId path)
+      description: |
+        Use GET /packages/sender/{userId} instead.
+      operationId: listPackages
+      tags: [Packages]
+      deprecated: true
+      responses:
+        '400':
+          $ref: '#/components/responses/InternalError'
+
+  /packages/sender/{userId}:
+    get:
+      summary: List packages sent by user
+      description: Returns all packages where the authenticated user is the sender
+      operationId: listSenderPackages
+      tags: [Packages]
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: List of packages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Package'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /packages/{id}:
+    get:
+      summary: Get package details
+      description: Returns package details. Accessible by sender or assigned carrier.
+      operationId: getPackage
+      tags: [Packages]
+      parameters:
+        - $ref: '#/components/parameters/PackageIdParam'
+      responses:
+        '200':
+          description: Package details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /packages/{id}/deliver:
+    post:
+      summary: Confirm package delivery
+      description: |
+        Mark package as delivered. Can be called by assigned carrier or sender.
+      operationId: deliverPackage
+      tags: [Packages]
+      parameters:
+        - $ref: '#/components/parameters/PackageIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackageDeliveryRequest'
+      responses:
+        '200':
+          description: Package delivered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Package'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          headers:
+            X-Api-Version:
+              schema:
+                type: string
+              example: v1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
