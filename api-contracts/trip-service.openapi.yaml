@@ -1,0 +1,645 @@
+openapi: 3.0.3
+info:
+  title: Wasel Trip Service API
+  version: 1.0.0
+  description: |
+    Trip management for Wasel ride-sharing platform.
+    Handles trip creation, search, updates, and driver trip management.
+  contact:
+    name: Wasel Platform Team
+    email: platform@wasel.jo
+servers:
+  - url: https://wasel14.online/functions/v1/trip-service
+    description: Production
+  - url: https://wasel14-staging.supabase.co/functions/v1/trip-service
+    description: Staging
+  - url: http://localhost:54321/functions/v1/trip-service
+    description: Local development (Supabase CLI)
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT access token
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Driver approval is required before publishing rides"
+      required: [error]
+
+    Trip:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Trip ID
+        from:
+          type: string
+          description: Origin city name
+        to:
+          type: string
+          description: Destination city name
+        date:
+          type: string
+          format: date
+          description: Departure date (YYYY-MM-DD)
+        time:
+          type: string
+          format: time
+          description: Departure time (HH:MM)
+        seats:
+          type: integer
+          minimum: 0
+          description: Available seats
+        price:
+          type: number
+          format: decimal
+          description: Price per seat
+        driver:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            rating:
+              type: number
+              format: decimal
+              minimum: 0
+              maximum: 5
+            verified:
+              type: boolean
+          required: [id, name, rating, verified]
+        vehicle_make:
+          type: string
+          nullable: true
+        vehicle_model:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        trip_status:
+          type: string
+          enum: [draft, open, booked, in_progress, completed, cancelled]
+        allow_packages:
+          type: boolean
+        package_capacity:
+          type: integer
+          minimum: 0
+          maximum: 3
+        created_at:
+          type: string
+          format: date-time
+
+    TripSearchParams:
+      type: object
+      properties:
+        from:
+          type: string
+          description: Origin city (partial match, case-insensitive)
+        to:
+          type: string
+          description: Destination city (partial match, case-insensitive)
+        date:
+          type: string
+          format: date
+          description: Departure date filter (YYYY-MM-DD)
+        seats:
+          type: integer
+          minimum: 1
+          maximum: 8
+          description: Minimum available seats required
+
+    CreateTripRequest:
+      type: object
+      required: [from, to, date, time, seats, price]
+      properties:
+        from:
+          type: string
+          description: Origin city
+        to:
+          type: string
+          description: Destination city
+        date:
+          type: string
+          format: date
+          description: Departure date (YYYY-MM-DD)
+        time:
+          type: string
+          format: time
+          description: Departure time (HH:MM)
+        seats:
+          type: integer
+          minimum: 1
+          maximum: 8
+          description: Available seats
+        price:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Price per seat
+        carModel:
+          type: string
+          description: Vehicle make and model (e.g., "Toyota Camry 2024")
+        acceptsPackages:
+          type: boolean
+          default: false
+          description: Allow package delivery on this trip
+        packageCapacity:
+          type: string
+          enum: [small, medium, large]
+          description: Package capacity tier
+        note:
+          type: string
+          description: Optional trip notes
+
+    UpdateTripRequest:
+      type: object
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+          format: time
+        seats:
+          type: integer
+          minimum: 1
+          maximum: 8
+        price:
+          type: number
+          format: decimal
+          minimum: 0
+        status:
+          type: string
+          enum: [open, active, cancelled]
+          description: Trip status (active maps to open)
+        note:
+          type: string
+
+    CalculatePriceRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [passenger, package]
+          default: passenger
+        weight:
+          type: number
+          description: Package weight in kg
+        distance_km:
+          type: number
+          description: Trip distance in kilometers
+        base_price:
+          type: number
+          format: decimal
+          default: 5
+          description: Base price
+
+    CalculatePriceResponse:
+      type: object
+      properties:
+        total:
+          type: number
+          format: decimal
+        breakdown:
+          type: object
+          properties:
+            base:
+              type: number
+              format: decimal
+            distance:
+              type: number
+              format: decimal
+            weight:
+              type: number
+              format: decimal
+          required: [base, distance, weight]
+      required: [total, breakdown]
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          example: trip-service
+        timestamp:
+          type: string
+          format: date-time
+
+  parameters:
+    TripIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Trip UUID
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid auth token"
+    Forbidden:
+      description: Insufficient permissions or driver not approved
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Driver approval is required before publishing rides"
+    NotFound:
+      description: Trip not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Trip not found"
+    InternalError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+paths:
+  /trips/search:
+    get:
+      summary: Search available trips
+      description: |
+        Public search for published trips. No authentication required.
+        Supports filtering by origin, destination, date, and minimum seats.
+      operationId: searchTrips
+      tags: [Trips]
+      security: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+          description: Origin city (partial match)
+        - name: to
+          in: query
+          schema:
+            type: string
+          description: Destination city (partial match)
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Departure date (YYYY-MM-DD)
+        - name: seats
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 8
+          description: Minimum available seats
+      responses:
+        '200':
+          description: List of matching trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trip'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /trips/calculate-price:
+    post:
+      summary: Calculate trip price
+      description: |
+        Calculate price for a trip based on type, distance, and weight.
+        No authentication required.
+      operationId: calculateTripPrice
+      tags: [Trips]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalculatePriceRequest'
+            examples:
+              passenger:
+                summary: Passenger trip
+                value:
+                  type: passenger
+                  distance_km: 50
+              package:
+                summary: Package delivery
+                value:
+                  type: package
+                  weight: 5
+                  distance_km: 30
+      responses:
+        '200':
+          description: Calculated price
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculatePriceResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /trips:
+    post:
+      summary: Create a new trip
+      description: |
+        Create a new trip offer. Requires authenticated approved driver.
+        Driver must have level_3 verification, approved status, and background check.
+      operationId: createTrip
+      tags: [Trips]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTripRequest'
+            examples:
+              standard:
+                summary: Standard ride
+                value:
+                  from: "Amman"
+                  to: "Zarqa"
+                  date: "2026-10-15"
+                  time: "08:30"
+                  seats: 4
+                  price: 15.00
+                  carModel: "Toyota Camry 2024"
+                  acceptsPackages: true
+                  packageCapacity: medium
+              package_only:
+                summary: Package delivery trip
+                value:
+                  from: "Amman"
+                  to: "Irbid"
+                  date: "2026-10-15"
+                  time: "10:00"
+                  seats: 1
+                  price: 25.00
+                  acceptsPackages: true
+                  packageCapacity: large
+      responses:
+        '200':
+          description: Trip created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      summary: List user's trips (as driver)
+      description: Returns all trips created by the authenticated driver
+      operationId: listUserTrips
+      tags: [Trips]
+      responses:
+        '200':
+          description: List of driver's trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /trips/user:
+    get:
+      summary: List user's trips (alias)
+      description: Alias for GET /trips
+      operationId: listUserTripsAlias
+      tags: [Trips]
+      deprecated: true
+      responses:
+        '200':
+          description: List of driver's trips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Trip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /trips/{id}:
+    get:
+      summary: Get trip details
+      description: Returns trip details including driver info. Public for published/active/completed trips.
+      operationId: getTrip
+      tags: [Trips]
+      parameters:
+        - $ref: '#/components/parameters/TripIdParam'
+      responses:
+        '200':
+          description: Trip details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      summary: Update trip
+      description: |
+        Update trip details. Requires trip owner (driver) authentication.
+        Only driver who owns the trip can update.
+      operationId: updateTrip
+      tags: [Trips]
+      parameters:
+        - $ref: '#/components/parameters/TripIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTripRequest'
+            examples:
+              update_details:
+                summary: Update trip details
+                value:
+                  from: "Amman"
+                  to: "Zarqa"
+                  date: "2026-10-16"
+                  time: "09:00"
+                  seats: 3
+                  price: 18.00
+                  note: "Updated departure time"
+      responses:
+        '200':
+          description: Trip updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trip'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      summary: Cancel trip
+      description: |
+        Cancel a trip. Requires trip owner (driver) authentication.
+        Sets trip_status to cancelled and deleted_at timestamp.
+      operationId: cancelTrip
+      tags: [Trips]
+      parameters:
+        - $ref: '#/components/parameters/TripIdParam'
+      responses:
+        '200':
+          description: Trip cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /trips/{id}/publish:
+    post:
+      summary: Publish trip
+      description: |
+        Publish a draft trip to make it searchable. Requires trip owner (driver) authentication.
+        Driver must be approved.
+      operationId: publishTrip
+      tags: [Trips]
+      parameters:
+        - $ref: '#/components/parameters/TripIdParam'
+      responses:
+        '200':
+          description: Trip published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      summary: Health check
+      description: Service health endpoint with API version header
+      operationId: healthCheck
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          headers:
+            X-Api-Version:
+              schema:
+                type: string
+              example: v1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'

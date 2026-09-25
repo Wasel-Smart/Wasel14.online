@@ -1,0 +1,429 @@
+openapi: 3.0.3
+info:
+  title: Wasel Booking Service API
+  version: 1.0.0
+  description: |
+    Booking management for Wasel ride-sharing platform.
+    Handles trip bookings, cancellations, and driver acceptance/rejection.
+  contact:
+    name: Wasel Platform Team
+    email: platform@wasel.jo
+servers:
+  - url: https://wasel14.online/functions/v1/booking-service
+    description: Production
+  - url: https://wasel14-staging.supabase.co/functions/v1/booking-service
+    description: Staging
+  - url: http://localhost:54321/functions/v1/booking-service
+    description: Local development (Supabase CLI)
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT access token
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Not enough seats available"
+      required: [error]
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Booking ID
+        booking_id:
+          type: string
+          format: uuid
+        trip_id:
+          type: string
+          format: uuid
+        passenger_id:
+          type: string
+          format: uuid
+        seats_requested:
+          type: integer
+          minimum: 1
+          maximum: 8
+        seat_number:
+          type: integer
+          minimum: 1
+        pickup_location:
+          type: string
+          nullable: true
+        dropoff_location:
+          type: string
+          nullable: true
+        price_per_seat:
+          type: number
+          format: decimal
+        total_price:
+          type: number
+          format: decimal
+        amount:
+          type: number
+          format: decimal
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed, rejected]
+        booking_status:
+          type: string
+          enum: [pending, confirmed, cancelled, completed, rejected]
+        confirmed_by_driver:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+        rejected_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_by:
+          type: string
+          format: uuid
+          nullable: true
+        cancellation_reason:
+          type: string
+          nullable: true
+      required: [id, booking_id, trip_id, passenger_id, seats_requested, price_per_seat, total_price, amount, status, booking_status, confirmed_by_driver, created_at]
+
+    CreateBookingRequest:
+      type: object
+      required: [trip_id]
+      properties:
+        trip_id:
+          type: string
+          format: uuid
+          description: ID of the trip to book
+        seats_requested:
+          type: integer
+          minimum: 1
+          maximum: 8
+          default: 1
+        seat_number:
+          type: integer
+          minimum: 1
+          default: 1
+        pickup_location:
+          type: string
+          description: Optional pickup stop name
+        dropoff_location:
+          type: string
+          description: Optional dropoff stop name
+        total_price:
+          type: number
+          format: decimal
+          description: Override total price (calculated from price_per_seat * seats_requested if not provided)
+        status:
+          type: string
+          enum: [pending, confirmed, pending_driver]
+          default: confirmed
+          description: Initial booking status
+        booking_status:
+          type: string
+          enum: [pending, confirmed, pending_driver]
+          default: confirmed
+
+    UpdateBookingRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted, rejected, cancelled, confirmed, pending_driver]
+          description: New booking status (driver accepts/rejects, passenger cancels)
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          example: booking-service
+        timestamp:
+          type: string
+          format: date-time
+
+  parameters:
+    BookingIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Booking UUID
+
+    TripIdParam:
+      name: tripId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Trip UUID
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid auth token"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "You do not own this booking"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Booking not found"
+    Conflict:
+      description: Business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Not enough seats available"
+    InternalError:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          example: 0
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          example: 45
+        Retry-After:
+          schema:
+            type: integer
+          example: 45
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Rate limit exceeded"
+
+paths:
+  /bookings:
+    post:
+      summary: Create a new booking
+      description: |
+        Book seats on a trip. Requires authenticated passenger.
+        Validates seat availability and creates booking with pending/confirmed status.
+      operationId: createBooking
+      tags: [Bookings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+            examples:
+              standard:
+                summary: Standard booking
+                value:
+                  trip_id: "550e8400-e29b-41d4-a716-446655440000"
+                  seats_requested: 2
+                  pickup_location: "Amman - 7th Circle"
+                  dropoff_location: "Zarqa - Main Station"
+      responses:
+        '200':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking:
+                    $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      summary: List user's bookings
+      description: Returns all bookings for the authenticated user (as passenger)
+      operationId: listUserBookings
+      tags: [Bookings]
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /bookings/user:
+    get:
+      summary: List user's bookings (alias)
+      description: Alias for GET /bookings
+      operationId: listUserBookingsAlias
+      tags: [Bookings]
+      deprecated: true
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /bookings/{id}:
+    put:
+      summary: Update booking status
+      description: |
+        Driver accepts/rejects booking or passenger cancels.
+        Requires authenticated user who owns the booking or is the trip driver.
+      operationId: updateBooking
+      tags: [Bookings]
+      parameters:
+        - $ref: '#/components/parameters/BookingIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBookingRequest'
+            examples:
+              accept:
+                summary: Driver accepts
+                value:
+                  status: accepted
+              reject:
+                summary: Driver rejects
+                value:
+                  status: rejected
+              cancel:
+                summary: Passenger cancels
+                value:
+                  status: cancelled
+      responses:
+        '200':
+          description: Booking updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /bookings/{id}/trip:
+    get:
+      summary: List bookings for a trip
+      description: Returns all bookings for a specific trip. Requires trip driver authentication.
+      operationId: listTripBookings
+      tags: [Bookings]
+      parameters:
+        - $ref: '#/components/parameters/TripIdParam'
+      responses:
+        '200':
+          description: List of bookings for the trip
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      summary: Health check
+      description: Service health endpoint
+      operationId: healthCheck
+      tags: [Health]
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
