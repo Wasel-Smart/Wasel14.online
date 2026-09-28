@@ -56,55 +56,18 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-
-          if (
-            id.includes('/node_modules/react/') ||
-            id.includes('/node_modules/react-dom/') ||
-            id.includes('/node_modules/react-router/') ||
-            id.includes('/node_modules/scheduler/')
-          ) return 'react-core';
-
-          if (
-            id.includes('/node_modules/@radix-ui/') ||
-            id.includes('/node_modules/lucide-react/') ||
-            id.includes('/node_modules/sonner/') ||
-            id.includes('/node_modules/vaul/') ||
-            id.includes('/node_modules/cmdk/') ||
-            id.includes('/node_modules/embla-carousel')
-          ) return 'ui-primitives';
-
-          if (id.includes('/node_modules/@supabase/')) return 'supabase';
-          if (
-            id.includes('/node_modules/@tanstack/') ||
-            id.includes('/node_modules/zod/')
-          ) return 'data-layer';
-
-            if (id.includes('/node_modules/leaflet/')) return 'maps';
-            if (
-              id.includes('/node_modules/motion/') ||
-              id.includes('/node_modules/framer-motion/')
-            ) return 'motion';
-
-            if (
-              id.includes('/node_modules/react-hook-form/') ||
-              id.includes('/node_modules/react-day-picker/')
-            ) return 'forms';
-
-            if (id.includes('/node_modules/@stripe/')) return 'payments';
-
-            // Three.js/react-three-fiber are only reachable via the lazy
-            // `import('./CorridorGlobeScene')` on the homepage — give them
-            // their own chunk so they stay out of the eager 'vendor' bundle
-            // that ships on every page.
-            if (
-              id.includes('/node_modules/three/') ||
-              id.includes('/node_modules/@react-three/')
-            ) return 'three-3d';
-
-            return 'vendor';
-        },
+        // NOTE: there is intentionally NO `manualChunks` here.
+        //
+        // The previous hand-written vendor split created a circular import
+        // between the `vendor` and `three-3d` chunks (vendor -> three-3d ->
+        // vendor) and pulled three.js (~850 KB) into the eager entry graph.
+        // The entry evaluated `three-3d` before `vendor`, so the browser threw
+        //   "ReferenceError: Cannot access '...' before initialization"
+        // before React mounted. No error boundary can catch that, so the page
+        // stayed blank on mobile.
+        //
+        // Rollup's default chunking does not produce that cycle and keeps
+        // three.js / react-three-fiber inside the lazy globe chunk.
         compact: true,
         experimentalMinChunkSize: 10000,
         assetFileNames: (assetInfo) => {
