@@ -301,6 +301,31 @@ const buildMainChildren = (): RouteObject[] => [
     ],
   } as unknown as RouteObject,
   // ── Admin ────────────────────────────────────────────────────────
+  // Gated per-surface by the canonical RBAC permissions, not by a single
+  // blanket admin check: `finance`/`support` hold users:read but not
+  // users:write, and `trust` holds disputes:write. Collapsing these into
+  // one `config:write` guard would hide surfaces those roles legitimately
+  // own — and expose write actions they must not reach.
+  {
+    Component: ProtectedOutlet,
+    require: 'users:read',
+    children: [
+      {
+        path: 'admin/users',
+        lazy: lazy(() => import('./features/admin/AdminUsersPage'), 'AdminUsersPage'),
+      },
+    ],
+  } as unknown as RouteObject,
+  {
+    Component: ProtectedOutlet,
+    require: 'disputes:read',
+    children: [
+      {
+        path: 'admin/disputes',
+        lazy: lazy(() => import('./features/admin/AdminDisputesPage'), 'AdminDisputesPage'),
+      },
+    ],
+  } as unknown as RouteObject,
   {
     Component: ProtectedOutlet,
     require: 'config:write',

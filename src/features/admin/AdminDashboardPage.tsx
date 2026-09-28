@@ -4,7 +4,7 @@ import { PageShell } from '../../components/wasel-ui/WaselPagePrimitives';
 import { C, R, SPACE, TYPE, card, pillStyle } from '../../utils/wasel-ds';
 import { RefreshCw, AlertTriangle, Users, Package, Car, DollarSign } from 'lucide-react';
 import { tx } from '../../locales/tx';
-import { apiRequest } from '../../utils/api';
+import { getAdminMetrics } from '../../services/adminApi';
 
 interface AdminMetrics {
   activeTrips: number;
@@ -15,12 +15,6 @@ interface AdminMetrics {
 }
 
 type Range = '1d' | '7d' | '30d';
-
-interface AdminApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: { message?: string };
-}
 
 const RANGE_LABELS: Record<Range, string> = { '1d': 'Today', '7d': '7 days', '30d': '30 days' };
 
@@ -43,26 +37,11 @@ useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const token = session?.access_token;
-        if (!token) {throw new Error('Missing admin session token');}
-
-        const response = await apiRequest<AdminApiResponse<AdminMetrics>>(
-          `/v1/admin/dashboard/metrics?range=${range}`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
+        const metrics = await getAdminMetrics(range);
 
         if (cancelled) {return;}
 
-        if (!response.success || !response.data) {
-          throw new Error(response.error?.message ?? 'Failed to fetch metrics');
-        }
-
-        setMetrics(response.data);
+        setMetrics(metrics);
         setLastUpdated(new Date());
         setError(null);
       } catch (err) {
@@ -269,6 +248,7 @@ useEffect(() => {
               value={metrics.activeUsers}
               icon={<Users size={18} color={C.cyan} />}
               accent={C.cyan}
+              href="/app/admin/users"
             />
             <MetricCard
               title={tx('trips.active')}

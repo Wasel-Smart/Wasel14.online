@@ -10,9 +10,15 @@
  *   VITE_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key-or-anon-key>
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from './database.types';
 import { hasSupabasePublicConfig, publicAnonKey, publicSupabaseUrl } from './info';
+
+// Cookie name shared with api/auth/callback.ts — the server-side callback
+// reads the PKCE code_verifier and writes the session under this same name.
+// If this ever drifts from the value in api/auth/callback.ts, server-side
+// OAuth/email-link completion will silently fail to find the verifier.
+const AUTH_COOKIE_NAME = 'wasel-auth-token';
 
 function isPlaceholderValue(value: string | undefined): boolean {
   if (!value) {return true;}
@@ -142,18 +148,18 @@ const getSupabaseClient = () => {
   const CLIENT_KEY = Symbol.for('supabase.client.instance.v4');
   const globalAny = typeof window !== 'undefined' ? window : globalThis;
   type GlobalWithClient = typeof globalAny &
-    Record<symbol, ReturnType<typeof createClient<Database>> | undefined>;
+    Record<symbol, ReturnType<typeof createBrowserClient<Database>> | undefined>;
   const globalStore = globalAny as GlobalWithClient;
   if (globalStore[CLIENT_KEY]) {return globalStore[CLIENT_KEY];}
 
   try {
-    const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    const client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+      cookieOptions: { name: AUTH_COOKIE_NAME },
       auth: {
-        storageKey: 'wasel-auth-token',
+        flowType: 'pkce',
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        storage: getBrowserStorage('localStorage'),
       },
       global: {
         headers: { 'X-Client-Info': 'wasel-web' },

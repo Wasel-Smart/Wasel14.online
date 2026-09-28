@@ -8,9 +8,11 @@ export interface AdminMetrics {
   activeUsers: number;
 }
 
-export async function getAdminMetrics() {
-  const response = await api.get('/v1/admin/dashboard/metrics');
-  return response as { data: AdminMetrics };
+export type AdminMetricsRange = '1d' | '7d' | '30d';
+
+export async function getAdminMetrics(range: AdminMetricsRange = '1d') {
+  const response = await api.get(`/v1/admin/dashboard/metrics?range=${range}`);
+  return response as AdminMetrics;
 }
 
 export async function getActiveRides(status?: string, page = 1, limit = 20) {

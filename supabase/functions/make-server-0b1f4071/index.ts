@@ -35,7 +35,15 @@ import {
   sanitizedUnhandledErrorResponse,
 } from './_handlers/shared.ts';
 
-import './_handlers/admin.ts';
+import {
+  handleAdminListPendingDrivers,
+  handleAdminApproveDriver,
+  handleAdminListUsers,
+  handleAdminSetUserStatus,
+  handleAdminListDisputes,
+  handleAdminResolveDispute,
+  handleAdminDashboardMetrics,
+} from './_handlers/admin.ts';
 import './_handlers/bookings.ts';
 import './_handlers/chat.ts';
 import './_handlers/communications.ts';
@@ -318,6 +326,42 @@ const ROUTES: RouteDescriptor[] = [
     methods: [ 'POST' ],
     test: ( path ) => /^\/admin\/drivers\/[^/]+\/approve$/.test( path ),
     handle: ( request, path ) => handleAdminApproveDriver( request, decodeURIComponent( path.split( '/' )[ 3 ] ) ),
+  },
+  // ── Admin surfaces backing the web console ──────────────────────────────
+  // These are session-authenticated (not worker-secret gated) and each one
+  // asserts its own canonical permission inside the handler, so the RBAC
+  // matrix in packages/rbac stays the single source of truth.
+  {
+    id: 'admin-users',
+    methods: [ 'GET' ],
+    test: ( path ) => path === '/admin/users',
+    handle: ( request ) => handleAdminListUsers( request ),
+  },
+  {
+    id: 'admin-user-status',
+    methods: [ 'PATCH' ],
+    test: ( path ) => /^\/admin\/users\/[^/]+\/status$/.test( path ),
+    handle: ( request, path ) =>
+      handleAdminSetUserStatus( request, decodeURIComponent( path.split( '/' )[ 3 ] ) ),
+  },
+  {
+    id: 'admin-disputes',
+    methods: [ 'GET' ],
+    test: ( path ) => path === '/admin/disputes',
+    handle: ( request ) => handleAdminListDisputes( request ),
+  },
+  {
+    id: 'admin-dispute-resolve',
+    methods: [ 'PATCH' ],
+    test: ( path ) => /^\/admin\/disputes\/[^/]+\/resolve$/.test( path ),
+    handle: ( request, path ) =>
+      handleAdminResolveDispute( request, decodeURIComponent( path.split( '/' )[ 3 ] ) ),
+  },
+  {
+    id: 'admin-dashboard-metrics',
+    methods: [ 'GET' ],
+    test: ( path ) => path === '/admin/dashboard/metrics',
+    handle: ( request ) => handleAdminDashboardMetrics( request ),
   },
   {
     id: 'auth-hook-send-sms',

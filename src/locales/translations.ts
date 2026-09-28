@@ -45,6 +45,8 @@ import { tripProgressCard } from './chunks/tripProgressCard';
 import { oAuthStatus } from './chunks/oAuthStatus';
 import { waselMap } from './chunks/waselMap';
 import { adminDashboardPage } from './chunks/adminDashboardPage';
+import { adminUsersPage } from './chunks/adminUsersPage';
+import { adminDisputesPage } from './chunks/adminDisputesPage';
 import { busPage } from './chunks/busPage';
 import { driverPage } from './chunks/driverPage';
 import { mobilityOSLandingMap } from './chunks/mobilityOSLandingMap';
@@ -143,6 +145,8 @@ export const translations: Record<Language, TranslationNode> = {
     ...oAuthStatus.en,
     ...waselMap.en,
     ...adminDashboardPage.en,
+    ...adminUsersPage.en,
+    ...adminDisputesPage.en,
     ...busPage.en,
     ...driverPage.en,
     ...mobilityOSLandingMap.en,
@@ -236,6 +240,8 @@ export const translations: Record<Language, TranslationNode> = {
     ...oAuthStatus.ar,
     ...waselMap.ar,
     ...adminDashboardPage.ar,
+    ...adminUsersPage.ar,
+    ...adminDisputesPage.ar,
     ...busPage.ar,
     ...driverPage.ar,
     ...mobilityOSLandingMap.ar,
