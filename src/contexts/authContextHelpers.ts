@@ -121,14 +121,18 @@ export async function signInWithOAuthProvider(
       /* ignore */
     }
 
+    // Supabase prepends each provider's default scopes to whatever is passed
+    // here (`email profile` for Google, `email` for Facebook). Re-requesting
+    // them produced duplicated values on the provider URL, e.g.
+    // `email profile openid profile email`, so only the extra scopes are listed.
     const scopes =
       provider === 'facebook'
-        ? 'email,public_profile'
-        : provider === 'microsoft'
-          ? 'openid profile email'
-          : provider === 'apple'
-            ? 'name email'
-            : 'openid profile email';
+        ? 'public_profile'
+        : provider === 'google'
+          ? 'openid'
+          : provider === 'microsoft'
+            ? 'openid profile email'
+            : 'name email';
 
     const { error } = await client.auth.signInWithOAuth({
       provider: provider as Provider,

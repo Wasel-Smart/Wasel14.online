@@ -47,7 +47,7 @@ describe('signInWithOAuthProvider - Facebook', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses the email + public_profile scopes Facebook requires', async () => {
+  it('requests only the scopes Supabase does not already send for Facebook', async () => {
     const client = makeClient();
     (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {},
@@ -62,7 +62,9 @@ describe('signInWithOAuthProvider - Facebook', () => {
     expect(result.error).toBeNull();
     const call = (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(call.provider).toBe('facebook');
-    expect(call.options.scopes).toBe('email,public_profile');
+    // Supabase prepends `email` for Facebook; asking for it again duplicated it
+    // on the provider URL (`email email public_profile`).
+    expect(call.options.scopes).toBe('public_profile');
     expect(call.options.redirectTo).toBe(
       'https://www.wasel14.online/app/auth/callback',
     );
@@ -139,5 +141,65 @@ describe('signInWithOAuthProvider - Facebook', () => {
 
     expect(result.error).toBeInstanceOf(Error);
     expect((result.error as Error).message).toBe('Facebook login failed');
+  });
+});
+
+describe('signInWithOAuthProvider - Google', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('asks only for openid, since Supabase already requests email + profile', async () => {
+    const client = makeClient();
+    (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {},
+      error: null,
+    });
+
+    await signInWithOAuthProvider(
+      client as unknown as Parameters<typeof signInWithOAuthProvider>[0],
+      'google',
+    );
+
+    const call = (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(call.provider).toBe('google');
+    expect(call.options.scopes).toBe('openid');
+  });
+
+  it('always shows the Google account chooser', async () => {
+    const client = makeClient();
+    (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {},
+      error: null,
+    });
+
+    await signInWithOAuthProvider(
+      client as unknown as Parameters<typeof signInWithOAuthProvider>[0],
+      'google',
+    );
+
+    const call = (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(call.options.queryParams).toEqual({ prompt: 'select_account' });
+  });
+
+  it('never asks Facebook for a popup dialog', async () => {
+    const client = makeClient();
+    (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {},
+      error: null,
+    });
+
+    await signInWithOAuthProvider(
+      client as unknown as Parameters<typeof signInWithOAuthProvider>[0],
+      'facebook',
+    );
+
+    const call = (client.auth.signInWithOAuth as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(call.options.queryParams).toBeUndefined();
+    expect(call.options.skipBrowserRedirect).toBeUndefined();
   });
 });
