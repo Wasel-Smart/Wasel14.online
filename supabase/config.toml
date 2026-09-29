@@ -43,25 +43,18 @@ enabled = true
 [auth]
 enabled = true
 site_url = "https://www.wasel14.online"
+# Wildcards (`/**`) so callback URLs carrying query strings (?returnTo=, ?type=recovery)
+# match. Mirrors the cloud dashboard allow-list. Keep in sync with mobile/src/lib/config.ts.
 additional_redirect_urls = [
-  "https://wasel14.online",
-  "https://www.wasel14.online",
-  "https://wasel14.online/app/auth/callback",
-  "https://www.wasel14.online/app/auth/callback",
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:3000/app/auth/callback",
-  "http://127.0.0.1:3000/app/auth/callback",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "http://localhost:5173/app/auth/callback",
-  "http://127.0.0.1:5173/app/auth/callback",
-  "http://localhost:4173",
-  "http://127.0.0.1:4173",
-  "http://localhost:4173/app/auth/callback",
-  "http://127.0.0.1:4173/app/auth/callback",
-  # Mobile (Expo) OAuth deep-link custom scheme. Supabase accepts custom schemes in
-  # the redirect allow-list; keep in sync with mobile/src/lib/config.ts.
+  "https://wasel14.online/**",
+  "https://www.wasel14.online/**",
+  "http://localhost:3000/**",
+  "http://127.0.0.1:3000/**",
+  "http://localhost:5173/**",
+  "http://127.0.0.1:5173/**",
+  "http://localhost:4173/**",
+  "http://127.0.0.1:4173/**",
+  # Mobile (Expo) OAuth deep-link custom scheme.
   "wasel://auth/callback",
 ]
 jwt_expiry = 3600
@@ -70,7 +63,7 @@ refresh_token_reuse_interval = 10
 enable_manual_linking = true
 enable_signup = true
 enable_anonymous_sign_ins = true
-minimum_password_length = 7
+minimum_password_length = 8
 password_requirements = "lower_upper_letters_digits_symbols"
 
 [auth.mfa.totp]

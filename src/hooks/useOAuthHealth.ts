@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { validateOAuthProvider, type OAuthProvider, type OAuthProviderStatus } from '../utils/oauthValidator';
+import { fetchEnabledOAuthProviders, validateOAuthProvider, type OAuthProvider, type OAuthProviderStatus } from '../utils/oauthValidator';
 
 export interface UseOAuthHealthResult {
   providers: OAuthProviderStatus[];
@@ -93,7 +93,7 @@ export function useOAuthProviderEnabled (
   const [ loading, setLoading ] = useState( false );
 
   useEffect( () => {
-    if ( !client || !import.meta.env.DEV ) { return; }
+    if ( !client ) { return; }
 
     let cancelled = false;
 
@@ -101,20 +101,11 @@ export function useOAuthProviderEnabled (
       setLoading( true );
 
       try {
-        const { error } = await client.auth.signInWithOAuth( {
-          provider,
-          options: {
-            skipBrowserRedirect: true,
-          },
-        } );
+        // Real check: the project's public /auth/v1/settings lists enabled providers.
+        const external = await fetchEnabledOAuthProviders();
         if ( !cancelled ) {
-          // If we get a redirect_uri error, the provider IS enabled but misconfigured
-          // If we get "provider not enabled", it's disabled
-          if ( error?.message?.toLowerCase().includes( 'not enabled' ) ) {
-            setEnabled( false );
-          } else {
-            setEnabled( true );
-          }
+          // Unknown (endpoint unreachable) => assume enabled, never block sign-in.
+          setEnabled( external?.[ provider ] !== false );
         }
       } catch {
         if ( !cancelled ) {

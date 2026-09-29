@@ -30,7 +30,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { AuthOperationError } from '../contexts/authContextHelpers';
 import { getAuthCallbackUrl, getWhatsAppSupportUrl, normalizeReturnToPath, resolveAuthRedirectOrigin } from '../utils/env';
 import { friendlyAuthError, getPasswordRuleIssue, pwStrength } from '../utils/authHelpers';
-import { getProviderSetupInstructions } from '../utils/oauthValidator';
+import { fetchEnabledOAuthProviders, getProviderSetupInstructions } from '../utils/oauthValidator';
 import { supabase } from '../utils/supabase/client';
 
 import { C, R, TYPE, F, SPACE } from '../utils/wasel-ds';
@@ -336,6 +336,26 @@ function TabSwitcher ( { tab, onChange }: { tab: Tab; onChange: ( t: Tab ) => vo
   );
 }
 
+// ─── Provider brand icons (inline SVG, no network) ───────────────────────────
+function GoogleIcon () {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
+
+function FacebookIcon () {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="#1877F2" d="M24 12.07C24 5.41 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.8-4.7 4.54-4.7 1.31 0 2.68.24 2.68.24v2.97h-1.5c-1.5 0-1.96.93-1.96 1.89v2.26h3.34l-.53 3.49h-2.8V24C19.62 23.1 24 18.1 24 12.07z" />
+    </svg>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function WaselAuth () {
   const [ params ] = useSearchParams();
@@ -374,6 +394,7 @@ export default function WaselAuth () {
   // Guards against the `user` effect and the post-success timer both navigating.
   const redirectedRef = useRef( false );
   const [ oauthConfigWarning, setOauthConfigWarning ] = useState( '' );
+  const [ providerAvailability, setProviderAvailability ] = useState<Record<string, boolean>>( {} );
   const [ activeProvider, setActiveProvider ] = useState<null | 'google' | 'facebook' | never>( null );
 
   const safeReturnTo = normalizeReturnToPath( params.get( 'returnTo' ) );
@@ -439,41 +460,59 @@ export default function WaselAuth () {
     }
   }, [ user, nav, safeReturnTo ] );
 
-  // Check for OAuth configuration issues on mount (dev mode only)
+  // Real provider availability check (public GET /auth/v1/settings). Buttons of
+  // providers that are not enabled are disabled up-front instead of failing after
+  // a redirect round-trip. Unknown/unreachable => assume enabled.
   useEffect( () => {
-    if ( !import.meta.env.DEV ) {
-      return;
-    }
-
-    const checkOAuthConfig = async () => {
-      try {
-        if ( !supabase ) {
-          return;
-        }
-
-        // Try to get Facebook auth URL without redirecting
-        const { error } = await supabase.auth.signInWithOAuth( {
-          provider: 'facebook',
-          options: {
-            skipBrowserRedirect: true,
-          },
-        } );
-
-        if ( error ) {
-          const message = error.message?.toLowerCase() || '';
-          if ( message.includes( 'not enabled' ) ) {
-            setOauthConfigWarning( ar ? 'فيسبوك غير مفعّل في Supabase' : 'Facebook is not enabled in Supabase' );
-          } else if ( message.includes( 'redirect_uri' ) || message.includes( 'uri not allowed' ) ) {
-            setOauthConfigWarning( ar ? 'مشكلة في إعدادات فيسبوك' : 'Facebook redirect URI is not configured correctly' );
-          }
-        }
-      } catch {
-        // Silently ignore errors in config check
+    let cancelled = false;
+    void fetchEnabledOAuthProviders().then( external => {
+      if ( cancelled || !external ) { return; }
+      setProviderAvailability( external );
+      const disabled = ( [ 'google', 'facebook' ] as const ).filter( key => external[ key ] === false );
+      if ( disabled.length > 0 ) {
+        const names = disabled.map( key => ( key === 'google' ? 'Google' : 'Facebook' ) ).join( ' / ' );
+        setOauthConfigWarning(
+          ar
+            ? `تسجيل الدخول عبر ${ names } غير مفعّل حالياً. استخدم البريد الإلكتروني وكلمة المرور.`
+            : `${ names } sign-in is not enabled yet. Use email and password instead.`,
+        );
       }
-    };
-
-    void checkOAuthConfig();
+    } );
+    return () => { cancelled = true; };
   }, [ ar ] );
+
+  // Surface failures that Supabase or /api/auth/callback redirect back with
+  // (?error=... in the query string, or #error=... in the hash).
+  useEffect( () => {
+    const hash = new URLSearchParams( window.location.hash.replace( /^#/, '' ) );
+    const raw =
+      params.get( 'error_description' ) ||
+      params.get( 'error' ) ||
+      hash.get( 'error_description' ) ||
+      hash.get( 'error' );
+    if ( !raw ) { return; }
+    const cancelled = params.get( 'error' ) === 'access_denied' || hash.get( 'error' ) === 'access_denied';
+    const clean = raw
+      .replace( /[<>"'`]/g, '' )
+      // eslint-disable-next-line no-control-regex
+      .replace( /[\x00-\x1f\x7f]/g, '' )
+      .slice( 0, 200 );
+    if ( cancelled ) {
+      setError( ar ? 'تم إلغاء تسجيل الدخول. يمكنك المحاولة مرة أخرى.' : 'Sign-in was cancelled. You can try again.' );
+    } else if ( clean ) {
+      setError( clean );
+    }
+  }, [ params, ar ] );
+
+  // Returning via the browser back button restores this page from bfcache with
+  // the provider spinner still active; unlock the buttons.
+  useEffect( () => {
+    const onPageShow = ( event: PageTransitionEvent ) => {
+      if ( event.persisted ) { setActiveProvider( null ); }
+    };
+    window.addEventListener( 'pageshow', onPageShow );
+    return () => window.removeEventListener( 'pageshow', onPageShow );
+  }, [] );
 
   const pushSuccessRedirect = () => {
     setSuccess( true );
@@ -652,12 +691,18 @@ export default function WaselAuth () {
     setActiveProvider( provider );
     try {
       const { error: oauthError } = await signIn( safeReturnTo );
-      if ( oauthError && mountedRef.current ) {
-        const enhancedMessage = enhanceOAuthError( oauthError.message, provider );
-        setError( friendlyAuthError( enhancedMessage, tx( `waselAuth.error_${ provider }_failed` ) ) );
+      if ( oauthError ) {
+        if ( mountedRef.current ) {
+          const enhancedMessage = enhanceOAuthError( oauthError.message, provider );
+          setError( friendlyAuthError( enhancedMessage, tx( `waselAuth.error_${ provider }_failed` ) ) );
+          setActiveProvider( null );
+        }
       }
-    } finally {
+      // On success the browser is navigating to the provider. Keep the buttons
+      // locked until then so a double-click can't start a second PKCE flow.
+    } catch ( unexpected ) {
       if ( mountedRef.current ) {
+        setError( friendlyAuthError( unexpected, tx( `waselAuth.error_${ provider }_failed` ) ) );
         setActiveProvider( null );
       }
     }
@@ -706,10 +751,23 @@ export default function WaselAuth () {
     key: 'google' | 'facebook';
     label: string;
     color: string;
+    icon: React.ReactNode;
     onClick: () => void;
   }> = [
-    { key: 'google', label: 'Google', color: '#4285F4', onClick: handleGoogleSignIn },
-    { key: 'facebook', label: 'Facebook', color: '#1877F2', onClick: handleFacebookSignIn },
+    {
+      key: 'google',
+      label: ar ? 'المتابعة عبر Google' : 'Continue with Google',
+      color: '#4285F4',
+      icon: <GoogleIcon />,
+      onClick: handleGoogleSignIn,
+    },
+    {
+      key: 'facebook',
+      label: ar ? 'المتابعة عبر Facebook' : 'Continue with Facebook',
+      color: '#1877F2',
+      icon: <FacebookIcon />,
+      onClick: handleFacebookSignIn,
+    },
   ];
 
   return (
@@ -1097,7 +1155,8 @@ export default function WaselAuth () {
                 <div style={ { display: 'flex', gap: SPACE[ 2 ], flexWrap: 'wrap' } }>
                   { socialButtons.map( social => {
                     const isActive = activeProvider === social.key;
-                    const disabled = busy || success || ( activeProvider !== null && !isActive );
+                    const providerOff = providerAvailability[ social.key ] === false;
+                    const disabled = busy || success || providerOff || ( activeProvider !== null && !isActive );
                     return (
                       <motion.button
                         key={ social.key }
@@ -1105,15 +1164,16 @@ export default function WaselAuth () {
                         whileTap={ disabled ? undefined : { scale: 0.97 } }
                         type="button"
                         disabled={ disabled }
-                        aria-label={ ar ? `تسجيل الدخول عبر ${ social.label }` : `Continue with ${ social.label }` }
+                        aria-label={ social.label }
                         aria-busy={ isActive }
+                        title={ providerOff ? ( ar ? 'غير مفعّل حالياً' : 'Not enabled yet' ) : undefined }
                         data-provider={ social.key }
                         onClick={ () => {
                           social.onClick();
                         } }
                         style={ {
-                          flex: '1 1 120px',
-                          minWidth: 120,
+                          flex: '1 1 100%',
+                          minWidth: 0,
                           height: 44,
                           borderRadius: R.lg,
                           border: `1px solid ${ social.color }30`,
@@ -1131,7 +1191,7 @@ export default function WaselAuth () {
                           gap: SPACE[ 2 ],
                         } }
                       >
-                        { isActive && (
+                        { isActive ? (
                           <span
                             aria-hidden="true"
                             style={ {
@@ -1144,7 +1204,7 @@ export default function WaselAuth () {
                               display: 'inline-block',
                             } }
                           />
-                        ) }
+                        ) : social.icon }
                         <span>{ social.label }</span>
                       </motion.button>
                     );

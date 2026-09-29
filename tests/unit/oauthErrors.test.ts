@@ -99,12 +99,20 @@ describe('parseOAuthError', () => {
     history.pushState(null, '', '');
   });
 
-  it('URL params take priority over error objects', () => {
+  it('an explicit error object takes priority over URL params', () => {
     history.pushState(null, '', '?error=access_denied');
     const result = parseOAuthError(new Error('different error'), 'google');
     expect(result).not.toBeNull();
-    expect(result!.code).toBe('access_denied');
+    expect(result!.code).toBe('unknown_error');
+    expect(result!.message).toBe('different error');
     history.pushState(null, '', '');
+  });
+
+  it('classifies a provider-disabled error object', () => {
+    const result = parseOAuthError(new Error('provider is not enabled'), 'facebook');
+    expect(result).not.toBeNull();
+    expect(result!.code).toBe('provider_not_enabled');
+    expect(result!.provider).toBe('facebook');
   });
 });
 
@@ -115,6 +123,7 @@ describe('OAUTH_ERROR_CODES', () => {
     expect(OAUTH_ERROR_CODES.invalid_client).toBeDefined();
     expect(OAUTH_ERROR_CODES.unauthorized_client).toBeDefined();
     expect(OAUTH_ERROR_CODES.invalid_request).toBeDefined();
+    expect(OAUTH_ERROR_CODES.provider_not_enabled).toBeDefined();
     expect(OAUTH_ERROR_CODES.redirect_uri_mismatch).toBeDefined();
     expect(OAUTH_ERROR_CODES.invalid_scope).toBeDefined();
     expect(OAUTH_ERROR_CODES.server_error).toBeDefined();

@@ -4,7 +4,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Provider } from '@supabase/auth-js';
+import { publicAnonKey, publicSupabaseUrl } from './supabase/info';
 
 export type OAuthProvider = 'google' | 'facebook' | 'microsoft' | 'apple';
 
@@ -30,49 +30,72 @@ export function getOAuthRedirectUri(supabaseUrl: string): string {
   return `${base}/auth/v1/callback`;
 }
 
+// ── Provider availability (real check) ────────────────────────────────────────
+// `signInWithOAuth({ skipBrowserRedirect: true })` only builds a URL client-side
+// and never contacts Supabase, so it can NOT detect a disabled provider. The
+// public GET /auth/v1/settings endpoint reports which external providers are
+// enabled for the project, which is the correct source of truth.
+let providerSettingsPromise: Promise<Record<string, boolean> | null> | null = null;
+
+export function fetchEnabledOAuthProviders(force = false): Promise<Record<string, boolean> | null> {
+  if (!publicSupabaseUrl || !publicAnonKey) {
+    return Promise.resolve(null);
+  }
+
+  if (!providerSettingsPromise || force) {
+    const request = (async (): Promise<Record<string, boolean> | null> => {
+      try {
+        const response = await fetch(`${publicSupabaseUrl.replace(/\/$/, '')}/auth/v1/settings`, {
+          headers: { apikey: publicAnonKey },
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (!response.ok) {return null;}
+        const data = (await response.json()) as { external?: Record<string, boolean> };
+        return data.external && typeof data.external === 'object' ? data.external : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    providerSettingsPromise = request;
+    // Never cache a failed lookup; the next caller retries.
+    void request.then(result => {
+      if (result === null && providerSettingsPromise === request) {
+        providerSettingsPromise = null;
+      }
+    });
+  }
+
+  return providerSettingsPromise;
+}
+
 /**
- * Validate OAuth configuration by attempting to get the provider's auth URL
- * without actually redirecting the user
+ * Validate that a provider is enabled for the Supabase project.
+ * When the settings endpoint is unreachable the provider is optimistically
+ * treated as available so a transient failure never blocks sign-in.
  */
 export async function validateOAuthProvider(
-  client: SupabaseClient,
+  // Kept for API compatibility with existing callers; the check no longer
+  // needs a Supabase client because it queries the project's auth settings.
+  _client: SupabaseClient,
   provider: OAuthProvider,
 ): Promise<OAuthProviderStatus> {
-  try {
-    // signInWithOAuth with shouldCreateSession=false lets us check config
-    // without initiating the full flow
-    const { data, error } = await client.auth.signInWithOAuth({
-      provider: provider as unknown as Provider,
-      options: {
-        redirectTo: window.location.origin + '/app/auth/callback',
-        skipBrowserRedirect: true,
-      },
-    });
+  const external = await fetchEnabledOAuthProviders();
 
-    if (error) {
-      return {
-        provider,
-        enabled: true,
-        configured: false,
-        error: classifyConfigError(error.message, provider),
-      };
-    }
+  if (!external || !(provider in external)) {
+    return { provider, enabled: true, configured: true };
+  }
 
-    // If we got a URL back, the provider is configured
+  if (external[provider] === false) {
     return {
       provider,
-      enabled: true,
-      configured: Boolean(data?.url),
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return {
-      provider,
-      enabled: true,
+      enabled: false,
       configured: false,
-      error: classifyConfigError(message, provider),
+      error: classifyConfigError('provider is not enabled', provider),
     };
   }
+
+  return { provider, enabled: true, configured: true };
 }
 
 /**
@@ -108,8 +131,7 @@ function classifyConfigError(message: string, provider: OAuthProvider): string {
  * Get the expected redirect URI for this app
  */
 export function getExpectedRedirectUri(): string {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  return getOAuthRedirectUri(supabaseUrl);
+  return getOAuthRedirectUri(publicSupabaseUrl || import.meta.env.VITE_SUPABASE_URL || '');
 }
 
 /**
@@ -124,11 +146,11 @@ export function getProviderSetupInstructions(provider: OAuthProvider): {
   if (provider === 'facebook') {
     return {
       steps: [
-        'Go to Facebook Developers â†’ Your App â†’ Facebook Login â†’ Settings',
+        'Go to Meta for Developers > Your App > Use cases / Products > Facebook Login > Settings',
         `Add "${redirectUri}" to Valid OAuth Redirect URIs`,
-        'Go to Supabase Dashboard â†’ Authentication â†’ Providers â†’ Facebook',
+        'Go to Supabase Dashboard > Authentication > Sign In / Providers > Facebook',
         'Enable Facebook and enter your App ID + App Secret',
-        'Ensure your Facebook app is in "Live" mode for public access',
+        'Set the app to "Live" mode and fill in the Privacy Policy URL and Data Deletion instructions URL',
       ],
       docsUrl: 'https://developers.facebook.com/docs/facebook-login',
     };
@@ -137,10 +159,10 @@ export function getProviderSetupInstructions(provider: OAuthProvider): {
   if (provider === 'microsoft') {
     return {
       steps: [
-        'Go to Azure Portal â†’ Microsoft Entra ID â†’ App registrations',
+        'Go to Azure Portal > Microsoft Entra ID > App registrations',
         `Add "${redirectUri}" to Redirect URIs (web)`,
-        'Go to Supabase Dashboard â†’ Authentication â†’ Providers â†’ Microsoft',
-        'Enable Microsoft and enter your Client ID + Client Secret',
+        'Go to Supabase Dashboard > Authentication > Sign In / Providers > Azure (Microsoft)',
+        'Enable it and enter your Client ID + Client Secret',
         'Ensure the app is published and consent is granted for the required scopes',
       ],
       docsUrl: 'https://learn.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app',
@@ -150,9 +172,9 @@ export function getProviderSetupInstructions(provider: OAuthProvider): {
   if (provider === 'apple') {
     return {
       steps: [
-        'Go to Apple Developer â†’ Certificates, Identifiers & Profiles â†’ Identifiers',
+        'Go to Apple Developer > Certificates, Identifiers & Profiles > Identifiers',
         `Add "${redirectUri}" to Return URLs in your Apple Services ID`,
-        'Go to Supabase Dashboard â†’ Authentication â†’ Providers â†’ Apple',
+        'Go to Supabase Dashboard > Authentication > Sign In / Providers > Apple',
         'Enable Apple and enter your Services ID, Team ID, Key ID, and Private Key',
         'Ensure your Apple app is configured for Sign in with Apple',
       ],
@@ -162,9 +184,10 @@ export function getProviderSetupInstructions(provider: OAuthProvider): {
 
   return {
     steps: [
-      'Go to Google Cloud Console â†’ Credentials',
+      'Go to Google Cloud Console > APIs & Services > Credentials > your OAuth client (Web application)',
       `Add "${redirectUri}" to Authorized redirect URIs`,
-      'Go to Supabase Dashboard â†’ Authentication â†’ Providers â†’ Google',
+      'Under OAuth consent screen, set Publishing status to "In production" (otherwise only test users can sign in)',
+      'Go to Supabase Dashboard > Authentication > Sign In / Providers > Google',
       'Enable Google and enter your Client ID + Client Secret',
     ],
     docsUrl: 'https://developers.google.com/identity/protocols/oauth2',
@@ -188,4 +211,3 @@ export function isOriginAllowed(allowedOrigins: string[]): boolean {
     }
   });
 }
-

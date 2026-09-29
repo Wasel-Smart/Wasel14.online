@@ -28,6 +28,7 @@ export const OAUTH_ERROR_CODES = {
   invalid_client: 'OAuth client configuration error',
   unauthorized_client: 'OAuth client not authorized',
   invalid_request: 'Invalid OAuth request',
+  provider_not_enabled: 'OAuth provider is not enabled for this project',
 
   // Redirect errors
   redirect_uri_mismatch: 'Redirect URI mismatch',
@@ -51,25 +52,37 @@ export const OAUTH_ERROR_CODES = {
  * Parse OAuth error from URL parameters or error object
  */
 export function parseOAuthError(error: unknown, provider?: OAuthProvider): OAuthError | null {
-  // Handle URL error parameters
+  // An explicit error object always wins. URL parameters are only consulted when
+  // no error was passed, so a stale `?error=` in the address bar can never mask
+  // the real failure (e.g. "provider is not enabled").
+  if (error instanceof Error) {
+    const message = error.message;
+    const code = (error as { code?: unknown }).code;
+    const lower = message.toLowerCase();
+    if (
+      code === 'provider_disabled' ||
+      lower.includes('provider is not enabled') ||
+      lower.includes('unsupported provider')
+    ) {
+      return createOAuthError('provider_not_enabled', message, provider);
+    }
+    return createOAuthError('unknown_error', message, provider);
+  }
+
+  if (typeof error === 'string') {
+    return createOAuthError('unknown_error', error, provider);
+  }
+
+  // Handle URL error parameters (query string, then hash)
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
-    const errorCode = params.get('error');
-    const errorDescription = params.get('error_description');
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const errorCode = params.get('error') || hashParams.get('error');
+    const errorDescription = params.get('error_description') || hashParams.get('error_description');
 
     if (errorCode) {
       return createOAuthError(errorCode, errorDescription, provider);
     }
-  }
-
-  // Handle error objects
-  if (error instanceof Error) {
-    return createOAuthError('unknown_error', error.message, provider);
-  }
-
-  // Handle string errors
-  if (typeof error === 'string') {
-    return createOAuthError('unknown_error', error, provider);
   }
 
   return null;
@@ -109,6 +122,11 @@ function createOAuthError(
     case 'invalid_scope':
       userMessage = `${providerName} requested invalid permissions. Please contact support.`;
       recoveryAction = 'Contact support';
+      break;
+
+    case 'provider_not_enabled':
+      userMessage = `${providerName} sign-in is not available yet. Please use email and password or another sign-in method.`;
+      recoveryAction = 'Use email and password';
       break;
 
     case 'server_error':
@@ -174,6 +192,7 @@ export function isConfigurationError(error: OAuthError): boolean {
     'unauthorized_client',
     'redirect_uri_mismatch',
     'invalid_scope',
+    'provider_not_enabled',
   ].includes(error.code);
 }
 

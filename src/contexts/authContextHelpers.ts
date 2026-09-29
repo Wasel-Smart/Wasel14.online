@@ -113,8 +113,13 @@ export async function signInWithOAuthProvider(
 
     // Generate and store a one-time nonce so the AuthContext message listener
     // can verify the wasel-auth-complete postMessage came from our own callback.
-    const nonce = crypto.randomUUID();
-    sessionStorage.setItem('wasel_oauth_nonce', nonce);
+    // Storage can throw (Safari private mode, blocked cookies); a missing nonce
+    // only disables the popup postMessage handshake, never the redirect flow.
+    try {
+      sessionStorage.setItem('wasel_oauth_nonce', crypto.randomUUID());
+    } catch {
+      /* ignore */
+    }
 
     const scopes =
       provider === 'facebook'
@@ -132,10 +137,10 @@ export async function signInWithOAuthProvider(
         scopes,
         // Supabase recommends PKCE for OAuth when supported; it's a no-op for
         // providers that don't support it (Apple, older Facebook clients).
-        queryParams:
-          provider === 'facebook'
-            ? { display: 'popup' }
-            : undefined,
+        // Full-page redirect flow: do NOT request Facebook's `display=popup`
+        // dialog (it renders a popup-sized dialog inside the main window).
+        // Google: always show the account chooser so users can switch accounts.
+        queryParams: provider === 'google' ? { prompt: 'select_account' } : undefined,
       },
     });
 
