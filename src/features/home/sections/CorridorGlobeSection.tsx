@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Radar } from 'lucide-react';
+import { Radar, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { WaselErrorBoundary } from '../../../components/ErrorBoundary';
 import { TYPE } from '../../../utils/wasel-ds';
@@ -60,13 +60,13 @@ export function CorridorGlobeSection({ ar }: CorridorGlobeSectionProps) {
       >
         <div className="wasel-home-globe-canvas">
           {canRender3D ? (
-            <WaselErrorBoundary fallback={<GlobeFallback ar={ar} />}>
+            <WaselErrorBoundary fallback={<StaticMapFallback ar={ar} />}>
               <Suspense fallback={<GlobeLoading />}>
                 <CorridorGlobeScene reduceMotion={reduceMotion} />
               </Suspense>
             </WaselErrorBoundary>
           ) : (
-            <GlobeFallback ar={ar} />
+            <StaticMapFallback ar={ar} />
           )}
         </div>
 
@@ -74,7 +74,7 @@ export function CorridorGlobeSection({ ar }: CorridorGlobeSectionProps) {
           <p style={{ fontSize: TYPE.size.sm, color: C.textMuted, margin: 0, lineHeight: 1.6 }}>
             {ar
               ? 'مسارات مباشرة من عمّان إلى وجهات واصل الأكثر طلبًا، مع حركة حيّة على كل ممر.'
-              : 'Live routes from Amman to Wasel’s busiest destinations, with real-time movement on every corridor.'}
+              : 'Live routes from Amman to Wasel\'s busiest destinations, with real-time movement on every corridor.'}
           </p>
           <div style={{ display: 'grid', gap: 8 }}>
             {POPULAR_ROUTES.slice(0, 5).map(route => (
@@ -123,24 +123,54 @@ function GlobeLoading() {
   );
 }
 
-function GlobeFallback({ ar }: { ar: boolean }) {
+function StaticMapFallback({ ar }: { ar: boolean }) {
   return (
     <div
       style={{
         width: '100%',
-        height: '100%',
-        display: 'grid',
-        placeItems: 'center',
+        aspectRatio: '16 / 9',
         borderRadius: 16,
         background: C.elevated,
-        border: `1px dashed ${C.border}`,
-        color: C.textMuted,
-        fontSize: TYPE.size.sm,
-        textAlign: 'center',
-        padding: 20,
+        border: `1px solid ${C.border}`,
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      {ar ? 'معاينة الخريطة التفاعلية غير متاحة على هذا الجهاز' : 'Interactive map preview isn’t available on this device'}
+      <img
+        src="/brand/assets/og/og-default.png"
+        alt={ar ? 'خريطة مسارات واصل' : 'Wasel routes map'}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          opacity: 0.6,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          padding: 24,
+          textAlign: 'center',
+        }}
+      >
+        <MapPin size={48} color={C.cyan} style={{ opacity: 0.8 }} />
+        <p style={{ margin: 0, color: C.textMuted, fontSize: TYPE.size.sm, lineHeight: 1.6 }}>
+          {ar
+            ? 'خريطة تفاعلية للمسارات — تتطلب WebGL'
+            : 'Interactive corridor map — requires WebGL'}
+        </p>
+        <p style={{ margin: 0, color: C.textSub, fontSize: TYPE.size.xs }}>
+          {ar
+            ? 'مسارات حية من عمّان إلى العقبة، إربد، البحر الميت، البتراء، وادي رم، الزرقاء'
+            : 'Live routes from Amman to Aqaba, Irbid, Dead Sea, Petra, Wadi Rum, Zarqa'}
+        </p>
+      </div>
     </div>
   );
 }

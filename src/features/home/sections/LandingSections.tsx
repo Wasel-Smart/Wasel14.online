@@ -112,8 +112,6 @@ const stats = [
 ] as const;
 
 export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
-  const reduceMotion = ar; // placeholder, will be replaced with useReducedMotion
-
   return (
     <>
       <motion.section
@@ -139,7 +137,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
             gap: 16,
           }}
         >
-          {featureCards.map((feature, index) => {
+          {featureCards.map((feature) => {
             const Icon = feature.icon;
             return (
               <motion.article

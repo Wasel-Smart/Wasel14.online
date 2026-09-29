@@ -1,6 +1,3 @@
-import { useLanguage } from '../../../contexts/LanguageContext';
-import { tx } from '../../../locales/tx';
-
 interface StructuredDataProps {
   ar: boolean;
 }
@@ -192,8 +189,6 @@ function createFAQSchema(ar: boolean) {
 }
 
 export function StructuredData({ ar }: StructuredDataProps) {
-  const { language } = useLanguage();
-
   const schemas = [
     ORGANIZATION_SCHEMA,
     WEBSITE_SCHEMA,
