@@ -19,7 +19,7 @@
 ### 1b. Real DATABASE_URL password in tracked `.env.example` — CRITICAL
 `.env.example` (tracked, line 98):
 ```
-DATABASE_URL=postgresql://postgres:[LOVEtupac90!]@db.zexlxabdcsjefptmjhuq.supabase.co:5432/postgres
+DATABASE_URL=postgresql://postgres:<redacted>@db.zexlxabdcsjefptmjhuq.supabase.co:5432/postgres
 ```
 Contains a real database password. The `validate-no-secrets.mjs` scanner **excludes** `.example` files (line 20), so this is never caught.
 

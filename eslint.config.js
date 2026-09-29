@@ -16,16 +16,18 @@ export default tseslint.config(
       'mobile',
       'mobile/**',
       'supabase/functions',
-      'e2e',
-      'service.ts',
-      'docs',
-      'public',
-      '*.config.js',
-      '*.config.mjs',
-      '*.config.ts',
-      '.kilo',
-      '.kilo/**',
-    ]
+       'e2e',
+       'service.ts',
+       'docs',
+       'public',
+       '*.config.js',
+       '*.config.mjs',
+       '*.config.ts',
+       '.kilo',
+       '.kilo/**',
+       '**/dist/**',
+       'packages/rbac/deno/**',
+     ]
   },
   {
     extends: [ js.configs.recommended, ...tseslint.configs.recommended ],
@@ -33,7 +35,7 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2020,
       parserOptions: {
-        project: [ './tsconfig.json', './tsconfig.api.json', './tsconfig.tests.json' ],
+        project: [ './tsconfig.json', './tsconfig.api.json', './tsconfig.tests.json', './packages/rbac/tsconfig.json' ],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {

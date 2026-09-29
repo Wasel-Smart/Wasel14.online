@@ -261,7 +261,9 @@ function validateRolePermissions(): void {
   // Validate all permissions are known
   const allPermissions = new Set<AccessPermission>();
   for (const perms of Object.values(ROLE_PERMISSIONS)) {
-    for (const p of perms) allPermissions.add(p);
+    for (const p of perms) {
+      allPermissions.add(p);
+    }
   }
 }
 
@@ -301,8 +303,12 @@ export function assertPermission(role: AccessRole, permission: AccessPermission)
  * @returns Canonical AccessRole
  */
 export function resolveAccessRole(role: string | undefined): AccessRole {
-  if (!role) return 'guest';
-  if (VALID_ROLES.includes(role as AccessRole)) return role as AccessRole;
+  if (!role) {
+    return 'guest';
+  }
+  if (VALID_ROLES.includes(role as AccessRole)) {
+    return role as AccessRole;
+  }
 
   // Fail closed: unrecognised role strings (corrupt data, new DB enum values
   // not yet mapped here, attacker-supplied values) must never silently grant

@@ -24,7 +24,9 @@ const RULES = [
   { id: 'TWILIO_ACCOUNT_SID', re: /\bAC[a-f0-9]{32}\b/ },
   { id: 'TWILIO_API_KEY_SID', re: /\bSK[a-f0-9]{32}\b/ },
   { id: 'SUPABASE_SECRET_KEY', re: /\bsb_secret_[A-Za-z0-9_-]{16,}/ },
-  { id: 'SUPABASE_PUBLISHABLE_KEY', re: /\bsb_publishable_[A-Za-z0-9_-]{20,}/ },
+  // SUPABASE_PUBLISHABLE_KEY is public by design (exposed via VITE_ prefix).
+  // Skip in local env files to avoid false positives, but still flag in tracked templates.
+  { id: 'SUPABASE_PUBLISHABLE_KEY', re: /\bsb_publishable_[A-Za-z0-9_-]{20,}/, skipInLocal: true },
   { id: 'GOOGLE_OAUTH_SECRET', re: /\bGOCSPX-[A-Za-z0-9_-]{20,}/ },
   { id: 'GOOGLE_API_KEY', re: /\bAIza[0-9A-Za-z_-]{35}\b/ },
   { id: 'SENDGRID_API_KEY', re: /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/ },
@@ -109,14 +111,15 @@ function shouldSkip(filePath) {
   return SKIP_EXTENSIONS.has(path.extname(normalized).toLowerCase());
 }
 
-function scanContent(file, content) {
+function scanContent(file, content, isLocal = false) {
   const findings = [];
   const lines = content.split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     if (line.includes('secretscan:allow')) continue;
-    for (const rule of RULES) {
-      const match = rule.re.exec(line);
+            for (const rule of RULES) {
+            if (isLocal && rule.skipInLocal) continue;
+            const match = rule.re.exec(line);
       if (!match) continue;
       if (rule.id === 'JWT' && isSupabaseDemoJwt(match[0])) continue;
       if (rule.validate) {
@@ -144,7 +147,7 @@ function main() {
     if (!fs.existsSync(localFile)) continue;
     const content = readIfSmall(localFile);
     if (content === null) continue;
-    for (const f of scanContent(localFile, content)) findings.push({ ...f, scope: 'local-only' });
+    for (const f of scanContent(localFile, content, true)) findings.push({ ...f, scope: 'local-only' });
   }
 
   // 2. Every tracked file, templates and docs included.
