@@ -1,4 +1,4 @@
-import { projectId, publicAnonKey } from '../../utils/supabase/info';
+import { projectId, publicAnonKey, publicSupabaseUrl } from '../../utils/supabase/info';
 import { getEdgeFunctionName } from '../../utils/edgeFunctionConfig';
 
 export { projectId, publicAnonKey };
@@ -30,7 +30,13 @@ const rawConfiguredFunctionName = (
 const configuredFunctionName = isPlaceholderEdgeFunctionName(rawConfiguredFunctionName)
   ? ''
   : rawConfiguredFunctionName;
-const defaultFunctionsBaseUrl = projectId ? `https://${projectId}.supabase.co/functions/v1` : '';
+// Derive from the resolved Supabase URL so hosted (https://<ref>.supabase.co)
+// and local-stack (http://127.0.0.1:54321) projects both produce a valid base.
+const defaultFunctionsBaseUrl = publicSupabaseUrl
+  ? `${publicSupabaseUrl.replace(/\/$/, '')}/functions/v1`
+  : projectId
+    ? `https://${projectId}.supabase.co/functions/v1`
+    : '';
 const resolvedFunctionsBaseUrl = configuredFunctionsBaseUrl || defaultFunctionsBaseUrl;
 const resolvedFunctionName = configuredFunctionName || getEdgeFunctionName();
 

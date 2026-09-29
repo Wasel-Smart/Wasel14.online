@@ -35,7 +35,9 @@ function isPlaceholderValue(value: string | undefined): boolean {
     normalized.includes('paste_your') ||
     normalized.includes('_here') ||
     normalized.includes('your_sb_') ||
-    normalized.includes('your_supabase_')
+    normalized.includes('your_supabase_') ||
+    normalized.includes('set_local_dev_value') ||
+    normalized.includes('set_in_secret_manager')
   );
 }
 

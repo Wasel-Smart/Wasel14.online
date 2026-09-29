@@ -28,6 +28,9 @@ const PLACEHOLDER_MARKERS = [
   '_here',
   'your_sb_',
   'your_supabase_',
+  // Unfilled .env / .env.production template values.
+  'set_local_dev_value',
+  'set_in_secret_manager',
 ];
 
 const BLOCKED_PUBLIC_SUPABASE_KEYS = new Set([
@@ -67,6 +70,12 @@ function isConfiguredValue(value: string | undefined): value is string {
   const normalized = value.trim();
   if (!normalized) {return false;}
   if (BLOCKED_PUBLIC_SUPABASE_KEYS.has(normalized)) {return false;}
+  // Real keys (sb_publishable_..., legacy JWTs) never contain whitespace or
+  // slashes. Rejects pasted dashboard URLs / prose so they can't win key selection.
+  if (/\s/.test(normalized) || normalized.includes('/')) {
+    // Absolute URLs are validated separately by isValidPublicSupabaseUrl.
+    if (!/^https?:\/\/[^\s]+$/i.test(normalized)) {return false;}
+  }
 
   const lower = normalized.toLowerCase();
   return !PLACEHOLDER_MARKERS.some(marker => lower.includes(marker));
@@ -75,10 +84,15 @@ function isConfiguredValue(value: string | undefined): value is string {
 function isValidPublicSupabaseUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
-    return (
+    const isHostedProject =
       (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
-      parsed.hostname.endsWith('.supabase.co')
-    );
+      parsed.hostname.endsWith('.supabase.co');
+    // Local Supabase CLI stack (`supabase start`) — dev builds only.
+    const isLocalStack =
+      Boolean(import.meta.env?.DEV) &&
+      parsed.protocol === 'http:' &&
+      (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost');
+    return isHostedProject || isLocalStack;
   } catch {
     return false;
   }
