@@ -28,8 +28,8 @@ import { useIframeSafeNavigate } from '../hooks/useIframeSafeNavigate';
 import { checkRateLimit, resetRateLimit, validateEmail, validatePhone } from '../utils/security';
 import { useAuth } from '../contexts/AuthContext';
 import type { AuthOperationError } from '../contexts/authContextHelpers';
-import { getAuthCallbackUrl, getConfig, getWhatsAppSupportUrl, normalizeReturnToPath, resolveAuthRedirectOrigin } from '../utils/env';
-import { friendlyAuthError, pwStrength } from '../utils/authHelpers';
+import { getAuthCallbackUrl, getWhatsAppSupportUrl, normalizeReturnToPath, resolveAuthRedirectOrigin } from '../utils/env';
+import { friendlyAuthError, getPasswordRuleIssue, pwStrength } from '../utils/authHelpers';
 import { getProviderSetupInstructions } from '../utils/oauthValidator';
 import { supabase } from '../utils/supabase/client';
 
@@ -40,16 +40,8 @@ import { tx } from '../locales/tx';
 type Tab = 'signin' | 'signup';
 
 // ─── Shared validation helpers ────────────────────────────────────────────────
-type PasswordRuleIssue = 'min_length' | 'requirements' | null;
-
-/** Single source of truth for signup password rules (used live and on submit). */
-function getPasswordRuleIssue ( password: string ): PasswordRuleIssue {
-  if ( password.length < 8 ) { return 'min_length'; }
-  if ( !/[a-z]/.test( password ) || !/[A-Z]/.test( password ) || !/\d/.test( password ) || !/[^a-zA-Z0-9]/.test( password ) ) {
-    return 'requirements';
-  }
-  return null;
-}
+// Password rules live in utils/authHelpers (getPasswordRuleIssue) so sign-up,
+// password reset and the strength meter can never drift apart.
 
 /** Strip spaces/dashes/brackets so "+962 79 123 4567" is accepted and sent as E.164. */
 function normalizePhoneInput ( value: string ): string {
@@ -379,7 +371,8 @@ export default function WaselAuth () {
   const { resetPassword, signInWithGoogle, signInWithFacebook } = useAuth();
   const nav = useIframeSafeNavigate();
   const mountedRef = useRef( true );
-  const { supportWhatsAppNumber } = getConfig();
+  // Guards against the `user` effect and the post-success timer both navigating.
+  const redirectedRef = useRef( false );
   const [ oauthConfigWarning, setOauthConfigWarning ] = useState( '' );
   const [ activeProvider, setActiveProvider ] = useState<null | 'google' | 'facebook' | never>( null );
 
@@ -440,7 +433,10 @@ export default function WaselAuth () {
   }, [] );
 
   useEffect( () => {
-    if ( user && mountedRef.current ) { nav( safeReturnTo ); }
+    if ( user && mountedRef.current && !redirectedRef.current ) {
+      redirectedRef.current = true;
+      nav( safeReturnTo );
+    }
   }, [ user, nav, safeReturnTo ] );
 
   // Check for OAuth configuration issues on mount (dev mode only)
@@ -482,7 +478,10 @@ export default function WaselAuth () {
   const pushSuccessRedirect = () => {
     setSuccess( true );
     setTimeout( () => {
-      if ( mountedRef.current ) { nav( safeReturnTo ); }
+      if ( mountedRef.current && !redirectedRef.current ) {
+        redirectedRef.current = true;
+        nav( safeReturnTo );
+      }
     }, 700 );
   };
 
@@ -672,12 +671,16 @@ export default function WaselAuth () {
     void runOAuth( 'facebook', signInWithFacebook );
   };
 
+  // Empty when the number or the WhatsApp feature flag isn't configured, so the
+  // help link is only rendered when it will actually open something.
+  const whatsAppSupportUrl = getWhatsAppSupportUrl( ar ? 'مرحبا واصل' : 'Hi Wasel' );
+
   const handleWhatsAppHelp = () => {
-    if ( !supportWhatsAppNumber ) {
+    if ( !whatsAppSupportUrl ) {
       setError( tx( 'waselAuth.error_whatsapp_not_configured' ) );
       return;
     }
-    window.open( getWhatsAppSupportUrl( ar ? 'مرحبا واصل' : 'Hi Wasel' ), '_blank', 'noopener,noreferrer' );
+    window.open( whatsAppSupportUrl, '_blank', 'noopener,noreferrer' );
   };
 
   /**
@@ -700,16 +703,13 @@ export default function WaselAuth () {
   };
 
   const socialButtons: Array<{
-    key: 'google' | 'facebook' | never | 'whatsapp';
+    key: 'google' | 'facebook';
     label: string;
     color: string;
     onClick: () => void;
   }> = [
     { key: 'google', label: 'Google', color: '#4285F4', onClick: handleGoogleSignIn },
     { key: 'facebook', label: 'Facebook', color: '#1877F2', onClick: handleFacebookSignIn },
-    ...( supportWhatsAppNumber
-      ? [ { key: 'whatsapp' as const, label: 'WhatsApp', color: '#25D366', onClick: handleWhatsAppHelp } ]
-      : [] ),
   ];
 
   return (
@@ -883,6 +883,7 @@ export default function WaselAuth () {
                       <AlertCircle size={ 16 } color={ C.error } style={ { flexShrink: 0, marginTop: 2 } } />
                     ) }
                     <span
+                      role="alert"
                       style={ {
                         fontSize: TYPE.size.sm,
                         color: C.error,
@@ -1149,6 +1150,27 @@ export default function WaselAuth () {
                     );
                   } ) }
                 </div>
+
+                { whatsAppSupportUrl && (
+                  <div style={ { textAlign: 'center' } }>
+                    <button
+                      type="button"
+                      onClick={ handleWhatsAppHelp }
+                      style={ {
+                        background: 'none',
+                        border: 'none',
+                        color: C.textMuted,
+                        fontSize: TYPE.size.xs,
+                        fontFamily: F,
+                        cursor: 'pointer',
+                        padding: 0,
+                        textDecoration: 'underline',
+                      } }
+                    >
+                      { tx( 'waselAuth.need_help_whatsapp' ) }
+                    </button>
+                  </div>
+                ) }
               </form>
             </motion.div>
           </AnimatePresence>

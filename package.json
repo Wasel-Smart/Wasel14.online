@@ -7,6 +7,9 @@
     },
     "version": "1.0.0",
     "type": "module",
+    "engines": {
+        "node": ">=20"
+    },
     "scripts": {
         "dev": "vite",
         "build": "npx tsc && vite build && node scripts/generate-pwa-manifest.mjs && node scripts/version-sw.mjs",

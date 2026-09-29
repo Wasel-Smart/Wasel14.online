@@ -21,11 +21,9 @@ cp -r ./dist ./deploy/dist
 cp -r ./package.json ./deploy/package.json
 cp -r ./package-lock.json ./deploy/package-lock.json
 cp -r ./vercel.json ./deploy/vercel.json
-# .env.production is consumed at build time by Vite (production mode); copy it
-# into the deploy payload only when it exists so the script does not fail.
-if [ -f .env.production ]; then
-  cp -r .env.production ./deploy/.env
-fi
+# SECURITY: never copy .env* files into the deploy payload. Vite has already inlined
+# the VITE_* values into dist/ during the build above, and everything else (server
+# secrets) must live in Vercel / Supabase secret management, not in a pushed repo.
 cd deploy
 
 git init

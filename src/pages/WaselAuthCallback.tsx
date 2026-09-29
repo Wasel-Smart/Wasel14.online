@@ -3,6 +3,7 @@ import type { AuthChangeEvent } from '@supabase/auth-js';
 import { useIframeSafeNavigate } from '../hooks/useIframeSafeNavigate';
 import { supabase } from '../utils/supabase/client';
 import { normalizeReturnToPath } from '../utils/env';
+import { getPasswordRuleIssue } from '../utils/authHelpers';
 import { tx } from '../locales/tx';
 
 type CallbackState = 'loading' | 'closing' | 'redirecting' | 'recovery' | 'error';
@@ -27,7 +28,7 @@ function readCallbackParam(key: string): string {
 export default function WaselAuthCallback() {
   const navigate = useIframeSafeNavigate();
   const [state, setState] = useState<CallbackState>('loading');
-  const [message, setMessage] = useState('Completing sign-in...');
+  const [message, setMessage] = useState(() => tx('waselAuthCallback.completing_sign_in'));
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState('');
@@ -51,13 +52,22 @@ export default function WaselAuthCallback() {
 
   useEffect(() => {
     let active = true;
+    // `type=recovery` is added to the reset-email redirect URL by
+    // AuthContext.resetPassword, so this is known up-front for new links.
     let isRecoveryFlow = callbackType === 'recovery';
+
+    const showRecovery = () => {
+      if (!active) {return;}
+      setState('recovery');
+      setMessage(tx('waselAuthCallback.set_new_password_message'));
+      setFormError('');
+    };
 
     const finishAuth = async () => {
       if (!supabase) {
         if (!active) {return;}
         setState('error');
-        setMessage('Backend is not configured for social sign-in.');
+        setMessage(tx('waselAuthCallback.backend_not_configured_social'));
         return;
       }
 
@@ -75,19 +85,13 @@ export default function WaselAuthCallback() {
 
         if (event === 'PASSWORD_RECOVERY') {
           isRecoveryFlow = true;
-          setState('recovery');
-          setMessage('Set a new password to finish recovering your account.');
-          setFormError('');
+          showRecovery();
         }
       });
 
       try {
-        await new Promise(resolve => setTimeout(resolve, 50));
-
         if (isRecoveryFlow) {
-          if (!active) {return;}
-          setState('recovery');
-          setMessage('Set a new password to finish recovering your account.');
+          showRecovery();
           return;
         }
 
@@ -99,13 +103,21 @@ export default function WaselAuthCallback() {
           throw error;
         }
 
+        // With PKCE, getSession() waits for the code exchange, and
+        // PASSWORD_RECOVERY fires during that wait. A recovery session must
+        // never be redirected into the app without asking for a new password.
+        if (isRecoveryFlow) {
+          showRecovery();
+          return;
+        }
+
         if (!session) {
-          throw new Error('Authentication session could not be established.');
+          throw new Error(tx('waselAuthCallback.session_failed'));
         }
 
         if (window.opener && !window.opener.closed) {
           setState('closing');
-          setMessage('Sign-in complete. You can return to Wasel.');
+          setMessage(tx('waselAuthCallback.sign_in_complete_return'));
           const nonce = sessionStorage.getItem('wasel_oauth_nonce') ?? '';
           window.opener.postMessage({ type: 'wasel-auth-complete', nonce }, window.location.origin);
           window.close();
@@ -113,12 +125,12 @@ export default function WaselAuthCallback() {
         }
 
         setState('redirecting');
-        setMessage('Sign-in complete. Redirecting...');
+        setMessage(tx('waselAuthCallback.sign_in_complete_redirecting'));
         navigate(returnTo, { replace: true });
       } catch (error) {
         if (!active) {return;}
         setState('error');
-        setMessage(error instanceof Error ? error.message : 'Unable to complete sign-in.');
+        setMessage(error instanceof Error ? error.message : tx('waselAuthCallback.unable_to_complete'));
       } finally {
         subscription.unsubscribe();
       }
@@ -133,34 +145,52 @@ export default function WaselAuthCallback() {
 
   const handlePasswordUpdate = async () => {
     if (!supabase) {
-      setFormError('Backend is not configured for password recovery.');
+      setFormError(tx('waselAuthCallback.backend_not_configured_recovery'));
       return;
     }
 
-    if (password.length < 8) {
-      setFormError('Password must be at least 8 characters long.');
+    // Same rules as sign-up (utils/authHelpers) so a reset can't set a
+    // weaker password than registration would accept.
+    const passwordIssue = getPasswordRuleIssue(password);
+    if (passwordIssue === 'min_length') {
+      setFormError(tx('waselAuth.error_password_min_length'));
+      return;
+    }
+    if (passwordIssue === 'requirements') {
+      setFormError(tx('waselAuth.error_password_requirements'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setFormError('Passwords do not match.');
+      setFormError(tx('waselAuthCallback.passwords_do_not_match'));
       return;
     }
 
     setFormError('');
     setSavingPassword(true);
 
+    // An expired or already-used reset link leaves no session; say so plainly
+    // instead of surfacing Supabase's "Auth session missing!".
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      setSavingPassword(false);
+      setFormError(tx('waselAuthCallback.link_expired'));
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
       setSavingPassword(false);
-      setFormError(error.message || 'Unable to update your password.');
+      setFormError(error.message || tx('waselAuthCallback.unable_to_update_password'));
       return;
     }
 
     await supabase.auth.signOut().catch(() => undefined);
 
     setState('redirecting');
-    setMessage('Password updated. Redirecting to sign in...');
+    setMessage(tx('waselAuthCallback.password_updated_redirecting'));
     navigate(`/app/auth?tab=signin&reset=success&returnTo=${encodeURIComponent(returnTo)}`, {
       replace: true,
     });
@@ -199,86 +229,104 @@ export default function WaselAuthCallback() {
             <p style={{ margin: 0, color: 'rgba(239,246,255,0.7)', lineHeight: 1.6 }}>{message}</p>
           </div>
 
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={{ fontSize: '0.82rem', color: 'rgba(196,220,238,0.68)' }}>
-              {tx('settingsExpanded.newPassword')}
-            </span>
-            <input
-              type="password"
-              value={password}
-              onChange={event => setPassword(event.target.value)}
-              placeholder={tx('waselAuthCallback.enter_a_new_password')}
-              style={{
-                width: '100%',
-                minHeight: 46,
-                borderRadius: 12,
-                border: '1px solid rgba(0,200,232,0.18)',
-                background: 'rgba(255,255,255,0.03)',
-                color: '#EFF6FF',
-                padding: '0 14px',
-                fontSize: '0.95rem',
-              }}
-            />
-          </label>
-
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span style={{ fontSize: '0.82rem', color: 'rgba(196,220,238,0.68)' }}>
-              {tx('waselAuthCallback.confirm_password')}
-            </span>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={event => setConfirmPassword(event.target.value)}
-              placeholder={tx('waselAuthCallback.re_enter_your_new_password')}
-              style={{
-                width: '100%',
-                minHeight: 46,
-                borderRadius: 12,
-                border: '1px solid rgba(0,200,232,0.18)',
-                background: 'rgba(255,255,255,0.03)',
-                color: '#EFF6FF',
-                padding: '0 14px',
-                fontSize: '0.95rem',
-              }}
-            />
-          </label>
-
-          {formError && (
-            <div
-              style={{
-                borderRadius: 12,
-                border: '1px solid rgba(255,68,85,0.28)',
-                background: 'rgba(255,68,85,0.12)',
-                color: '#FF8A96',
-                padding: '12px 14px',
-                fontSize: '0.85rem',
-                lineHeight: 1.5,
-              }}
-            >
-              {formError}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
+          <form
+            onSubmit={event => {
+              event.preventDefault();
               void handlePasswordUpdate();
             }}
-            disabled={savingPassword}
-            style={{
-              minHeight: 46,
-              borderRadius: 12,
-              border: 'none',
-              background: 'linear-gradient(135deg, #00E5FF, #0e5cb0)',
-              color: '#EFF6FF',
-              fontSize: '0.95rem',
-              fontWeight: 800,
-              cursor: savingPassword ? 'not-allowed' : 'pointer',
-              opacity: savingPassword ? 0.7 : 1,
-            }}
+            style={{ display: 'grid', gap: 14 }}
+            noValidate
           >
-            {savingPassword ? 'Updating password...' : 'Save new password'}
-          </button>
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={{ fontSize: '0.82rem', color: 'rgba(196,220,238,0.68)' }}>
+                {tx('settingsExpanded.newPassword')}
+              </span>
+              <input
+                type="password"
+                value={password}
+                autoComplete="new-password"
+                onChange={event => setPassword(event.target.value)}
+                placeholder={tx('waselAuthCallback.enter_a_new_password')}
+                aria-describedby="reset-password-rules"
+                style={{
+                  width: '100%',
+                  minHeight: 46,
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,200,232,0.18)',
+                  background: 'rgba(255,255,255,0.03)',
+                  color: '#EFF6FF',
+                  padding: '0 14px',
+                  fontSize: '0.95rem',
+                }}
+              />
+              <span
+                id="reset-password-rules"
+                style={{ fontSize: '0.75rem', color: 'rgba(196,220,238,0.55)' }}
+              >
+                {tx('waselAuth.minimum_8_characters')}
+              </span>
+            </label>
+
+            <label style={{ display: 'grid', gap: 6 }}>
+              <span style={{ fontSize: '0.82rem', color: 'rgba(196,220,238,0.68)' }}>
+                {tx('waselAuthCallback.confirm_password')}
+              </span>
+              <input
+                type="password"
+                value={confirmPassword}
+                autoComplete="new-password"
+                onChange={event => setConfirmPassword(event.target.value)}
+                placeholder={tx('waselAuthCallback.re_enter_your_new_password')}
+                style={{
+                  width: '100%',
+                  minHeight: 46,
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,200,232,0.18)',
+                  background: 'rgba(255,255,255,0.03)',
+                  color: '#EFF6FF',
+                  padding: '0 14px',
+                  fontSize: '0.95rem',
+                }}
+              />
+            </label>
+
+            {formError && (
+              <div
+                role="alert"
+                style={{
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,68,85,0.28)',
+                  background: 'rgba(255,68,85,0.12)',
+                  color: '#FF8A96',
+                  padding: '12px 14px',
+                  fontSize: '0.85rem',
+                  lineHeight: 1.5,
+                }}
+              >
+                {formError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={savingPassword}
+              style={{
+                minHeight: 46,
+                borderRadius: 12,
+                border: 'none',
+                background: 'linear-gradient(135deg, #00E5FF, #0e5cb0)',
+                color: '#EFF6FF',
+                fontSize: '0.95rem',
+                fontWeight: 800,
+                cursor: savingPassword ? 'not-allowed' : 'pointer',
+                opacity: savingPassword ? 0.7 : 1,
+              }}
+            >
+              {savingPassword
+                ? tx('waselAuthCallback.updating_password')
+                : tx('waselAuthCallback.save_new_password')}
+            </button>
+          </form>
 
           <button
             type="button"
@@ -330,6 +378,7 @@ export default function WaselAuthCallback() {
         }}
       >
         <div
+          aria-hidden="true"
           style={{
             width: 42,
             height: 42,
@@ -347,9 +396,16 @@ export default function WaselAuthCallback() {
           }}
         />
         <h1 style={{ margin: '0 0 8px', fontSize: '1.35rem', lineHeight: 1.2 }}>
-          {state === 'error' ? 'Sign-in could not finish' : 'Finalizing authentication'}
+          {state === 'error'
+            ? tx('waselAuthCallback.sign_in_could_not_finish')
+            : tx('waselAuthCallback.finalizing_authentication')}
         </h1>
-        <p style={{ margin: 0, color: 'rgba(239,246,255,0.7)' }}>{message}</p>
+        <p
+          role={state === 'error' ? 'alert' : 'status'}
+          style={{ margin: 0, color: 'rgba(239,246,255,0.7)' }}
+        >
+          {message}
+        </p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     </div>

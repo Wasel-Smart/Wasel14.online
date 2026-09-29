@@ -33,6 +33,8 @@ type VercelResponse = {
 
 const DEFAULT_RETURN_TO = '/app/find-ride';
 const SIGN_IN_PATH = '/app/auth';
+// Client route that renders the new-password form (WaselAuthCallback).
+const CLIENT_CALLBACK_PATH = '/app/auth/callback';
 const COOKIE_NAME = 'wasel-auth-token';
 
 function getEnv(name: string): string {
@@ -108,6 +110,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const code = url.searchParams.get('code');
   const oauthError = url.searchParams.get('error_description') || url.searchParams.get('error');
   const returnTo = safeReturnTo(url.searchParams.get('returnTo'));
+  const isRecovery = url.searchParams.get('type') === 'recovery';
 
   if (oauthError) {
     response.writeHead(302, { Location: `${SIGN_IN_PATH}?error=${encodeURIComponent(oauthError)}` });
@@ -153,8 +156,16 @@ export default async function handler(request: VercelRequest, response: VercelRe
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
+  // A password-recovery link signs the user in via the code exchange above,
+  // but they still have to choose a new password. Hand off to the client
+  // callback page (session cookie is already set) instead of dropping them
+  // straight into the app at `returnTo`.
+  const successLocation = isRecovery
+    ? `${CLIENT_CALLBACK_PATH}?type=recovery&returnTo=${encodeURIComponent(returnTo)}`
+    : returnTo;
+
   const headers: Record<string, string | string[]> = {
-    Location: error ? `${SIGN_IN_PATH}?error=${encodeURIComponent(error.message)}` : returnTo,
+    Location: error ? `${SIGN_IN_PATH}?error=${encodeURIComponent(error.message)}` : successLocation,
   };
   if (outgoingCookies.length > 0) {
     headers['Set-Cookie'] = outgoingCookies;

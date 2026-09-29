@@ -41,10 +41,6 @@
           "value": "nosniff"
         },
         {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        },
-        {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
@@ -58,7 +54,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://js.stripe.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: https://zexlxabdcsjefptmjhuq.supabase.co https://images.unsplash.com https://api.qrserver.com https://*.vercel.app; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://zexlxabdcsjefptmjhuq.supabase.co wss://zexlxabdcsjefptmjhuq.supabase.co wss://*.sentry.io https://api.stripe.com https://maps.googleapis.com https://*.sentry.io https://*.vercel.app; frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://*.vercel.app; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://*.vercel.app; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self' https://js.stripe.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: https://zexlxabdcsjefptmjhuq.supabase.co https://images.unsplash.com https://api.qrserver.com https://*.vercel.app; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://zexlxabdcsjefptmjhuq.supabase.co wss://zexlxabdcsjefptmjhuq.supabase.co wss://*.sentry.io https://api.stripe.com https://maps.googleapis.com https://*.sentry.io https://*.vercel.app; frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://*.vercel.app; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
         },
         {
           "key": "Cross-Origin-Opener-Policy",
@@ -67,22 +63,6 @@
         {
           "key": "Cross-Origin-Resource-Policy",
           "value": "cross-origin"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, X-Client-Info"
-        },
-        {
-          "key": "Access-Control-Allow-Credentials",
-          "value": "true"
         }
       ]
     },

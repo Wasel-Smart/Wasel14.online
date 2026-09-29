@@ -48,20 +48,42 @@ export function friendlyAuthError(error: unknown, fallback: string, code?: strin
 }
 
 /**
+ * Password rules — single source of truth for sign-up, password reset and the
+ * strength meter. Anything that accepts a new password must go through this.
+ */
+export type PasswordRuleIssue = 'min_length' | 'requirements' | null;
+
+export function getPasswordRuleIssue(password: string): PasswordRuleIssue {
+  if (password.length < 8) {return 'min_length';}
+  if (
+    !/[a-z]/.test(password) ||
+    !/[A-Z]/.test(password) ||
+    !/\d/.test(password) ||
+    !/[^a-zA-Z0-9]/.test(password)
+  ) {
+    return 'requirements';
+  }
+  return null;
+}
+
+/**
  * Password strength scorer.
  * Returns score 0-5, label, and colour token from wasel-ds.
+ * A password that fails getPasswordRuleIssue can never score above "Fair", so
+ * the meter never says "Strong" for something the form will reject.
  */
 import { C } from '../utils/wasel-ds';
 
 export function pwStrength(password: string): { score: number; label: string; color: string } {
   if (!password) {return { score: 0, label: '', color: C.textMuted };}
 
-  let score = 0;
-  if (password.length >= 8) {score += 1;}
-  if (password.length >= 12) {score += 1;}
-  if (/[A-Z]/.test(password)) {score += 1;}
-  if (/\d/.test(password)) {score += 1;}
-  if (/[^A-Za-z0-9]/.test(password)) {score += 1;}
+  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(rule => rule.test(password)).length;
+  let score = classes + (password.length >= 12 ? 1 : 0);
+  if (password.length < 8) {
+    score = Math.min(score, 1);
+  } else if (getPasswordRuleIssue(password)) {
+    score = Math.min(score, 2);
+  }
 
   const map = [
     { score: 0, label: '', color: C.textMuted },

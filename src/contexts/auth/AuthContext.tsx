@@ -108,8 +108,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [waselUser, setWaselUser] = useState<WaselUser | null>(null);
   const optimisticRef = useRef<Partial<WaselUser> | null>(null);
+  // Tracks an in-flight ensure-profile call so signIn()/signUp() and the
+  // SIGNED_IN auth event don't both load (and possibly create) the profile.
+  const ensureProfileInflightRef = useRef<{ userId: string; promise: Promise<Profile | null> } | null>(null);
 
-  const fetchProfile = useCallback(async (forceCreate = false, authUser?: User | null) => {
+  const loadAndEnsureProfile = useCallback(async (forceCreate = false, authUser?: User | null) => {
     if (!authUser || !getSupabaseClient()) {
       setProfile(null);
       return null;
@@ -143,6 +146,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setProfile(nextProfile);
     return nextProfile;
   }, []);
+
+  const fetchProfile = useCallback(
+    (forceCreate = false, authUser?: User | null): Promise<Profile | null> => {
+      // Only ensure/create calls are coalesced. Plain refreshes always hit the
+      // backend so they can't return data older than a just-finished update.
+      if (!forceCreate || !authUser) {
+        return loadAndEnsureProfile(forceCreate, authUser);
+      }
+
+      const inflight = ensureProfileInflightRef.current;
+      if (inflight && inflight.userId === authUser.id) {
+        return inflight.promise;
+      }
+
+      const promise = loadAndEnsureProfile(true, authUser).finally(() => {
+        if (ensureProfileInflightRef.current?.promise === promise) {
+          ensureProfileInflightRef.current = null;
+        }
+      });
+      ensureProfileInflightRef.current = { userId: authUser.id, promise };
+      return promise;
+    },
+    [loadAndEnsureProfile],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -507,11 +534,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!client) {return { error: new Error('Backend not configured') };}
 
       try {
+        // `type=recovery` lets the callback page show the new-password form
+        // deterministically instead of racing the PASSWORD_RECOVERY event.
         const { error } = await client.auth.resetPasswordForEmail(email, {
-          redirectTo: getAuthCallbackUrl(
-            resolveAuthRedirectOrigin(),
-            returnTo ? { returnTo } : undefined,
-          ),
+          redirectTo: getAuthCallbackUrl(resolveAuthRedirectOrigin(), {
+            type: 'recovery',
+            ...(returnTo ? { returnTo } : {}),
+          }),
         });
         return { error: error ?? null };
       } catch (error: unknown) {

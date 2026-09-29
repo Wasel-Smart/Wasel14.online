@@ -34,7 +34,11 @@ yarn.lock
 .env.staging
 .env.staging.local
 .env*.local
-.env?*            # catch-all for any variant not listed above
+# catch-all for any env variant not listed above (templates stay committed)
+.env?*
+!.env.example
+!.env.production.template
+!.env.production.staging.template
 .env.original
 .env.testcopy
 .env-LaithNassar.*
@@ -131,8 +135,6 @@ backup-codes*.txt
 *-backup-codes.txt
 *backup_code*.txt
 *backup-code*.txt
-stripe_backup_code.txt
-client_secret_*.json
 *.pem
 *.p8
 *.key
@@ -176,7 +178,6 @@ public/_write_test.txt
 dev-output.txt
 load-test-results.json
 wasel-fixes.patch
-=                  # accidental git-paste artifact
 
 # ---- AI-generated images ----
 src/assets/ChatGPT*
