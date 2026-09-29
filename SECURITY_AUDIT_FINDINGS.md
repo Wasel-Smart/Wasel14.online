@@ -15,7 +15,7 @@ deployed environment.
 ## A. Blockers
 
 **A1. The main API edge function looks like an unfinished refactor.**
-`scripts/full-refactor.js` (now in `_CLEANUP_REVIEW_DELETE_ME/scripts/`) split the old
+`scripts/full-refactor.js` split the old
 monolithic `make-server-0b1f4071/index.ts` into `_handlers/*.ts`. As the files stand:
 - `index.ts` imports `handleStripeWebhook, handleCliqWebhook, handleSanadWebhook,
   handleResendWebhook, handleTwilioWebhook` from `webhooks.ts`, but `webhooks.ts` only
