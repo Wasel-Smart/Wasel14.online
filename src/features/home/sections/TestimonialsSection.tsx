@@ -1,7 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { MessageSquareQuote, Star } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { tx } from '../../../locales/tx';
 import { C, TYPE } from '../HomePageShared';
 
 export function TestimonialsSection() {

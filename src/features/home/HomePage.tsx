@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Car, Package, Bus, Calendar, Route } from 'lucide-react';
-import { motion, useReducedMotion, type Variants } from 'framer-motion';
+import { Search, Car, Package, Bus, Calendar } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import type { Language } from '../../locales/translations';
@@ -14,7 +14,7 @@ import { trackUserAction } from '../../utils/monitoring';
 import { API_URL } from '../../services/core';
 import { WaselErrorBoundary } from '../../components/ErrorBoundary';
 import { ActiveTripsBanner } from '../../components/TripProgressCard';
-import { C, F, POPULAR_ROUTES } from './HomePageShared';
+import { C, F, POPULAR_ROUTES, TYPE } from './HomePageShared';
 import cookieBannerStyles from './sections/CookieBanner.module.css';
 import {
   CorridorsSection,
@@ -43,10 +43,6 @@ import {
 // below — previously these were framer-motion components with no motion at
 // all (`initial={false}`, no animate/whileInView), which cost bundle weight
 // and a wrapper element for zero visible effect.
-const sectionRiseVariants: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0 },
-};
 const sectionRiseTransition = { duration: 0.28, ease: [0.4, 0, 0.2, 1] as const };
 
 const CorridorGlobeSection = lazy( () =>
