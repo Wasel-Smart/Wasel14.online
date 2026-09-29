@@ -14,6 +14,7 @@ export const C = {
 } as const;
 
 export const F = FONT_SANS;
+export { R, SH, TYPE };
 export const glass = (_op = 0.84) => C.glass;
 
 export const POPULAR_ROUTES = [
