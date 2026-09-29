@@ -284,3 +284,6 @@ vitest.config.mjs
 
 # ---- Local write-test / ephemeral output ----
 # (covered above under root-level scratch)
+
+.vercel
+.env*

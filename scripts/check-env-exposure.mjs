@@ -1,195 +1,183 @@
 #!/usr/bin/env node
 /**
- * CI guard: scan for .env files with real secrets in the repository.
+ * Env-file exposure guard.
  *
- * This script runs in CI and fails if any .env file contains non-placeholder
- * values that look like real secrets. It protects against accidental commits
- * of credentials, especially in OneDrive-synced trees.
+ * What it checks
+ *  1. Template files (`.env.example`, `.env.*.template`, `*.sample`) must contain
+ *     placeholders only. A real value in a template is a leak, because
+ *     templates are committed.
+ *  2. Real env files (`.env`, `.env.local`, `.env.production`, ...) must not
+ *     hold live secrets while the project sits inside a cloud-synced folder
+ *     (OneDrive, Dropbox, Google Drive, iCloud). Sync copies them off-machine.
+ *     Point WASEL_ENV_DIR at a folder outside the project instead.
+ *  3. In CI, real env files must not exist at all.
+ *  4. `VITE_*` variables are shipped to the browser, so a secret-looking name
+ *     (SECRET / PRIVATE / SERVICE_ROLE) with a real value is always a failure.
  *
- * Usage:
- *   node scripts/check-env-exposure.mjs
+ * Unlike the earlier version, dot-files are NOT skipped: skipping them meant
+ * every `.env*` file was invisible to the scan.
  *
- * Exit codes:
- *   0 - No .env files found, or all contain only placeholders
- *   1 - .env file with real secrets detected
+ * Values are never printed. Exit 0 = clean, 1 = problem found.
  */
+import { readdir, readFile } from 'node:fs/promises';
+import { join, relative, resolve, sep } from 'node:path';
 
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, relative, resolve, normalize } from 'node:path';
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.venv', '.expo', '.next']);
 
-const SECRET_PATTERNS = [
-  /sk_live_[a-zA-Z0-9]{24,}/i,           // Stripe secret key
-  /sk_test_[a-zA-Z0-9]{24,}/i,           // Stripe test key
-  /whsec_[a-zA-Z0-9]{24,}/i,             // Stripe webhook secret
-  /xox[baprs]-[a-zA-Z0-9]{10,}/i,       // Slack token
-  /AIza[0-9A-Za-z-_]{35}/i,             // Google API key
-  /ya29\.[a-zA-Z0-9_-]+/i,              // Google OAuth token
-  /SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}/i, // SendGrid API key
-  /AC[a-f0-9]{32}/i,                     // Twilio Account SID
-  /key-[a-zA-Z0-9]{32,}/i,               // Various API keys
-  /(?:supabase|postgres|postgresql):\/\/[^:]+:[^@]+@[^\/]+\/[^?]+/i, // Database URLs
-  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i, // Private keys
+const TEMPLATE_RE = /(\.example|\.template|\.sample|\.dist)$/i;
+const ENV_FILE_RE = /^\.env(\..+)?$/i;
+
+const SENSITIVE_KEY_RE =
+  /(SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE|SERVICE_ROLE|API_KEY|APIKEY|DATABASE_URL|DB_URL|WEBHOOK|CLIENT_SECRET|AUTH_KEY|BACKUP_CODE|OIDC)/i;
+const BROWSER_SECRET_KEY_RE = /^VITE_.*(SECRET|PRIVATE|SERVICE_ROLE|PASSWORD)/i;
+
+/** Keys that look sensitive by name but are public identifiers or plain config. */
+const PUBLIC_KEY_ALLOWLIST = new Set([
+  'VITE_SUPABASE_PUBLISHABLE_KEY',
+  'VITE_SUPABASE_ANON_KEY',
+  'VITE_STRIPE_PUBLISHABLE_KEY',
+  'VITE_GOOGLE_MAPS_API_KEY',
+  'VITE_EVENT_BROKER_API_KEY',
+]);
+
+const SECRET_VALUE_PATTERNS = [
+  /\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}/,
+  /\bwhsec_[A-Za-z0-9+/=]{24,}/,
+  /\bsb_secret_[A-Za-z0-9_-]{16,}/,
+  /\bGOCSPX-[A-Za-z0-9_-]{20,}/,
+  /\bAC[a-f0-9]{32}\b/,
+  /\bSK[a-f0-9]{32}\b/,
+  /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/,
+  /\bre_[A-Za-z0-9]{32,}\b/,
+  /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
 ];
 
-const PLACEHOLDER_PATTERNS = [
-  /your[-_]?edge[-_]?function/i,
-  /replace[-_]?with/i,
-  /example/i,
-  /placeholder/i,
-  /your[-_]?api[-_]?key/i,
-  /your[-_]?secret/i,
-  /xxx/i,
-  /changeme/i,
-  /test/i,
-  /dummy/i,
-  /sample/i,
-  /fake/i,
-  /<.*>/i,
-  /\$\{.*\}/i,
+const PLACEHOLDER_HINTS = [
+  'your', 'placeholder', 'replace', 'example', 'changeme', 'change-me', 'dummy', 'sample', 'fake',
+  'redacted', 'xxxx', 'paste_', 'rotate_and_set', 'set_real', '<', '>', '${', '...', 'todo',
 ];
 
-const ENV_FILE_PATTERNS = [
-  '.env',
-  '.env.local',
-  '.env.development',
-  '.env.development.local',
-  '.env.test',
-  '.env.test.local',
-  '.env.production',
-  '.env.production.local',
-  '.env.staging',
-  '.env.staging.local',
-];
+function isPlaceholder(value) {
+  const v = value.trim().replace(/^['"]|['"]$/g, '');
+  if (v === '') return true;
+  const lower = v.toLowerCase();
+  return PLACEHOLDER_HINTS.some((hint) => lower.includes(hint));
+}
 
-let hasErrors = false;
+function isLocalDatabaseUrl(value) {
+  return /@(localhost|127\.0\.0\.1|host\.docker\.internal|db|postgres)(:|\/|$)/i.test(value);
+}
 
-function isPlaceholderLine(line) {
+function looksLikeRealSecret(key, rawValue) {
+  const value = rawValue.trim().replace(/^['"]|['"]$/g, '');
+  if (isPlaceholder(value)) return false;
+  if (SECRET_VALUE_PATTERNS.some((re) => re.test(value))) return true;
+  if (/^[a-z]+:\/\/[^:\s/@]+:[^@\s]+@/i.test(value) && !isLocalDatabaseUrl(value)) return true;
+  if (PUBLIC_KEY_ALLOWLIST.has(key)) return false;
+  // Name says "secret", value is a long non-placeholder string.
+  return SENSITIVE_KEY_RE.test(key) && value.length >= 16;
+}
+
+function parseEnvLine(line) {
   const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith('#')) return true;
-  return PLACEHOLDER_PATTERNS.some(pattern => pattern.test(trimmed));
+  if (!trimmed || trimmed.startsWith('#')) return null;
+  const cleaned = trimmed.replace(/^export\s+/, '');
+  const idx = cleaned.indexOf('=');
+  if (idx <= 0) return null;
+  return { key: cleaned.slice(0, idx).trim(), value: cleaned.slice(idx + 1) };
 }
 
-function containsSecret(line) {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith('#')) return false;
-  return SECRET_PATTERNS.some(pattern => pattern.test(trimmed));
-}
-
-async function scanFile(filePath) {
+async function findEnvFiles(dir, root) {
+  const found = [];
+  let entries;
   try {
-    // Resolve and normalize to prevent path traversal before reading.
-    const safePath = normalize(resolve(filePath));
-    const content = await readFile(safePath, 'utf-8');
-    const lines = content.split('\n');
-    const secretLines = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (isPlaceholderLine(line)) continue;
-      if (containsSecret(line)) {
-        secretLines.push(`  Line ${i + 1}: ${line.slice(0, 120)}${line.length > 120 ? '...' : ''}`);
-      }
-    }
-
-    return secretLines;
+    entries = await readdir(dir, { withFileTypes: true });
   } catch {
-    return [];
+    return found;
   }
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS.has(entry.name)) continue;
+      found.push(...(await findEnvFiles(full, root)));
+    } else if (ENV_FILE_RE.test(entry.name) || (TEMPLATE_RE.test(entry.name) && entry.name.startsWith('.env'))) {
+      found.push(full);
+    }
+  }
+  return found;
 }
 
-async function findEnvFiles(dir, baseDir = dir) {
-  const envFiles = [];
-
-  try {
-    const entries = await readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
-      const relativePath = relative(baseDir, fullPath);
-
-      // Skip node_modules, .git, dist, build
-      if (
-        entry.name === 'node_modules' ||
-        entry.name === '.git' ||
-        entry.name === 'dist' ||
-        entry.name === 'build' ||
-        entry.name.startsWith('.')
-      ) {
-        continue;
-      }
-
-      if (entry.isDirectory()) {
-        const nested = await findEnvFiles(fullPath, baseDir);
-        envFiles.push(...nested);
-      } else if (ENV_FILE_PATTERNS.some(pattern => entry.name === pattern || entry.name.startsWith(pattern))) {
-        // Resolve and normalize the path to prevent traversal before adding to the scan list.
-        const safePath = normalize(resolve(fullPath));
-        const safeBase = normalize(resolve(baseDir));
-        if (safePath.startsWith(safeBase)) {
-          envFiles.push(safePath);
-        }
-      }
-    }
-  } catch {
-    // Skip directories we can't read
-  }
-
-  return envFiles;
+async function scanFile(file) {
+  const content = await readFile(file, 'utf8');
+  const problems = [];
+  content.split(/\r?\n/).forEach((line, index) => {
+    const parsed = parseEnvLine(line);
+    if (!parsed) return;
+    const { key, value } = parsed;
+    const real = looksLikeRealSecret(key, value);
+    if (!real) return;
+    problems.push({ line: index + 1, key, browserExposed: BROWSER_SECRET_KEY_RE.test(key) });
+  });
+  return problems;
 }
 
 async function main() {
-  const repoRoot = process.cwd();
+  const root = resolve(process.cwd());
+  const inCloudSync = /(onedrive|dropbox|google drive|googledrive|icloud)/i.test(root);
+  const inCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
-  console.log('[env-exposure-check] Scanning for .env files with real secrets...');
+  const files = await findEnvFiles(root, root);
+  console.log(`[env-exposure-check] Scanned ${files.length} env file(s) under ${root}`);
 
-  const envFiles = await findEnvFiles(repoRoot);
-  console.log(`[env-exposure-check] Found ${envFiles.length} .env file(s)`);
+  let failed = false;
 
-  if (envFiles.length === 0) {
-    console.log('[env-exposure-check] ✓ No .env files found in repository');
-    return 0;
-  }
+  for (const file of files) {
+    const rel = relative(root, file).split(sep).join('/');
+    const isTemplate = TEMPLATE_RE.test(rel);
+    const problems = await scanFile(file);
 
-  let totalSecrets = 0;
-
-  const safeRepoRoot = normalize(resolve(repoRoot));
-
-  for (const filePath of envFiles) {
-    // Boundary check: ensure the resolved path is still within the repo root.
-    const safePath = normalize(resolve(filePath));
-    if (!safePath.startsWith(safeRepoRoot)) {
-      console.warn(`[env-exposure-check] Skipping out-of-bounds path: ${filePath}`);
+    if (inCI && !isTemplate) {
+      console.error(`FAIL ${rel}: real env files must not exist in CI. Use CI secrets instead.`);
+      failed = true;
       continue;
     }
-    const relativePath = relative(repoRoot, safePath);
-    const secretLines = await scanFile(safePath);
 
-    if (secretLines.length > 0) {
-      hasErrors = true;
-      totalSecrets += secretLines.length;
-      console.error(`\n[env-exposure-check] ✗ SECRETS FOUND in ${relativePath}:`);
-      for (const line of secretLines) {
-        console.error(line);
+    if (problems.length === 0) {
+      console.log(`ok   ${rel}`);
+      continue;
+    }
+
+    for (const p of problems) {
+      const browser = p.browserExposed ? ' (VITE_* is bundled into the browser!)' : '';
+      if (isTemplate) {
+        console.error(`FAIL ${rel}:${p.line} ${p.key}: template contains a real-looking value${browser}`);
+        failed = true;
+      } else if (inCloudSync || p.browserExposed) {
+        const reason = inCloudSync ? 'file sits in a cloud-synced folder' : 'exposed to the browser bundle';
+        console.error(`FAIL ${rel}:${p.line} ${p.key}: live secret, ${reason}${browser}`);
+        failed = true;
+      } else {
+        console.warn(`warn ${rel}:${p.line} ${p.key}: live value in a local env file (keep it out of git and synced folders)`);
       }
-    } else {
-      console.log(`[env-exposure-check] ✓ ${relativePath} contains only placeholders or comments`);
     }
   }
 
-  if (hasErrors) {
-    console.error(`\n[env-exposure-check] ✗ BLOCKING: ${totalSecrets} potential secret(s) found in .env files`);
-    console.error('[env-exposure-check] Move real secrets to Vercel env vars, Azure Key Vault, or Supabase secrets');
-    console.error('[env-exposure-check] See SECURITY.md for guidance');
+  if (failed) {
+    console.error('\n[env-exposure-check] BLOCKING. What to do:');
+    console.error('  1. Move real secrets outside the project (set WASEL_ENV_DIR, e.g. %USERPROFILE%\\.wasel-secrets).');
+    console.error('  2. Replace values in templates with placeholders.');
+    console.error('  3. Rotate anything real at the provider; deleting a local copy does not invalidate it.');
     return 1;
   }
 
-  console.log('\n[env-exposure-check] ✓ All .env files contain only placeholders');
+  console.log('[env-exposure-check] OK');
   return 0;
 }
 
 main()
-  .then(exitCode => process.exit(exitCode))
-  .catch(error => {
+  .then((code) => process.exit(code))
+  .catch((error) => {
     console.error('[env-exposure-check] Error:', error);
     process.exit(1);
   });

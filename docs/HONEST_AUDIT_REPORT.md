@@ -20,7 +20,7 @@ Additional fixes applied this session:
 
 1. **Rotate the Google OAuth client secret** at Google Cloud Console — the old value `[REDACTED]` was in `.env`; it is now a placeholder but the old secret is still LIVE at Google until you regenerate it
 2. **Rotate the Facebook OAuth client secret** at Meta for Developers — same situation
-3. **Rotate the Supabase secret key** `sb_secret_il0B5uktCTmsU1zkKB8oAA_Es4wqAG1` in Supabase Dashboard → Settings → API
+3. **Rotate the Supabase secret key** (value redacted; it was in `.env`) in Supabase Dashboard → Settings → API
 4. **Rotate the SMS hook webhook secret** in Supabase Dashboard → Auth → Hooks
 5. **Regenerate Stripe 2FA backup codes** in Stripe Dashboard → Settings → Two-step authentication
 6. **Purge git history** with `git filter-repo` or BFG for any commits that contained real secrets

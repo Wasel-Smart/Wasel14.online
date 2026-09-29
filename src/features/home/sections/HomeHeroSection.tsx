@@ -264,13 +264,17 @@ export function HomeHeroSection ( {
         </div>
 
         <h1 className="wasel-home-title">
-          { tx( 'homeHeroSection.hero_title' ) }
+          { ar ? 'مسارات مشتركة تقلل تكلفة السفر' : 'Shared Routes That Reduce Travel Cost' }
         </h1>
 
         <p className="wasel-home-lead">
           { firstName
-            ? tx( 'homeHeroSection.hero_lead_returning' ).replace( '{name}', firstName )
-            : tx( 'homeHeroSection.hero_lead_new' ) }
+            ? (ar
+                ? `أهلاً بعودتك، ${firstName}. واصل يربط الركاب والسائقين عبر مسارات مشتركة لتقليل التكلفة.`
+                : `Welcome back, ${firstName}. Wasel connects riders and drivers through shared routes to reduce cost.`)
+            : (ar
+                ? 'وصل يربط الركاب والسائقين عبر مسارات مشتركة لتقليل التكلفة. احجز رحلة، اعرض مسارًا، أو انضم للشبكة في الأردن.'
+                : 'Wasel connects riders and drivers through shared routes to reduce cost. Book a ride, offer a route, or join the network across Jordan.') }
         </p>
 
         <div className="wasel-home-proof-row">

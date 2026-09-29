@@ -1,0 +1,37 @@
+.cookieBanner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--wasel-glass);
+  color: var(--wasel-text);
+  padding: var(--wasel-size-sm) 20px calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 200;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--wasel-border-hov);
+  backdrop-filter: blur(16px);
+}
+
+.cookieBannerContent {
+  font-size: var(--wasel-size-sm);
+  font-family: var(--wasel-font);
+  flex: 1;
+  min-width: 200px;
+  line-height: 1.5;
+}
+
+.cookieBannerLink {
+  color: var(--wasel-cyan);
+  text-decoration: underline;
+  font-size: var(--wasel-size-xs);
+}
+
+.cookieBannerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}

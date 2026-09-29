@@ -12,11 +12,11 @@ sensitive values were found in local environment files.
 | Credential | Where to rotate | Status |
 |---|---|---|
 | `TWILIO_AUTH_TOKEN` | [Twilio Console → Account → Auth Token](https://console.twilio.com/us1/account/keys-credentials/auth-token) | ❌ Rotate now |
-| `TWILIO_API_KEY_SECRET` | Twilio Console → API Keys → delete & recreate `SKd72935...` | ❌ Rotate now |
+| `TWILIO_API_KEY_SECRET` | Twilio Console → API Keys → delete & recreate the exposed key | ❌ Rotate now |
 | `TWILIO_ACCOUNT_SID` | Note: SIDs are not secrets but rotate the auth token which invalidates them | — |
 | `TWILIO_MESSAGING_SERVICE_SID` | Twilio Console → Messaging → Services | ❌ Verify not exposed |
 | `TWILIO_VERIFY_SERVICE_SID` | Twilio Console → Verify → Services | ❌ Verify not exposed |
-| `VITE_STRIPE_PUBLISHABLE_KEY` (`pk_live_51Spp9L...`) | [Stripe Dashboard → Developers → API Keys](https://dashboard.stripe.com/apikeys) | ❌ Roll key |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | [Stripe Dashboard → Developers → API Keys](https://dashboard.stripe.com/apikeys) | ❌ Roll key |
 | `STRIPE_SECRET_KEY` | Stripe Dashboard → Developers → API Keys → reveal & rotate | ❌ Rotate now |
 | `STRIPE_WEBHOOK_SECRET` | Stripe Dashboard → Developers → Webhooks → rotate | ❌ Rotate now |
 | `VITE_GOOGLE_CLIENT_ID` / `SUPABASE_AUTH_GOOGLE_CLIENT_ID` | [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) | ❌ Verify scope |

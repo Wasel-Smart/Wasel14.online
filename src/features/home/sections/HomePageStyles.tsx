@@ -3,7 +3,16 @@ import { F } from '../HomePageShared';
 export function HomePageStyles () {
   return (
     <style>{ `
-      :root { color-scheme: dark; }
+      :root {
+        color-scheme: dark;
+        --wasel-glass: rgba(8, 29, 57, 0.88);
+        --wasel-text: #f8fbff;
+        --wasel-border-hov: rgba(20, 127, 228, 0.22);
+        --wasel-cyan: #00E5FF;
+        --wasel-size-sm: 0.875rem;
+        --wasel-size-xs: 0.75rem;
+        --wasel-font: 'Plus Jakarta Sans', system-ui, sans-serif;
+      }
 
       @keyframes shimmer {
         0% { background-position: -200% 0; }

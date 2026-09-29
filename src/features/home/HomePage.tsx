@@ -17,16 +17,19 @@ import { ActiveTripsBanner } from '../../components/TripProgressCard';
 import { C, F, POPULAR_ROUTES } from './HomePageShared';
 import { TYPE } from '../../utils/wasel-ds';
 import { homeSectionIconGlow } from './sections/styleHelpers';
+import cookieBannerStyles from './sections/CookieBanner.module.css';
 import {
   CorridorsSection,
   CorridorBetaFocusSection,
   HomeHeroSection,
   HomePageStyles,
+  LandingSections,
   OnboardingDemoSection,
   ProofSection,
   QuickActionsSection,
   SignedInUtilitySection,
   SignedOutCtaSection,
+  StructuredData,
   TrustPagesSection,
   type CorridorCard,
   type QuickAction,
@@ -72,45 +75,21 @@ function CookieBanner ( { bannerRef, onAccept, onDecline, t }: CookieBannerProps
   return (
     <div
       ref={ bannerRef }
-      style={ {
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: C.glass,
-        color: C.text,
-        padding: `${ TYPE.size.sm } 20px calc(14px + env(safe-area-inset-bottom))`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        zIndex: 200,
-        flexWrap: 'wrap',
-        borderTop: `1px solid ${ C.borderHov }`,
-        backdropFilter: 'blur(16px)',
-      } }
+      className={ cookieBannerStyles.cookieBanner }
       role="dialog"
       aria-label={ t( 'cookies.title' ) }
       aria-modal="true"
     >
-      <span
-        style={ {
-          fontSize: TYPE.size.sm,
-          fontFamily: F,
-          flex: 1,
-          minWidth: 200,
-          lineHeight: 1.5,
-        } }
-      >
+      <span className={ cookieBannerStyles.cookieBannerContent }>
         { t( 'cookies.description' ) }{ ' ' }
         <a
           href="/app/privacy"
-          style={ { color: C.cyan, textDecoration: 'underline', fontSize: TYPE.size.xs } }
+          className={ cookieBannerStyles.cookieBannerLink }
         >
           { t( 'cookies.privacy_policy' ) }
         </a>
       </span>
-      <div style={ { display: 'flex', gap: 8, flexShrink: 0 } }>
+      <div className={ cookieBannerStyles.cookieBannerActions }>
         <WaselButton
           variant="ghost"
           size="sm"
@@ -513,6 +492,7 @@ export function HomePage () {
     <WaselErrorBoundary>
       <div className="wasel-home-shell" dir={ dir } style={ { color: C.text, fontFamily: F } }>
         <HomePageStyles />
+        <StructuredData ar={ ar } />
 
         { !cookieConsented && !cookieDeclined && (
           <CookieBanner
@@ -559,6 +539,8 @@ export function HomePage () {
           </Suspense>
 
           <TrustPagesSection ar={ ar } onNavigate={ handleNavigate } />
+
+          <LandingSections ar={ ar } onNavigate={ handleNavigate } />
 
           { /* HowItWorksSection previously restated OnboardingDemoSection's
                4-step flow (same icons, same order) and StatsStrip restated
