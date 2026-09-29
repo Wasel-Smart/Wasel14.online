@@ -12,49 +12,48 @@ import {
   Users,
 } from 'lucide-react';
 import { WaselButton } from '../../../components/wasel-ui/WaselButton';
-import { C, R, SH, TYPE, F } from '../HomePageShared';
+import { C, POPULAR_ROUTES, R, SH, TYPE, F } from '../HomePageShared';
 import { tx } from '../../../locales/tx';
 
 interface LandingSectionsProps {
   ar: boolean;
   onNavigate: (path: string, source?: string) => void;
 }
-
 const featureCards = [
   {
     icon: Shield,
-    titleKey: 'landing.features.verified',
-    descKey: 'landing.features.verifiedDesc',
+    titleKey: 'featuresVerified',
+    descKey: 'featuresVerifiedDesc',
     accent: C.cyan,
   },
   {
     icon: CircleDollarSign,
-    titleKey: 'landing.features.affordable',
-    descKey: 'landing.features.affordableDesc',
+    titleKey: 'featuresAffordable',
+    descKey: 'featuresAffordableDesc',
     accent: C.gold,
   },
   {
     icon: Route,
-    titleKey: 'landing.features.flexible',
-    descKey: 'landing.features.flexibleDesc',
+    titleKey: 'featuresFlexible',
+    descKey: 'featuresFlexibleDesc',
     accent: C.orange,
   },
   {
     icon: Users,
-    titleKey: 'landing.features.support',
-    descKey: 'landing.features.supportDesc',
+    titleKey: 'featuresSupport',
+    descKey: 'featuresSupportDesc',
     accent: C.green,
   },
   {
     icon: BadgeCheck,
-    titleKey: 'landing.features.secure',
-    descKey: 'landing.features.secureDesc',
+    titleKey: 'featuresSecure',
+    descKey: 'featuresSecureDesc',
     accent: C.blue,
   },
   {
     icon: Clock,
-    titleKey: 'landing.features.tracking',
-    descKey: 'landing.features.trackingDesc',
+    titleKey: 'featuresTracking',
+    descKey: 'featuresTrackingDesc',
     accent: C.purple,
   },
 ] as const;
@@ -62,53 +61,63 @@ const featureCards = [
 const serviceCards = [
   {
     icon: Route,
-    titleKey: 'landing.services.ridesharing',
-    descKey: 'landing.services.ridesharingDesc',
+    titleKey: 'servicesRidesharing',
+    descKey: 'servicesRidesharingDesc',
     accent: C.cyan,
     path: '/find-ride',
   },
   {
     icon: PackageCheck,
-    titleKey: 'landing.services.delivery',
-    descKey: 'landing.services.deliveryDesc',
+    titleKey: 'servicesDelivery',
+    descKey: 'servicesDeliveryDesc',
     accent: C.orange,
     path: '/packages',
   },
   {
     icon: Truck,
-    titleKey: 'landing.services.freight',
-    descKey: 'landing.services.freightDesc',
+    titleKey: 'servicesFreight',
+    descKey: 'servicesFreightDesc',
     accent: C.blue,
     path: '/freight',
   },
   {
     icon: MapPinned,
-    titleKey: 'landing.services.carpool',
-    descKey: 'landing.services.carpoolDesc',
+    titleKey: 'servicesCarpool',
+    descKey: 'servicesCarpoolDesc',
     accent: C.green,
     path: '/carpool',
   },
   {
     icon: Shield,
-    titleKey: 'landing.services.school',
-    descKey: 'landing.services.schoolDesc',
+    titleKey: 'servicesSchool',
+    descKey: 'servicesSchoolDesc',
     accent: C.gold,
     path: '/school',
   },
   {
     icon: Star,
-    titleKey: 'landing.services.luxury',
-    descKey: 'landing.services.luxuryDesc',
+    titleKey: 'servicesLuxury',
+    descKey: 'servicesLuxuryDesc',
     accent: C.purple,
     path: '/luxury',
   },
 ] as const;
 
+// Counts are derived from data the app already ships, never invented. The
+// service count matches landing.featuresFlexibleDesc ("12 specialized
+// services"), and the corridor/city counts are computed from POPULAR_ROUTES.
+// A previous revision hardcoded "50K+ / 200K+ / 5K+" user and trip totals
+// that exist in no source and on no live surface — fabricated traction
+// figures on a public marketing page, so they are gone.
+const SERVICE_COUNT = 12;
+const CORRIDOR_COUNT = POPULAR_ROUTES.length;
+const CITY_COUNT = new Set(POPULAR_ROUTES.map(r => r.to)).size;
+
 const stats = [
-  { value: '50K+', labelKey: 'landing.stats.users', accent: C.cyan },
-  { value: '200K+', labelKey: 'landing.stats.trips', accent: C.gold },
-  { value: '12', labelKey: 'landing.stats.cities', accent: C.orange },
-  { value: '5K+', labelKey: 'landing.stats.drivers', accent: C.green },
+  { value: String(SERVICE_COUNT), labelKey: 'statsServices', accent: C.cyan },
+  { value: String(CORRIDOR_COUNT), labelKey: 'statsCorridors', accent: C.gold },
+  { value: String(CITY_COUNT), labelKey: 'statsCities', accent: C.orange },
+  { value: String(CORRIDOR_COUNT), labelKey: 'statsRoutes', accent: C.green },
 ] as const;
 
 export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
@@ -125,7 +134,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
               <Shield size={16} />
             </div>
             <h2 id="features-heading" className="wasel-home-section-title">
-              {tx('landing.features.title')}
+              {tx('featuresTitle')}
             </h2>
           </div>
         </div>
@@ -207,7 +216,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
               <Route size={16} />
             </div>
             <h2 id="services-heading" className="wasel-home-section-title">
-              {tx('landing.services.title')}
+              {tx('servicesTitle')}
             </h2>
           </div>
           <button
@@ -215,7 +224,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
             className="wasel-home-section-action"
             onClick={() => void onNavigate('/app/services', 'services_browse_all')}
           >
-            {tx('landing.services.subtitle')}
+            {tx('servicesSubtitle')}
           </button>
         </div>
         <div
@@ -335,10 +344,10 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
                 marginBottom: 8,
               }}
             >
-              {tx('landing.statsTitle') || 'Platform at a glance'}
+              {tx('homeSections.statsTitle')}
             </div>
             <h2 id="stats-heading" className="wasel-home-section-title" style={{ margin: 0, textAlign: 'center' }}>
-              {tx('landing.cta.title') || 'Ready to get started?'}
+              {tx('ctaTitle')}
             </h2>
           </div>
           <div
@@ -392,7 +401,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
               iconEnd={ar ? <Route size={16} style={{ transform: 'rotate(180deg)' }} /> : <Route size={16} />}
               onClick={() => void onNavigate('/app/auth?tab=register', 'stats_cta_register')}
             >
-              {tx('landing.cta.signUpNow') || 'Sign Up Now'}
+              {tx('ctaSignUpNow')}
             </WaselButton>
           </div>
         </div>

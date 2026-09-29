@@ -131,6 +131,98 @@ function checkSupabaseConfig() {
   return (hasGoogleConfig && googleEnabled) || (hasFacebookConfig && facebookEnabled);
 }
 
+function readEnvVars() {
+  const envPath = join(process.cwd(), '.env');
+  if (!existsSync(envPath)) {
+    return {};
+  }
+
+  const envVars = {};
+  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+    const match = line.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      envVars[match[1].trim()] = match[2].trim();
+    }
+  }
+  return envVars;
+}
+
+// The provider never sees this app's URL. signInWithOAuth sends the browser to
+// supabase.co/auth/v1/authorize, which 302s to Google/Facebook with
+// `${supabaseUrl}/auth/v1/callback` as `redirect_uri` and our app URL only as
+// `redirect_to`. If that Supabase callback is missing from the provider
+// console, the provider answers `redirect_uri_mismatch` and the user never
+// reaches the app at all — which is why the callback path is not the thing to
+// check here.
+function providerRedirectUri(envVars) {
+  const supabaseUrl = (envVars.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  return supabaseUrl ? `${supabaseUrl}/auth/v1/callback` : '';
+}
+
+async function checkLiveProviders(envVars) {
+  log('\n🌐 Checking live Supabase provider settings...', 'cyan');
+
+  const supabaseUrl = (envVars.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  const apiKey = envVars.VITE_SUPABASE_ANON_KEY || envVars.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+
+  if (!supabaseUrl || !apiKey) {
+    log('⚠️  VITE_SUPABASE_URL / anon key missing - skipping live check', 'yellow');
+    return true;
+  }
+
+  try {
+    const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+      headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok) {
+      log(`⚠️  Auth settings returned HTTP ${response.status} - skipping live check`, 'yellow');
+      return true;
+    }
+
+    const { external = {} } = await response.json();
+    let allEnabled = true;
+    for (const provider of ['google', 'facebook']) {
+      if (external[provider] === true) {
+        log(`✅ ${provider} enabled on the Supabase project`, 'green');
+      } else {
+        log(`❌ ${provider} is NOT enabled on the Supabase project`, 'red');
+        allEnabled = false;
+      }
+    }
+    return allEnabled;
+  } catch (error) {
+    log(`⚠️  Could not reach the Supabase auth service (${error.message})`, 'yellow');
+    return true;
+  }
+}
+
+function checkProviderRedirectUri(envVars) {
+  log('\n🔗 Checking the provider-facing redirect URI...', 'cyan');
+
+  const redirectUri = providerRedirectUri(envVars);
+  if (!redirectUri) {
+    log('❌ Could not derive the provider redirect URI (VITE_SUPABASE_URL missing)', 'red');
+    return false;
+  }
+
+  const appOrigin = envVars.VITE_APP_URL || envVars.VITE_APP_ORIGIN || '(unset)';
+  const appCallback = `${appOrigin}${envVars.VITE_AUTH_CALLBACK_PATH || '/app/auth/callback'}`;
+
+  log('   Provider `redirect_uri` (what Google/Facebook must whitelist):', 'cyan');
+  log(`     ${redirectUri}`, 'blue');
+  log('   App `redirect_to` (where the code is finally delivered):', 'cyan');
+  log(`     ${appCallback}`, 'blue');
+  log('   These are different URLs by design. Verify the first one is registered:', 'yellow');
+  log('     Google   → APIs & Services → Credentials → Authorized redirect URIs', 'yellow');
+  log('     Facebook → Developers → Settings → Valid OAuth Redirect URIs', 'yellow');
+  log('     Supabase → Authentication → URL Configuration → Redirect URLs (the second one)', 'yellow');
+  log('   A missing entry surfaces as `redirect_uri_mismatch` on the provider page.', 'yellow');
+
+  return true;
+}
+
 function checkAuthFiles() {
   log('\n📋 Checking authentication files...', 'cyan');
 
@@ -223,19 +315,29 @@ function printSummary(results) {
   return allPassed;
 }
 
-function main() {
+async function main() {
   log('\n🔐 Wasel OAuth Configuration Verification', 'cyan');
   log('='.repeat(60) + '\n', 'cyan');
+
+  const envVars = readEnvVars();
 
   const results = {
     'Environment Variables': checkEnvFile(),
     'Supabase Configuration': checkSupabaseConfig(),
+    'Provider Redirect URI': checkProviderRedirectUri(envVars),
+    'Live Providers': await checkLiveProviders(envVars),
     'Authentication Files': checkAuthFiles(),
     'OAuth Implementation': checkOAuthImplementation(),
   };
 
   const allPassed = printSummary(results);
-  process.exit(allPassed ? 0 : 1);
+  // Do not call process.exit(): the live provider check leaves an undici
+  // keep-alive socket open, and forcing an exit while it is still pending
+  // crashes node on Windows (0xC0000409). Setting exitCode lets it drain.
+  process.exitCode = allPassed ? 0 : 1;
 }
 
-main();
+main().catch((error) => {
+  log(`\n❌ Verification crashed: ${error.stack || error.message}`, 'red');
+  process.exitCode = 1;
+});

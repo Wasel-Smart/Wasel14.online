@@ -244,7 +244,7 @@ useEffect(() => {
               accent={C.green}
             />
             <MetricCard
-              title={tx('landing.stats.users')}
+              title={tx('statsUsers')}
               value={metrics.activeUsers}
               icon={<Users size={18} color={C.cyan} />}
               accent={C.cyan}

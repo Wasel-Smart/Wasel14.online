@@ -1,65 +1,69 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setCurrentLang, tx } from '../../src/locales/tx';
 
-const KEYS_USED_BY_LANDING_SECTIONS = [
-  'landing.features.title',
-  'landing.features.verified',
-  'landing.features.verifiedDesc',
-  'landing.features.affordable',
-  'landing.features.affordableDesc',
-  'landing.features.flexible',
-  'landing.features.flexibleDesc',
-  'landing.features.support',
-  'landing.features.supportDesc',
-  'landing.features.secure',
-  'landing.features.secureDesc',
-  'landing.features.tracking',
-  'landing.features.trackingDesc',
-  'landing.services.title',
-  'landing.services.subtitle',
-  'landing.services.ridesharing',
-  'landing.services.ridesharingDesc',
-  'landing.services.delivery',
-  'landing.services.deliveryDesc',
-  'landing.services.freight',
-  'landing.services.freightDesc',
-  'landing.services.carpool',
-  'landing.services.carpoolDesc',
-  'landing.services.school',
-  'landing.services.schoolDesc',
-  'landing.services.luxury',
-  'landing.services.luxuryDesc',
-  'landing.stats.users',
-  'landing.stats.trips',
-  'landing.stats.cities',
-  'landing.stats.drivers',
-  'landing.cta.title',
-  'landing.cta.signUpNow',
+// Every key the landing sections render. tx() returns the requested key itself
+// when a lookup misses, so a value equal to the key is a raw leak into the UI
+// rather than a translation. LandingSections previously addressed these as
+// 'landing.features.title' etc., which the flat-by-tail resolver silently
+// mis-resolved (landing was the only nested chunk in src/locales/chunks).
+const KEYS = [
+  'featuresTitle',
+  'featuresVerified',
+  'featuresVerifiedDesc',
+  'featuresAffordable',
+  'featuresAffordableDesc',
+  'featuresFlexible',
+  'featuresFlexibleDesc',
+  'featuresSupport',
+  'featuresSupportDesc',
+  'featuresSecure',
+  'featuresSecureDesc',
+  'featuresTracking',
+  'featuresTrackingDesc',
+  'servicesTitle',
+  'servicesSubtitle',
+  'servicesRidesharing',
+  'servicesRidesharingDesc',
+  'servicesDelivery',
+  'servicesDeliveryDesc',
+  'servicesFreight',
+  'servicesFreightDesc',
+  'servicesCarpool',
+  'servicesCarpoolDesc',
+  'servicesSchool',
+  'servicesSchoolDesc',
+  'servicesLuxury',
+  'servicesLuxuryDesc',
+  'statsServices',
+  'statsCorridors',
+  'statsCities',
+  'statsRoutes',
+  'statsUsers',
+  'statsTrips',
+  'statsDrivers',
+  'ctaTitle',
+  'ctaSubtitle',
+  'ctaSignUpNow',
+  'ctaDownloadApp',
+  'heroTitle',
+  'heroSubtitle',
+  'heroGetStarted',
+  'homeSections.statsTitle',
   'homeSections.quickActionsCTA',
 ];
 
-// tx() returns the key itself when a lookup misses, so a resolved value must
-// differ from the requested key. Anything equal here is a raw leak into the UI.
-function assertResolved(key: string, lang: 'en' | 'ar') {
-  const value = tx(key);
-  expect(value, `${lang}:${key}`).not.toBe(key);
-  expect(value.trim().length, `${lang}:${key} resolved empty`).toBeGreaterThan(0);
-}
-
 describe('landing page translation keys resolve', () => {
-  beforeEach(() => {
-    setCurrentLang('en');
-  });
-
   for (const lang of ['en', 'ar'] as const) {
     describe(lang, () => {
       beforeEach(() => {
         setCurrentLang(lang);
       });
 
-      for (const key of KEYS_USED_BY_LANDING_SECTIONS) {
+      for (const key of KEYS) {
         it(`resolves ${key}`, () => {
-          assertResolved(key, lang);
+          const value = tx(key);
+          expect(value, `${lang}:${key}`).not.toBe(key);
+          expect(value.trim().length, `${lang}:${key} resolved empty`).toBeGreaterThan(0);
         });
       }
     });

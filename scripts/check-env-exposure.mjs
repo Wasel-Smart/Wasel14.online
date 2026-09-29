@@ -22,7 +22,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative, resolve, sep } from 'node:path';
 
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.venv', '.expo', '.next']);
+const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'coverage', '.venv', '.expo', '.next', '.kilo']);
 
 const TEMPLATE_RE = /(\.example|\.template|\.sample|\.dist)$/i;
 const ENV_FILE_RE = /^\.env(\..+)?$/i;

@@ -70,7 +70,7 @@ export function ObservabilityDashboard() {
 
         {/* Active Users Card */}
         <MetricCard
-          title={tx('landing.stats.users')}
+          title={tx('statsUsers')}
           value={metrics.activeUsers.toString()}
           subtitle={tx('observabilityDashboard.last_15_minutes')}
           status="healthy"
