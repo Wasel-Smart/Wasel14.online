@@ -28,7 +28,7 @@ Contains a real database password. The `validate-no-secrets.mjs` scanner **exclu
 `.env.production.template` (tracked, lines 39–46): real Google OAuth client ID (`996...`) and Facebook App ID (`1438...`), different from `.env.example` — indicating orphaned or migrated configs.
 
 ### 1d. Real project refs leaked across tracked files
-The Supabase project ref `zexlxabdcsjefptmjhuq` appears in 20+ tracked locations: `.env.example` (lines 76, 98, 107, 112), `vercel.json` (line 61), `index.html` (line 132), `supabase/config.toml` (lines 101, 126, 134), `docs/oauth-setup-guide.md`, `docs/oauth-setup-checklist.md`, `docs/FACEBOOK_OAUTH_SETUP.md`, and more. A second ref (`vmskleqlszoupgjkyxqs`) appears in `.env.production.template` (line 12) and `.vscode/mcp.json`.
+The Supabase project ref `zexlxabdcsjefptmjhuq` appears in 20+ tracked locations: `.env.example` (lines 76, 98, 107, 112), `vercel.json` (line 61), `index.html` (line 132), `supabase/config.toml` (lines 101, 126, 134), `docs/oauth-setup-guide.md`, `docs/oauth-setup-checklist.md`, `docs/FACEBOOK_OAUTH_SETUP.md`, and more. An earlier orphaned ref also appeared in `.env.production.template` and `.vscode/mcp.json`; both have since been repointed to `zexlxabdcsjefptmjhuq`.
 
 ### 1e. Local `.env` files contain real values but are NOT tracked — OK (mostly)
 `.env`, `.env.local`, `.env.production` are correctly gitignored (confirmed: `git ls-files --error-unmatch` returns no matches). However, they reside inside a **OneDrive-synced folder** (see SECURITY.md line 5), creating continuous cloud-sync exposure risk. `.env.local` contains a real Supabase publishable key (local-only, but browser-visible).
@@ -126,8 +126,7 @@ The project has `scripts/validate-env.mjs`, `scripts/validate-env-example.mjs`, 
 
 ### 6a. Inconsistent Supabase project refs — MEDIUM
 Three different refs across the codebase:
-- `zexlxabdcsjefptmjhuq` — `.env.example`, `.env`, `index.html`, `vercel.json`, `supabase/config.toml`
-- `vmskleqlszoupgjkyxqs` — `.env.production.template`, `.vscode/mcp.json`, `supabase/.temp/` (local)
+- `zexlxabdcsjefptmjhuq` — the only project ref; see `.env.example`, `.env`, `index.html`, `vercel.json`, `supabase/config.toml`
 - `YOUR-STAGING-PROJECT-REF` — `.env.production.staging.template`
 
 This indicates orphaned configs from a project migration.

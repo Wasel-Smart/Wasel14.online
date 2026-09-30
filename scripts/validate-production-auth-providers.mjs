@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const SUPABASE_URL =
-  process.env.VITE_SUPABASE_URL || 'https://vmskleqlszoupgjkyxqs.supabase.co';
+  process.env.VITE_SUPABASE_URL || 'https://zexlxabdcsjefptmjhuq.supabase.co';
 const SUPABASE_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const APP_URL = process.env.VITE_APP_URL || 'https://www.wasel14.online';
