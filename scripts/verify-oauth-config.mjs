@@ -57,8 +57,12 @@ function checkEnvFile() {
 
   const envContent = readFileSync(envPath, 'utf-8');
   const envVars = {};
-  for (const line of envContent.split('\n')) {
-    const match = line.match(/^([^=]+)=(.*)$/);
+  // Split on /\r?\n/, not '\n': a CRLF file leaves a trailing \r on every line and
+  // `.` does not match \r in JS, so `/^([^=]+)=(.*)$/` silently matched nothing
+  // and the script reported every OAuth variable as "Not configured" while the
+  // app was configured correctly.
+  for (const line of envContent.split(/\r?\n/)) {
+    const match = line.match(/^\s*([^#=\s][^=]*)=(.*)$/);
     if (match) {
       envVars[match[1].trim()] = match[2].trim();
     }
@@ -138,8 +142,8 @@ function readEnvVars() {
   }
 
   const envVars = {};
-  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
-    const match = line.match(/^([^=]+)=(.*)$/);
+  for (const line of readFileSync(envPath, 'utf-8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([^#=\s][^=]*)=(.*)$/);
     if (match) {
       envVars[match[1].trim()] = match[2].trim();
     }

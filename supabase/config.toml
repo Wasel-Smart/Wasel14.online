@@ -102,14 +102,18 @@ account_sid = ""
 message_service_sid = ""
 auth_token = ""
 [auth.external.google]
-enabled = false
+# Google and Facebook are enabled on the linked project (verified against
+# /auth/v1/settings), and both sign-in methods ship in the app. Credentials stay
+# empty here on purpose: they live in the Supabase dashboard, so this file must
+# not carry secrets or claim the providers are off.
+enabled = true
 client_id = ""
 secret = ""
 redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"
 skip_nonce_check = false
 email_optional = true
 [auth.external.facebook]
-enabled = false
+enabled = true
 client_id = ""
 secret = ""
 redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"

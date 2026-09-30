@@ -62,7 +62,22 @@ if (!env) {
   process.exitCode = 1;
 } else {
   const supabaseUrl = (env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
-  const anon = env.VITE_SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  // Order must match resolveSupabasePublicKey() in src/utils/env/resolvers.ts:
+  // the publishable key wins. Reading the anon key first let a stale
+  // VITE_SUPABASE_ANON_KEY shadow the working key, so this script probed a key
+  // the browser never sends and reported "Unregistered API key" for routes the
+  // app can actually call.
+  const anon = env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY;
+  const publishable = env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+  const anonOnly = env.VITE_SUPABASE_ANON_KEY || '';
+  if (publishable && anonOnly && publishable !== anonOnly) {
+    fail(
+      `VITE_SUPABASE_ANON_KEY and VITE_SUPABASE_PUBLISHABLE_KEY disagree in ${envFile}`,
+      'Only one key is registered per project; align them or the browser and this script authenticate with different keys',
+    );
+  } else {
+    ok('Supabase public keys agree');
+  }
   const functionsBase = (env.VITE_EDGE_FUNCTIONS_BASE_URL || (supabaseUrl ? `${supabaseUrl}/functions/v1` : '')).replace(/\/$/, '');
   const fnName = env.VITE_EDGE_FUNCTION_NAME || 'make-server-0b1f4071';
   const API_URL = functionsBase ? `${functionsBase}/${fnName}` : '';
