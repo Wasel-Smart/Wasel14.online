@@ -32,6 +32,7 @@ import {
   advanceCorridorAfterBooking,
   buildMobilitySnapshot,
   MOBILITY_OS_SEED_SQL,
+  MOBILITY_OS_RUNTIME_SQL,
   EVENT_OUTBOX_SQL,
   type MobilityBookingType,
   type MobilityCorridorRow,
@@ -876,7 +877,10 @@ export async function fetchDriverProfiles (
 
 export async function ensureMobilitySeed ( admin: ReturnType<typeof getAdminClient> ) {
   if ( SUPABASE_DB_URL ) {
-    await executeSqlStatements( EVENT_OUTBOX_SQL ).catch( () => undefined );
+    // MOBILITY_OS_RUNTIME_SQL carries the create-table DDL. Without running it
+    // first the seed insert below targets a table that does not exist yet, and
+    // the failure is swallowed, so the caller then 500s on the missing table.
+    await executeSqlStatements( MOBILITY_OS_RUNTIME_SQL ).catch( () => undefined );
   }
   const { data } = await admin.from( 'mobility_corridors' ).select( 'id' ).limit( 1 );
   if ( Array.isArray( data ) && data.length > 0 ) return;

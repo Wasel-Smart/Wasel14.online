@@ -42,15 +42,25 @@ async function handlePublicMobilitySnapshot ( _request: Request ) {
     await ensureMobilitySeed( admin );
     const { data, error } = await admin
       .from( 'mobility_corridors' )
-      .select( 'id, origin_city, destination_city, base_price_seat, demand_index, seats_total, seats_booked, updated_at' )
+      .select( 'id, origin, destination, base_price_seat, demand_index, seats_total, seats_booked, updated_at' )
       .order( 'demand_index', { ascending: false } )
       .limit( 12 );
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {
+      logUnhandledRouteError( error, _request );
+      return json(
+        {
+          error: 'Mobility corridor data is unavailable',
+          corridors: [],
+          generatedAt: new Date().toISOString(),
+        },
+        200,
+      );
+    }
 
     const corridors = ( Array.isArray( data ) ? data : [] ).map( ( row: Record<string, unknown> ) => ( {
       id: String( row.id ?? '' ),
-      from: String( row.origin_city ?? '' ),
-      to: String( row.destination_city ?? '' ),
+      from: String( row.origin ?? '' ),
+      to: String( row.destination ?? '' ),
       priceJod: Number( row.base_price_seat ?? 0 ),
       demand: Number( row.demand_index ?? 0 ),
       seatsTotal: Number( row.seats_total ?? 0 ),
@@ -60,7 +70,15 @@ async function handlePublicMobilitySnapshot ( _request: Request ) {
 
     return json( { corridors, generatedAt: new Date().toISOString() } );
   } catch ( err ) {
-    return json( { error: err instanceof Error ? err.message : 'Snapshot failed' }, 500 );
+    logUnhandledRouteError( err, _request );
+    return json(
+      {
+        error: 'Mobility corridor data is unavailable',
+        corridors: [],
+        generatedAt: new Date().toISOString(),
+      },
+      200,
+    );
   }
 }
 

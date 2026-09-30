@@ -51,7 +51,10 @@ async function handleTripRequest ( request: Request, path: string ) {
     if ( date ) query = query.gte( 'departure_time', `${ date }T00:00:00` ).lt( 'departure_time', `${ date }T23:59:59.999` );
     if ( seats ) query = query.gte( 'available_seats', Number( seats ) );
     const { data, error } = await query.in( 'trip_status', [ 'open', 'booked', 'in_progress' ] ).order( 'departure_time' );
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {
+      logUnhandledRouteError( error, request );
+      return json( { error: 'Trip search is temporarily unavailable' }, 503 );
+    }
     const rows = Array.isArray( data ) ? data : [];
     const profiles = await fetchDriverProfiles( admin, rows.map( ( row: Record<string, unknown> ) => String( row.driver_id ?? '' ) ) );
     return json( rows.map( ( row: Record<string, unknown> ) => mapTripRow( row, profiles[ String( row.driver_id ?? '' ) ] ) ) );
