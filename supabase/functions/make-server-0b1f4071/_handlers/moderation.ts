@@ -29,12 +29,16 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleApplyModerationMigrations ( request: Request ) {
+import {
+  CONTENT_MODERATION_SQL,
+} from './shared.ts';
+
+
+export async function handleApplyModerationMigrations ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
   if ( accessError ) return accessError;
 
@@ -47,9 +51,9 @@ async function handleApplyModerationMigrations ( request: Request ) {
   } );
 }
 
-async function handleSubmitReport ( request: Request ) {
+export async function handleSubmitReport ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const body = await request.json();
   const bookingId = String( body.bookingId ?? '' ).trim();

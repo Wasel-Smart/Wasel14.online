@@ -172,10 +172,13 @@ Deno.serve(async (request: Request) => {
   try {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^.*phone-service/, '') || '/';
-    let response: Response;
+    // The route handlers return undefined when no sub-path matches so the router can
+    // decide between a 404 and the next branch.
+    let response: Response | undefined;
 
     if (path.startsWith('/phone')) {
       response = await handlePhoneVerification(request, path);
+      if (!response) response = json({ error: 'Not found', service: 'phone-service' }, 404);
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'phone-service', timestamp: new Date().toISOString() });
     } else {

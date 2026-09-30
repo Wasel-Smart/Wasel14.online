@@ -46,10 +46,190 @@ import {
   resolveAccessRole,
 } from '../_shared/rbac.ts';
 
+
+// â”€â”€ Runtime barrel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Every handler module imports its helpers from './shared.ts', so this module
+// re-exports the pure runtimes from ../_shared/ as well. Keeping the barrel
+// here means a handler never has to know whether a helper lives in shared.ts or
+// in a sibling runtime module, and it keeps the import graph acyclic.
+export {
+  buildFailurePatch,
+  buildIdempotencyKey,
+  buildResendPayload,
+  buildSendgridPayload,
+  buildTwilioRequest,
+  determineProviderName,
+  hasValidWebhookToken,
+  mapResendEventToStatus,
+  mapTwilioStatusToLifecycle,
+  type CommunicationDeliveryRecord,
+  type DeliveryProcessorEnv,
+} from '../_shared/communication-runtime.ts';
+
+export {
+  generateBackupCodes,
+  generateQRCode,
+  generateTOTPSecret,
+  hashBackupCode,
+  hashBackupCodes,
+  verifyTwoFactorChallenge,
+} from '../_shared/two-factor-runtime.ts';
+
+export {
+  buildPublicHealthPayload,
+  isRuntimeAdminEnabled,
+  resolveAllowedOrigin,
+} from '../_shared/request-security.ts';
+
+export {
+  advanceCorridorAfterBooking,
+  buildMobilitySnapshot,
+  MOBILITY_OS_SEED_SQL,
+  MOBILITY_OS_RUNTIME_SQL,
+  EVENT_OUTBOX_SQL,
+  type MobilityBookingType,
+  type MobilityCorridorRow,
+} from '../_shared/mobility-os-runtime.ts';
+
+export { calculateDirectPrice, toNumber } from '../_shared/pricing.ts';
+export { normalizePhoneNumber, isValidE164Phone } from '../_shared/phone.ts';
+
+export {
+  hasPermission,
+  resolveAccessRole,
+  getRolePermissions,
+  getRolesWithPermission,
+  userHasPermission,
+  assertPermission,
+  ROLE_PERMISSIONS,
+  VALID_ROLES,
+  type AccessRole,
+  type AccessPermission,
+} from '../_shared/rbac.ts';
+
 // Alias for the service-role client returned by getAdminClient(). Handler
 // modules that only need the client type should import this rather than
 // threading `ReturnType<typeof getAdminClient>` through every signature.
 export type AdminClient = ReturnType<typeof getAdminClient>;
+
+/**
+ * Row shape of the canonical `public.users` record that every request resolves
+ * to. Typed explicitly so that `authenticateRequest` returns a properly
+ * discriminated union â€” without it, `'error' in auth` cannot narrow and every
+ * caller's `auth.error` becomes `Response | undefined`.
+ */
+export interface CanonicalUserRow {
+  // The canonical `users` row is passed to helpers typed as
+  // `Record<string, unknown>`, so the record must stay indexable.
+  [column: string]: unknown;
+  id: string;
+  auth_user_id: string | null;
+  email: string | null;
+  phone_number: string | null;
+  full_name: string | null;
+  role: string | null;
+  verification_level: string | null;
+  sanad_verified_status: string | null;
+  phone_verified_at: string | null;
+  profile_status: string | null;
+  updated_at: string | null;
+}
+
+// getUser() resolves to a discriminated union whose data arm still allows a
+// null user, so both levels are unwrapped here. authenticateRequest() has
+// already bailed out when there is no user, so callers can rely on it.
+export type SupabaseAuthUser = NonNullable<
+  NonNullable<Awaited<ReturnType<AdminClient['auth']['getUser']>>['data']>['user']
+>;
+
+/**
+ * Failure arm. `error` is declared only here, so the `if ('error' in auth)`
+ * guard every handler uses narrows to this arm and to nothing else.
+ */
+export type AuthFailure = { error: Response };
+
+/** Success arm. Declares no `error` property, which is what makes the union discriminable. */
+export type AuthSuccess = {
+  admin: AdminClient;
+  authUser: SupabaseAuthUser;
+  canonicalUser: CanonicalUserRow;
+};
+
+export type AuthResult = AuthFailure | AuthSuccess;
+
+/** Column list used by every canonical-user lookup; kept next to the type. */
+const CANONICAL_USER_COLUMNS =
+  'id, auth_user_id, email, phone_number, full_name, role, verification_level, sanad_verified_status, phone_verified_at, profile_status, updated_at';
+
+// â”€â”€ Domain limits and messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// A pending identity or driver-document review that never resolves would leave
+// the trust surface permanently in limbo, so stale pending rows are failed
+// closed after this many hours.
+export const IDENTITY_PENDING_TIMEOUT_HOURS = 72;
+export const DRIVER_DOCUMENT_TIMEOUT_HOURS = 72;
+
+// Phone OTP lifetime and the message returned when a number is already bound to
+// another account. Kept next to the code that enforces it.
+export const PHONE_VERIFICATION_TTL_MINUTES = 10;
+export const PHONE_NUMBER_IN_USE_MESSAGE = 'This phone number is already linked to another account.';
+
+// JOD settles in 1/1000 minor units. The bounds keep a client from creating a
+// payment intent for a dust amount or an amount no provider will accept.
+export const MIN_PAYMENT_AMOUNT_MINOR = 50;
+export const MAX_PAYMENT_AMOUNT_MINOR = 5_000_000;
+
+/** ISO-4217 codes the platform settles in. Mirrors src/utils/currency/types.ts. */
+export const ALLOWED_PAYMENT_CURRENCIES: ReadonlySet<string> = new Set( [
+  'jod', 'usd', 'eur', 'gbp', 'aed', 'sar', 'egp',
+  'kwd', 'bhd', 'qar', 'omr', 'mad', 'tnd', 'iqd',
+] );
+
+// â”€â”€ Wallet row shapes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// All three are read with `select('*')`, so the records carry more columns than
+// the platform names. The index signature models that honestly instead of
+// pretending the table has only the fields listed here.
+export interface WalletRow {
+  [column: string]: unknown;
+  wallet_id: string;
+  user_id: string;
+  balance: number | string | null;
+  currency_code: string | null;
+  wallet_status: string | null;
+  pending_balance: number | string | null;
+  pin_hash: string | null;
+  auto_top_up_enabled: boolean | null;
+  auto_top_up_amount: number | string | null;
+  auto_top_up_threshold: number | string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface WalletTransactionRow {
+  [column: string]: unknown;
+  transaction_id: string;
+  wallet_id: string | null;
+  user_id: string | null;
+  transaction_type: string;
+  transaction_status: string | null;
+  direction: string;
+  amount: number | string | null;
+  reference_type: string | null;
+  reference_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface PaymentMethodRow {
+  [column: string]: unknown;
+  id: string;
+  user_id: string | null;
+  method_type: string | null;
+  provider: string | null;
+  provider_reference: string | null;
+  last_four: string | null;
+  is_default: boolean | null;
+  created_at: string | null;
+}
 
 export const SUPABASE_URL = Deno.env.get( 'SUPABASE_URL' ) ?? '';
 export const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get( 'SUPABASE_SERVICE_ROLE_KEY' ) ?? '';
@@ -407,9 +587,7 @@ export function getAdminClient () {
   } );
 }
 
-export type AdminClient = ReturnType<typeof getAdminClient>;
-
-export async function authenticateRequest ( request: Request ) {
+export async function authenticateRequest ( request: Request ): Promise<AuthResult> {
   const authorization = request.headers.get( 'Authorization' ) ?? '';
   const token = authorization.startsWith( 'Bearer ' ) ? authorization.slice( 7 ) : '';
   if ( !token ) {
@@ -424,9 +602,7 @@ export async function authenticateRequest ( request: Request ) {
 
   const { data: byAuthUser, error: byAuthError } = await admin
     .from( 'users' )
-    .select(
-      'id, auth_user_id, email, phone_number, full_name, role, verification_level, sanad_verified_status, phone_verified_at, profile_status, updated_at',
-    )
+    .select( CANONICAL_USER_COLUMNS )
     .eq( 'auth_user_id', authData.user.id )
     .maybeSingle();
 
@@ -434,17 +610,15 @@ export async function authenticateRequest ( request: Request ) {
     return { error: json( { error: byAuthError.message }, 500 ) };
   }
 
-  let canonicalUser = byAuthUser;
+  let canonicalUser = byAuthUser as CanonicalUserRow | null;
   let userError = null;
   if ( !canonicalUser ) {
     const fallback = await admin
       .from( 'users' )
-      .select(
-        'id, auth_user_id, email, phone_number, full_name, role, verification_level, sanad_verified_status, phone_verified_at, profile_status, updated_at',
-      )
+      .select( CANONICAL_USER_COLUMNS )
       .eq( 'id', authData.user.id )
       .maybeSingle();
-    canonicalUser = fallback.data;
+    canonicalUser = fallback.data as CanonicalUserRow | null;
     userError = fallback.error;
   }
 
@@ -2127,6 +2301,21 @@ export async function finalizeTopUpTransaction (
   }
 }
 
+/**
+ * Shape returned by every checkout-session creator.
+ *
+ * `id`/`url` are the provider-native fields the webhook handlers and the Stripe
+ * audit trail store; `sessionId`/`checkoutUrl` are the platform names the wallet
+ * API serialises. Returning both keeps a single call site working whether it
+ * persists a raw provider reference or renders a redirect.
+ */
+export interface CheckoutSession {
+  id: string;
+  url: string | null;
+  sessionId: string;
+  checkoutUrl: string;
+}
+
 export async function createStripeCheckoutSession ( input: {
   amountJod: number;
   paymentMethod: string;
@@ -2134,7 +2323,7 @@ export async function createStripeCheckoutSession ( input: {
   canonicalUserId: string;
   walletId: string;
   request: Request;
-} ): Promise<{ checkoutUrl: string; sessionId: string }> {
+} ): Promise<CheckoutSession> {
   const customerId = await ensureStripeCustomer( { admin: getAdminClient(), canonicalUser: { id: input.canonicalUserId } } );
   const appUrl = getAppBaseUrl( input.request );
   const params = new URLSearchParams();
@@ -2151,7 +2340,12 @@ export async function createStripeCheckoutSession ( input: {
   params.append( 'metadata[wallet_id]', input.walletId );
   params.append( 'metadata[user_id]', input.canonicalUserId );
   const session = await stripeApiRequest( '/v1/checkout/sessions', { method: 'POST', params } );
-  return { checkoutUrl: String( session.url ), sessionId: String( session.id ) };
+  return {
+    id: String( session.id ),
+    url: session.url ? String( session.url ) : null,
+    sessionId: String( session.id ),
+    checkoutUrl: String( session.url ),
+  };
 }
 
 export async function createStripeSubscriptionCheckoutSession ( input: {
@@ -2159,7 +2353,7 @@ export async function createStripeSubscriptionCheckoutSession ( input: {
   canonicalUser: { id: string; email?: string | null; full_name?: string | null; phone_number?: string | null };
   planName: string;
   request: Request;
-} ): Promise<{ checkoutUrl: string; sessionId: string }> {
+} ): Promise<CheckoutSession> {
   const priceId = STRIPE_WASEL_PLUS_PRICE_ID;
   if ( !priceId ) throw new Error( 'STRIPE_WASEL_PLUS_PRICE_ID is not configured' );
   const customerId = await ensureStripeCustomer( input );
@@ -2174,7 +2368,12 @@ export async function createStripeSubscriptionCheckoutSession ( input: {
   params.append( 'metadata[user_id]', input.canonicalUser.id );
   params.append( 'metadata[plan]', input.planName );
   const session = await stripeApiRequest( '/v1/checkout/sessions', { method: 'POST', params } );
-  return { checkoutUrl: String( session.url ), sessionId: String( session.id ) };
+  return {
+    id: String( session.id ),
+    url: session.url ? String( session.url ) : null,
+    sessionId: String( session.id ),
+    checkoutUrl: String( session.url ),
+  };
 }
 
 export async function createCliqCheckoutSession ( input: {
@@ -2182,7 +2381,7 @@ export async function createCliqCheckoutSession ( input: {
   amountJod: number;
   currency: string;
   request: Request;
-} ): Promise<{ checkoutUrl: string; providerReference: string | null }> {
+} ): Promise<CheckoutSession & { providerReference: string | null }> {
   if ( !CLIQ_CHECKOUT_URL_TEMPLATE || !CLIQ_MERCHANT_ID ) {
     throw new Error( 'CliQ checkout is not configured' );
   }
@@ -2194,7 +2393,13 @@ export async function createCliqCheckoutSession ( input: {
     returnUrl: `${ appUrl }/app/wallet?topup=success&tx=${ input.transactionId }`,
     merchantId: CLIQ_MERCHANT_ID,
   } );
-  return { checkoutUrl, providerReference: input.transactionId };
+  return {
+    id: input.transactionId,
+    url: checkoutUrl,
+    sessionId: input.transactionId,
+    checkoutUrl,
+    providerReference: input.transactionId,
+  };
 }
 
 export function constantTimeEquals ( left: string, right: string ): boolean {
@@ -2420,28 +2625,28 @@ export async function submitSanadVerificationRequest ( input: {
   userId: string;
   providerReference: string;
   documentReference: string | null;
-} ): Promise<{ ok: boolean; error?: string }> {
+} ): Promise<{ ok: boolean; error?: string; submittedToProvider: boolean }> {
   if ( !SANAD_API_BASE_URL || !SANAD_CLIENT_ID || !SANAD_CLIENT_SECRET ) {
-    return { ok: false, error: 'Sanad verification is not configured' };
+    return { ok: false, error: 'Sanad verification is not configured', submittedToProvider: false };
   }
   // Validate SANAD_API_BASE_URL is HTTPS and within the allowed Sanad domain (SSRF guard).
   let parsedBase: URL;
   try {
     parsedBase = new URL( SANAD_API_BASE_URL );
   } catch {
-    return { ok: false, error: 'Sanad API URL is invalid' };
+    return { ok: false, error: 'Sanad API URL is invalid', submittedToProvider: false };
   }
   if ( parsedBase.protocol !== 'https:' ) {
-    return { ok: false, error: 'Sanad API URL must use HTTPS' };
+    return { ok: false, error: 'Sanad API URL must use HTTPS', submittedToProvider: false };
   }
   const allowedSanadHosts = [ 'api.sanad.jo', 'sandbox.sanad.jo' ];
   if ( !allowedSanadHosts.includes( parsedBase.hostname ) ) {
-    return { ok: false, error: 'Sanad API URL is not within the allowed domain' };
+    return { ok: false, error: 'Sanad API URL is not within the allowed domain', submittedToProvider: false };
   }
-  // Construct the endpoint path from the validated base URL only — no user input enters the URL.
+  // Construct the endpoint path from the validated base URL only â€” no user input enters the URL.
   const endpointPath = SANAD_VERIFICATION_ENDPOINT.startsWith( '/' ) ? SANAD_VERIFICATION_ENDPOINT : `/${ SANAD_VERIFICATION_ENDPOINT }`;
   const safeUrl = `${ parsedBase.origin }${ endpointPath }`;
-  // Sanitize all body values — strip control characters before serializing.
+  // Sanitize all body values â€” strip control characters before serializing.
   const safeUserId = String( input.userId ).replace( /[^\w-]/g, '' );
   const safeProviderRef = String( input.providerReference ).replace( /[^\w-]/g, '' );
   const safeDocRef = input.documentReference ? String( input.documentReference ).replace( /[^\w-]/g, '' ) : null;
@@ -2461,9 +2666,9 @@ export async function submitSanadVerificationRequest ( input: {
   } );
   if ( !response.ok ) {
     const body = await response.json().catch( () => ( {} ) );
-    return { ok: false, error: String( body?.message ?? `Sanad API error ${ response.status }` ) };
+    return { ok: false, error: String( body?.message ?? `Sanad API error ${ response.status }` ), submittedToProvider: false };
   }
-  return { ok: true };
+  return { ok: true, submittedToProvider: true };
 }
 
 export async function assertTripParticipant ( admin: ReturnType<typeof getAdminClient>, tripId: string, userId: string ) {
@@ -2490,23 +2695,4 @@ export function cityCoord ( city: string | null | undefined ) {
     zarqa: { lat: 32.0728, lng: 36.088 },
   };
   return coords[ String( city ?? '' ).toLowerCase() ] ?? coords.amman;
-}
-
-export async function resolveRoute ( request: Request ): Promise<Response> {
-  const url = new URL( request.url );
-  let path = url.pathname.replace( /^.*make-server-0b1f4071/, '' ) || '/';
-
-  if ( path.startsWith( '/v1' ) ) {
-    path = path.slice( 3 ) || '/';
-  }
-
-  for ( const route of ROUTES ) {
-    if ( route.methods && !route.methods.includes( request.method ) ) continue;
-    if ( !route.test( path, request.method ) ) continue;
-
-    const result = await route.handle( request, path );
-    if ( result ) return result;
-  }
-
-  return json( { error: 'Route not found', path }, 404 );
 }

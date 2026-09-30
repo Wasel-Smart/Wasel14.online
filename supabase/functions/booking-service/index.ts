@@ -162,7 +162,9 @@ Deno.serve(async (request: Request) => {
   try {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^.*booking-service/, '') || '/';
-    let response: Response;
+    // The route handler returns undefined when no sub-path matches, so the router
+  // falls through to the 404 below.
+  let response: Response | undefined;
 
     if (path.startsWith('/bookings')) {
       response = await handleBookingRequest(request, path);

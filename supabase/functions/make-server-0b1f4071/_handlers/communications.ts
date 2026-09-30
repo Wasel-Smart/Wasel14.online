@@ -29,12 +29,30 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleGetCommunicationPreferences ( request: Request ) {
+import {
+  CommunicationDeliveryRecord,
+  buildIdempotencyKey,
+  buildResendPayload,
+  buildSendgridPayload,
+  determineProviderName,
+} from '../_shared/communication-runtime.ts';
+
+import {
+  COMMUNICATIONS_OPERATIONS_SQL,
+  COMMUNICATIONS_RUNTIME_SQL,
+  deliveryEnv,
+  getTwilioAuthPair,
+  hasTwilioVerifyRuntime,
+  hasWorkerAccess,
+  processQueuedDeliveries,
+} from './shared.ts';
+
+
+export async function handleGetCommunicationPreferences ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -51,7 +69,7 @@ async function handleGetCommunicationPreferences ( request: Request ) {
   return json( { preferences: data ?? null } );
 }
 
-async function handlePatchCommunicationPreferences ( request: Request ) {
+export async function handlePatchCommunicationPreferences ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -86,7 +104,7 @@ async function handlePatchCommunicationPreferences ( request: Request ) {
   return json( { preferences: data } );
 }
 
-async function handleQueueCommunicationDeliveries ( request: Request ) {
+export async function handleQueueCommunicationDeliveries ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -142,7 +160,7 @@ async function handleQueueCommunicationDeliveries ( request: Request ) {
   return json( { queued: Array.isArray( data ) ? data.length : rows.length, deliveries: data ?? [] }, 202 );
 }
 
-async function handleProcessCommunicationQueue ( request: Request ) {
+export async function handleProcessCommunicationQueue ( request: Request ) {
   if ( !hasWorkerAccess( request ) ) {
     return json( { error: 'Missing worker secret' }, 401 );
   }
@@ -152,7 +170,7 @@ async function handleProcessCommunicationQueue ( request: Request ) {
   return json( result );
 }
 
-async function handleSendTestCommunication ( request: Request ) {
+export async function handleSendTestCommunication ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
   if ( accessError ) return accessError;
 
@@ -232,7 +250,7 @@ async function handleSendTestCommunication ( request: Request ) {
   }
 }
 
-async function handleProviderDiagnostics ( request: Request ) {
+export async function handleProviderDiagnostics ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
   if ( accessError ) return accessError;
 
@@ -326,7 +344,7 @@ async function handleProviderDiagnostics ( request: Request ) {
   return json( diagnostics );
 }
 
-async function handleApplyCommunicationMigrations ( request: Request ) {
+export async function handleApplyCommunicationMigrations ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
   if ( accessError ) return accessError;
 

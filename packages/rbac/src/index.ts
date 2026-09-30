@@ -298,11 +298,12 @@ export function assertPermission(role: AccessRole, permission: AccessPermission)
 
 /**
  * Maps a raw DB/JWT role string to the canonical AccessRole.
- * Fails closed: unknown or undefined roles resolve to 'guest' (least privilege).
- * @param role - Raw role string from DB/JWT
+ * Fails closed: unknown, null, or undefined roles resolve to 'guest' (least privilege).
+ * @param role - Raw role string from DB/JWT. Accepts null because the canonical
+ *   `users.role` column is nullable and is read straight from Postgres.
  * @returns Canonical AccessRole
  */
-export function resolveAccessRole(role: string | undefined): AccessRole {
+export function resolveAccessRole(role: string | null | undefined): AccessRole {
   if (!role) {
     return 'guest';
   }
@@ -323,7 +324,7 @@ export function resolveAccessRole(role: string | undefined): AccessRole {
  * @param permission - AccessPermission to check
  * @returns true if role grants permission
  */
-export function userHasPermission(role: string | undefined, permission: AccessPermission): boolean {
+export function userHasPermission(role: string | null | undefined, permission: AccessPermission): boolean {
   return hasPermission(resolveAccessRole(role), permission);
 }
 

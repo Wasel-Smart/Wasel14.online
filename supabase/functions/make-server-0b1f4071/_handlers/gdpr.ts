@@ -29,14 +29,13 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleRecordConsent ( request: Request ) {
+export async function handleRecordConsent ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const body = await request.json();
   const userId = String( body.userId ?? auth.canonicalUser.id );
@@ -55,9 +54,9 @@ async function handleRecordConsent ( request: Request ) {
   return json( { ok: true }, 201 );
 }
 
-async function handleGetConsent ( request: Request, path: string ) {
+export async function handleGetConsent ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const url = new URL( request.url );
   const userId = url.searchParams.get( 'userId' ) ?? auth.canonicalUser.id;
@@ -77,9 +76,9 @@ async function handleGetConsent ( request: Request, path: string ) {
   return json( { granted: Boolean( data?.granted ) } );
 }
 
-async function handleRequestDataExport ( request: Request ) {
+export async function handleRequestDataExport ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const body = await request.json();
   const userId = String( body.userId ?? auth.canonicalUser.id );
@@ -134,9 +133,9 @@ async function handleRequestDataExport ( request: Request ) {
   return json( { userId, requestedAt, completedAt: Date.now(), downloadUrl, expiresAt } );
 }
 
-async function handleRequestDeletion ( request: Request ) {
+export async function handleRequestDeletion ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const body = await request.json();
   const userId = String( body.userId ?? auth.canonicalUser.id );
@@ -157,9 +156,9 @@ async function handleRequestDeletion ( request: Request ) {
   return json( { userId, requestedAt, scheduledFor, reason } );
 }
 
-async function handleCancelDeletion ( request: Request ) {
+export async function handleCancelDeletion ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const body = await request.json();
   const userId = String( body.userId ?? auth.canonicalUser.id );

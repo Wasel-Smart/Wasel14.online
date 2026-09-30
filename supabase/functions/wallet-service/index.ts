@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { checkDbRateLimit } from '../_shared/rate-limiter.ts';
+import { checkDbRateLimit } from './_shared/rate-limiter.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -302,10 +302,13 @@ Deno.serve(async (request: Request) => {
   try {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^.*wallet-service/, '') || '/';
-    let response: Response;
+    // The route handlers return undefined when no sub-path matches so the router can
+    // decide between a 404 and the next branch.
+    let response: Response | undefined;
 
     if (path.startsWith('/wallet')) {
       response = await handleWalletRequest(request, path);
+      if (!response) response = json({ error: 'Not found', service: 'wallet-service' }, 404);
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'wallet-service', timestamp: new Date().toISOString() });
     } else {

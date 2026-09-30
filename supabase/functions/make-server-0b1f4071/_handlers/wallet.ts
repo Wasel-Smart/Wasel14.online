@@ -33,7 +33,41 @@ import {
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleGetWallet ( request: Request, requestedUserId: string ) {
+import {
+  CLIQ_API_BASE_URL,
+  CLIQ_API_KEY,
+  CLIQ_CHECKOUT_URL_TEMPLATE,
+  CLIQ_MERCHANT_ID,
+  authenticateWalletRequest,
+  buildCliqCheckoutUrl,
+  buildWalletInsights,
+  createCliqCheckoutSession,
+  createPendingTopUpTransaction,
+  createStripeCheckoutSession,
+  createStripeSubscriptionCheckoutSession,
+  ensureWalletForUser,
+  getWalletSubscription,
+  hashWalletPin,
+  loadWalletDetails,
+  loadWalletPayload,
+  mapReferenceTypeToTransactionType,
+  mapSubscriptionPlan,
+  markTopUpTransactionFailed,
+  normalizeWalletPaymentMethod,
+  parseWalletRoute,
+  resolveWalletRecipient,
+  toMoneyNumber,
+  toWalletTransaction,
+  updateTopUpTransactionMetadata,
+  verifyWalletPinHash,
+} from './shared.ts';
+
+import {
+  toNumber,
+} from '../_shared/pricing.ts';
+
+
+export async function handleGetWallet ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -44,7 +78,7 @@ async function handleGetWallet ( request: Request, requestedUserId: string ) {
   }
 }
 
-async function handleGetWalletTransactions ( request: Request, requestedUserId: string ) {
+export async function handleGetWalletTransactions ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -55,7 +89,7 @@ async function handleGetWalletTransactions ( request: Request, requestedUserId: 
     const type = url.searchParams.get( 'type' );
     const details = await loadWalletDetails( auth.admin, auth.canonicalUser.id );
     const all = details.transactions.map( toWalletTransaction );
-    const filtered = type ? all.filter( tx => tx.type === type ) : all;
+    const filtered = type ? all.filter( ( tx ) => tx.type === type ) : all;
     const start = ( page - 1 ) * limit;
     return json( {
       transactions: filtered.slice( start, start + limit ),
@@ -68,7 +102,7 @@ async function handleGetWalletTransactions ( request: Request, requestedUserId: 
   }
 }
 
-async function handleGetWalletInsights ( request: Request, requestedUserId: string ) {
+export async function handleGetWalletInsights ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -80,7 +114,7 @@ async function handleGetWalletInsights ( request: Request, requestedUserId: stri
   }
 }
 
-async function handleWalletWithdraw ( request: Request, requestedUserId: string ) {
+export async function handleWalletWithdraw ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -117,7 +151,7 @@ async function handleWalletWithdraw ( request: Request, requestedUserId: string 
   }
 }
 
-async function handleWalletSend ( request: Request, requestedUserId: string ) {
+export async function handleWalletSend ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -148,7 +182,7 @@ async function handleWalletSend ( request: Request, requestedUserId: string ) {
   }
 }
 
-async function handleSetWalletPin ( request: Request, requestedUserId: string ) {
+export async function handleSetWalletPin ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -169,7 +203,7 @@ async function handleSetWalletPin ( request: Request, requestedUserId: string ) 
   }
 }
 
-async function handleVerifyWalletPin ( request: Request, requestedUserId: string ) {
+export async function handleVerifyWalletPin ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -184,7 +218,7 @@ async function handleVerifyWalletPin ( request: Request, requestedUserId: string
   }
 }
 
-async function handleSetWalletAutoTopUp ( request: Request, requestedUserId: string ) {
+export async function handleSetWalletAutoTopUp ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -208,7 +242,7 @@ async function handleSetWalletAutoTopUp ( request: Request, requestedUserId: str
   }
 }
 
-async function handleGetWalletPaymentMethods ( request: Request, requestedUserId: string ) {
+export async function handleGetWalletPaymentMethods ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -220,7 +254,7 @@ async function handleGetWalletPaymentMethods ( request: Request, requestedUserId
   }
 }
 
-async function handleAddWalletPaymentMethod ( request: Request, requestedUserId: string ) {
+export async function handleAddWalletPaymentMethod ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -246,7 +280,7 @@ async function handleAddWalletPaymentMethod ( request: Request, requestedUserId:
   }
 }
 
-async function handleDeleteWalletPaymentMethod ( request: Request, requestedUserId: string, methodId: string | null ) {
+export async function handleDeleteWalletPaymentMethod ( request: Request, requestedUserId: string, methodId: string | null ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
   if ( !methodId ) return json( { error: 'Payment method id is required.' }, 400 );
@@ -264,7 +298,7 @@ async function handleDeleteWalletPaymentMethod ( request: Request, requestedUser
   }
 }
 
-async function handleGetWalletTrustScore ( request: Request, requestedUserId: string ) {
+export async function handleGetWalletTrustScore ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 
@@ -294,13 +328,13 @@ async function handleGetWalletTrustScore ( request: Request, requestedUserId: st
   }
 }
 
-async function handleGetWalletRewards ( request: Request, requestedUserId: string ) {
+export async function handleGetWalletRewards ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
   return json( { rewards: [] } );
 }
 
-async function handleClaimWalletReward ( request: Request, requestedUserId: string ) {
+export async function handleClaimWalletReward ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
   const body = await request.json().catch( () => ( {} ) );
@@ -309,7 +343,7 @@ async function handleClaimWalletReward ( request: Request, requestedUserId: stri
   return json( { error: 'Reward is not available.' }, 404 );
 }
 
-async function handleGetWalletSubscription ( request: Request, requestedUserId: string ) {
+export async function handleGetWalletSubscription ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
   if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
@@ -324,7 +358,7 @@ async function handleGetWalletSubscription ( request: Request, requestedUserId: 
   }
 }
 
-async function handleWalletTopUp ( request: Request, requestedUserId: string ) {
+export async function handleWalletTopUp ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
   if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
@@ -377,7 +411,7 @@ async function handleWalletTopUp ( request: Request, requestedUserId: string ) {
       amountJod,
       currency: String( wallet.currency_code ?? 'JOD' ).toUpperCase(),
       request,
-    } ).catch( async ( error ) => {
+    } ).catch( async ( error: unknown ) => {
       await markTopUpTransactionFailed(
         auth.admin,
         pending.transactionId,
@@ -453,7 +487,7 @@ async function handleWalletTopUp ( request: Request, requestedUserId: string ) {
   }
 }
 
-async function handleWalletSubscribe ( request: Request, requestedUserId: string ) {
+export async function handleWalletSubscribe ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
   if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
@@ -500,7 +534,7 @@ async function handleWalletSubscribe ( request: Request, requestedUserId: string
   }
 }
 
-async function handleWalletPay ( request: Request, requestedUserId: string ) {
+export async function handleWalletPay ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) return auth.error;
 

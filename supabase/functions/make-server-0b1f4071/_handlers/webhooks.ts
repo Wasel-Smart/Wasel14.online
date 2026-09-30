@@ -29,13 +29,36 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
   SUPABASE_AUTH_HOOK_SEND_SMS_SECRET,
   deliveryEnv,
   constantTimeEquals,
 } from './shared.ts';
+
+import {
+  CLIQ_WEBHOOK_SECRET,
+  SANAD_WEBHOOK_SECRET,
+  STRIPE_WEBHOOK_SECRET,
+  fetchStripeSubscription,
+  finalizeTopUpTransaction,
+  firstStringValue,
+  isFailedProviderStatus,
+  isSuccessfulProviderStatus,
+  markTopUpTransactionFailed,
+  normalizeProviderStatus,
+  syncStripeSubscriptionRecord,
+  updateTopUpTransactionMetadata,
+  verifyProviderWebhookSignature,
+  verifyStripeWebhookSignature,
+} from './shared.ts';
+
+import {
+  hasValidWebhookToken,
+  mapResendEventToStatus,
+  mapTwilioStatusToLifecycle,
+} from '../_shared/communication-runtime.ts';
+
 
 export async function handleStripeWebhook ( request: Request ) {
   if ( !STRIPE_WEBHOOK_SECRET ) {

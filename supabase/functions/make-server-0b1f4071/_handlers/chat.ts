@@ -29,14 +29,18 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleGetChatMessages ( request: Request, path: string ) {
+import {
+  assertTripParticipant,
+} from './shared.ts';
+
+
+export async function handleGetChatMessages ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const tripId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   if ( !( await assertTripParticipant( auth.admin, tripId, auth.canonicalUser.id ) ) ) {
@@ -55,9 +59,9 @@ async function handleGetChatMessages ( request: Request, path: string ) {
   return json( { messages: ( data ?? [] ).reverse() } );
 }
 
-async function handleSendChatMessage ( request: Request, path: string ) {
+export async function handleSendChatMessage ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const tripId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   if ( !( await assertTripParticipant( auth.admin, tripId, auth.canonicalUser.id ) ) ) {
@@ -85,9 +89,9 @@ async function handleSendChatMessage ( request: Request, path: string ) {
   return json( { message: data }, 201 );
 }
 
-async function handleMarkChatMessagesRead ( request: Request ) {
+export async function handleMarkChatMessagesRead ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const body = await request.json();
   const messageIds = Array.isArray( body.messageIds ) ? body.messageIds.map( String ).filter( Boolean ) : [];
@@ -113,9 +117,9 @@ async function handleMarkChatMessagesRead ( request: Request ) {
   return json( { ok: true } );
 }
 
-async function handleGetChatUnreadCount ( request: Request, path: string ) {
+export async function handleGetChatUnreadCount ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const tripId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   if ( !( await assertTripParticipant( auth.admin, tripId, auth.canonicalUser.id ) ) ) {

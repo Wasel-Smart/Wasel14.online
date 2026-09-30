@@ -224,6 +224,9 @@ async function handleTrustRequest(request: Request, path: string) {
       console.error('Trust review history error:', error instanceof Error ? error.message : String(error));
       return json({ error: 'Internal server error' }, 500);
     }
+  }
+
+  return json({ error: 'Not found', service: 'trust-service', path }, 404);
 }
 
 Deno.serve(async (request: Request) => {
@@ -234,10 +237,13 @@ Deno.serve(async (request: Request) => {
   try {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^.*trust-service/, '') || '/';
-    let response: Response;
+    // The route handlers return undefined when no sub-path matches so the router can
+    // decide between a 404 and the next branch.
+    let response: Response | undefined;
 
     if (path.startsWith('/trust') || path.startsWith('/v1/trust')) {
       response = await handleTrustRequest(request, path);
+      if (!response) response = json({ error: 'Not found', service: 'trust-service' }, 404);
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'trust-service', timestamp: new Date().toISOString() });
     } else {

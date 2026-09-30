@@ -179,7 +179,9 @@ Deno.serve(async (request: Request) => {
   try {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^.*package-service/, '') || '/';
-    let response: Response;
+    // The route handler returns undefined when no sub-path matches, so the router
+  // falls through to the 404 below.
+  let response: Response | undefined;
 
     if (path.startsWith('/packages')) {
       response = await handlePackageRequest(request, path);

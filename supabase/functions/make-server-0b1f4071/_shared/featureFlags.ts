@@ -1,9 +1,13 @@
 /**
  * Wasel Feature Flags — Deno/Edge Function Entry Point (make-server)
  *
- * Re-exports from the canonical feature flags implementation.
- * The actual implementation lives in src/utils/featureFlags.ts
- * and is shared between frontend (React) and backend (Deno edge functions).
+ * Re-exports from the canonical feature flag engine.
+ * The implementation lives in src/utils/featureFlags/core.ts and is shared
+ * between frontend (React) and backend (Deno edge functions).
+ *
+ * `npm run edge:sync` vendors that module into this function directory and
+ * rewrites the specifier below, because `supabase functions deploy` uploads
+ * only the files under supabase/functions/make-server-0b1f4071/.
  */
 
 export {
@@ -16,7 +20,7 @@ export {
   setKillSwitch,
   clearKillSwitch,
   getKillSwitch,
-  auditFlagEvaluation,
+  readRuntimeEnv,
   type FeatureFlagDefinition,
   type FeatureFlagKey,
   type TargetingRule,
@@ -26,7 +30,15 @@ export {
   type EvaluationContext,
   type EvaluationResult,
   type FlagAuditEntry,
-} from '../../src/utils/featureFlags.ts';
+  FEATURE_FLAGS,
+} from '../_vendor/src/utils/featureFlags/core.ts';
+
+import {
+  FEATURE_FLAGS,
+  evaluateFeatureFlag,
+  type EvaluationContext,
+  type FeatureFlagKey,
+} from '../_vendor/src/utils/featureFlags/core.ts';
 
 // Deno-specific: Server-side context builder
 export function buildServerContext(
@@ -62,5 +74,3 @@ export function featureFlagsMiddleware(
   const results = keys.map(key => evaluateFeatureFlag(key, context, { isServer: true }));
   return Object.fromEntries(results.map(r => [r.flag.key, r.enabled])) as Record<FeatureFlagKey, boolean>;
 }
-
-export { FEATURE_FLAGS } from '../../src/utils/featureFlags.ts';

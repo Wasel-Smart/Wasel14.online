@@ -33,7 +33,19 @@ import {
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleTripRequest ( request: Request, path: string ) {
+import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
+import {
+  calculateDirectPrice,
+  toNumber,
+} from '../_shared/pricing.ts';
+
+import {
+  cityCoord,
+  parseEntityRoute,
+} from './shared.ts';
+
+
+export async function handleTripRequest ( request: Request, path: string ) {
   const admin = getAdminClient();
   const url = new URL( request.url );
 
@@ -197,7 +209,7 @@ async function handleTripRequest ( request: Request, path: string ) {
   return undefined;
 }
 
-async function handleBookingCollectionForTrip ( request: Request, tripId: string ) {
+export async function handleBookingCollectionForTrip ( request: Request, tripId: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
   const { data, error } = await auth.admin
@@ -209,9 +221,9 @@ async function handleBookingCollectionForTrip ( request: Request, tripId: string
   return json( ( Array.isArray( data ) ? data : [] ).map( mapBookingRow ) );
 }
 
-async function handleCancelTrip ( request: Request ) {
+export async function handleCancelTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canCancelAny = hasPermission( role, 'rides:cancel_any' ) || hasPermission( role, 'packages:cancel_any' );
@@ -281,9 +293,9 @@ async function handleCancelTrip ( request: Request ) {
   } );
 }
 
-async function handleGetLiveTrip ( request: Request ) {
+export async function handleGetLiveTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const { data: booking, error: bookingError } = await auth.admin
     .from( 'bookings' )

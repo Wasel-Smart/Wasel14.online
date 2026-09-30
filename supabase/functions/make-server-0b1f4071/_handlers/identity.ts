@@ -29,12 +29,27 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleProfileRequest ( request: Request, path: string ) {
+import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
+import {
+  parseEntityRoute,
+  submitSanadVerificationRequest,
+} from './shared.ts';
+
+import {
+  generateBackupCodes,
+  generateQRCode,
+  generateTOTPSecret,
+  hashBackupCode,
+  hashBackupCodes,
+  verifyTwoFactorChallenge,
+} from '../_shared/two-factor-runtime.ts';
+
+
+export async function handleProfileRequest ( request: Request, path: string ) {
   const auth = await authenticateAuthUser( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -110,7 +125,7 @@ async function handleProfileRequest ( request: Request, path: string ) {
   return json( await buildProfilePayload( auth.admin, nextUser ) );
 }
 
-async function handleTwoFactorSetup ( request: Request ) {
+export async function handleTwoFactorSetup ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -142,7 +157,7 @@ async function handleTwoFactorSetup ( request: Request ) {
   } );
 }
 
-async function handleTwoFactorVerify ( request: Request ) {
+export async function handleTwoFactorVerify ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -197,7 +212,7 @@ async function handleTwoFactorVerify ( request: Request ) {
   } );
 }
 
-async function handleTwoFactorDisable ( request: Request ) {
+export async function handleTwoFactorDisable ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -244,7 +259,7 @@ async function handleTwoFactorDisable ( request: Request ) {
   return json( { disabled: true } );
 }
 
-async function handleSubmitIdentityVerification ( request: Request ) {
+export async function handleSubmitIdentityVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -290,7 +305,7 @@ async function handleSubmitIdentityVerification ( request: Request ) {
   );
 }
 
-async function handleEnableDriverMode ( request: Request ) {
+export async function handleEnableDriverMode ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -310,7 +325,7 @@ async function handleEnableDriverMode ( request: Request ) {
   } );
 }
 
-async function handleSubmitDriverDocuments ( request: Request ) {
+export async function handleSubmitDriverDocuments ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 

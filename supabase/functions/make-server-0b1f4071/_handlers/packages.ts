@@ -29,12 +29,22 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handlePackageRequest ( request: Request, path: string ) {
+import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
+import {
+  calculateDirectPrice,
+  toNumber,
+} from '../_shared/pricing.ts';
+
+import {
+  parseEntityRoute,
+} from './shared.ts';
+
+
+export async function handlePackageRequest ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 

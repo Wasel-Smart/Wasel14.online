@@ -1,7 +1,7 @@
 
 import Stripe from "npm:stripe@12.12.0";
 import { createClient } from "npm:@supabase/supabase-js@2.36.0";
-import { createRateLimitMiddleware } from "../_shared/rate-limiter.ts";
+import { createRateLimitMiddleware } from "./_shared/rate-limiter.ts";
 
 const STRIPE_SECRET = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";

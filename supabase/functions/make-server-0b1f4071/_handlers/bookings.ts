@@ -29,12 +29,21 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleBookingRequest ( request: Request, path: string ) {
+import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
+import {
+  toNumber,
+} from '../_shared/pricing.ts';
+
+import {
+  parseEntityRoute,
+} from './shared.ts';
+
+
+export async function handleBookingRequest ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -161,9 +170,9 @@ async function handleBookingRequest ( request: Request, path: string ) {
   return undefined;
 }
 
-async function handleSubmitRating ( request: Request ) {
+export async function handleSubmitRating ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canModerateRatings = hasPermission( role, 'trust:moderate' );
@@ -225,9 +234,9 @@ async function handleSubmitRating ( request: Request ) {
   return json( { ok: true }, 201 );
 }
 
-async function handleGetDriverRating ( request: Request, path: string ) {
+export async function handleGetDriverRating ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const driverId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   const { admin } = auth;
@@ -262,9 +271,9 @@ async function handleGetDriverRating ( request: Request, path: string ) {
   } );
 }
 
-async function handleCanRateBooking ( request: Request, path: string ) {
+export async function handleCanRateBooking ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const bookingId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   const { admin, canonicalUser } = auth;
@@ -293,9 +302,9 @@ async function handleCanRateBooking ( request: Request, path: string ) {
   return json( { canRate: true } );
 }
 
-async function handleCancelBooking ( request: Request ) {
+export async function handleCancelBooking ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canCancelAny = hasPermission( role, 'rides:cancel_any' ) || hasPermission( role, 'packages:cancel_any' );
@@ -306,14 +315,25 @@ async function handleCancelBooking ( request: Request ) {
   if ( !bookingId || !reason ) return json( { error: 'bookingId and reason are required' }, 400 );
 
   const { admin, canonicalUser } = auth;
-  const { data: booking, error: fetchError } = await admin
+  const { data: bookingRow, error: fetchError } = await admin
     .from( 'bookings' )
     .select( 'id, user_id, status, payment_status, trip_id, trips(driver_id)' )
     .eq( 'id', bookingId )
     .maybeSingle();
 
   if ( fetchError ) return json( { error: fetchError.message }, 500 );
-  if ( !booking ) return json( { error: 'Booking not found' }, 404 );
+  if ( !bookingRow ) return json( { error: 'Booking not found' }, 404 );
+  const booking = bookingRow as unknown as {
+    id: string;
+    user_id: string;
+    status: string;
+    payment_status: string | null;
+    trip_id: string | null;
+    // PostgREST returns an embedded to-one relation as an object and a to-many
+    // relation as an array depending on how the FK cardinality is resolved, so
+    // both shapes have to be handled.
+    trips: { driver_id: string | null } | { driver_id: string | null }[] | null;
+  };
   if ( !canCancelAny && booking.user_id !== canonicalUser.id ) return json( { error: 'Unauthorized' }, 403 );
   if ( booking.status === 'cancelled' ) return json( { error: 'Booking already cancelled' }, 409 );
   if ( booking.status === 'completed' ) return json( { error: 'Cannot cancel completed booking' }, 409 );
@@ -349,9 +369,9 @@ async function handleCancelBooking ( request: Request ) {
   } );
 }
 
-async function handleCanCancelBooking ( request: Request, path: string ) {
+export async function handleCanCancelBooking ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canCancelAny = hasPermission( role, 'rides:cancel_any' ) || hasPermission( role, 'packages:cancel_any' );

@@ -4,7 +4,7 @@ import {
   type AccessPermission,
   hasPermission,
   resolveAccessRole,
-} from '../_shared/rbac.ts';
+} from './_shared/rbac.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -202,10 +202,13 @@ Deno.serve(async (request: Request) => {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^.*profile-service/, '') || '/';
 
-    let response: Response;
+    // The route handlers return undefined when no sub-path matches so the router can
+    // decide between a 404 and the next branch.
+    let response: Response | undefined;
 
     if (path.startsWith('/profile')) {
       response = await handleProfileRequest(request, path);
+      if (!response) response = json({ error: 'Not found', service: 'profile-service' }, 404);
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'profile-service', timestamp: new Date().toISOString() });
     } else {

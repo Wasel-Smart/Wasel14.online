@@ -29,12 +29,37 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handleGetTrustStatus ( request: Request ) {
+import {
+  isValidE164Phone,
+  normalizePhoneNumber,
+} from '../_shared/phone.ts';
+
+import {
+  PHONE_NUMBER_IN_USE_MESSAGE,
+  PHONE_VERIFICATION_TTL_MINUTES,
+  TWILIO_VERIFY_SERVICE_SID,
+  checkTwilioPhoneVerification,
+  constantTimeEqual,
+  generateOtpCode,
+  hasTwilioVerifyRuntime,
+  hashOtpCode,
+  isExpired,
+  isPhoneNumberUniqueViolation,
+  sendDelivery,
+  startTwilioPhoneVerification,
+} from './shared.ts';
+
+import {
+  buildIdempotencyKey,
+  determineProviderName,
+} from '../_shared/communication-runtime.ts';
+
+
+export async function handleGetTrustStatus ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -42,7 +67,7 @@ async function handleGetTrustStatus ( request: Request ) {
   return json( { status } );
 }
 
-async function handleStartPhoneVerification ( request: Request ) {
+export async function handleStartPhoneVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -198,7 +223,7 @@ async function handleStartPhoneVerification ( request: Request ) {
   );
 }
 
-async function handleConfirmPhoneVerification ( request: Request ) {
+export async function handleConfirmPhoneVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 

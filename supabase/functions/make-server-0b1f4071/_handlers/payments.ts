@@ -29,12 +29,18 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handlePaymentIntentCreate ( request: Request ): Promise<Response> {
+import {
+  ALLOWED_PAYMENT_CURRENCIES,
+  normalizePaymentAmount,
+  stripe,
+} from './shared.ts';
+
+
+export async function handlePaymentIntentCreate ( request: Request ): Promise<Response> {
   if ( !stripe ) {
     return json( { error: 'Stripe is not configured' }, 503 );
   }
@@ -97,7 +103,7 @@ async function handlePaymentIntentCreate ( request: Request ): Promise<Response>
   }
 }
 
-async function handlePaymentRefund ( request: Request ): Promise<Response> {
+export async function handlePaymentRefund ( request: Request ): Promise<Response> {
   if ( !stripe ) {
     return json( { error: 'Stripe is not configured' }, 503 );
   }
@@ -138,9 +144,17 @@ async function handlePaymentRefund ( request: Request ): Promise<Response> {
   }
 
   try {
-    const params: Stripe.RefundCreateParams = {
+    // Declared locally rather than as `Stripe.RefundCreateParams`: the Stripe
+    // SDK is loaded as a remote ESM module, which exports the class but not the
+    // `Stripe` namespace, so the namespace type is not reachable here. This is
+    // the subset of refund parameters this handler actually sends.
+    const params: {
+      payment_intent: string;
+      amount?: number;
+      reason: 'requested_by_customer' | 'duplicate' | 'fraudulent';
+    } = {
       payment_intent: resolvedPaymentIntentId,
-      reason: ( reason as Stripe.RefundCreateParams['reason'] ) ?? 'requested_by_customer',
+      reason: ( reason as 'requested_by_customer' | 'duplicate' | 'fraudulent' ) ?? 'requested_by_customer',
     };
     if ( amount ) {
       params.amount = amount;
@@ -157,7 +171,7 @@ async function handlePaymentRefund ( request: Request ): Promise<Response> {
   }
 }
 
-async function handleGetPaymentStatus ( request: Request, bookingId: string ): Promise<Response> {
+export async function handleGetPaymentStatus ( request: Request, bookingId: string ): Promise<Response> {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 

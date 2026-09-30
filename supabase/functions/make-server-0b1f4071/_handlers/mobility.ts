@@ -29,12 +29,23 @@ import {
   fetchDriverProfiles,
   buildTrustStatus,
   ensureMobilitySeed,
-  resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './shared.ts';
 
-async function handlePublicMobilitySnapshot ( _request: Request ) {
+import {
+  MobilityBookingType,
+  MobilityCorridorRow,
+  advanceCorridorAfterBooking,
+  buildMobilitySnapshot,
+} from '../_shared/mobility-os-runtime.ts';
+
+import {
+  toNumber,
+} from '../_shared/pricing.ts';
+
+
+export async function handlePublicMobilitySnapshot ( _request: Request ) {
   try {
     const admin = getAdminClient();
     await ensureMobilitySeed( admin );
@@ -80,7 +91,7 @@ async function handlePublicMobilitySnapshot ( _request: Request ) {
   }
 }
 
-async function handleMobilityOSRequest ( request: Request, path: string ) {
+export async function handleMobilityOSRequest ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) return auth.error;
 
@@ -166,9 +177,9 @@ async function handleMobilityOSRequest ( request: Request, path: string ) {
   return undefined;
 }
 
-async function handleGetMobilityLiveRows ( request: Request ) {
+export async function handleGetMobilityLiveRows ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( auth.error ) return auth.error;
+  if ( 'error' in auth ) return auth.error;
 
   const [ { data: trips }, { data: bookings }, { data: packages }, { data: tripPresence } ] =
     await Promise.all( [

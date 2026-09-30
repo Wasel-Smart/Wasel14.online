@@ -23,8 +23,8 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { checkRateLimit } from '../_shared/rate-limiter.ts';
-import { idempotencyMiddleware } from '../_shared/idempotency-middleware.ts';
+import { checkRateLimit } from './_shared/rate-limiter.ts';
+import { idempotencyMiddleware } from './_shared/idempotency-middleware.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -82,7 +82,24 @@ async function runMatchingCycle(): Promise<MatchResult> {
    * We only fetch alerts that have origin/destination points populated.
    * Alerts without coordinates fall back to city-name matching (legacy path).
    */
-  const { data: alerts, error: alertsError } = await admin
+  // The column list is assembled from string concatenation so the worker and
+  // the admin surface cannot drift, but that also defeats PostgREST's column
+  // inference and leaves the row typed as GenericStringError. Name the row
+  // shape the select above actually asks for.
+  type DemandAlertRow = {
+    alert_id: string;
+    user_id: string;
+    origin_city: string | null;
+    destination_city: string | null;
+    requested_date: string;
+    seats_needed: number | null;
+    origin_lat: number;
+    origin_lng: number;
+    destination_lat: number;
+    destination_lng: number;
+  };
+
+  const { data: rawAlerts, error: alertsError } = await admin
     .from('demand_alerts')
     .select(
       'alert_id, user_id, origin_city, destination_city, requested_date, seats_needed, ' +
@@ -96,6 +113,8 @@ async function runMatchingCycle(): Promise<MatchResult> {
     .limit(BATCH_LIMIT);
 
   if (alertsError) throw new Error(`Failed to fetch alerts: ${alertsError.message}`);
+
+  const alerts = (rawAlerts ?? []) as unknown as DemandAlertRow[];
 
   const result: MatchResult = {
     processed: (alerts ?? []).length,

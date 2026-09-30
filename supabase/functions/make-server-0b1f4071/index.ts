@@ -42,18 +42,9 @@ import {
   handleAdminResolveDispute,
   handleAdminDashboardMetrics,
 } from './_handlers/admin.ts';
-import './_handlers/bookings.ts';
-import './_handlers/chat.ts';
-import './_handlers/communications.ts';
-import './_handlers/gdpr.ts';
-import './_handlers/identity.ts';
-import './_handlers/infrastructure.ts';
-import './_handlers/mobility.ts';
-import './_handlers/moderation.ts';
-import './_handlers/packages.ts';
-import './_handlers/payments.ts';
-import './_handlers/trips.ts';
-import './_handlers/trust.ts';
+// Every handler module is imported for its named bindings further down; the
+// bare side-effect imports that used to sit here never registered anything and
+// left the route table referencing functions that did not exist in scope.
 import { handleWalletDispatch } from './_handlers/wallet.ts';
 import {
   handleGetActiveTrip,
@@ -69,6 +60,92 @@ import {
 } from './_handlers/notifications.ts';
 import { handleSubmitReview } from './_handlers/reviews.ts';
 import { handleStripeWebhook, handleCliqWebhook, handleSanadWebhook, handleResendWebhook, handleTwilioWebhook, handleSendSmsHook } from './_handlers/webhooks.ts';
+
+import {
+  handleEnableDriverMode,
+  handleProfileRequest,
+  handleSubmitDriverDocuments,
+  handleSubmitIdentityVerification,
+  handleTwoFactorDisable,
+  handleTwoFactorSetup,
+  handleTwoFactorVerify,
+} from './_handlers/identity.ts';
+
+import {
+  handleCancelTrip,
+  handleGetLiveTrip,
+  handleTripRequest,
+} from './_handlers/trips.ts';
+
+import {
+  handleBookingRequest,
+  handleCanCancelBooking,
+  handleCanRateBooking,
+  handleCancelBooking,
+  handleGetDriverRating,
+  handleSubmitRating,
+} from './_handlers/bookings.ts';
+
+import {
+  handlePackageRequest,
+} from './_handlers/packages.ts';
+
+import {
+  handleApplyModerationMigrations,
+  handleSubmitReport,
+} from './_handlers/moderation.ts';
+
+import {
+  handleGetChatMessages,
+  handleGetChatUnreadCount,
+  handleMarkChatMessagesRead,
+  handleSendChatMessage,
+} from './_handlers/chat.ts';
+
+import {
+  handleGetMobilityLiveRows,
+  handleMobilityOSRequest,
+  handlePublicMobilitySnapshot,
+} from './_handlers/mobility.ts';
+
+import {
+  handleCancelDeletion,
+  handleGetConsent,
+  handleRecordConsent,
+  handleRequestDataExport,
+  handleRequestDeletion,
+} from './_handlers/gdpr.ts';
+
+import {
+  parseWalletRoute,
+} from './_handlers/shared.ts';
+
+import {
+  handleApplyCommunicationMigrations,
+  handleGetCommunicationPreferences,
+  handlePatchCommunicationPreferences,
+  handleProcessCommunicationQueue,
+  handleProviderDiagnostics,
+  handleQueueCommunicationDeliveries,
+  handleSendTestCommunication,
+} from './_handlers/communications.ts';
+
+import {
+  handleConfirmPhoneVerification,
+  handleGetTrustStatus,
+  handleStartPhoneVerification,
+} from './_handlers/trust.ts';
+
+import {
+  handleGetPaymentStatus,
+  handlePaymentIntentCreate,
+  handlePaymentRefund,
+} from './_handlers/payments.ts';
+
+import {
+  handleHealth,
+} from './_handlers/infrastructure.ts';
+
 
 interface RouteDescriptor {
   id: string;
