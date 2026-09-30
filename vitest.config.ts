@@ -4,6 +4,12 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// Vitest only defaults NODE_ENV to "test" when it is unset. A leaked
+// NODE_ENV=production (easy to inherit in a shell that has run `npm run build`)
+// makes React resolve to its production build, where `React.act` does not
+// exist, so every DOM test dies with "React.act is not a function". Pin it.
+process.env.NODE_ENV = 'test';
+
 // Dedicated Vitest config — intentionally excludes @tailwindcss/vite.
 // That plugin accesses Vite internals (plugin.config) that are unavailable
 // inside the Vitest worker context, crashing every test suite with:

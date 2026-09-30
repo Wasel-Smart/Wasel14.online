@@ -1,14 +1,31 @@
 import { vi } from 'vitest';
-import { webcrypto } from 'node:crypto';
 
 // Polyfill Web Crypto API for jsdom — required by src/utils/encryption.ts
 // which uses crypto.subtle (AES-GCM). Node's webcrypto is spec-compliant.
+//
+// jsdom 29 ships crypto.getRandomValues but no crypto.subtle, so this is load
+// bearing. The builtin is imported through a computed specifier with
+// @vite-ignore on purpose: a static `import ... from 'node:crypto'` is rewritten
+// by Vite for the jsdom (client) graph, which externalises node builtins and
+// surfaces as "Cannot find package 'node:crypto'" — that takes down every test
+// suite in the repo, not just this polyfill.
 if (!globalThis.crypto?.subtle) {
-  Object.defineProperty(globalThis, 'crypto', {
-    value: webcrypto,
-    configurable: true,
-    writable: true,
-  });
+  try {
+    const specifier = [ 'node', 'crypto' ].join( ':' );
+    const { webcrypto } = await import(/* @vite-ignore */ specifier) as {
+      webcrypto?: Crypto;
+    };
+    if (webcrypto) {
+      Object.defineProperty(globalThis, 'crypto', {
+        value: webcrypto,
+        configurable: true,
+        writable: true,
+      });
+    }
+  } catch {
+    // Nothing else to try; suites that genuinely need crypto.subtle will fail
+    // with a clear error from the calling code rather than silently.
+  }
 }
 
 // Polyfill for structuredClone in JSDOM environment

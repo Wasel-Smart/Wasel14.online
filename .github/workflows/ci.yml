@@ -100,6 +100,24 @@ jobs:
           path: coverage/
           retention-days: 7
 
+  route-contract:
+    name: Route Contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+      # Reports frontend paths the edge function declares no route for. These
+      # are silent 404s at runtime that no type or unit test can see. Currently
+      # non-blocking because /active-trip, /notifications*, /reviews are
+      # genuinely unimplemented; flip `continue-on-error` off once they land.
+      - name: Frontend paths must exist on the backend
+        continue-on-error: true
+        run: npm run check:routes
+
   backend-wiring:
     name: Backend Wiring
     runs-on: ubuntu-latest
