@@ -5,16 +5,23 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('wasel-language', 'en'));
 });
 
+// The landing hero heading. Keep in sync with HomeHeroSection.tsx.
+const LANDING_HEADING = /shared routes that reduce travel cost/i;
+
+// `load` also waits for third-party fonts/images, which can stall for a minute
+// on a cold Vite dev server. The title and the heading assertions below are what
+// actually prove the app rendered, so wait for DOM content only.
+const GOTO = { waitUntil: 'domcontentloaded' } as const;
+
 test('landing page loads and contains Wasel branding @smoke', async ({ page }) => {
-  await page.goto('/');
-  const title = await page.title();
-  expect(title.toLowerCase()).toContain('wasel');
+  await page.goto('/', GOTO);
+  await expect(page).toHaveTitle(/wasel/i);
 });
 
 test('unauthenticated /app renders the public landing surface @smoke', async ({ page }) => {
-  await page.goto('/app');
-  await expect(page.getByRole('heading', { name: /move across jordan for less/i })).toBeVisible();
-  await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+  await page.goto('/app', GOTO);
+  await expect(page.getByRole('heading', { name: LANDING_HEADING })).toBeVisible();
+  await expect(page.getByRole('button', { name: /sign in/i }).first()).toBeVisible();
 });
 
 test('auth page renders email and password fields @smoke', async ({ page }) => {
@@ -38,8 +45,8 @@ test('register tab renders create account button', async ({ page }) => {
 
 test('authenticated user receives the signed-in landing surface @smoke', async ({ page }) => {
   await seedDemoSession(page, 'en');
-  await page.goto('/app');
-  await expect(page.getByRole('heading', { name: /move across jordan for less/i })).toBeVisible();
+  await page.goto('/app', GOTO);
+  await expect(page.getByRole('heading', { name: LANDING_HEADING })).toBeVisible();
   // Use the avatar button which has a stable name "DR Demo"
   await expect(page.getByRole('button', { name: /DR Demo/i })).toBeVisible();
 });

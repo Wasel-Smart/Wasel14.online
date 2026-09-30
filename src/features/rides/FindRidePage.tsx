@@ -722,7 +722,7 @@ export function FindRidePage() {
                       ? `${selectedSignal.activeSupply} departures`
                       : `${corridorRides.length} departures`,
                     sub: selectedSignal
-                      ? `${selectedSignal.liveBookings} booked Â· ${selectedSignal.activeDemandAlerts} watching`
+                      ? `${selectedSignal.liveBookings} booked · ${selectedSignal.activeDemandAlerts} watching`
                       : 'Live supply on this route',
                     tone: DS.cyan,
                   },
@@ -752,7 +752,7 @@ export function FindRidePage() {
                       ? `${selectedSignal.routeOwnershipScore}/100`
                       : (corridorPlan?.routeMoat ?? 'Growing'),
                     sub: selectedSignal
-                      ? selectedSignal.productionSources.slice(0, 2).join(' Â· ')
+                      ? selectedSignal.productionSources.slice(0, 2).join(' · ')
                       : `${demandStats.active} saved alerts`,
                     tone: DS.cyan,
                   },
@@ -1017,7 +1017,7 @@ export function FindRidePage() {
                   <div>
                     <div style={{ color: C.text, fontWeight: 800 }}>Why this route fits</div>
                     <div style={{ color: DS.muted, fontSize: '0.76rem', marginTop: 2 }}>
-                      Demand signals for {from} â†’ {to}.
+                      Demand signals for {from} → {to}.
                     </div>
                   </div>
                 </div>
@@ -1408,13 +1408,14 @@ export function FindRidePage() {
 
               <div style={{ display: 'grid', gap: 14 }}>
                 {[
-                  { title: t.recentSearches, items: recentSearches, empty: t.searchHelp },
+                  { title: t.recentSearches, items: recentSearches, empty: t.searchHelp, clickable: true },
                   {
                     title: t.bookedTrips,
                     items: bookedRides.map(
                       ride => `${ride.from} to ${ride.to} | ${ride.time} | ${ride.driver.name}`,
                     ),
                     empty: t.noTripsYet,
+                    clickable: false,
                   },
                 ].map(card => (
                   <div
@@ -1429,12 +1430,17 @@ export function FindRidePage() {
                     <div style={{ color: C.text, fontWeight: 800, marginBottom: 12 }}>
                       {card.title}
                     </div>
-                    {recentSearches.length > 0 ? (
+                    {card.items.length > 0 ? (
                       <div style={{ display: 'grid', gap: 10 }}>
-                        {recentSearches.map(item => (
+                        {card.items.map(item => (
                           <button
                             key={item}
+                            type="button"
                             onClick={() => {
+                              if (!card.clickable) {
+                                openMyTrips();
+                                return;
+                              }
                               const parts = item.split(' to ');
                               if (parts[0]) {setFrom(parts[0]);}
                               const toPart = parts[1]?.split(' on ')[0];
@@ -1462,7 +1468,7 @@ export function FindRidePage() {
                         ))}
                       </div>
                     ) : (
-                      <div style={{ color: DS.muted, fontSize: '0.8rem' }}>{t.searchHelp}</div>
+                      <div style={{ color: DS.muted, fontSize: '0.8rem' }}>{card.empty}</div>
                     )}
                   </div>
                 ))}

@@ -91,8 +91,35 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 5173,
     strictPort: false,
-    open: true,
+    // Never pop a browser window for CI / Playwright runs (scripts/start-playwright-dev.mjs
+    // sets WASEL_NO_OPEN). Interactive `npm run dev` still opens one.
+    open: !process.env.CI && process.env.WASEL_NO_OPEN !== 'true',
     host: '127.0.0.1',
+    // The project lives under OneDrive and contains large non-web trees. Watching
+    // them slows startup and can trigger spurious reloads mid-test.
+    watch: {
+      ignored: [
+        '**/.kilo/**',
+        '**/.venv/**',
+        '**/mobile/**',
+        '**/test-results/**',
+        '**/artifacts/**',
+        '**/dist/**',
+      ],
+    },
+    // Pre-transform the landing/auth/core-flow modules at startup so the first
+    // request does not pay the full cold-compile cost.
+    warmup: {
+      clientFiles: [
+        './src/main.tsx',
+        './src/App.tsx',
+        './src/wasel-routes.tsx',
+        './src/features/home/HomePage.tsx',
+        './src/features/rides/FindRidePage.tsx',
+        './src/features/rides/OfferRidePage.tsx',
+        './src/features/packages/PackagesPage.tsx',
+      ],
+    },
   },
 
   css: {
@@ -105,13 +132,27 @@ export default defineConfig(({ mode }) => ({
   },
 
   optimizeDeps: {
+    // Scan ONLY the real app entry. By default Vite crawls every index.html under
+    // the project root, including the copies in .kilo/worktrees/* and mobile/,
+    // which discovers extra deps late and triggers a mid-session re-optimise +
+    // full page reload (the cause of pages hanging on the loading screen).
+    entries: ['index.html'],
     include: [
       'react',
       'react-dom',
+      'react-router',
       '@supabase/supabase-js',
       '@tanstack/react-query',
       'lucide-react',
       'sonner',
+      'framer-motion',
+      'motion/react',
+      'recharts',
+      'leaflet',
+      'three',
+      '@react-three/fiber',
+      '@react-three/drei',
+      'zod',
     ],
   },
 }));

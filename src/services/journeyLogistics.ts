@@ -1,5 +1,6 @@
 import { API_URL, createEdgeHeaders, fetchWithRetry, getAuthDetails } from './core';
 import { supabase } from '../utils/supabase/client';
+import { isLocalOnlySession } from '../utils/localSession';
 import {
   createDirectPackage,
   getDirectPackageByTrackingId,
@@ -466,10 +467,13 @@ export async function createConnectedRide (
     } );
     return created;
   } catch ( error ) {
-    if ( supabase ) {
+    // A real backend is configured and this is a real user session: surface the
+    // failure so the driver knows the ride was NOT published.
+    if ( supabase && !isLocalOnlySession() ) {
       throw error instanceof Error ? error : new Error( 'Ride could not be published.' );
     }
-    // No Supabase backend configured (E2E local mode) — persist locally.
+    // No backend, or a local/E2E demo session that has no real Supabase token —
+    // persist locally so the core offer-ride workflow still completes.
     saveRides( [ ride ], getConnectedRides() );
     void trackGrowthEvent( {
       userId: input.ownerId,

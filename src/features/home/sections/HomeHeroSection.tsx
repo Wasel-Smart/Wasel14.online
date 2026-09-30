@@ -273,7 +273,7 @@ export function HomeHeroSection ( {
                 ? `أهلاً بعودتك، ${firstName}. واصل يربط الركاب والسائقين عبر مسارات مشتركة لتقليل التكلفة.`
                 : `Welcome back, ${firstName}. Wasel connects riders and drivers through shared routes to reduce cost.`)
             : (ar
-                ? 'وصل يربط الركاب والسائقين عبر مسارات مشتركة لتقليل التكلفة. احجز رحلة، اعرض مسارًا، أو انضم للشبكة في الأردن.'
+                ? 'واصل يربط الركاب والسائقين عبر مسارات مشتركة لتقليل التكلفة. احجز رحلة، اعرض مسارًا، أو انضم للشبكة في الأردن.'
                 : 'Wasel connects riders and drivers through shared routes to reduce cost. Book a ride, offer a route, or join the network across Jordan.') }
         </p>
 

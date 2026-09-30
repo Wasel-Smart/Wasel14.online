@@ -26,6 +26,7 @@ import {
 } from './directSupabase';
 import { trackGrowthEvent } from './growthEngine';
 import { supabase } from '../utils/supabase/client';
+import { isLocalOnlySession } from '../utils/localSession';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -268,12 +269,14 @@ export async function createRideBooking ( input: {
     } );
     persisted = result.booking;
   } catch ( error ) {
-    if ( supabase ) {
+    // Real backend + real user session: surface the failure, never fake a booking.
+    if ( supabase && !isLocalOnlySession() ) {
       throw new Error(
         `Booking could not be created: ${ error instanceof Error ? error.message : String( error ) }`,
       );
     }
-    // No Supabase backend configured (E2E local mode) — proceed with a local-only booking record.
+    // No backend, or a local/E2E demo session with no real Supabase token —
+    // proceed with a local-only booking record.
   }
 
   // ── 2. Build canonical record using the persisted ID (or local fallback) ───

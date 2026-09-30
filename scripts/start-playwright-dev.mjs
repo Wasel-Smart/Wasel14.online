@@ -12,6 +12,8 @@ const child = spawn(command, commandArgs, {
   stdio: 'inherit',
   env: {
     ...process.env,
+    // Do not open a real browser window for the test server (see vite.config.ts).
+    WASEL_NO_OPEN: 'true',
     VITE_ENABLE_DEMO_DATA: useDemoData ? 'true' : 'false',
     // Signal to AuthContext to honour the localStorage session seed
     // even when a real Supabase project is configured in the environment.
