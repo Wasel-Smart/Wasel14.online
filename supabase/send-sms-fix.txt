@@ -1,0 +1,4 @@
+﻿[auth.hook.send_sms]
+enabled = false
+uri = "https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/auth/hooks/send-sms"
+

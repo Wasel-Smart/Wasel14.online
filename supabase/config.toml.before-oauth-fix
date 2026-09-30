@@ -97,24 +97,25 @@ message_service_sid = ""
 auth_token = ""
 
 [auth.sms.twilio_verify]
-enabled = false
-account_sid = ""
-message_service_sid = ""
-auth_token = ""
+enabled = true
+account_sid = "env(SUPABASE_AUTH_SMS_TWILIO_ACCOUNT_SID)"
+message_service_sid = "env(SUPABASE_AUTH_SMS_TWILIO_VERIFY_SERVICE_SID)"
+auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+
 [auth.external.google]
-enabled = false
-client_id = ""
-secret = ""
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
 redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"
 skip_nonce_check = false
 email_optional = true
+
 [auth.external.facebook]
-enabled = false
-client_id = ""
-secret = ""
+enabled = true
+client_id = "env(SUPABASE_AUTH_FACEBOOK_CLIENT_ID)"
 redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"
 skip_nonce_check = false
 email_optional = true
+
 [auth.web3.solana]
 enabled = true
 

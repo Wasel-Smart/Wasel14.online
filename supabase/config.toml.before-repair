@@ -1,0 +1,235 @@
+# ============================================================
+# WASEL14.ONLINE - SUPABASE CONFIG + DEPLOY REPAIR
+# CORRECTED VERSION
+# ============================================================
+
+$ErrorActionPreference = "Stop"
+
+$ProjectPath = "C:\Users\user\OneDrive\Desktop\Wasel14.online"
+$ConfigPath  = Join-Path $ProjectPath "supabase\config.toml"
+$BackupPath  = Join-Path $ProjectPath "supabase\config.toml.before-repair"
+
+Write-Host ""
+Write-Host "=============================================" -ForegroundColor Cyan
+Write-Host " Wasel14.online - Supabase Repair" -ForegroundColor Cyan
+Write-Host "=============================================" -ForegroundColor Cyan
+Write-Host ""
+
+# ------------------------------------------------------------
+# 1. Project
+# ------------------------------------------------------------
+
+if (-not (Test-Path $ProjectPath)) {
+    Write-Host "ERROR: Project directory not found:" -ForegroundColor Red
+    Write-Host $ProjectPath
+    exit 1
+}
+
+Set-Location $ProjectPath
+
+Write-Host "[1/6] Project:" -ForegroundColor Yellow
+Write-Host (Get-Location)
+Write-Host ""
+
+# ------------------------------------------------------------
+# 2. Config
+# ------------------------------------------------------------
+
+if (-not (Test-Path $ConfigPath)) {
+    Write-Host "ERROR: $ConfigPath not found." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[2/6] Backing up config..." -ForegroundColor Yellow
+
+Copy-Item $ConfigPath $BackupPath -Force
+
+Write-Host "Backup:" -ForegroundColor Green
+Write-Host $BackupPath
+Write-Host ""
+
+# ------------------------------------------------------------
+# 3. Read config
+# ------------------------------------------------------------
+
+$lines = @(Get-Content $ConfigPath)
+
+$startIndex = -1
+$endIndex   = -1
+
+for ($i = 0; $i -lt $lines.Count; $i++) {
+
+    $trimmed = $lines[$i].Trim()
+
+    if ($trimmed -eq "[auth.hook.send_sms]") {
+        $startIndex = $i
+        break
+    }
+}
+
+if ($startIndex -lt 0) {
+    Write-Host "ERROR: [auth.hook.send_sms] was not found." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Your original config is safe at:" -ForegroundColor Yellow
+    Write-Host $BackupPath
+    exit 1
+}
+
+for ($i = $startIndex + 1; $i -lt $lines.Count; $i++) {
+
+    $trimmed = $lines[$i].Trim()
+
+    if ($trimmed -match '^\[.+\]$') {
+        $endIndex = $i
+        break
+    }
+}
+
+if ($endIndex -lt 0) {
+    $endIndex = $lines.Count
+}
+
+# ------------------------------------------------------------
+# 4. Replace ONLY auth.hook.send_sms section
+# ------------------------------------------------------------
+
+$newHook = @(
+    "[auth.hook.send_sms]"
+    "enabled = false"
+    'uri = "https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/auth/hooks/send-sms"'
+    ""
+)
+
+$before = @()
+
+if ($startIndex -gt 0) {
+    $before = $lines[0..($startIndex - 1)]
+}
+
+$after = @()
+
+if ($endIndex -lt $lines.Count) {
+    $after = $lines[$endIndex..($lines.Count - 1)]
+}
+
+$updatedLines = @($before) + @($newHook) + @($after)
+
+Set-Content -Path $ConfigPath -Value $updatedLines -Encoding UTF8
+
+Write-Host "[3/6] Auth hook configuration repaired." -ForegroundColor Green
+Write-Host ""
+
+# ------------------------------------------------------------
+# 5. Verify the resulting section
+# ------------------------------------------------------------
+
+Write-Host "Resulting [auth.hook.send_sms] section:" -ForegroundColor Cyan
+Write-Host "---------------------------------------------"
+
+$checkLines = @(Get-Content $ConfigPath)
+
+$printing = $false
+
+foreach ($line in $checkLines) {
+
+    if ($line.Trim() -eq "[auth.hook.send_sms]") {
+        $printing = $true
+    }
+
+    if ($printing) {
+        Write-Host $line
+    }
+
+    if ($printing -and
+        $line.Trim() -eq "[auth.sms.twilio]") {
+        break
+    }
+}
+
+Write-Host "---------------------------------------------"
+Write-Host ""
+
+# ------------------------------------------------------------
+# 6. Link project
+# ------------------------------------------------------------
+
+Write-Host "[4/6] Linking Supabase project..." -ForegroundColor Yellow
+Write-Host ""
+
+supabase link --project-ref zexlxabdcsjefptmjhuq
+
+if ($LASTEXITCODE -ne 0) {
+
+    Write-Host ""
+    Write-Host "SUPABASE LINK FAILED." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Original config backup:" -ForegroundColor Yellow
+    Write-Host $BackupPath
+    Write-Host ""
+
+    exit $LASTEXITCODE
+}
+
+Write-Host ""
+Write-Host "Supabase link succeeded." -ForegroundColor Green
+Write-Host ""
+
+# ------------------------------------------------------------
+# 7. Deploy
+# ------------------------------------------------------------
+
+Write-Host "[5/6] Deploying Edge Function..." -ForegroundColor Yellow
+Write-Host ""
+
+supabase functions deploy make-server-0b1f4071
+
+if ($LASTEXITCODE -ne 0) {
+
+    Write-Host ""
+    Write-Host "FUNCTION DEPLOYMENT FAILED." -ForegroundColor Red
+    Write-Host ""
+    exit $LASTEXITCODE
+}
+
+Write-Host ""
+Write-Host "Edge Function deployment succeeded." -ForegroundColor Green
+Write-Host ""
+
+# ------------------------------------------------------------
+# 8. Verify
+# ------------------------------------------------------------
+
+Write-Host "[6/6] Running wiring verification..." -ForegroundColor Yellow
+Write-Host ""
+
+npm run verify:wiring
+
+$verifyCode = $LASTEXITCODE
+
+Write-Host ""
+Write-Host "=============================================" -ForegroundColor Cyan
+
+if ($verifyCode -eq 0) {
+
+    Write-Host " ALL CHECKS PASSED" -ForegroundColor Green
+    Write-Host "=============================================" -ForegroundColor Cyan
+}
+else {
+
+    Write-Host " DEPLOYMENT COMPLETE" -ForegroundColor Green
+    Write-Host " VERIFICATION HAS REMAINING FAILURES" -ForegroundColor Yellow
+    Write-Host "=============================================" -ForegroundColor Cyan
+
+    Write-Host ""
+    Write-Host "The Supabase configuration and deployment succeeded." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Any failures printed above are now application/deployment" -ForegroundColor Yellow
+    Write-Host "issues that we can fix next." -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "Original config backup:" -ForegroundColor Cyan
+Write-Host $BackupPath
+Write-Host ""
+Write-Host "DONE." -ForegroundColor Green
+Write-Host ""
