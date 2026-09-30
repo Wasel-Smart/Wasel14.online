@@ -47,6 +47,7 @@
         "secrets:check": "node scripts/validate-no-secrets.mjs",
         "env:check": "node scripts/check-env-exposure.mjs",
         "edge:check": "deno check supabase/functions/make-server-0b1f4071/index.ts",
+        "verify:wiring": "node scripts/verify-frontend-backend-wiring.mjs",
         "secrets:migrate": "node scripts/migrate-secrets-offsite.mjs"
     },
     "dependencies": {

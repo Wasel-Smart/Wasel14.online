@@ -100,6 +100,29 @@ jobs:
           path: coverage/
           retention-days: 7
 
+  backend-wiring:
+    name: Backend Wiring
+    runs-on: ubuntu-latest
+    # Probes the live deployment, so it only runs where real credentials exist.
+    # Without this, a function whose service-role key is invalid still passes
+    # lint, typecheck, deno check and the unit suite: /health returns 200 while
+    # every route that reads the database 500s.
+    if: ${{ secrets.VITE_SUPABASE_URL != '' && secrets.VITE_SUPABASE_ANON_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+      - name: Verify frontend can reach the backend
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_EDGE_FUNCTIONS_BASE_URL: ${{ secrets.VITE_EDGE_FUNCTIONS_BASE_URL }}
+          VITE_EDGE_FUNCTION_NAME: ${{ vars.VITE_EDGE_FUNCTION_NAME || 'make-server-0b1f4071' }}
+        run: node scripts/verify-frontend-backend-wiring.mjs
+
   build:
     name: Build
     runs-on: ubuntu-latest

@@ -15,6 +15,12 @@ export interface FetchWithRetryOptions extends RequestInit {
   timeout?: number;
 }
 
+// Public, read-only map endpoints the app calls directly (mosque lookup and
+// driving routes). They are not part of the Supabase backend, so they have to
+// be allowlisted explicitly or fetchWithRetry rejects them as untrusted.
+// Neither host accepts credentials, so allowing them cannot leak a token.
+const TRUSTED_MAP_HOSTS = ['overpass-api.de', 'router.project-osrm.org'];
+
 export async function fetchWithRetry(
   url: string,
   options: FetchWithRetryOptions = {},
@@ -28,9 +34,13 @@ export async function fetchWithRetry(
   }
 
   const { allowedApiDomain } = getConfig();
-  const allowedDomains = ['supabase.co', 'supabase.net', 'localhost', allowedApiDomain].filter(
-    Boolean,
-  );
+  const allowedDomains = [
+    'supabase.co',
+    'supabase.net',
+    'localhost',
+    allowedApiDomain,
+    ...TRUSTED_MAP_HOSTS,
+  ].filter(Boolean);
 
   if (!validateApiUrl(url, allowedDomains)) { // nosec CWE-918
     throw new Error('Invalid or unauthorized URL');
