@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import {
   useNavigate as useRouterNavigate,
   type NavigateOptions,
@@ -70,14 +71,20 @@ export type SafeNavigate = (to?: To | number, options?: NavigateOptions) => void
 export function useIframeSafeNavigate(): SafeNavigate {
   const navigate = useRouterNavigate();
 
-  return ((to: To | number = '/home', options?: NavigateOptions) => {
-    if (typeof to === 'number') {
-      navigate(to);
-      return;
-    }
+  // Must be memoized: callers put this in effect dependency arrays (the OAuth
+  // callback page does), and a fresh closure every render would re-run those
+  // effects on every render.
+  return useCallback<SafeNavigate>(
+    (to = '/home', options) => {
+      if (typeof to === 'number') {
+        navigate(to);
+        return;
+      }
 
-    navigate(normalizeTo(to), options);
-  }) as SafeNavigate;
+      navigate(normalizeTo(to), options);
+    },
+    [navigate],
+  );
 }
 
 export { useIframeSafeNavigate as useNavigate };

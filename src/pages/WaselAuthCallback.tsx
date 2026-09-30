@@ -36,7 +36,15 @@ export default function WaselAuthCallback() {
   const callbackType = useMemo(() => readCallbackParam('type'), []);
   const returnTo = useMemo(() => normalizeReturnToPath(readCallbackParam('returnTo')), []);
   const callbackError = useMemo(() => {
-    const raw = readCallbackParam('error_description') || readCallbackParam('error') || '';
+    // A cancelled social sign-in returns here with error=access_denied and a
+    // provider description like "Permissions error", which tells the user
+    // nothing about what happened. Say what actually occurred instead.
+    const errorCode = readCallbackParam('error');
+    if (errorCode === 'access_denied' || errorCode === 'user_cancelled') {
+      return tx('waselAuthCallback.sign_in_cancelled');
+    }
+
+    const raw = readCallbackParam('error_description') || errorCode;
     if (!raw) {return '';}
     try {
       // Sanitize: only allow printable ASCII, strip control chars and HTML
@@ -406,6 +414,32 @@ export default function WaselAuthCallback() {
         >
           {message}
         </p>
+        {/* A cancelled or failed social sign-in lands here with no session and
+            no way forward, so offer the same way back to the form that the
+            recovery branch uses instead of stranding the user. */}
+        {state === 'error' ? (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/app/auth?tab=signin&returnTo=${encodeURIComponent(returnTo)}`, {
+                replace: true,
+              })
+            }
+            style={{
+              marginTop: 20,
+              minHeight: 42,
+              borderRadius: 12,
+              border: '1px solid rgba(0,200,232,0.18)',
+              background: 'transparent',
+              color: '#EFF6FF',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {tx('waselAuthCallback.back_to_sign_in')}
+          </button>
+        ) : null}
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     </div>
