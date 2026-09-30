@@ -127,6 +127,25 @@ async function resolveSessionToken (): Promise<string | undefined> {
   return data.session?.access_token ?? undefined;
 }
 
+// A caller that passed an explicit `accessToken` already built its own
+// Authorization header (see getApiHeaders). Recover that token so it can be
+// honoured; getApiHeaders' anon-key fallback must never be the one that wins.
+function readCallerBearer ( headers: HeadersInit | undefined ): string | undefined {
+  if ( !headers ) { return undefined; }
+  const value = new Headers( headers ).get( 'Authorization' ) ?? '';
+  return value.startsWith( 'Bearer ' ) ? value.slice( 7 ) : undefined;
+}
+
+// Explicit caller token first, then the ambient session, and only then the
+// anon-key fallback inside getApiHeaders. The apiGet/apiPost/... helpers
+// pre-build their own headers, so a bearer equal to the anon key just means
+// "no token supplied" rather than a deliberate choice.
+function resolveAuthToken ( headers: HeadersInit | undefined, sessionToken: string | undefined ): string | undefined {
+  const callerBearer = readCallerBearer( headers );
+  if ( callerBearer && callerBearer !== publicAnonKey ) { return callerBearer; }
+  return sessionToken;
+}
+
 function parseApiErrorPayload (
   payload: unknown,
   statusText: string,
@@ -169,6 +188,7 @@ export async function apiRequest<T = unknown> (
   const url = endpoint.startsWith( 'http' ) ? endpoint : `${ API_BASE_URL }${ endpoint }`;
   const requestId = createCorrelationId();
   const sessionToken = await resolveSessionToken();
+  const authToken = resolveAuthToken( options.headers, sessionToken );
   let lastError: Error | null = null;
 
   for ( let attempt = 0; attempt <= retries; attempt += 1 ) {
@@ -177,9 +197,14 @@ export async function apiRequest<T = unknown> (
     try {
       const response = await fetchWithTimeout( url, {
         ...options,
+        // Caller headers go first so the resolved auth headers below win.
+        // The apiGet/apiPost/... helpers build their own headers from an
+        // `accessToken` argument that is usually undefined, which made
+        // getApiHeaders() fall back to the anon key and overwrite the real
+        // session bearer — every request through adminApi went out anonymous.
         headers: {
-          ...getApiHeaders( sessionToken, requestId, method ),
           ...options.headers,
+          ...getApiHeaders( authToken, requestId, method ),
         },
       } );
 

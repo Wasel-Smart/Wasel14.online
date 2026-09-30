@@ -1,4 +1,4 @@
-import { API_URL, fetchWithRetry, getAuthDetails } from './core';
+import { API_URL, createEdgeHeaders, fetchWithRetry, getAuthDetails } from './core';
 import { supabase } from '../utils/supabase/client';
 import {
   createDirectPackage,
@@ -666,16 +666,24 @@ export async function createConnectedPackage ( input: {
   return fallbackPackage;
 }
 
+async function buildTrackedPackageHeaders (): Promise<Headers> {
+  const { token } = await getAuthDetails();
+  // No CSRF token: this is a read-only GET, and the edge only demands the
+  // CSRF header on mutating requests.
+  return createEdgeHeaders({ 'Content-Type': 'application/json' }, token, false);
+}
+
 async function fetchRemotePackageRecord (
   normalizedTrackingId: string,
 ): Promise<Record<string, unknown> | null> {
   if ( API_URL ) {
+    // The edge requires apikey + a Bearer session token on this route and
+    // rejects unauthenticated calls before the handler runs, so a bare fetch
+    // with only Content-Type could only ever come back 401.
     const response = await fetchWithRetry(
       `${ API_URL }/packages/track/${ encodeURIComponent( normalizedTrackingId ) }`,
       {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await buildTrackedPackageHeaders(),
       },
     );
     if ( !response.ok ) { return null; }
