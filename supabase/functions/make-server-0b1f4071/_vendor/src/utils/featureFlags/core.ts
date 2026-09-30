@@ -26,7 +26,9 @@ export function readRuntimeEnv(key: string): string | undefined {
   const viteEnv = (import.meta as unknown as { env?: RuntimeEnvRecord }).env;
   if (viteEnv) {
     const value = viteEnv[key];
-    if (typeof value === 'string') return value;
+    if (typeof value === 'string') {
+      return value;
+    }
   }
 
   const deno = (globalThis as unknown as { Deno?: { env?: { get?: (k: string) => string | undefined } } }).Deno;

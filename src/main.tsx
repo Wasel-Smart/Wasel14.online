@@ -149,6 +149,15 @@ const environmentIsValid = (() => {
     paragraph.textContent = 'The application is not configured correctly. Contact support.';
     configErrorDiv.appendChild(heading);
     configErrorDiv.appendChild(paragraph);
+    // The guard messages only name variables (never values), so they are safe
+    // to show and tell the operator exactly what to fix in the Vercel dashboard.
+    if (envError instanceof Error && envError.message) {
+      const detail = document.createElement('p');
+      detail.style.opacity = '0.75';
+      detail.style.fontSize = '0.9rem';
+      detail.textContent = `Reason: ${envError.message}`;
+      configErrorDiv.appendChild(detail);
+    }
     if (rootElement) {
       rootElement.innerHTML = '';
       rootElement.appendChild(configErrorDiv);
