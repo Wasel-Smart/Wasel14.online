@@ -46,6 +46,11 @@ import {
   resolveAccessRole,
 } from '../_shared/rbac.ts';
 
+// Alias for the service-role client returned by getAdminClient(). Handler
+// modules that only need the client type should import this rather than
+// threading `ReturnType<typeof getAdminClient>` through every signature.
+export type AdminClient = ReturnType<typeof getAdminClient>;
+
 export const SUPABASE_URL = Deno.env.get( 'SUPABASE_URL' ) ?? '';
 export const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get( 'SUPABASE_SERVICE_ROLE_KEY' ) ?? '';
 export const SUPABASE_DB_URL = Deno.env.get( 'SUPABASE_DB_URL' ) ?? '';

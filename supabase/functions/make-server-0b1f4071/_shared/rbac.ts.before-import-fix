@@ -1,5 +1,5 @@
 /**
- * Wasel RBAC â€” Deno/Edge Function Entry Point (make-server)
+ * Wasel RBAC — Deno/Edge Function Entry Point (make-server)
  *
  * Re-exports from the canonical @wasel/rbac package (deno entry point).
  * The actual implementation lives in packages/rbac/src/index.ts
@@ -17,4 +17,4 @@ export {
   VALID_ROLES_DENO as VALID_ROLES,
   type AccessRole,
   type AccessPermission,
-} from '../../../../packages/rbac/src/index.ts';
+} from '../../packages/rbac/deno/index.ts';

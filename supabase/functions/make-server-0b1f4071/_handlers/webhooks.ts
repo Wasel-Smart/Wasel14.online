@@ -27,10 +27,8 @@ import {
   mapBookingRow,
   mapPackageRow,
   fetchDriverProfiles,
-  authorizeTripOwner,
   buildTrustStatus,
   ensureMobilitySeed,
-  handleWalletDispatch,
   resolveRoute,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
@@ -39,7 +37,7 @@ import {
   constantTimeEquals,
 } from './shared.ts';
 
-async function handleStripeWebhook ( request: Request ) {
+export async function handleStripeWebhook ( request: Request ) {
   if ( !STRIPE_WEBHOOK_SECRET ) {
     return json( { error: 'Stripe webhook secret is not configured.' }, 503 );
   }
@@ -156,7 +154,7 @@ async function handleStripeWebhook ( request: Request ) {
   return json( { received: true, ignored: true } );
 }
 
-async function handleCliqWebhook ( request: Request ) {
+export async function handleCliqWebhook ( request: Request ) {
   if ( !CLIQ_WEBHOOK_SECRET ) {
     return json( { error: 'CliQ webhook secret is not configured.' }, 503 );
   }
@@ -219,7 +217,7 @@ async function handleCliqWebhook ( request: Request ) {
   return json( { received: true, transactionId, pending: true } );
 }
 
-async function handleSanadWebhook ( request: Request ) {
+export async function handleSanadWebhook ( request: Request ) {
   if ( !SANAD_WEBHOOK_SECRET ) {
     return json( { error: 'Sanad webhook secret is not configured.' }, 503 );
   }
@@ -285,7 +283,7 @@ async function handleSanadWebhook ( request: Request ) {
   return json( { received: true, providerReference, sanadStatus, updatedUsers: userIds.length } );
 }
 
-async function handleResendWebhook ( request: Request ) {
+export async function handleResendWebhook ( request: Request ) {
   const url = new URL( request.url );
   if ( !hasValidWebhookToken( url, deliveryEnv.communicationWebhookToken ) ) {
     return json( { error: 'Invalid webhook token' }, 401 );
@@ -323,7 +321,7 @@ async function handleResendWebhook ( request: Request ) {
   return json( { received: true, status } );
 }
 
-async function handleTwilioWebhook ( request: Request ) {
+export async function handleTwilioWebhook ( request: Request ) {
   const url = new URL( request.url );
   if ( !hasValidWebhookToken( url, deliveryEnv.communicationWebhookToken ) ) {
     return json( { error: 'Invalid webhook token' }, 401 );

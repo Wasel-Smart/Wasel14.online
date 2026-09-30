@@ -27,10 +27,8 @@ import {
   mapBookingRow,
   mapPackageRow,
   fetchDriverProfiles,
-  authorizeTripOwner,
   buildTrustStatus,
   ensureMobilitySeed,
-  handleWalletDispatch,
   logUnhandledRouteError,
   sanitizedUnhandledErrorResponse,
 } from './_handlers/shared.ts';
@@ -56,7 +54,7 @@ import './_handlers/packages.ts';
 import './_handlers/payments.ts';
 import './_handlers/trips.ts';
 import './_handlers/trust.ts';
-import './_handlers/wallet.ts';
+import { handleWalletDispatch } from './_handlers/wallet.ts';
 import {
   handleGetActiveTrip,
   handleSetActiveTrip,
