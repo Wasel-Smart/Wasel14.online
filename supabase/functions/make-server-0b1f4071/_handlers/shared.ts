@@ -401,6 +401,8 @@ export function getAdminClient () {
   } );
 }
 
+export type AdminClient = ReturnType<typeof getAdminClient>;
+
 export async function authenticateRequest ( request: Request ) {
   const authorization = request.headers.get( 'Authorization' ) ?? '';
   const token = authorization.startsWith( 'Bearer ' ) ? authorization.slice( 7 ) : '';
@@ -567,6 +569,28 @@ export function formatTime ( value: unknown ): string {
   const date = new Date( String( value ?? '' ) );
   if ( Number.isNaN( date.getTime() ) ) return String( value ?? '' ).slice( 0, 5 ) || '08:00';
   return date.toISOString().slice( 11, 16 );
+}
+
+export function isPlainObject ( value: unknown ): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray( value );
+}
+
+/**
+ * Strip markup and control characters from user-supplied text before it is
+ * persisted or echoed back. The public.notifications trigger chain only covers
+ * users/trips/packages/bookings, so free-text fields written by the edge
+ * function (notification titles, review comments) have to be cleaned here.
+ * Length is clamped so a single request cannot bloat a row.
+ */
+export function sanitizePlainText ( value: unknown, maxLength = 500 ): string {
+  return String( value ?? '' )
+    .replace( /<[^>]*>/g, '' )
+    .replace( /(javascript:|data:|vbscript:)/gi, '' )
+    // eslint-disable-next-line no-control-regex
+    .replace( /[\u0000-\u001F\u007F]/g, ' ' )
+    .replace( /\s+/g, ' ' )
+    .trim()
+    .slice( 0, maxLength );
 }
 
 export async function authenticateAuthUser ( request: Request ) {

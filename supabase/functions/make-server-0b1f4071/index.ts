@@ -57,6 +57,19 @@ import './_handlers/payments.ts';
 import './_handlers/trips.ts';
 import './_handlers/trust.ts';
 import './_handlers/wallet.ts';
+import {
+  handleGetActiveTrip,
+  handleSetActiveTrip,
+  handlePatchActiveTrip,
+  handleClearActiveTrip,
+} from './_handlers/activeTrip.ts';
+import {
+  handleGetNotifications,
+  handleMarkNotificationRead,
+  handleSendPushNotification,
+  handleSetPushPreference,
+} from './_handlers/notifications.ts';
+import { handleSubmitReview } from './_handlers/reviews.ts';
 import { handleStripeWebhook, handleCliqWebhook, handleSanadWebhook, handleResendWebhook, handleTwilioWebhook, handleSendSmsHook } from './_handlers/webhooks.ts';
 
 interface RouteDescriptor {
@@ -166,6 +179,70 @@ const ROUTES: RouteDescriptor[] = [
     methods: [ 'GET' ],
     test: ( path ) => path === '/live-trip',
     handle: ( request ) => handleGetLiveTrip( request ),
+  },
+  // ── Ride-in-progress state ────────────────────────────────────────────────
+  // One record per user, shared by the Dashboard banner and LiveTripTracking so
+  // a reload restores the ride. Mutating verbs require the x-csrf-token header
+  // that fetchWithRetry attaches centrally.
+  {
+    id: 'active-trip-get',
+    methods: [ 'GET' ],
+    test: ( path ) => path === '/active-trip',
+    handle: ( request ) => handleGetActiveTrip( request ),
+  },
+  {
+    id: 'active-trip-set',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/active-trip',
+    handle: ( request ) => handleSetActiveTrip( request ),
+  },
+  {
+    id: 'active-trip-patch',
+    methods: [ 'PATCH' ],
+    test: ( path ) => path === '/active-trip',
+    handle: ( request ) => handlePatchActiveTrip( request ),
+  },
+  {
+    id: 'active-trip-clear',
+    methods: [ 'DELETE' ],
+    test: ( path ) => path === '/active-trip',
+    handle: ( request ) => handleClearActiveTrip( request ),
+  },
+  // ── Notifications ────────────────────────────────────────────────────────
+  // The literal sub-paths are registered before the {id}/read pattern so a
+  // notification type can never shadow a route name.
+  {
+    id: 'notifications-list',
+    methods: [ 'GET' ],
+    test: ( path ) => path === '/notifications',
+    handle: ( request ) => handleGetNotifications( request ),
+  },
+  {
+    id: 'notifications-send-push',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/notifications/send-push',
+    handle: ( request ) => handleSendPushNotification( request ),
+  },
+  {
+    id: 'notifications-push-pref',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/notifications/push-pref',
+    handle: ( request ) => handleSetPushPreference( request ),
+  },
+  {
+    id: 'notifications-mark-read',
+    methods: [ 'PATCH' ],
+    test: ( path ) => /^\/notifications\/[^/]+\/read$/.test( path ),
+    handle: ( request, path ) =>
+      handleMarkNotificationRead( request, decodeURIComponent( path.split( '/' )[ 2 ] ) ),
+  },
+  // ── Post-ride review ─────────────────────────────────────────────────────
+  // Distinct from /ratings: see the contract note in _handlers/reviews.ts.
+  {
+    id: 'reviews-submit',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/reviews',
+    handle: ( request ) => handleSubmitReview( request ),
   },
   {
     id: 'gdpr-consents-post',

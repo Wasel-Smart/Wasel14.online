@@ -111,11 +111,10 @@ jobs:
           cache: 'npm'
       - run: npm ci --legacy-peer-deps
       # Reports frontend paths the edge function declares no route for. These
-      # are silent 404s at runtime that no type or unit test can see. Currently
-      # non-blocking because /active-trip, /notifications*, /reviews are
-      # genuinely unimplemented; flip `continue-on-error` off once they land.
+      # are silent 404s at runtime that no type or unit test can see. This is a
+      # hard gate: /active-trip, /notifications* and /reviews are implemented, so
+      # a new frontend call without a matching route must fail CI.
       - name: Frontend paths must exist on the backend
-        continue-on-error: true
         run: npm run check:routes
 
   backend-wiring:
