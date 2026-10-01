@@ -204,14 +204,14 @@ function ProfilePageContent({
               </WaselButton>
               <WaselButton
                 variant="outline"
-                onClick={() => { void nav(); }}
+                onClick={() => { nav('/app/trust'); }}
                 className="border-white/15 bg-white/5 text-white hover:bg-white/10"
               >
                 {t('profileExpanded.trustCenter')}
               </WaselButton>
               <WaselButton
                 variant="outline"
-                onClick={() => { void nav(); }}
+                onClick={() => { nav('/app/settings'); }}
                 className="border-white/15 bg-white/5 text-white hover:bg-white/10"
               >
                 {t('profileExpanded.settings')}
@@ -471,14 +471,14 @@ function ProfilePageContent({
                   {item.status}
                 </span>
               }
-              onClick={() => { void nav(); }}
+              onClick={() => { nav('/app/trust'); }}
             />
           ))}
           <SharedRow
             label={t('profileExpanded.operationalStanding')}
             value={`${trustTier} - ${memberLabel}`}
             icon={<CheckCircle size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/trust'); }}
           />
         </SharedSection>
 
@@ -550,19 +550,19 @@ function ProfilePageContent({
               label={t('profileExpanded.myVehicle')}
               value={t('profileExpanded.notAddedYet')}
               icon={<Car size={15} />}
-              onClick={() => { void nav(); }}
+              onClick={() => { nav('/app/driver'); }}
             />
             <SharedRow
               label={t('profileExpanded.documents')}
               value={t('profileExpanded.licenseInsuranceRegistration')}
               icon={<FileText size={15} />}
               badge={<CheckCircle size={14} color={C.green} />}
-              onClick={() => { void nav(); }}
+              onClick={() => { nav('/app/driver'); }}
             />
             <SharedRow
               label={t('profileExpanded.earnings')}
               icon={<TrendingUp size={15} />}
-              onClick={() => { void nav(); }}
+              onClick={() => { nav('/app/wallet'); }}
             />
           </SharedSection>
         )}
@@ -572,18 +572,18 @@ function ProfilePageContent({
             label={t('profileExpanded.genderPreference')}
             value={t('profileExpanded.mixedDefault')}
             icon={<Settings size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/settings'); }}
           />
           <SharedRow
             label={t('profileExpanded.currency')}
             value="JOD"
             icon={<CreditCard size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/settings'); }}
           />
           <SharedRow
             label={t('profileExpanded.advancedSettings')}
             icon={<Settings size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/settings'); }}
           />
         </SharedSection>
 
@@ -591,7 +591,7 @@ function ProfilePageContent({
           <SharedRow
             label={t('profileExpanded.changePassword')}
             icon={<Key size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/settings'); }}
           />
           <SharedRow
             label={t('profileExpanded.twoFactorAuth2FA')}
@@ -611,12 +611,12 @@ function ProfilePageContent({
               </span>
             }
             icon={<Shield size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/settings'); }}
           />
           <SharedRow
             label={t('profileExpanded.activeSessions')}
             icon={<Monitor size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/settings'); }}
           />
         </SharedSection>
 
@@ -634,12 +634,12 @@ function ProfilePageContent({
           <SharedRow
             label={t('profileExpanded.privacyPolicy')}
             icon={<FileText size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/privacy'); }}
           />
           <SharedRow
             label={t('profileExpanded.termsOfService')}
             icon={<FileText size={15} />}
-            onClick={() => { void nav(); }}
+            onClick={() => { nav('/app/terms'); }}
           />
         </SharedSection>
 

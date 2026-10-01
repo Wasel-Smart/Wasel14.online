@@ -197,7 +197,7 @@ export default function DriverPage() {
               }}
             >
               <button
-                onClick={() => { void navigate(); }}
+                onClick={() => { navigate('/app/offer-ride'); }}
                 style={{
                   height: 46,
                   borderRadius: '999px',
@@ -211,7 +211,7 @@ export default function DriverPage() {
                 {t('driverPageExpanded.openRoute')}
               </button>
               <button
-                onClick={() => { void navigate(); }}
+                onClick={() => { navigate('/app/trust'); }}
                 style={{
                   height: 46,
                   borderRadius: '999px',
@@ -225,7 +225,7 @@ export default function DriverPage() {
                 {t('driverPageExpanded.trust')}
               </button>
               <button
-                onClick={() => { void navigate(); }}
+                onClick={() => { navigate('/app/settings'); }}
                 style={{
                   height: 46,
                   borderRadius: '999px',

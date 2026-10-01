@@ -789,7 +789,7 @@ export function ReturnMatching() {
                         {t('returnMatching.new_return')}
                       </button>
                       <button
-                        onClick={() => { void nav(); }}
+                        onClick={() => { nav('/app/packages'); }}
                         style={{
                           height: 44,
                           borderRadius: 12,
@@ -949,7 +949,7 @@ export function ReturnMatching() {
               </div>
               <div style={{ display: 'grid', gap: 10 }}>
                 <button
-                  onClick={() => { void nav(); }}
+                  onClick={() => { nav('/app/packages'); }}
                   style={{
                     height: 42,
                     borderRadius: R.md,
@@ -963,7 +963,7 @@ export function ReturnMatching() {
                   {t('returnMatching.open_package_tracking')}
                 </button>
                 <button
-                  onClick={() => { void nav(); }}
+                  onClick={() => { nav('/app/find-ride'); }}
                   style={{
                     height: 42,
                     borderRadius: R.md,

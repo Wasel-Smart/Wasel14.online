@@ -227,6 +227,9 @@ const buildMainChildren = (): RouteObject[] => [
     Component: ProtectedOutlet,
     children: [
       { path: 'bus', lazy: lazy(() => import('./features/bus/BusPage'), 'BusPage') },
+      // Primary bottom-nav tab for every signed-in user (see CORE_NAV_ITEMS) —
+      // must NOT sit behind `operations:read`.
+      { path: 'mobility-os', lazy: lazy(() => import('./features/mobility-os')) },
       { path: 'packages', lazy: lazy(() => import('./features/packages/PackagesPage')) },
       { path: 'awasel/send', Component: () => <RedirectTo to="/app/packages" /> },
       { path: 'awasel/track', Component: () => <RedirectTo to="/app/packages" /> },
@@ -246,8 +249,7 @@ const buildMainChildren = (): RouteObject[] => [
   // these back into one shared ProtectedOutlet, since roles differ per path
   // (e.g. a 'corporate' user must not reach 'moderation').
    {
-    Component: ProtectedOutlet,
-    require: 'corporate:read',
+    element: <ProtectedOutlet require="corporate:read" />,
     children: [
       {
         path: 'services/corporate',
@@ -256,8 +258,7 @@ const buildMainChildren = (): RouteObject[] => [
     ],
   } as unknown as RouteObject,
   {
-    Component: ProtectedOutlet,
-    require: 'school:read',
+    element: <ProtectedOutlet require="school:read" />,
     children: [
       {
         path: 'services/school',
@@ -266,14 +267,12 @@ const buildMainChildren = (): RouteObject[] => [
     ],
   } as unknown as RouteObject,
   {
-    Component: ProtectedOutlet,
-    require: 'operations:read',
+    element: <ProtectedOutlet require="operations:read" />,
     children: [
       {
         path: 'innovation-hub',
         lazy: lazy(() => import('./features/operations/OperationsOverviewPage')),
       },
-      { path: 'mobility-os', lazy: lazy(() => import('./features/mobility-os')) },
       {
         path: 'ai-intelligence',
         lazy: lazy(() => import('./features/operations/OperationsOverviewPage')),
@@ -281,8 +280,7 @@ const buildMainChildren = (): RouteObject[] => [
     ],
   } as unknown as RouteObject,
   {
-    Component: ProtectedOutlet,
-    require: 'analytics:read',
+    element: <ProtectedOutlet require="analytics:read" />,
     children: [
       {
         path: 'analytics',
@@ -291,8 +289,7 @@ const buildMainChildren = (): RouteObject[] => [
     ],
   } as unknown as RouteObject,
   {
-    Component: ProtectedOutlet,
-    require: 'trust:moderate',
+    element: <ProtectedOutlet require="trust:moderate" />,
     children: [
       {
         path: 'moderation',
@@ -307,8 +304,7 @@ const buildMainChildren = (): RouteObject[] => [
   // one `config:write` guard would hide surfaces those roles legitimately
   // own — and expose write actions they must not reach.
   {
-    Component: ProtectedOutlet,
-    require: 'users:read',
+    element: <ProtectedOutlet require="users:read" />,
     children: [
       {
         path: 'admin/users',
@@ -317,8 +313,7 @@ const buildMainChildren = (): RouteObject[] => [
     ],
   } as unknown as RouteObject,
   {
-    Component: ProtectedOutlet,
-    require: 'disputes:read',
+    element: <ProtectedOutlet require="disputes:read" />,
     children: [
       {
         path: 'admin/disputes',
@@ -327,8 +322,7 @@ const buildMainChildren = (): RouteObject[] => [
     ],
   } as unknown as RouteObject,
   {
-    Component: ProtectedOutlet,
-    require: 'config:write',
+    element: <ProtectedOutlet require="config:write" />,
     children: [
       {
         path: 'admin',

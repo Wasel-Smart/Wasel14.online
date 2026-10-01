@@ -311,13 +311,13 @@ export function SupportPage() {
           accent={C.blueLight}
           actions={
             <>
-              <WaselButton type="button" variant="primary" onClick={() => { void nav(); }}>
+              <WaselButton type="button" variant="primary" onClick={() => { nav('/app/my-trips'); }}>
                 {ar ? 'افتح رحلاتي' : 'Open my trips'}
               </WaselButton>
               <WaselButton
                 type="button"
                 variant="outline"
-                onClick={() => { void nav(); }}
+                onClick={() => { nav('/app/settings'); }}
                 style={{ background: C.elevated, color: C.text }}
               >
                 {ar ? 'إعدادات الحساب' : 'Account settings'}

@@ -106,7 +106,6 @@ export function FindRidePage() {
   const [to, setTo] = useState(initialTo);
   const [date, setDate] = useState(initialDate);
   const [searched, setSearched] = useState(initialSearched);
-  const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Ride | null>(null);
   const [bookingInFlightId, setBookingInFlightId] = useState<string | null>(null);
   const [rideBookings, setRideBookings] = useState<RideBookingRecord[]>(() => getRideBookings());
@@ -266,7 +265,6 @@ export function FindRidePage() {
     setSearchError(null);
     setBookingMessage(null);
     setBookingSuccess(null);
-    setLoading(true);
     setSearched(true);
     setRecentSearches(previous => {
       const label = `${from} to ${to}${date ? ` on ${date}` : ''}`;
@@ -627,7 +625,7 @@ export function FindRidePage() {
                   gap: 10,
                 }}
               >
-                {loading || inventoryLoading ? (
+                {inventoryLoading ? (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
@@ -642,7 +640,7 @@ export function FindRidePage() {
                 ) : (
                   <Search size={18} />
                 )}
-                {loading || inventoryLoading ? t.searching : 'Search rides'}
+                {inventoryLoading ? t.searching : 'Search rides'}
               </WaselButton>
 
               <div
