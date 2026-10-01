@@ -3,7 +3,7 @@
  */
 
 import { Eye, EyeOff } from 'lucide-react';
-import { type InputHTMLAttributes, type ReactNode, useState } from 'react';
+import { type InputHTMLAttributes, type ReactNode, useId, useState } from 'react';
 import { ANIM, C, F, R, TYPE } from '../../utils/wasel-ds';
 import { sanitizeHtml } from '../../utils/sanitization';
 
@@ -19,11 +19,18 @@ interface WaselInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'o
 }
 
 function PasswordToggle({ showPassword, onToggle }: { showPassword: boolean; onToggle: () => void }) {
+  // LanguageProvider isn't guaranteed above every input; /initial-locale.js
+  // sets <html lang> before first paint, so read the active language from there.
+  const ar = typeof document !== 'undefined' && document.documentElement.lang === 'ar';
+  const label = ar
+    ? (showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور')
+    : (showPassword ? 'Hide password' : 'Show password');
   return (
     <button
       type="button"
       onClick={() => { void onToggle(); }}
-      aria-label={showPassword ? 'Hide password' : 'Show password'}
+      aria-label={label}
+      aria-pressed={showPassword}
       style={{
         background: 'none',
         border: 'none',
@@ -47,23 +54,27 @@ export function WaselInput({
   icon,
   trailing,
   type = 'text',
-  dir = 'ltr',
+  dir,
   onChange,
   id,
   style,
   ...rest
 }: WaselInputProps) {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+  const errorId = `${inputId}-error`;
   const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
   const resolvedType = isPassword && showPassword ? 'text' : type;
   const hasError = Boolean(error);
 
-  const borderColor = hasError ? C.error : focused ? C.borderHov : C.border;
+  // Focus border must hit 3:1 against the field: the old 28%-alpha cyan did not.
+  const borderColor = hasError ? C.error : focused ? C.cyan : C.border;
   const boxShadow = hasError
     ? `0 0 0 3px ${C.errorDim}`
     : focused
-      ? `0 0 0 3px ${C.cyanDim}`
+      ? `0 0 0 3px ${C.cyanGlow}`
       : 'none';
 
   return (
@@ -79,7 +90,7 @@ export function WaselInput({
         >
           {label && (
             <label
-              htmlFor={id}
+              htmlFor={inputId}
               style={{
                 fontSize: TYPE.size.sm,
                 fontWeight: TYPE.weight.bold,
@@ -124,8 +135,10 @@ export function WaselInput({
 
         <input
           {...rest}
-          id={id}
+          id={inputId}
           type={resolvedType}
+          aria-invalid={hasError || undefined}
+          aria-describedby={hasError ? errorId : rest['aria-describedby']}
           onChange={e => onChange?.(e.target.value)}
           onFocus={e => {
             setFocused(true);
@@ -143,7 +156,7 @@ export function WaselInput({
             fontSize: TYPE.size.base,
             fontFamily: F,
             color: C.text,
-            textAlign: dir === 'rtl' ? 'right' : 'left',
+            textAlign: dir === 'rtl' ? 'right' : dir === 'ltr' ? 'left' : 'start',
             minWidth: 0,
             ...style,
           }}
@@ -159,7 +172,7 @@ export function WaselInput({
       </div>
 
       {error && (
-        <span style={{ fontSize: TYPE.size.xs, color: C.error, fontFamily: F, lineHeight: 1.5 }}>
+        <span id={errorId} role="alert" style={{ fontSize: TYPE.size.xs, color: C.error, fontFamily: F, lineHeight: 1.5 }}>
           {sanitizeHtml(error)}
         </span>
       )}

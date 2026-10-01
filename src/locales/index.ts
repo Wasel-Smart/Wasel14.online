@@ -91,3 +91,4 @@ export { waselServiceShared } from './chunks/waselServiceShared';
 export { worldClassAuthPage } from './chunks/worldClassAuthPage';
 export { liveGeoTracking } from './chunks/liveGeoTracking';
 export { protectedOutlet } from './chunks/protectedOutlet';
+export { routeFallback } from './chunks/routeFallback';

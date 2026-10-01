@@ -24,8 +24,17 @@ let lastCheckedAt: number | null = null;
 let loggedLocalHealthBypass = false;
 const availabilityListeners = new Set<AvailabilityListener>();
 
+/**
+ * Skip the Edge Function health probe when running the dev server on loopback.
+ *
+ * The check is scoped to `import.meta.env.DEV` as well as a loopback origin: the
+ * previous version keyed off the origin alone, so any build served from
+ * `http://localhost` or `http://127.0.0.1` silently reported a healthy backend
+ * without ever contacting it, and the `loggedLocalHealthBypass` guard nested a
+ * second `import.meta.env.DEV` test inside a branch that already tested it.
+ */
 function shouldPreferDirectSupabaseHealth(): boolean {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !import.meta.env.DEV) {
     return false;
   }
 
@@ -34,11 +43,9 @@ function shouldPreferDirectSupabaseHealth(): boolean {
     const isLocalOrigin =
       protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1');
 
-    if (isLocalOrigin && import.meta.env.DEV && !loggedLocalHealthBypass) {
+    if (isLocalOrigin && !loggedLocalHealthBypass) {
       loggedLocalHealthBypass = true;
-      if (import.meta.env.DEV) {
-        console.info('[Wasel] Local dev origin detected, bypassing remote edge health probe.');
-      }
+      console.info('[Wasel] Local dev origin detected, bypassing remote edge health probe.');
     }
 
     return isLocalOrigin;

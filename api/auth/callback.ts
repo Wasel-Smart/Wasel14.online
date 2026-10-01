@@ -64,10 +64,52 @@ function getRequestOrigin(request: VercelRequest): string {
   return `${proto}://${host}`;
 }
 
-/** Never redirect off-site — only allow paths back into our own app. */
-function safeReturnTo(value: string | null): string {
+/**
+ * Never redirect off-site — only allow same-origin paths back into our own app.
+ *
+ * A plain `startsWith('/')` / `!startsWith('//')` check is not enough: browsers
+ * normalise a backslash to a slash, so `/\evil.example` is treated as
+ * `//evil.example` (protocol-relative). We therefore reject backslashes and
+ * control characters outright, then parse against our own origin and require
+ * that the resolved origin is unchanged.
+ */
+function hasUnsafeRedirectChars(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code === 0x5c /* backslash */ || code <= 0x1f || code === 0x7f) {return true;}
+  }
+  return false;
+}
+
+function safeReturnTo(value: string | null, origin: string): string {
   if (!value) {return DEFAULT_RETURN_TO;}
-  return value.startsWith('/') && !value.startsWith('//') ? value : DEFAULT_RETURN_TO;
+  if (!value.startsWith('/') || value.startsWith('//') || hasUnsafeRedirectChars(value)) {
+    return DEFAULT_RETURN_TO;
+  }
+  try {
+    const parsed = new URL(value, origin);
+    if (parsed.origin !== origin) {return DEFAULT_RETURN_TO;}
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return DEFAULT_RETURN_TO;
+  }
+}
+
+/**
+ * Provider/Supabase error text comes from the URL and is attacker-controllable
+ * (phishing copy injected into our sign-in page). Never echo it back; map the
+ * known OAuth error codes to fixed messages instead.
+ */
+function friendlyAuthError(code: string | null): string {
+  switch ((code ?? '').toLowerCase()) {
+    case 'access_denied':
+      return 'Sign-in was cancelled.';
+    case 'server_error':
+    case 'temporarily_unavailable':
+      return 'The sign-in provider is temporarily unavailable. Please try again.';
+    default:
+      return 'Sign-in failed. Please try again.';
+  }
 }
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -108,12 +150,13 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const origin = getRequestOrigin(request);
   const url = new URL(request.url ?? '/api/auth/callback', origin);
   const code = url.searchParams.get('code');
-  const oauthError = url.searchParams.get('error_description') || url.searchParams.get('error');
-  const returnTo = safeReturnTo(url.searchParams.get('returnTo'));
+  const oauthErrorCode = url.searchParams.get('error');
+  const oauthError = oauthErrorCode || url.searchParams.get('error_description');
+  const returnTo = safeReturnTo(url.searchParams.get('returnTo'), origin);
   const isRecovery = url.searchParams.get('type') === 'recovery';
 
   if (oauthError) {
-    response.writeHead(302, { Location: `${SIGN_IN_PATH}?error=${encodeURIComponent(oauthError)}` });
+    response.writeHead(302, { Location: `${SIGN_IN_PATH}?error=${encodeURIComponent(friendlyAuthError(oauthErrorCode))}` });
     response.end();
     return;
   }
@@ -165,7 +208,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     : returnTo;
 
   const headers: Record<string, string | string[]> = {
-    Location: error ? `${SIGN_IN_PATH}?error=${encodeURIComponent(error.message)}` : successLocation,
+    Location: error ? `${SIGN_IN_PATH}?error=${encodeURIComponent(friendlyAuthError(null))}` : successLocation,
   };
   if (outgoingCookies.length > 0) {
     headers['Set-Cookie'] = outgoingCookies;

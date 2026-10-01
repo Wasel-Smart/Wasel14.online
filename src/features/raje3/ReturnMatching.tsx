@@ -2,7 +2,7 @@
  * Wasel Raje3 Returns
  * Connected to the shared ride/package network.
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, Check, CheckCircle2, QrCode, RefreshCw, Search, Star } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -67,6 +67,9 @@ export function ReturnMatching() {
   const [creating, setCreating] = useState(false);
   const [createdReturn, setCreatedReturn] = useState<PackageRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped whenever the connected-ride list is (re)read, so the match count and
+  // the match list recompute instead of staying frozen at first mount.
+  const [ridesVersion, setRidesVersion] = useState(0);
 
   const matches = useMemo(
     () =>
@@ -82,17 +85,42 @@ export function ReturnMatching() {
           toCity: ride.to,
           priceJOD: ride.price,
         })),
-    [],
+    [ridesVersion],
   );
+
+  const refreshRides = useCallback(() => {
+    setRidesVersion(version => version + 1);
+  }, []);
+
+  useEffect(() => {
+    // Re-read the live ride list when the tab regains focus so the "rides
+    // available right now" count reflects rides posted after mount.
+    const onFocus = () => refreshRides();
+    window.addEventListener('focus', onFocus);
+    refreshRides();
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refreshRides]);
 
   const selectedTrip = matches.find(match => match.id === selectedMatch) ?? null;
   const selectedRetailer = RETAILERS.find(item => item.id === retailer) ?? null;
   const selectedReason = RETURN_REASONS.find(item => item.id === reason) ?? null;
 
-  const searchMatches = () => {
-    setSearching(false);
+  const searchMatches = async () => {
+    setSearching(true);
     setError(null);
-    setStep(2);
+    try {
+      // Yield a frame so the "Finding rides…" state actually paints, then read
+      // the live ride list so the count and match list are current.
+      await new Promise<void>(resolve => {
+        window.setTimeout(resolve, 350);
+      });
+      refreshRides();
+      setStep(2);
+    } catch {
+      setError('Ride search failed. Please try again.');
+    } finally {
+      setSearching(false);
+    }
   };
 
   const confirmReturn = async () => {
@@ -105,8 +133,14 @@ export function ReturnMatching() {
         weight: inferWeight(size),
         note: [orderId && `Order ${orderId}`, item, reason].filter(Boolean).join(' · '),
         packageType: 'return',
+        // Honour the ride the user actually picked. createConnectedPackage
+        // attaches this exact ride when it is live and package-ready on the
+        // corridor; when the service cannot honour it the returned record
+        // reflects what really happened and we surface that below.
+        rideId: selectedTrip?.id,
       });
       setCreatedReturn(created);
+      refreshRides();
       setStep(3);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to create return request.');
@@ -114,6 +148,15 @@ export function ReturnMatching() {
       setCreating(false);
     }
   };
+
+  // The service attaches the requested ride when it can. If it could not and
+  // the parcel landed on a different ride (or stayed queued), say so instead
+  // of implying the user's selection was honoured.
+  const attachedToRequestedRide =
+    !selectedTrip ||
+    createdReturn?.matchedRideId === undefined ||
+    createdReturn.matchedRideId === selectedTrip.id;
+  const requestedRideNotHonoured = !attachedToRequestedRide;;
 
   const stageLabels = ['Retailer', 'Details', 'Match', 'Track'];
   const liveLane = selectedTrip
@@ -725,8 +768,14 @@ export function ReturnMatching() {
                       }}
                     >
                       {createdReturn.matchedRideId
-                        ? `Matched to ${createdReturn.matchedDriver ?? 'a Wasel captain'} on a live route.`
-                        : 'Created in searching mode. It will stay visible until a live route picks it up.'}
+                        ? requestedRideNotHonoured
+                          ? isRTL
+                            ? `تم ربط الطلب برحلة أخرى (${createdReturn.matchedDriver ?? 'كابتن متصل'}) لأن الرحلة المختارة لم تعد متاحة.`
+                            : `The service attached this return to a different live ride (${createdReturn.matchedDriver ?? 'a connected captain'}) because the ride you selected was no longer available.`
+                          : `Matched to ${createdReturn.matchedDriver ?? 'a Wasel captain'} on the ride you selected.`
+                        : isRTL
+                          ? 'أُنشئ الطلب في وضع البحث. سيبقى ظاهراً حتى تلتقطه رحلة مباشرة.'
+                          : 'Created in searching mode. It will stay visible until a live route picks it up.'}
                     </p>
                     <div
                       style={{

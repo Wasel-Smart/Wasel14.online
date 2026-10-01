@@ -3,9 +3,13 @@
  */
 
 import { X } from 'lucide-react';
-import { type CSSProperties, type ReactNode, useEffect, useId } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useId, useRef } from 'react';
 import { ANIM, C, F, R, SH, TYPE, Z } from '../../utils/wasel-ds';
+import { lockBodyScroll } from '../../utils/bodyScrollLock';
 import { WaselButton } from './WaselButton';
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 type DialogSize = 'sm' | 'md' | 'lg';
 
@@ -41,6 +45,49 @@ export function WaselDialog({
   const generatedId = useId();
   const titleId = `${generatedId}-title`;
   const descriptionId = description ? `${generatedId}-description` : undefined;
+  const panelRef = useRef<HTMLElement>(null);
+
+  // Focus management: move focus into the dialog, trap Tab, lock background
+  // scroll, and hand focus back to whatever opened it when it closes.
+  useEffect(() => {
+    if (!open) {return undefined;}
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const releaseScroll = lockBodyScroll();
+    const panel = panelRef.current;
+    const focusables = () =>
+      panel ? Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)) : [];
+
+    // Prefer the first form control over the close button.
+    const first = focusables().find(el => el.tagName !== 'BUTTON') ?? focusables()[0] ?? panel;
+    first?.focus();
+
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') {return;}
+      const items = focusables();
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const head = items[0];
+      const tail = items[items.length - 1];
+      if (!head || !tail) {return;}
+      if (event.shiftKey && document.activeElement === head) {
+        event.preventDefault();
+        tail.focus();
+      } else if (!event.shiftKey && document.activeElement === tail) {
+        event.preventDefault();
+        head.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleTab);
+    return () => {
+      document.removeEventListener('keydown', handleTab);
+      releaseScroll();
+      previouslyFocused?.focus?.();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) {return undefined;}
@@ -75,14 +122,16 @@ export function WaselDialog({
       }}
     >
       <section
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
+        tabIndex={-1}
         style={{
           width: '100%',
           maxWidth: widthBySize[size],
-          maxHeight: 'min(720px, calc(100vh - 48px))',
+          maxHeight: 'min(720px, calc(100dvh - 48px))',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',

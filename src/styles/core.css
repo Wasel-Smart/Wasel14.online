@@ -7,52 +7,52 @@
 
 /* ── Brand Colors (never change) ────────────────────────────────────────── */
 :root {
-  --wasel-cyan: #66e0ff;
+  --wasel-cyan: #00e5ff;
   --wasel-gold: #ffbe5c;
-  --wasel-green: #47d69e;
+  --wasel-green: #72c70d;
   --wasel-lime: #9af1cf;
   --wasel-teal: #66e0ff;
   --wasel-bronze: #ffbe5c;
 
   /* ── DARK THEME (default) ─── */
-  --background: #06131f;
-  --foreground: #eef8ff;
-  --card: #10253a;
-  --card-foreground: #eaf7ff;
-  --popover: #0b1d2d;
-  --popover-foreground: #eaf7ff;
-  --primary: #00E5FF;
-  --primary-foreground: #041018;
-  --secondary: #11283d;
-  --secondary-foreground: #9ab7cc;
-  --muted: #11283d;
-  --muted-foreground: #6f90aa;
-  --accent: #ffbe5c;
-  --accent-foreground: #041018;
+  --background: #081d39;
+  --foreground: #f8fbff;
+  --card: #0e2240;
+  --card-foreground: #f8fbff;
+  --popover: #0a1f3a;
+  --popover-foreground: #f8fbff;
+  --primary: #00e5ff;
+  --primary-foreground: #081d39;
+  --secondary: #132b4d;
+  --secondary-foreground: #c4dcf0;
+  --muted: #132b4d;
+  --muted-foreground: #95b2c9;
+  --accent: #ff8a0b;
+  --accent-foreground: #081d39;
   --destructive: #ff7c8b;
   --destructive-foreground: #ffffff;
-  --border: rgba(103, 232, 255, 0.15);
-  --input: rgba(103, 232, 255, 0.08);
-  --ring: rgba(103, 232, 255, 0.4);
+  --border: rgba(0, 229, 255, 0.16);
+  --input: rgba(0, 229, 255, 0.08);
+  --ring: rgba(0, 229, 255, 0.35);
 
   /* Surfaces (5-level elevation) */
-  --wasel-surface-0: #06131f;
-  --wasel-surface-1: #0b1d2d;
-  --wasel-surface-2: #10253a;
-  --wasel-surface-3: #16314c;
-  --wasel-surface-4: #1d4061;
+  --wasel-surface-0: #081d39;
+  --wasel-surface-1: #0a1f3a;
+  --wasel-surface-2: #0e2240;
+  --wasel-surface-3: #132b4d;
+  --wasel-surface-4: #1a3560;
 
   /* Glassmorphism */
-  --wasel-glass-sm: rgba(11, 29, 45, 0.52);
-  --wasel-glass-md: rgba(11, 29, 45, 0.72);
-  --wasel-glass-lg: rgba(11, 29, 45, 0.92);
-  --wasel-glass-xl: rgba(11, 29, 45, 0.97);
+  --wasel-glass-sm: rgba(10, 24, 42, 0.55);
+  --wasel-glass-md: rgba(10, 24, 42, 0.72);
+  --wasel-glass-lg: rgba(10, 24, 42, 0.88);
+  --wasel-glass-xl: rgba(10, 24, 42, 0.94);
 
-  /* Shadows */
-  --wasel-shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.5);
-  --wasel-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.55);
-  --wasel-shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.6);
-  --wasel-shadow-xl: 0 16px 60px rgba(0, 0, 0, 0.65);
+  /* Shadows — brand ink, never heavy black (BRAND_GUIDELINES.md) */
+  --wasel-shadow-sm: 0 1px 4px rgba(8, 29, 57, 0.35);
+  --wasel-shadow-md: 0 4px 20px rgba(8, 29, 57, 0.4);
+  --wasel-shadow-lg: 0 8px 40px rgba(8, 29, 57, 0.45);
+  --wasel-shadow-xl: 0 16px 60px rgba(8, 29, 57, 0.5);
 
   /* Spacing (8pt grid) */
   --sp-1: 4px;
@@ -90,19 +90,19 @@
   --card-foreground: #0c2132;
   --popover: #ffffff;
   --popover-foreground: #0c2132;
-  --primary: #00E5FF;
+  --primary: #0369a1;
   --primary-foreground: #ffffff;
   --secondary: #eaf7ff;
   --secondary-foreground: #35556d;
   --muted: #eef8ff;
   --muted-foreground: #5d7d96;
-  --accent: #f3a83d;
+  --accent: #c2570a;
   --accent-foreground: #ffffff;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: rgba(20, 155, 203, 0.12);
-  --input: rgba(20, 155, 203, 0.08);
-  --ring: rgba(20, 155, 203, 0.35);
+  --border: rgba(3, 105, 161, 0.14);
+  --input: rgba(3, 105, 161, 0.06);
+  --ring: rgba(3, 105, 161, 0.45);
 
   --wasel-glass-sm: rgba(255, 255, 255, 0.65);
   --wasel-glass-md: rgba(255, 255, 255, 0.8);
@@ -183,10 +183,10 @@ input[type='submit'] {
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   * {
-    border-width: 2px !important;
+    border-color: currentColor !important;
   }
 
-  button,
+  /* Underline only real links; underlining every button hurts legibility */
   a {
     text-decoration: underline;
   }

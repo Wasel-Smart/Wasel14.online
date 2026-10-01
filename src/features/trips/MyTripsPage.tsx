@@ -734,7 +734,24 @@ export default function MyTripsPage() {
     );
   }, [location.search]);
 
-  const rideItems = useMemo(() => syncRideBookingCompletion().map(booking => {
+  // `syncRideBookingCompletion` MUTATES the booking cache (it auto-completes
+  // departed rides and publishes lifecycle events), so it must not run inside
+  // useMemo during render. State holds the synced list; a timer re-evaluates it
+  // so a ride whose departure passed while the page stayed open still flips to
+  // completed.
+  const [rideBookings, setRideBookings] = useState<RideBookingRecord[]>([]);
+
+  useEffect(() => {
+    const sync = () => {
+      setRideBookings(syncRideBookingCompletion());
+    };
+
+    sync();
+    const timer = window.setInterval(sync, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const rideItems = useMemo(() => rideBookings.map(booking => {
       const relatedSupport = getSupportForItem(supportTickets, [
         booking.id,
         booking.backendBookingId,
@@ -742,7 +759,7 @@ export default function MyTripsPage() {
         booking.rideId,
       ]);
       return toRideItem(booking, relatedSupport, locale.locale, language);
-    }), [language, supportTickets, locale.locale]);
+    }), [rideBookings, language, supportTickets, locale.locale]);
 
   const packageItems = useMemo(() => getConnectedPackages().map(pkg => {
       const relatedSupport = getSupportForItem(supportTickets, [
@@ -799,8 +816,11 @@ export default function MyTripsPage() {
     ticket => ticket.status !== 'resolved' && ticket.status !== 'closed',
   ).length;
 
+  // The rides tab is the rider's own trips, so its "new ride" CTA must open
+  // ride search. `/app/offer-ride` is the driver-post flow and sends riders into
+  // a form they cannot complete.
   const createPath =
-    tab === 'rides' ? '/app/offer-ride' : tab === 'packages' ? '/app/packages' : '/app/bus';
+    tab === 'rides' ? '/app/find-ride' : tab === 'packages' ? '/app/packages' : '/app/bus';
   const filters: Array<{ key: TripLifecycle | 'all'; label: string }> = [
     { key: 'all', label: isRTL ? 'الكل' : 'All' },
     { key: 'active', label: isRTL ? 'نشطة' : 'Active' },

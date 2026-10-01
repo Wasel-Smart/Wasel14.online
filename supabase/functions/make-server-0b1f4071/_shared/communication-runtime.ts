@@ -34,7 +34,11 @@ function resolveProviderWebhookBaseUrl(functionBaseUrl?: string): string | undef
   if (!functionBaseUrl) return undefined;
   const normalized = functionBaseUrl.replace(/\/$/, '');
   return normalized.includes('/functions/v1/make-server-0b1f4071')
-    ? normalized.replace('/functions/v1/make-server-0b1f4071', '/functions/v1/provider-webhooks')
+    // The status-callback handlers live in this same function at
+    // /communications/webhooks/{twilio,resend}. There is no separate
+    // `provider-webhooks` function in supabase/functions, so the old rewrite
+    // sent every delivery receipt to a 404 and messages never reached 'delivered'.
+    ? `${normalized}/communications/webhooks`
     : normalized;
 }
 

@@ -3,8 +3,9 @@
  * Uses inline SVG charts to avoid shipping a large charting runtime for one tab.
  */
 
-import { ArrowUpRight, ArrowDownLeft, TrendingUp, TrendingDown, Zap } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, RefreshCw, TrendingUp, TrendingDown, Zap } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
 import { WaselColors } from '../../../tokens/wasel-tokens';
 import { PIE_COLORS } from './WalletShared';
 import type { InsightsData } from '../../../services/wallet/walletTypes';
@@ -13,7 +14,10 @@ import { tx } from '../../../locales/tx';
 
 interface InsightsTabProps {
   insights: InsightsData | null;
+  insightsError: boolean;
+  insightsLoading: boolean;
   isRTL: boolean;
+  onRetryInsights: () => void;
   t: Record<string, string>;
 }
 
@@ -196,8 +200,29 @@ function MiniCategoryDonut({ data }: { data: CategoryPoint[] }) {
   );
 }
 
-export function InsightsTab({ insights, isRTL, t }: InsightsTabProps) {
+export function InsightsTab({
+  insights,
+  insightsError,
+  insightsLoading,
+  isRTL,
+  onRetryInsights,
+  t,
+}: InsightsTabProps) {
   void isRTL;
+
+  if (insightsError) {
+    return (
+      <div className="text-center py-12 space-y-3">
+        <p className="text-sm text-muted-foreground">
+          {t.insightsLoadError ?? 'Unable to load insights right now'}
+        </p>
+        <Button variant="outline" size="sm" onClick={onRetryInsights} disabled={insightsLoading}>
+          <RefreshCw className={`mr-2 h-3.5 w-3.5 ${insightsLoading ? 'animate-spin' : ''}`} />
+          {t.retry ?? 'Retry'}
+        </Button>
+      </div>
+    );
+  }
 
   if (!insights) {
     return (

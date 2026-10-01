@@ -26,7 +26,7 @@ Required env vars — copy `.env.example` and fill in:
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_EDGE_FUNCTION_NAME=make-server-0b1f4071
-VITE_APP_URL=https://wasel14.online
+VITE_APP_URL=https://www.wasel14.online
 ```
 
 See [docs/WIRING_ARCHITECTURE.md](docs/WIRING_ARCHITECTURE.md) for the full environment reference.

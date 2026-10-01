@@ -58,6 +58,14 @@ const featureCards = [
   },
 ] as const;
 
+// Every card must land on a route the router actually declares — a path with no
+// route behind it lands the visitor on the 404 page, which is a dead end from
+// the marketing surface. These four services are delivered through existing
+// Wasel capabilities rather than a dedicated page:
+//   Freight  -> parcel/cargo capacity on the packages surface
+//   Commute  -> posting your own seats is carpooling (offer-ride)
+//   School   -> scheduled, route-fixed transport (bus)
+//   Luxury   -> the premium tier (plus)
 const serviceCards = [
   {
     icon: Route,
@@ -78,28 +86,28 @@ const serviceCards = [
     titleKey: 'servicesFreight',
     descKey: 'servicesFreightDesc',
     accent: C.blue,
-    path: '/freight',
+    path: '/packages',
   },
   {
     icon: MapPinned,
     titleKey: 'servicesCarpool',
     descKey: 'servicesCarpoolDesc',
     accent: C.green,
-    path: '/carpool',
+    path: '/offer-ride',
   },
   {
     icon: Shield,
     titleKey: 'servicesSchool',
     descKey: 'servicesSchoolDesc',
     accent: C.gold,
-    path: '/school',
+    path: '/bus',
   },
   {
     icon: Star,
     titleKey: 'servicesLuxury',
     descKey: 'servicesLuxuryDesc',
     accent: C.purple,
-    path: '/luxury',
+    path: '/plus',
   },
 ] as const;
 
@@ -222,7 +230,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
           <button
             type="button"
             className="wasel-home-section-action"
-            onClick={() => void onNavigate('/app/services', 'services_browse_all')}
+            onClick={() => void onNavigate('/app', 'services_browse_all')}
           >
             {tx('servicesSubtitle')}
           </button>

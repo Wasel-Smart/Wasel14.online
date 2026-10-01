@@ -27,6 +27,7 @@ import { getConnectedRides } from '../../services/journeyLogistics';
 import { getMovementPriceQuote } from '../../services/movementPricing';
 import { recordMovementActivity } from '../../services/movementMembership';
 import {
+  areRouteRemindersEqual,
   createReminderFromSuggestion,
   formatRouteReminderSchedule,
   getRecurringRouteSuggestions,
@@ -50,7 +51,6 @@ import { walletApi } from '../../services/wallet/walletApi';
 import { getCorridorOpportunity, getMarketplaceNodes } from '../../config/wasel-movement-network';
 import {
   CITIES,
-  RIDE_BOOKINGS_KEY,
   RIDE_SEARCHES_KEY,
   type Ride,
 } from '../../pages/waselCoreRideData';
@@ -229,15 +229,15 @@ export function FindRidePage() {
   }, [user?.id]);
 
   useEffect(() => {
-    setSavedReminders(getRouteReminders());
+    const refresh = () => {
+      const next = getRouteReminders();
+      setSavedReminders(prev => (areRouteRemindersEqual(prev, next) ? prev : next));
+    };
+    refresh();
     void syncRouteReminders(user ?? undefined).then(delivered => {
-      if (delivered.length > 0) {setSavedReminders(getRouteReminders());}
+      if (delivered.length > 0) {refresh();}
     });
   }, [routeIntelligence.updatedAt, user?.email, user?.phone]);
-
-  useEffect(() => {
-    writeStoredStringList(RIDE_BOOKINGS_KEY, Array.from(bookedRideIds));
-  }, [bookedRideIds]);
 
   useEffect(() => {
     writeStoredStringList(RIDE_SEARCHES_KEY, recentSearches);
@@ -1406,12 +1406,24 @@ export function FindRidePage() {
 
               <div style={{ display: 'grid', gap: 14 }}>
                 {[
-                  { title: t.recentSearches, items: recentSearches, empty: t.searchHelp, clickable: true },
+                  {
+                    title: t.recentSearches,
+                    // Keyed by the ride/search identity, not the rendered label:
+                    // two bookings on the same route, time and driver produce
+                    // identical label strings and collided as React keys.
+                    items: recentSearches.map((label, index) => ({
+                      key: `search-${index}-${label}`,
+                      label,
+                    })),
+                    empty: t.searchHelp,
+                    clickable: true,
+                  },
                   {
                     title: t.bookedTrips,
-                    items: bookedRides.map(
-                      ride => `${ride.from} to ${ride.to} | ${ride.time} | ${ride.driver.name}`,
-                    ),
+                    items: bookedRides.map(ride => ({
+                      key: `booked-${ride.id}`,
+                      label: `${ride.from} to ${ride.to} | ${ride.time} | ${ride.driver.name}`,
+                    })),
                     empty: t.noTripsYet,
                     clickable: false,
                   },
@@ -1432,14 +1444,14 @@ export function FindRidePage() {
                       <div style={{ display: 'grid', gap: 10 }}>
                         {card.items.map(item => (
                           <button
-                            key={item}
+                            key={item.key}
                             type="button"
                             onClick={() => {
                               if (!card.clickable) {
                                 openMyTrips();
                                 return;
                               }
-                              const parts = item.split(' to ');
+                              const parts = item.label.split(' to ');
                               if (parts[0]) {setFrom(parts[0]);}
                               const toPart = parts[1]?.split(' on ')[0];
                               if (toPart) {setTo(toPart);}
@@ -1460,7 +1472,7 @@ export function FindRidePage() {
                               gap: 8,
                             }}
                           >
-                            <span>{item}</span>
+                            <span>{item.label}</span>
                             <Search size={12} color={DS.muted} />
                           </button>
                         ))}

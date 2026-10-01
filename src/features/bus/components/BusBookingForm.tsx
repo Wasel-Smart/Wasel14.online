@@ -17,6 +17,7 @@ export function BusBookingForm({
   seatPreference,
   setSeatPreference,
   tripDate,
+  setTripDate,
   today,
   totalPrice,
   bookingDisabled,
@@ -53,6 +54,7 @@ export function BusBookingForm({
   seatPreference: 'window' | 'aisle' | 'front-zone';
   setSeatPreference: (v: 'window' | 'aisle' | 'front-zone') => void;
   tripDate: string;
+  setTripDate: (date: string) => void;
   today: string;
   totalPrice: number;
   bookingDisabled: boolean;
@@ -129,7 +131,7 @@ export function BusBookingForm({
                 fontWeight: 700,
               }}
             >
-              {mode === 'depart-now' ? local('Depart now', 'غادر الآن') : local('Book later', 'احجز لاحقًا')}
+              {mode === 'depart-now' ? tx('busPage.depart_now') : tx('busPage.book_later')}
             </button>
           ))}
         </div>
@@ -218,22 +220,36 @@ export function BusBookingForm({
           </div>
         )}
         {scheduleMode === 'schedule-later' && (
-          <input
-            type="date"
-            min={today}
-            value={tripDate}
-            onChange={() => {}}
-            style={{
-              width: '100%',
-              height: 46,
-              borderRadius: r(14),
-              border: `1px ${DS.border}`,
-              background: DS.card2,
-              color: C.text,
-              padding: '0 14px',
-              fontFamily: DS.F,
-            }}
-          />
+          <div>
+            <label
+              htmlFor="bus-booking-date"
+              style={{
+                display: 'block',
+                color: DS.sub,
+                fontSize: '0.76rem',
+                marginBottom: 8,
+              }}
+            >
+              {tx('busPage.booking_date')}
+            </label>
+            <input
+              id="bus-booking-date"
+              type="date"
+              min={today}
+              value={tripDate}
+              onChange={event => setTripDate(event.target.value)}
+              style={{
+                width: '100%',
+                height: 46,
+                borderRadius: r(14),
+                border: `1px ${DS.border}`,
+                background: DS.card2,
+                color: C.text,
+                padding: '0 14px',
+                fontFamily: DS.F,
+              }}
+            />
+          </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
@@ -347,12 +363,15 @@ export function BusBookingForm({
           }}
         >
           {[
-            { label: local('Seat fare', 'سعر المقعد'), value: `${activeBus.price} JOD × ${passengers}` },
+            { label: tx('busPage.seat_fare'), value: `${activeBus.price} JOD × ${passengers}` },
             {
-              label: local('Schedule days', 'أيام التشغيل'),
-              value: activeBus.scheduleDays ?? activeBus.frequency,
+              label: tx('busPage.schedule_days'),
+              value: activeBus.scheduleDays ?? activeBus.frequency ?? '—',
             },
-            { label: local('Available on this coach', 'المتاح في هذه الحافلة'), value: local(`${activeBus.seats} seats`, `${activeBus.seats} مقعدًا`) },
+            {
+              label: tx('busPage.available_on_this_coach'),
+              value: tx('busPage.seats_count', { count: activeBus.seats }),
+            },
           ].map(row => (
             <div
               key={row.label}
@@ -411,15 +430,15 @@ export function BusBookingForm({
           }}
         >
           {bookingBusy
-            ? 'Reserving seat...'
+            ? tx('busPage.reserving_seat')
             : activeBus.seats === 0
-              ? local('Try another departure', 'جرّب مغادرة أخرى')
-              : local('Reserve seat', 'احجز المقعد')}
+              ? tx('busPage.try_another_departure')
+              : tx('busPage.reserve_seat')}
         </button>
         <div style={{ color: DS.sub, fontSize: '0.78rem', lineHeight: 1.55 }}>
           {activeBus.seats === 0
-            ? 'This coach is full right now. Pick another departure below and keep the same corridor details.'
-            : 'Your seat, boarding stop, and departure alerts stay linked in your account. If the schedule changes, Wasel updates you.'}
+            ? tx('busPage.pick_another_departure_same_corridor')
+            : tx('busPage.seat_boarding_stop_and_alerts_stay_linked')}
         </div>
         {activeBus.sourceUrl && (
           <a
@@ -464,16 +483,14 @@ export function BusBookingForm({
             </div>
             <div style={{ color: C.text, fontSize: '0.86rem', lineHeight: 1.5 }}>
               {passengers} {tx('busPage.seat')}
-              {ar ? ' محجوزة لـ ' : passengers > 1 ? 's are reserved for ' : ' is reserved for '}
+              {tx('busPage.reserved_for')}
               {selectedDeparture}
               {tx('busPage.ticket_code')}
-              {bookingTicketCode ?? 'pending'} {tx('busPage.was_saved_for_the')}
+              {bookingTicketCode ?? tx('busPage.pending')} {tx('busPage.was_saved_for_the')}
               {activeBus.from} {tx('busPage.to_6')}
               {activeBus.to}{' '}
               {tx('busPage.corridor_saved_in_your_account_with_departure_reminders')}
-              {bookingSource === 'local'
-                ? ' Secure confirmation will sync when the booking backend reconnects.'
-                : ''}
+              {bookingSource === 'local' ? tx('busPage.secure_confirmation_pending') : ''}
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
               <button
@@ -498,8 +515,4 @@ export function BusBookingForm({
       </div>
     </div>
   );
-}
-
-function local(english: string, _arabic: string) {
-  return english;
 }

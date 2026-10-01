@@ -140,6 +140,42 @@ export const ROUTE_META: WaselRouteMeta[] = [
     analyticsKey: 'plus',
   },
   {
+    path: '/app/mobility-os',
+    requiresAuth: true,
+    title: 'Mobility OS',
+    titleAr: 'نظام تشغيل التنقل',
+    description: 'Explore the live Wasel mobility network and connected corridors.',
+    descriptionAr: 'استكشف شبكة تنقل واصل المباشرة والمسارات المتصلة.',
+    analyticsKey: 'mobility_os',
+  },
+  {
+    path: '/app/schedule',
+    requiresAuth: true,
+    title: 'Schedule',
+    titleAr: 'الجدول',
+    description: 'Your upcoming Wasel schedule of rides, buses and deliveries.',
+    descriptionAr: 'جدولك القادم من الرحلات والحافلات والتوصيلات في واصل.',
+    analyticsKey: 'schedule',
+  },
+  {
+    path: '/app/routes',
+    requiresAuth: true,
+    title: 'Popular Routes',
+    titleAr: 'المسارات الشائعة',
+    description: 'Browse the most travelled Wasel routes between Jordanian cities.',
+    descriptionAr: 'تصفح أكثر مسارات واصل استخداماً بين المدن الأردنية.',
+    analyticsKey: 'routes',
+  },
+  {
+    path: '/app/activity',
+    requiresAuth: true,
+    title: 'Activity',
+    titleAr: 'النشاط',
+    description: 'Every Wasel ride, delivery, bus booking and scheduled pickup in one timeline.',
+    descriptionAr: 'كل رحلاتك وتوصيلاتك وحجوزات الباص والاستلامات المجدولة في واصل في جدول واحد.',
+    analyticsKey: 'activity',
+  },
+  {
     path: '/app/privacy',
     title: 'Privacy Policy',
     titleAr: 'سياسة الخصوصية',
@@ -174,14 +210,97 @@ export const ROUTE_META: WaselRouteMeta[] = [
     descriptionAr: 'لوحة تحكم إدارة واصل.',
     analyticsKey: 'admin',
   },
+  {
+    path: '/app/admin/users',
+    requiresAuth: true,
+    title: 'User Management',
+    titleAr: 'إدارة المستخدمين',
+    description: 'Review, search and moderate Wasel accounts.',
+    descriptionAr: 'راجع حسابات واصل وابحث فيها وأدرها.',
+    analyticsKey: 'admin_users',
+  },
+  {
+    path: '/app/admin/disputes',
+    requiresAuth: true,
+    title: 'Disputes',
+    titleAr: 'النزاعات',
+    description: 'Resolve Wasel booking and payment disputes.',
+    descriptionAr: 'حل نزاعات الحجز والدفع في واصل.',
+    analyticsKey: 'admin_disputes',
+  },
+  {
+    path: '/app/analytics',
+    requiresAuth: true,
+    title: 'Analytics',
+    titleAr: 'التحليلات',
+    description: 'Wasel platform analytics and reporting.',
+    descriptionAr: 'تحليلات وتقارير منصة واصل.',
+    analyticsKey: 'analytics',
+  },
+  {
+    path: '/app/moderation',
+    requiresAuth: true,
+    title: 'Moderation',
+    titleAr: 'الإشراف',
+    description: 'Moderate Wasel content, reports and trust signals.',
+    descriptionAr: 'أشرف على محتوى واصل والبلاغات وإشارات الثقة.',
+    analyticsKey: 'moderation',
+  },
+  {
+    path: '/app/innovation-hub',
+    requiresAuth: true,
+    title: 'Innovation Hub',
+    titleAr: 'مركز الابتكار',
+    description: 'Wasel innovation and product experiments.',
+    descriptionAr: 'ابتكار واصل وتجارب المنتجات.',
+    analyticsKey: 'innovation_hub',
+  },
+  {
+    path: '/app/ai-intelligence',
+    requiresAuth: true,
+    title: 'AI Intelligence',
+    titleAr: 'ذكاء واصل',
+    description: 'AI-assisted matching and network intelligence.',
+    descriptionAr: 'مطابقة مدعومة بالذكاء الاصطناعي وذكاء الشبكة.',
+    analyticsKey: 'ai_intelligence',
+  },
+  {
+    path: '/app/services/corporate',
+    requiresAuth: true,
+    title: 'Corporate Travel',
+    titleAr: 'السفر المؤسسي',
+    description: 'Managed corporate travel on Wasel.',
+    descriptionAr: 'السفر المؤسسي المُدار عبر واصل.',
+    analyticsKey: 'services_corporate',
+  },
+  {
+    path: '/app/services/school',
+    requiresAuth: true,
+    title: 'School Transport',
+    titleAr: 'نقل المدارس',
+    description: 'Managed school transport on Wasel.',
+    descriptionAr: 'نقل المدارس المُدار عبر واصل.',
+    analyticsKey: 'services_school',
+  },
 ];
 
 export function getRouteMeta(pathname: string): WaselRouteMeta | undefined {
-  return ROUTE_META.find(meta => pathname === meta.path || pathname.startsWith(meta.path + '/'));
+  // Longest-prefix wins, so `/app/admin/users` never falls back to the
+  // `/app/admin` entry just because that one is declared first.
+  let best: WaselRouteMeta | undefined;
+
+  for (const meta of ROUTE_META) {
+    const matches = pathname === meta.path || pathname.startsWith(`${meta.path}/`);
+    if (matches && (!best || meta.path.length > best.path.length)) {
+      best = meta;
+    }
+  }
+
+  return best;
 }
 
 export function isProtectedRoute(pathname: string): boolean {
-  return ROUTE_META.some(meta => meta.requiresAuth && pathname === meta.path);
+  return getRouteMeta(pathname)?.requiresAuth === true;
 }
 
 export type { RouteObject };

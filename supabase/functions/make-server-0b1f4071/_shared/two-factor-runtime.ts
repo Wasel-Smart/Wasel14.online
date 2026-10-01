@@ -1,3 +1,5 @@
+import qrcode from 'https://esm.sh/qrcode-generator@1.4.4';
+
 export type TwoFactorSetupPayload = {
   secret: string;
   qrCode: string;
@@ -32,7 +34,15 @@ export function generateQRCode(secret: string, userLabel: string): string {
   const issuer = 'Wasel';
   const label = `${issuer}:${userLabel}`;
   const otpUrl = `otpauth://totp/${encodeURIComponent(label)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}`;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpUrl)}`;
+  // Render the QR locally. The previous implementation sent the full otpauth URL,
+  // including the TOTP secret, to a third-party service (api.qrserver.com) - that
+  // is a disclosure of the second factor and lands in their access logs. A data:
+  // URI keeps the response shape identical (the client uses it as an <img src>)
+  // and is already permitted by the CSP `img-src data:`.
+  const qr = qrcode(0, 'M');
+  qr.addData(otpUrl);
+  qr.make();
+  return `data:image/svg+xml;base64,${btoa(qr.createSvgTag(4, 2))}`;
 }
 
 export function generateBackupCodes(count = 10): string[] {

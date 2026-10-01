@@ -1,5 +1,10 @@
 # Wasel — Phase 4 audit findings (partial, read-only)
 
+> **Status update 2026-10-01:** A1, B1, B2, B3, B4 and the medium items on error-text
+> reflection, password length and idempotency scoping have since been fixed in the code.
+> Only **A2** (`verify_jwt` vs webhooks) remains open. See `REVIEW_REPORT.md` for the
+> current verified state. The text below is kept as the original record.
+
 Scope actually reviewed (files read in full): `src/utils/supabase/client.ts`, `info.tsx`,
 `src/utils/session.ts`, `src/services/storage.ts`, `src/utils/stripe.ts`,
 `api/auth/callback.ts`, `supabase/config.toml`, `supabase/functions/deno.json`,

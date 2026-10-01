@@ -144,6 +144,16 @@ export function setWaselPlusActive(active: boolean) {
   return writeSnapshot(next);
 }
 
+/**
+ * Ends the active commuter pass. The pass and the daily route share an id, so
+ * only the pass reference is cleared — the daily corridor stays as the user's
+ * default route.
+ */
+export function cancelCommuterPass() {
+  const current = readSnapshot();
+  return writeSnapshot({ ...current, commuterPassRouteId: null });
+}
+
 export function startCommuterPass(routeId: string) {
   const current = readSnapshot();
   const streak = updateStreak(current.lastActivityDate);

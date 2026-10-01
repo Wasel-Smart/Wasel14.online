@@ -8,15 +8,19 @@ interface CounterState {
 export function useCounter(initialValue = 0) {
   const [state, setState] = useState<CounterState>({ count: initialValue, lastUpdated: 0 });
 
+  const countRef = useRef(initialValue);
+  const listenersRef = useRef<Set<(state: CounterState) => void>>(new Set());
+
   useEffect(() => {
     const id = setTimeout(() => {
+      // Reset the ref as well as the rendered state. Leaving countRef untouched
+      // makes getRefValue()/increment()/decrement() keep counting from the old
+      // value, so they silently disagree with the number on screen.
+      countRef.current = initialValue;
       setState({ count: initialValue, lastUpdated: Date.now() });
     }, 0);
     return () => clearTimeout(id);
   }, [initialValue]);
-
-  const countRef = useRef(initialValue);
-  const listenersRef = useRef<Set<(state: CounterState) => void>>(new Set());
 
   const increment = useCallback(() => {
     const newCount = countRef.current + 1;

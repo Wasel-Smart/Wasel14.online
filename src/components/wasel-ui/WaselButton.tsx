@@ -6,7 +6,7 @@
 
 import { Loader2 } from 'lucide-react';
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
-import { C, F, GRAD, GRAD_GOLD, R, SH, TYPE } from '../../utils/wasel-ds';
+import { C, GRAD, GRAD_GOLD, R, SH, TYPE } from '../../utils/wasel-ds';
 
 const STYLE_ID = 'wasel-btn-css';
 const BTN_CSS = `
@@ -15,6 +15,7 @@ const BTN_CSS = `
   .wbtn:not(:disabled):hover::after { transform:translateX(110%); }
   .wbtn:not(:disabled):hover { transform: translateY(-2px) scale(1.015); }
   .wbtn:not(:disabled):active { transform: scale(0.97) !important; }
+  .wbtn:focus-visible { outline: 2px solid var(--wasel-focus, #00E5FF); outline-offset: 3px; }
   .wbtn[data-variant='primary']:not(:disabled):hover { box-shadow: 0 14px 36px rgba(0,229,255,0.38), 0 1px 0 rgba(255,255,255,0.18) inset; }
   .wbtn[data-variant='outline']:not(:disabled):hover { background: rgba(0,229,255,0.1) !important; border-color: rgba(0,229,255,0.5) !important; box-shadow: 0 0 22px rgba(0,229,255,0.16); }
   .wbtn[data-variant='ghost']:not(:disabled):hover { background: rgba(255,255,255,0.07) !important; color: #F8FBFF !important; }
@@ -102,7 +103,7 @@ export function WaselButton ( {
   fullWidth = false,
   icon,
   iconEnd,
-  dir = 'ltr',
+  dir,
   children,
   disabled,
   style,
@@ -123,7 +124,7 @@ export function WaselButton ( {
     padding: s.padding,
     fontSize: s.fontSize,
     fontWeight: TYPE.weight.black,
-    fontFamily: F,
+    fontFamily: 'inherit',
     letterSpacing: TYPE.letterSpacing.normal,
     borderRadius: s.borderRadius,
     border: v.border,
@@ -134,7 +135,6 @@ export function WaselButton ( {
     opacity: isDisabled ? 0.6 : 1,
     userSelect: 'none',
     WebkitUserSelect: 'none',
-    outline: 'none',
     whiteSpace: 'nowrap',
     minWidth: 0,
     ...style,
@@ -146,6 +146,7 @@ export function WaselButton ( {
       dir={ dir }
       disabled={ isDisabled }
       data-variant={ variant }
+      aria-busy={ loading || undefined }
       className={ `wbtn${ className ? ` ${ className }` : '' }` }
       style={ baseStyle }
     >

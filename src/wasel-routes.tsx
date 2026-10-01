@@ -11,26 +11,31 @@
  */
 import React, { memo, Suspense, useEffect } from 'react';
 import { AlertTriangle, LoaderCircle, SearchX } from 'lucide-react';
-import { createBrowserRouter, isRouteErrorResponse, Navigate, useRouteError, type RouteObject } from 'react-router';
+import {
+  createBrowserRouter,
+  isRouteErrorResponse,
+  Navigate,
+  useLocation,
+  useRouteError,
+  type RouteObject,
+} from 'react-router';
 import { Button } from './components/ui/button';
 import { WaselStateCard } from './components/system/WaselStateCard';
 import { useLanguage } from './contexts/LanguageContext';
+import { normalizePathname } from './hooks/useIframeSafeNavigate';
+import { routeFallback } from './locales/chunks/routeFallback';
 import WaselRoot from './layouts/WaselRoot';
 import ProtectedOutlet from './router/ProtectedOutlet';
 
 const PageLoader = memo(() => {
   const { language } = useLanguage();
-  const ar = language === 'ar';
+  const copy = routeFallback[language];
 
   return (
     <WaselStateCard
-      eyebrow={ar ? 'تحميل' : 'Loading'}
-      title={ar ? 'نفتح شاشة واصل التالية' : 'Opening the next Wasel view'}
-      description={
-        ar
-          ? 'نجهز المسار ونحمل بيانات الشاشة ونستعيد آخر سياق لك.'
-          : 'We are preparing the route, loading the screen data, and restoring your last context.'
-      }
+      eyebrow={copy.routeFallback_loading_eyebrow}
+      title={copy.routeFallback_loading_title}
+      description={copy.routeFallback_loading_description}
       icon={LoaderCircle}
       loading
       minHeight="60vh"
@@ -62,26 +67,42 @@ const RedirectTo = memo(({ to }: { to: string }) => <Navigate to={to} replace />
 
 const NotFound = memo(() => {
   const { language } = useLanguage();
-  const ar = language === 'ar';
+  const copy = routeFallback[language];
 
   return (
     <WaselStateCard
       eyebrow="404"
-      title={ar ? 'الصفحة غير موجودة' : 'Page not found'}
-      description={
-        ar
-          ? 'الصفحة المطلوبة غير متاحة أو أن الرابط قديم.'
-          : 'The page you requested is unavailable or the link is outdated.'
-      }
+      title={copy.routeFallback_404_title}
+      description={copy.routeFallback_404_description}
       icon={SearchX}
       minHeight="80vh"
       actions={
         <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <a href="/">{ar ? 'العودة إلى واصل' : 'Back to Wasel'}</a>
+          <a href="/">{copy.routeFallback_back_to_wasel}</a>
         </Button>
       }
     />
   );
+});
+
+/**
+ * Last-resort guard for legacy bare paths (`/bus`, `/find-ride`, …).
+ *
+ * The whole app is mounted under `/app/...`, but nav config, marketing CTAs and
+ * external deep links still carry the old bare form. Any of those that reach the
+ * router without passing through `useIframeSafeNavigate` used to fall through to
+ * a 404 "App Error" screen, which reads to the user as "the app is not
+ * responding". This maps them back into the mounted namespace instead.
+ */
+const LegacyPathRedirect = memo(() => {
+  const location = useLocation();
+  const target = normalizePathname(location.pathname);
+
+  if (target !== location.pathname) {
+    return <Navigate to={`${target}${location.search}`} replace />;
+  }
+
+  return <NotFound />;
 });
 
 const isInvalidHookCallError = (message: string): boolean =>
@@ -89,15 +110,13 @@ const isInvalidHookCallError = (message: string): boolean =>
 
 const RouteErrorFallback = memo(() => {
   const { language } = useLanguage();
-  const ar = language === 'ar';
+  const copy = routeFallback[language];
   const error = useRouteError();
   const message = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
     : error instanceof Error
       ? error.message
-      : ar
-        ? 'تعذر تحميل هذه الصفحة.'
-        : 'This page could not be loaded.';
+      : copy.routeFallback_error_default_message;
 
   const isHookError = isInvalidHookCallError(message);
 
@@ -118,42 +137,10 @@ const RouteErrorFallback = memo(() => {
     return () => clearTimeout(timer);
   }, [isHookError]);
 
-  if (isHookError) {
-    return (
-      <WaselStateCard
-        eyebrow={ar ? 'خطأ في التطبيق' : 'App Error'}
-        title={ar ? 'تعذر تحميل هذه الصفحة' : 'This page could not be loaded'}
-        description={message}
-        icon={AlertTriangle}
-        tone="danger"
-        minHeight="100vh"
-        actions={
-          <>
-            <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <a href="/app/find-ride">{ar ? 'ابحث عن مشوار' : 'Find a ride'}</a>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="border-white/15 bg-white/5 text-white hover:bg-white/10"
-            >
-              <a href="/">{ar ? 'العودة للرئيسية' : 'Go home'}</a>
-            </Button>
-          </>
-        }
-        footer={
-          ar
-            ? 'تم اكتشاف خطأ في استدعاء Hook. جارٍ إعادة تشغيل التطبيق تلقائياً...'
-            : 'Invalid hook call detected. Automatically recovering...'
-        }
-      />
-    );
-  }
-
   return (
     <WaselStateCard
-      eyebrow={ar ? 'خطأ في التطبيق' : 'App Error'}
-      title={ar ? 'تعذر تحميل هذه الصفحة' : 'This page could not be loaded'}
+      eyebrow={copy.routeFallback_error_eyebrow}
+      title={copy.routeFallback_error_title}
       description={message}
       icon={AlertTriangle}
       tone="danger"
@@ -161,22 +148,18 @@ const RouteErrorFallback = memo(() => {
       actions={
         <>
           <Button asChild className="bg-primary text-primary-foreground hover:bg-primary/90">
-            <a href="/app/find-ride">{ar ? 'ابحث عن مشوار' : 'Find a ride'}</a>
+            <a href="/app/find-ride">{copy.routeFallback_find_ride}</a>
           </Button>
           <Button
             asChild
             variant="outline"
             className="border-white/15 bg-white/5 text-white hover:bg-white/10"
           >
-            <a href="/">{ar ? 'العودة للرئيسية' : 'Go home'}</a>
+            <a href="/">{copy.routeFallback_go_home}</a>
           </Button>
         </>
       }
-      footer={
-        ar
-          ? 'إذا تكرر هذا، فأعد تحميل التطبيق أو افتح التدفق مرة أخرى من الشاشة الرئيسية.'
-          : 'If this repeats, reload the app shell or reopen the flow from the home screen.'
-      }
+      footer={isHookError ? copy.routeFallback_hook_footer : copy.routeFallback_reload_footer}
     />
   );
 });
@@ -227,6 +210,14 @@ const buildMainChildren = (): RouteObject[] => [
     Component: ProtectedOutlet,
     children: [
       { path: 'bus', lazy: lazy(() => import('./features/bus/BusPage'), 'BusPage') },
+      // Cross-service timeline (rides, packages, buses, scheduled pickups).
+      // The /app/activity/* subpaths below are the paths src/config/
+      // navigation-structure.ts advertises; they resolve to the pages that
+      // actually own each surface.
+      { path: 'activity', lazy: lazy(() => import('./features/activity/ActivityPage'), 'ActivityPage') },
+      { path: 'activity/trips', Component: () => <RedirectTo to="/app/my-trips" /> },
+      { path: 'activity/packages', Component: () => <RedirectTo to="/app/packages" /> },
+      { path: 'activity/wallet', Component: () => <RedirectTo to="/app/wallet" /> },
       // Primary bottom-nav tab for every signed-in user (see CORE_NAV_ITEMS) —
       // must NOT sit behind `operations:read`.
       { path: 'mobility-os', lazy: lazy(() => import('./features/mobility-os')) },
@@ -326,7 +317,7 @@ const buildMainChildren = (): RouteObject[] => [
     children: [
       {
         path: 'admin',
-        lazy: lazy(() => import('./features/admin/AdminDashboardPage')),
+        lazy: lazy(() => import('./features/admin/AdminDashboardPage'), 'AdminDashboardPage'),
       },
     ],
   } as unknown as RouteObject,
@@ -347,14 +338,14 @@ const buildMainChildren = (): RouteObject[] => [
       { path: 'trust', lazy: lazy(() => import('./features/trust/TrustCenterPage')) },
       { path: 'driver', lazy: lazy(() => import('./features/driver/DriverPage')) },
       { path: 'safety', lazy: lazy(() => import('./features/safety/SafetyPage')) },
-      { path: 'schedule', lazy: lazy(() => import('./features/schedule/SchedulePage')) },
+      { path: 'schedule', lazy: lazy(() => import('./features/schedule/SchedulePage'), 'SchedulePage') },
     ],
   },
 
   // ── Legal ─────────────────────────────────────────────────────────────────
-  { path: 'privacy', lazy: lazy(() => import('./features/legal/PrivacyPolicy')) },
-  { path: 'terms', lazy: lazy(() => import('./features/legal/TermsOfService')) },
-  { path: 'security', lazy: lazy(() => import('./features/legal/SecurityPage')) },
+  { path: 'privacy', lazy: lazy(() => import('./features/legal/PrivacyPolicy'), 'PrivacyPolicy') },
+  { path: 'terms', lazy: lazy(() => import('./features/legal/TermsOfService'), 'TermsOfService') },
+  { path: 'security', lazy: lazy(() => import('./features/legal/SecurityPage'), 'SecurityPage') },
   { path: 'support', lazy: lazy(() => import('./features/support/SupportPage')) },
   { path: 'legal/privacy', Component: () => <RedirectTo to="/app/privacy" /> },
   { path: 'legal/terms', Component: () => <RedirectTo to="/app/terms" /> },
@@ -392,5 +383,12 @@ export const waselRouter = createBrowserRouter([
     hydrateFallbackElement: <PageLoader />,
     errorElement: <RouteErrorFallback />,
     children: buildMainChildren() as unknown as RouteObject[],
+  },
+  // Declared last for readability only. React Router ranks matches by route
+  // specificity, not array position, so this catch-all can never shadow /app
+  // or /trust regardless of where it sits.
+  {
+    path: '*',
+    Component: LegacyPathRedirect,
   },
 ] as unknown as RouteObject[]);

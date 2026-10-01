@@ -213,13 +213,72 @@ interface AppErrorBoundaryState {
   error: string;
 }
 
+const BENIGN_RUNTIME_ERROR_PATTERNS = [
+  'IframeMessageAbortError',
+  'message port was destroyed',
+  'Message aborted',
+  'setupMessageChannel',
+];
+
 function shouldIgnoreRuntimeError(message: string): boolean {
-  return [
-    'IframeMessageAbortError',
-    'message port was destroyed',
-    'Message aborted',
-    'setupMessageChannel',
-  ].some(pattern => message.includes(pattern));
+  return BENIGN_RUNTIME_ERROR_PATTERNS.some(pattern => message.includes(pattern));
+}
+
+/**
+ * True when a thrown value matches one of the benign cross-origin
+ * iframe / postMessage abort patterns above.
+ */
+export function isBenignRuntimeError(value: unknown): boolean {
+  const message = value instanceof Error ? value.message : String(value);
+  return shouldIgnoreRuntimeError(message);
+}
+
+/**
+ * Absorbs benign cross-frame runtime noise *upstream of React*.
+ *
+ * An error boundary cannot "ignore" an error: returning a non-error state makes
+ * React re-render the exact children that just threw, so a recurring
+ * postMessage/iframe abort re-throws, remounts and re-throws forever, freezing
+ * the app. So the filtering happens where it belongs — before React ever sees
+ * the error:
+ *
+ * - `window.addEventListener('error', …, true)` runs in the capture phase, i.e.
+ *   before React's own bubble-phase listener on the root container, so
+ *   `stopPropagation()` means the error never reaches React and never becomes
+ *   an uncaught render error. Other `window` listeners (Sentry, App Insights)
+ *   still run, because `stopPropagation` does not stop same-target listeners.
+ * - `unhandledrejection` covers the same noise surfacing as a rejected promise;
+ *   `preventDefault()` stops the browser's unhandled-rejection reporting.
+ *
+ * Returns a teardown function.
+ */
+export function installBenignRuntimeErrorFilter(): () => void {
+  if (typeof window === 'undefined') {
+    return () => undefined;
+  }
+
+  const handleError = (event: ErrorEvent): void => {
+    if (!shouldIgnoreRuntimeError(event.message ?? '')) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleRejection = (event: PromiseRejectionEvent): void => {
+    if (!isBenignRuntimeError(event.reason)) {
+      return;
+    }
+    event.preventDefault();
+  };
+
+  window.addEventListener('error', handleError, true);
+  window.addEventListener('unhandledrejection', handleRejection);
+
+  return () => {
+    window.removeEventListener('error', handleError, true);
+    window.removeEventListener('unhandledrejection', handleRejection);
+  };
 }
 
 export class AppErrorBoundary extends Component<{ children: ReactNode }, AppErrorBoundaryState> {
@@ -228,10 +287,10 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, AppErro
   static getDerivedStateFromError(error: unknown): AppErrorBoundaryState {
     const message = error instanceof Error ? error.message : String(error);
 
-    if (shouldIgnoreRuntimeError(message)) {
-      return { hasError: false, error: '' };
-    }
-
+    // Any error that still reaches the boundary is a real error. Returning
+    // `hasError: false` here would re-render the children that just threw and
+    // loop forever on a recurring abort; benign cross-frame noise is filtered
+    // earlier, by installBenignRuntimeErrorFilter().
     return { hasError: true, error: sanitizeLogMessage(message) };
   }
 

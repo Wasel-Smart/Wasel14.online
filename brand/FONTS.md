@@ -1,6 +1,11 @@
 # Wasel Font System
 
-## Self-Hosted Fonts
+> **Status (2026-10-01):** `public/fonts/` does not exist yet. Fonts are currently
+> loaded from Google Fonts via a `<link>` in `index.html` (`display=swap`). The
+> self-hosted layout below is the target state for offline/PWA resilience — until
+> the woff2 files are added, do not reference `/fonts/...` in CSS.
+
+## Self-Hosted Fonts (target)
 
 All Wasel fonts are served from `/fonts/` for offline/PWA resilience and performance.
 

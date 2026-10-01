@@ -105,6 +105,9 @@ export function PackagesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [trackingMessage, setTrackingMessage] = useState<string | null>(null);
   const [busyState, setBusyState] = useState<'idle' | 'creating' | 'tracking'>('idle');
+  // The returns panel owns its own confirmation state so creating a return does
+  // not leave the Send tab stuck on its success panel (and vice versa).
+  const [returnTrackingId, setReturnTrackingId] = useState<string | null>(null);
 
   const featuredCorridors = useMemo(() => getFeaturedCorridors(3), []);
   const marketplaceNodes = useMemo(() => getMarketplaceNodes().slice(2), []);
@@ -167,7 +170,16 @@ export function PackagesPage() {
         recipientPhone: pkg.recipientPhone,
       });
 
-      setPkg(previous => ({ ...previous, sent: true, trackingId: created.trackingId }));
+      // `sent` drives the Send tab's success panel, so it must only flip for a
+      // delivery. The returns panel renders its own tracking confirmation.
+      setPkg(previous => ({
+        ...previous,
+        sent: packageType === 'delivery' ? true : previous.sent,
+        trackingId: packageType === 'delivery' ? created.trackingId : previous.trackingId,
+      }));
+      if (packageType === 'return') {
+        setReturnTrackingId(created.trackingId);
+      }
       setTrackedPackage(created);
       setTrackId(created.trackingId);
       setTrackingMessage(ar ? `التتبع مباشر: ${created.trackingId}.` : `Tracking live: ${created.trackingId}.`);
@@ -695,9 +707,16 @@ export function PackagesPage() {
 
           {activeTab === 'raje3' && (
             <PackageReturnsPanel
+              pkg={pkg}
+              setPkg={setPkg}
+              trackingId={returnTrackingId}
               createError={createError}
               busyState={busyState}
               onCreateReturn={() => handlePackageCreate('return')}
+              onReset={() => {
+                setReturnTrackingId(null);
+                setCreateError(null);
+              }}
             />
           )}
         </div>

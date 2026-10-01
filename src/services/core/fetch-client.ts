@@ -1,7 +1,7 @@
 import { API_URL } from './api-resolver';
 import { getConfig } from '../../utils/env';
 import { validateApiUrl } from '../../utils/sanitization';
-import { circuitBreakers, CircuitState } from '../../utils/circuitBreaker';
+import { circuitBreakers } from '../../utils/circuitBreaker';
 import { addCSRFHeader } from '../../utils/csrf';
 import { supabase as supabaseClient } from '../../utils/supabase/client';
 import {
@@ -51,11 +51,15 @@ export async function fetchWithRetry(
     timeout: 5000,
   });
 
-  if (breaker.getState() === CircuitState.OPEN) {
-    breaker.reset();
-  }
+  // No manual reset here: the breaker resets itself on success and on manual
+  // reset (resetApiCircuitBreaker), and fails fast while OPEN until its reset
+  // window elapses. Resetting on entry made the breaker incapable of opening.
 
-  const executeFetch = async (): Promise<Response> => {
+  // The retries run as a loop inside the breaker-protected call, so one logical
+  // request counts as exactly one breaker outcome. Recursing through
+  // fetchWithRetry would re-enter the breaker for every attempt and trip it
+  // after ~3 requests instead of the configured 5 consecutive failures.
+  const attemptFetch = async (): Promise<Response> => {
     const { timeout = 5_000, signal: callerSignal, ...fetchOptions } = options;
 
     if (fetchOptions.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(fetchOptions.method)) {
@@ -86,45 +90,67 @@ export async function fetchWithRetry(
         return response;
       }
 
-      if (retries > 0 && [502, 503, 504].includes(response.status)) {
-        await delay(backoff);
-        return fetchWithRetry(url, options, retries - 1, backoff * 2);
-      }
-
-      if (!response.ok && response.status >= 500) {
+      if (response.status >= 500) {
         setBackendStatus(getNetworkOnline() ? 'degraded' : 'offline');
       }
 
       return response;
-    } catch (error: unknown) {
-      if (callerSignal?.aborted) {
-        throw error;
-      }
-
-      const isRetryable =
-        error instanceof TypeError ||
-        (error instanceof DOMException && error.name === 'AbortError');
-
-      if (retries > 0 && isRetryable) {
-        await delay(backoff);
-        return fetchWithRetry(url, options, retries - 1, backoff * 2);
-      }
-
-      setBackendStatus(getNetworkOnline() ? 'degraded' : 'offline');
-
-      if (url.startsWith(API_URL)) {
-        setEdgeFunctionAvailability(false);
-      }
-
-      throw error;
     } finally {
       clearTimeout(timer);
       callerSignal?.removeEventListener('abort', onCallerAbort);
     }
   };
 
+  const markBackendDown = (): void => {
+    setBackendStatus(getNetworkOnline() ? 'degraded' : 'offline');
+
+    if (url.startsWith(API_URL)) {
+      setEdgeFunctionAvailability(false);
+    }
+  };
+
+  const isRetryableFailure = (error: unknown): boolean => {
+    if (options.signal?.aborted === true) {
+      return false;
+    }
+
+    return (
+      error instanceof TypeError ||
+      (error instanceof DOMException && error.name === 'AbortError')
+    );
+  };
+
+  const executeFetch = async (): Promise<Response> => {
+    let remainingRetries = retries;
+    let currentBackoff = backoff;
+
+    for (;;) {
+      try {
+        const response = await attemptFetch();
+
+        if (remainingRetries <= 0 || !RETRYABLE_STATUS_CODES.includes(response.status)) {
+          return response;
+        }
+      } catch (error: unknown) {
+        if (remainingRetries <= 0 || !isRetryableFailure(error)) {
+          if (options.signal?.aborted !== true) {
+            markBackendDown();
+          }
+
+          throw error;
+        }
+      }
+
+      remainingRetries -= 1;
+      await delay(currentBackoff);
+      currentBackoff *= 2;
+    }
+  };
+
   return breaker.execute(executeFetch);
 }
+
+const RETRYABLE_STATUS_CODES = [502, 503, 504];
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));

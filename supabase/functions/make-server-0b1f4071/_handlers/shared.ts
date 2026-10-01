@@ -549,12 +549,19 @@ export const WEBHOOK_PATH_PREFIXES = [
   '/cliq/webhook',
   '/sanad/webhook',
   '/communications/webhook',
+  // Canonical routes registered in index.ts. The legacy prefixes above are kept
+  // for backward compatibility, but these are the paths providers actually call;
+  // without them every payment/KYC callback was rejected by the CSRF gate (403).
+  '/payments/webhooks/',
+  '/trust/webhooks/',
   '/webhooks/',
   '/auth/hooks/',
 ];
 
 export function isWebhookRoute ( path: string ): boolean {
-  return WEBHOOK_PATH_PREFIXES.some( prefix => path.startsWith( prefix ) );
+  // resolveRoute() strips a leading /v1; the security gate must see the same path.
+  const normalized = path.startsWith( '/v1/' ) ? path.slice( 3 ) : path;
+  return WEBHOOK_PATH_PREFIXES.some( prefix => normalized.startsWith( prefix ) );
 }
 
 // Server-side CSRF / request-security gate for state-changing requests.
@@ -607,7 +614,8 @@ export async function authenticateRequest ( request: Request ): Promise<AuthResu
     .maybeSingle();
 
   if ( byAuthError ) {
-    return { error: json( { error: byAuthError.message }, 500 ) };
+    console.error( '[auth] canonical user lookup failed', byAuthError.message );
+    return { error: json( { error: 'Unable to load your profile. Please try again.' }, 500 ) };
   }
 
   let canonicalUser = byAuthUser as CanonicalUserRow | null;
@@ -672,6 +680,68 @@ export function enforcePermission (
   }
 
   return null;
+}
+
+/**
+ * Fixed-window rate limit backed by `public.consume_rate_limit` (Postgres), so
+ * the counter is shared by every edge isolate.
+ *
+ * Returns a ready-to-send 429 when the caller is over the limit, otherwise null.
+ * `failClosed` decides what happens if the limiter itself is unavailable: money
+ * and credential paths should refuse (503) rather than run unthrottled; everything
+ * else fails open so a limiter outage cannot take the API down.
+ */
+export async function consumeRateLimit (
+  admin: ReturnType<typeof getAdminClient>,
+  key: string,
+  limit: number,
+  windowSeconds: number,
+  options: { failClosed?: boolean } = {},
+): Promise<Response | null> {
+  try {
+    const { data, error } = await admin.rpc( 'consume_rate_limit', {
+      p_key: key,
+      p_limit: limit,
+      p_window_seconds: windowSeconds,
+    } );
+    if ( error ) throw new Error( error.message );
+
+    const row = Array.isArray( data ) ? data[ 0 ] : data;
+    if ( row && row.allowed === false ) {
+      const retryAfter = Math.max( Number( row.retry_after_seconds ?? windowSeconds ), 1 );
+      return new Response(
+        JSON.stringify( {
+          error: 'Too many requests. Please try again later.',
+          code: 'RATE_LIMITED',
+          retryAfterSeconds: retryAfter,
+        } ),
+        {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': String( retryAfter ) },
+        },
+      );
+    }
+    return null;
+  } catch ( error ) {
+    console.error( '[rate-limit] limiter unavailable', {
+      key: key.split( ':' )[ 0 ],
+      message: error instanceof Error ? error.message : String( error ),
+    } );
+    return options.failClosed
+      ? json( { error: 'Service temporarily unavailable. Please try again shortly.' }, 503 )
+      : null;
+  }
+}
+
+export async function resetRateLimit (
+  admin: ReturnType<typeof getAdminClient>,
+  key: string,
+): Promise<void> {
+  try {
+    await admin.rpc( 'reset_rate_limit', { p_key: key } );
+  } catch ( error ) {
+    console.error( '[rate-limit] reset failed', error instanceof Error ? error.message : String( error ) );
+  }
 }
 
 export function hasAnyPermission (
@@ -796,6 +866,10 @@ export async function ensureCanonicalUserForAuth (
 ) {
   const authUserId = String( authUser.id ?? '' );
   const email = String(
+    // The auth-provider email is the verified identity; a client-supplied body
+    // email must never override it (it would let a caller claim someone else's
+    // address, which wallet transfers resolve recipients by).
+    ( authUser.email || undefined ) ??
     body.email ??
     authUser.email ??
     `pending-${ authUserId }@wasel.local`
@@ -803,7 +877,10 @@ export async function ensureCanonicalUserForAuth (
   const fullName =
     String(
       body.fullName ??
-      [ body.firstName, body.lastName ].filter( Boolean ).join( ' ' ) ??
+      // `join` returns '' (never nullish) when both names are absent, so the old
+      // `??` chain never reached user_metadata.full_name and OAuth users were all
+      // named "Wasel User". Convert the empty string to undefined first.
+      ( [ body.firstName, body.lastName ].filter( Boolean ).join( ' ' ) || undefined ) ??
       ( authUser.user_metadata as Record<string, unknown> | undefined )?.full_name ??
       authUser.phone ??
       'Wasel User'
@@ -1087,6 +1164,11 @@ export function toMoneyNumber ( value: unknown ): number {
   return Number.isFinite( amount ) ? Number( amount.toFixed( 3 ) ) : 0;
 }
 
+/**
+ * JOD is a three-decimal currency, so a dinar amount converts to fils at
+ * x1000. This must only ever be paired with a JOD Stripe price: charging it
+ * against a two-decimal currency bills ten times the intended amount.
+ */
 export function toStripeMinorAmount ( amountJod: number ): string {
   return String( Math.round( amountJod * 1000 ) );
 }
@@ -1702,8 +1784,11 @@ export function buildSubscriptionRecord (
           : null,
     status: String( subscription.status ?? 'incomplete' ),
     plan,
-    current_period_start: toIsoFromUnix( subscription.current_period_start ),
-    current_period_end: toIsoFromUnix( subscription.current_period_end ),
+    // Stripe API versions from 2025-03-31 (basil) onward moved the billing period
+    // from the subscription to its items; read the item when the top-level field
+    // is absent. STRIPE_API_VERSION defaults to 2026-02-25.clover.
+    current_period_start: toIsoFromUnix( subscription.current_period_start ?? firstItem.current_period_start ),
+    current_period_end: toIsoFromUnix( subscription.current_period_end ?? firstItem.current_period_end ),
     cancel_at_period_end: Boolean( subscription.cancel_at_period_end ),
     cancelled_at: toIsoFromUnix( subscription.canceled_at ),
     ended_at: toIsoFromUnix( subscription.ended_at ),
@@ -2330,7 +2415,7 @@ export async function createStripeCheckoutSession ( input: {
   params.append( 'payment_method_types[]', 'card' );
   params.append( 'mode', 'payment' );
   params.append( 'customer', customerId );
-  params.append( 'line_items[0][price_data][currency]', 'usd' );
+  params.append( 'line_items[0][price_data][currency]', 'jod' );
   params.append( 'line_items[0][price_data][unit_amount]', toStripeMinorAmount( input.amountJod ) );
   params.append( 'line_items[0][price_data][product_data][name]', 'Wasel Wallet Top-up' );
   params.append( 'line_items[0][quantity]', '1' );
@@ -2672,6 +2757,13 @@ export async function submitSanadVerificationRequest ( input: {
 }
 
 export async function assertTripParticipant ( admin: ReturnType<typeof getAdminClient>, tripId: string, userId: string ) {
+  // tripId comes from the URL and is interpolated into a PostgREST `or()` filter
+  // below. Without this check a crafted value (e.g. `x,driver_id.eq.<my id>`)
+  // injects extra filter clauses and can make the participant check pass for a
+  // trip the caller is not on. Only canonical UUIDs may reach the query.
+  if ( !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test( tripId ) ) {
+    return false;
+  }
   const [ { data: trip, error: tripError }, { data: booking, error: bookingError } ] = await Promise.all( [
     admin.from( 'trips' ).select( 'id, trip_id, driver_id' ).or( `id.eq.${ tripId },trip_id.eq.${ tripId }` ).maybeSingle(),
     admin

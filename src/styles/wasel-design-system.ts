@@ -17,7 +17,7 @@ export const WaselColors = {
   gold: C.gold,
   goldDim: C.goldDim,
   orange: C.orange,
-  bronze: C.blue,
+  bronze: C.bronze,
   green: C.green,
   greenDim: C.greenDim,
   purple: C.purple,
@@ -34,9 +34,9 @@ export const WaselColors = {
 export const WaselGradients = {
   primary: GRAD,
   cyan: GRAD,
-  card: 'linear-gradient(180deg, rgba(247,241,232,0.05), rgba(247,241,232,0.02))',
+  card: 'linear-gradient(180deg, rgba(248,251,255,0.06), rgba(248,251,255,0.02))',
   hero: `linear-gradient(to bottom, transparent, ${C.bg})`,
-  glow: 'radial-gradient(circle, rgba(244,239,232,0.18), transparent)',
+  glow: 'radial-gradient(circle, rgba(0,229,255,0.18), transparent)',
   gold: GRAD_GOLD,
   orange: `linear-gradient(135deg, ${C.orange}, ${C.gold})`,
   green: GRAD_GREEN,
@@ -131,7 +131,7 @@ export const WaselBreakpoints = {
 } as const;
 
 export const glassmorphism = (opacity = 0.8) => ({
-  background: `rgba(24,28,34,${opacity})`,
+  background: `rgba(10,24,42,${opacity})`,
   backdropFilter: 'blur(20px)',
   border: `1px solid ${WaselColors.border}`,
 });

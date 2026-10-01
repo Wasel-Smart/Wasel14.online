@@ -5,11 +5,14 @@ import { useIframeSafeNavigate } from '../../hooks/useIframeSafeNavigate';
 import { DS, PageShell, Protected, r, SectionHead } from '../../pages/waselServiceShared';
 import {
   activateWaselPlus,
+  cancelCommuterPass,
   getMovementMembershipSnapshot,
+  setWaselPlusActive,
   startCommuterPass,
   type MovementMembershipSnapshot,
 } from '../../services/movementMembership';
 import {
+  areRouteRemindersEqual,
   createReminderFromSuggestion,
   formatRouteReminderSchedule,
   getRecurringRouteSuggestions,
@@ -39,6 +42,7 @@ export default function WaselPlusPage() {
   const [membership, setMembership] = useState(() => getMovementMembershipSnapshot());
   const [savedReminders, setSavedReminders] = useState(() => getRouteReminders());
   const [retentionMessage, setRetentionMessage] = useState<string | null>(null);
+  const [membershipMessage, setMembershipMessage] = useState<string | null>(null);
 
   const routeIntelligence = useLiveRouteIntelligence({
     from: membership.dailyRoute?.from,
@@ -54,9 +58,13 @@ export default function WaselPlusPage() {
 
   // Merged into one effect to prevent double-sync on updatedAt change
   useEffect(() => {
-    setSavedReminders(getRouteReminders());
+    const refresh = () => {
+      const next = getRouteReminders();
+      setSavedReminders(prev => (areRouteRemindersEqual(prev, next) ? prev : next));
+    };
+    refresh();
     void syncRouteReminders(user ?? undefined).then(delivered => {
-      if (delivered.length > 0) {setSavedReminders(getRouteReminders());}
+      if (delivered.length > 0) {refresh();}
     });
   }, [routeIntelligence.updatedAt, user?.email, user?.phone]);
 
@@ -71,9 +79,22 @@ export default function WaselPlusPage() {
     setMembership(getMovementMembershipSnapshot());
   };
 
+  const handleCancelPlus = () => {
+    setWaselPlusActive(false);
+    setMembership(getMovementMembershipSnapshot());
+    setMembershipMessage(tx('waselPlusPage.plus_cancelled'));
+  };
+
   const handleStartPass = (routeId: string) => {
     startCommuterPass(routeId);
     setMembership(getMovementMembershipSnapshot());
+    setMembershipMessage(tx('waselPlusPage.pass_started'));
+  };
+
+  const handleCancelPass = () => {
+    cancelCommuterPass();
+    setMembership(getMovementMembershipSnapshot());
+    setMembershipMessage(tx('waselPlusPage.pass_cancelled'));
   };
 
   const handleSaveReminder = (corridorId: string) => {
@@ -188,6 +209,22 @@ export default function WaselPlusPage() {
             <div style={{ color: DS.sub, fontSize: '0.84rem', lineHeight: 1.65, marginBottom: 18 }}>
               {tx('waselPlusPage.built_for_cheaper_repeat_travel')}
             </div>
+            {membershipMessage && (
+              <div
+                role="status"
+                style={{
+                  marginBottom: 16,
+                  borderRadius: r(12),
+                  border: `1px solid ${DS.gold}35`,
+                  background: `${DS.gold}12`,
+                  padding: '11px 12px',
+                  color: C.text,
+                  fontSize: '0.78rem',
+                }}
+              >
+                {membershipMessage}
+              </div>
+            )}
             <div style={{ display: 'grid', gap: 10 }}>
               {[
                 membership.plusActive
@@ -217,7 +254,13 @@ export default function WaselPlusPage() {
               ))}
             </div>
             <button
-              onClick={() => { void handleActivatePlus(); }}
+              onClick={() => {
+                if (membership.plusActive) {
+                  handleCancelPlus();
+                } else {
+                  handleActivatePlus();
+                }
+              }}
               style={{
                 width: '100%',
                 height: 50,
@@ -238,7 +281,7 @@ export default function WaselPlusPage() {
             >
               {membership.plusActive ? (
                 <>
-                  <CheckCircle size={16} /> {tx('waselPlusPage.manage_plan')}
+                  <CheckCircle size={16} /> {tx('waselPlusPage.cancel_plan')}
                 </>
               ) : (
                 `Activate Wasel Plus · ${PLUS_PRICE_JOD} JOD/mo`
@@ -402,21 +445,27 @@ export default function WaselPlusPage() {
                     ))}
                   </div>
                   <button
-                    onClick={() => { void handleStartPass(corridor.id); }}
+                    onClick={() => {
+                      if (active) {
+                        handleCancelPass();
+                      } else {
+                        handleStartPass(corridor.id);
+                      }
+                    }}
                     style={{
                       width: '100%',
                       height: 42,
                       marginTop: 12,
                       borderRadius: '999px',
                       border: 'none',
-                      background: active ? DS.gradGold : DS.gradC,
+                      background: active ? C.elevated : DS.gradC,
                       color: C.text,
                       fontWeight: 800,
                       cursor: 'pointer',
                     }}
                   >
                     {active
-                      ? 'Current pass ✓'
+                      ? tx('waselPlusPage.cancel_current_pass')
                       : `Start ${corridor.from} pass · ${passPrice} JOD/mo`}
                   </button>
                 </div>

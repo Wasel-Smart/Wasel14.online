@@ -122,18 +122,27 @@ describe('admin console — client and server agree on the paths', () => {
 });
 
 describe('admin console — React route guards', () => {
-  it('gates /app/admin/users on users:read', () => {
-    const index = APP_ROUTES.indexOf("path: 'admin/users'");
+  // The router expresses each guard as a JSX element
+  // (`element: <ProtectedOutlet require="…" />`) rather than the older
+  // `Component`/`require` object form, so assert on the prop form that is
+  // actually emitted. What matters is that the guard sits on the route object
+  // that owns the path, so the guard is read from the text preceding the path.
+  const guardBefore = (path: string): string => {
+    const index = APP_ROUTES.indexOf(path);
     expect(index).toBeGreaterThan(-1);
-    const window = APP_ROUTES.slice(Math.max(0, index - 300), index);
-    expect(window).toContain("require: 'users:read'");
+    return APP_ROUTES.slice(Math.max(0, index - 300), index);
+  };
+
+  it('gates /app/admin/users on users:read', () => {
+    expect(guardBefore("path: 'admin/users'")).toContain('require="users:read"');
   });
 
   it('gates /app/admin/disputes on disputes:read', () => {
-    const index = APP_ROUTES.indexOf("path: 'admin/disputes'");
-    expect(index).toBeGreaterThan(-1);
-    const window = APP_ROUTES.slice(Math.max(0, index - 300), index);
-    expect(window).toContain("require: 'disputes:read'");
+    expect(guardBefore("path: 'admin/disputes'")).toContain('require="disputes:read"');
+  });
+
+  it('gates /app/admin on config:write', () => {
+    expect(guardBefore("path: 'admin'")).toContain('require="config:write"');
   });
 
   it('no longer links to an unregistered /app/admin/disputes route', () => {

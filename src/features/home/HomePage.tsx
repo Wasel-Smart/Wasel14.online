@@ -33,7 +33,6 @@ import {
   TrustPagesSection,
   type CorridorCard,
   type QuickAction,
-  type TripMode,
 } from './HomePageSections';
 
 // BRAND_GUIDELINES.md motion rules: 150/200/280ms durations, standard easing
@@ -443,15 +442,18 @@ export function HomePage () {
   const { user, waselUser } = useAuth();
   const navigate = useIframeSafeNavigate();
   const { stats: liveStats, loading } = useLiveUserStats();
-  const [ tripMode, setTripMode ] = useState<TripMode>( 'one-way' );
 
   const ar = language === 'ar';
   const svc = CurrencyService.getInstance();
   const firstName = user?.user_metadata?.name?.split( ' ' )[ 0 ] || user?.email?.split( '@' )[ 0 ] || '';
   const role = waselUser?.role;
   const corridorBetaPlan = useMemo( () => buildCorridorBetaPlan(), [] );
-  const trustScore = waselUser?.trustScore ?? 87;
-  const primaryTripPath = tripMode === 'round' ? '/find-ride?mode=round' : '/find-ride';
+  const trustScore = waselUser?.trustScore ?? null;
+  // One-way only: `parseFindRideParams` (src/pages/waselCorePageHelpers.ts) reads
+  // only from/to/date/search, so a `?mode=round` link produced an identical
+  // one-way search. The round-trip control was removed rather than left doing
+  // nothing.
+  const primaryTripPath = '/find-ride';
 
   const { cookieConsented, cookieDeclined, cookieBannerRef, acceptCookies, declineCookies } =
     useCookieConsent( language, setLanguage );
@@ -473,15 +475,9 @@ export function HomePage () {
     trackUserAction( 'homepage.cta_click', {
       source,
       path,
-      tripMode,
       signedIn: Boolean( user?.id ),
     } );
     navigate( path );
-  };
-
-  const handleTripModeChange = ( mode: TripMode ) => {
-    setTripMode( mode );
-    trackUserAction( 'homepage.trip_mode_select', { mode } );
   };
 
   return (
@@ -510,8 +506,6 @@ export function HomePage () {
             ar={ ar }
             user={ user }
             firstName={ firstName }
-            tripMode={ tripMode }
-            onTripModeChange={ handleTripModeChange }
             onNavigate={ handleNavigate }
             primaryTripPath={ primaryTripPath }
           />

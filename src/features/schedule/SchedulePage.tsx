@@ -38,6 +38,9 @@ export type ScheduleItem = {
 
 const LOCAL_KEY = 'wasel-scheduled-items-v1';
 
+/** Where the rows currently on screen came from. */
+type ScheduleDataSource = 'server' | 'local';
+
 const STATUS_LABEL: Record<string, { en: string; ar: string; color: string }> = {
   scheduled: { en: 'Scheduled', ar: 'مجدول', color: C.cyan },
   confirmed: { en: 'Confirmed', ar: 'مؤكد', color: C.green },
@@ -109,6 +112,7 @@ export function SchedulePage() {
 
   const [showForm, setShowForm] = useState(false);
   const [items, setItems] = useState<ScheduleItem[]>([]);
+  const [dataSource, setDataSource] = useState<ScheduleDataSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [locating, setLocating] = useState(false);
   const [locationCaptured, setLocationCaptured] = useState(false);
@@ -127,39 +131,41 @@ export function SchedulePage() {
           .order('scheduled_at', { ascending: true });
 
         if (supabaseError) {throw supabaseError;}
-        if (data && data.length > 0) {
-          const mapped: ScheduleItem[] = data.map((row: Record<string, unknown>) => ({
-            id: row.id as string,
-            item_type: row.item_type as ScheduleItem['item_type'],
-            status: row.status as string,
-            pickup_location: row.pickup_location as string,
-            pickup_lat: row.pickup_lat as number | undefined,
-            pickup_lng: row.pickup_lng as number | undefined,
-            dropoff_location: row.dropoff_location as string | undefined,
-            dropoff_lat: row.dropoff_lat as number | undefined,
-            dropoff_lng: row.dropoff_lng as number | undefined,
-            scheduled_at: row.scheduled_at as string,
-            recurring_pattern: row.recurring_pattern as string,
-            notes: row.notes as string | undefined,
-            user_id: row.user_id as string | undefined,
-            contact_name: row.contact_name as string | undefined,
-            contact_phone: row.contact_phone as string | undefined,
-            estimated_price: row.estimated_price as number | undefined,
-          }));
-          setItems(mapped);
-          localStorage.setItem(LOCAL_KEY, JSON.stringify(mapped));
-          setLoading(false);
-          return;
-        }
+        // A successful query is authoritative — including an empty one. Falling
+        // through to the local cache here resurrected rows the user deleted.
+        const mapped: ScheduleItem[] = (data ?? []).map((row: Record<string, unknown>) => ({
+          id: row.id as string,
+          item_type: row.item_type as ScheduleItem['item_type'],
+          status: row.status as string,
+          pickup_location: row.pickup_location as string,
+          pickup_lat: row.pickup_lat as number | undefined,
+          pickup_lng: row.pickup_lng as number | undefined,
+          dropoff_location: row.dropoff_location as string | undefined,
+          dropoff_lat: row.dropoff_lat as number | undefined,
+          dropoff_lng: row.dropoff_lng as number | undefined,
+          scheduled_at: row.scheduled_at as string,
+          recurring_pattern: row.recurring_pattern as string,
+          notes: row.notes as string | undefined,
+          user_id: row.user_id as string | undefined,
+          contact_name: row.contact_name as string | undefined,
+          contact_phone: row.contact_phone as string | undefined,
+          estimated_price: row.estimated_price as number | undefined,
+        }));
+        setItems(mapped);
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(mapped));
+        setDataSource('server');
+        setLoading(false);
+        return;
       }
     } catch {
-      // fall back to local
+      // Fall through to the on-device copy below, flagged as stale.
     }
 
     const stored = localStorage.getItem(LOCAL_KEY);
     if (stored) {
       try {
         setItems(JSON.parse(stored));
+        setDataSource('local');
       } catch {
         /* ignore */
       }
@@ -195,6 +201,7 @@ export function SchedulePage() {
           .upsert(payload, { onConflict: 'id' });
         if (!error) {
           localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
+          setDataSource('server');
           return;
         }
       } catch {
@@ -325,6 +332,30 @@ export function SchedulePage() {
       >
         <div style={{ height: 4 }} />
       </SectionCard>
+
+      {/* Rows below came from the on-device copy, not the account — say so. */}
+      {!loading && dataSource === 'local' && (
+        <div
+          role="status"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '12px 16px',
+            marginBottom: 16,
+            borderRadius: R.md,
+            border: `1px solid ${C.gold}44`,
+            background: `${C.gold}14`,
+            color: C.gold,
+            fontSize: TYPE.size.xs,
+            fontFamily: F,
+            lineHeight: 1.6,
+          }}
+        >
+          <RefreshCw size={14} />
+          {t('scheduleExpanded.showingSavedCopy')}
+        </div>
+      )}
 
       {/* ── New schedule form ── */}
       {showForm && (

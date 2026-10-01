@@ -70,7 +70,9 @@ export default defineConfig( {
     },
     coverage: {
       provider: 'v8',
-      reporter: [ 'text', 'json', 'html', 'lcov' ],
+      // `json-summary` writes coverage/coverage-summary.json, which the CI
+      // coverage gate reads. Without it that step crashed on a missing file.
+      reporter: [ 'text', 'json', 'json-summary', 'html', 'lcov' ],
       include: [ 'src/**/*.{ts,tsx}' ],
       exclude: [
         'src/**/*.d.ts',

@@ -2,7 +2,7 @@ export default {
   ci: {
     collect: {
       url: ['http://127.0.0.1:4173/'],
-      numberOfRuns: 1,
+      numberOfRuns: 3, // median of 3 — a single run is too noisy to gate on
       settings: {
         onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
         formFactor: 'mobile',

@@ -6,7 +6,8 @@ import { PWAInstallPrompt } from './components/mobile/PWAInstallPrompt';
 import { AppErrorBoundary } from './components/system/ErrorBoundary';
 
 import { AuthProvider } from './contexts/AuthContext';
-import { LanguageProvider } from './contexts/LanguageContext';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
+import { C, F } from './utils/wasel-ds';
 
 import { validateRuntimeConfiguration } from './utils/env';
 import { DEFAULT_QUERY_OPTIONS } from './utils/performance/cacheStrategy';
@@ -35,6 +36,31 @@ function scheduleWhenIdle(callback: () => void): () => void {
 }
 
 /* ---------------------------
+   BRAND TOASTER
+   Uses design-system tokens + brand font stack (Plus Jakarta Sans / Cairo)
+   and follows the active language direction so Arabic toasts render RTL.
+---------------------------*/
+function BrandToaster() {
+  const { dir } = useLanguage();
+
+  return (
+    <Toaster
+      position="bottom-center"
+      theme="dark"
+      dir={dir}
+      toastOptions={{
+        style: {
+          background: C.cardSolid,
+          border: '1px solid rgba(0,229,255,0.25)',
+          color: C.text,
+          fontFamily: F,
+        },
+      }}
+    />
+  );
+}
+
+/* ---------------------------
    PROVIDERS WRAPPER
 ---------------------------*/
 function AppProviders({ children }: { children: ReactNode }) {
@@ -42,6 +68,7 @@ function AppProviders({ children }: { children: ReactNode }) {
     <LanguageProvider>
       <AuthProvider>
         {children}
+        <BrandToaster />
       </AuthProvider>
     </LanguageProvider>
   );
@@ -143,17 +170,6 @@ export default function App() {
           <AppRuntimeCoordinator />
         </AppProviders>
 
-        <Toaster
-          position="bottom-center"
-          toastOptions={{
-            style: {
-              background: '#0A1628',
-              border: '1px solid rgba(0,200,232,0.25)',
-              color: '#EFF6FF',
-              fontFamily: "-apple-system, 'Inter', sans-serif",
-            },
-          }}
-        />
         <PWAInstallPrompt />
       </QueryClientProvider>
     </AppErrorBoundary>

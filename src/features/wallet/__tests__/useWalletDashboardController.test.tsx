@@ -114,13 +114,70 @@ describe( 'useWalletDashboardController', () => {
       expect( result.current.shouldRedirectToAuth ).toBe( true );
     } );
 
-    it( 'marks the wallet unavailable (without throwing) when the fetch fails', async () => {
+    it( 'keeps the dashboard recoverable (walletError set, dashboard not discarded) when the fetch fails', async () => {
       walletApiMocks.getWallet.mockRejectedValue( new Error( 'backend down' ) );
       const { result } = renderController();
 
       await waitFor( () => expect( result.current.loading ).toBe( false ) );
       expect( result.current.walletData ).toBeNull();
-      expect( result.current.walletUnavailable ).toBe( true );
+      expect( result.current.walletError ).toBe( 'unavailable' );
+      // The whole point of the fix: the tree (and its Refresh action) survives.
+      expect( result.current.walletUnavailable ).toBe( false );
+    } );
+
+    it( 'clears a previous walletError once a retry succeeds', async () => {
+      walletApiMocks.getWallet.mockRejectedValueOnce( new Error( 'backend down' ) );
+      const { result } = renderController();
+
+      await waitFor( () => expect( result.current.walletError ).toBe( 'unavailable' ) );
+
+      await act( async () => { await result.current.handleRefresh(); } );
+
+      expect( result.current.walletError ).toBeNull();
+      expect( result.current.walletData?.balance ).toBe( 100 );
+    } );
+
+    it( 'reports a failed refresh as an error instead of a success toast', async () => {
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      walletApiMocks.getWallet.mockRejectedValue( new Error( 'still down' ) );
+      await act( async () => { await result.current.handleRefresh(); } );
+
+      expect( toastMock.success ).not.toHaveBeenCalledWith( 'Refreshed' );
+      expect( toastMock.error ).toHaveBeenCalledWith( 'Unable to load wallet right now' );
+    } );
+
+    it( 'keeps a configured 0 auto-top-up amount/threshold instead of reverting to defaults', async () => {
+      const base = makeWallet();
+      walletApiMocks.getWallet.mockResolvedValue(
+        makeWallet( { wallet: { ...base.wallet, autoTopUpAmount: 0, autoTopUpThreshold: 0 } } ),
+      );
+
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      expect( result.current.autoTopUpAmount ).toBe( '0' );
+      expect( result.current.autoTopUpThreshold ).toBe( '0' );
+    } );
+
+    it( 'still falls back to the defaults when the auto-top-up values are absent', async () => {
+      const base = makeWallet();
+      walletApiMocks.getWallet.mockResolvedValue(
+        makeWallet( {
+          wallet: {
+            ...base.wallet,
+            autoTopUpAmount: undefined as unknown as number,
+            autoTopUpThreshold: undefined as unknown as number,
+          },
+        } ),
+      );
+
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      expect( result.current.autoTopUpAmount ).toBe( '20' );
+      expect( result.current.autoTopUpThreshold ).toBe( '5' );
     } );
   } );
 
@@ -213,6 +270,36 @@ describe( 'useWalletDashboardController', () => {
       expect( result.current.withdrawBank ).toBe( '' );
       expect( result.current.showWithdraw ).toBe( false );
     } );
+
+    it( 'blocks an over-withdrawal with the insufficient-balance message', async () => {
+      // makeWallet() defaults to a balance of 100.
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      act( () => {
+        result.current.setWithdrawAmount( '250' );
+        result.current.setWithdrawBank( 'JO00BANK123' );
+      } );
+      await act( async () => { await result.current.handleWithdraw(); } );
+
+      expect( toastMock.error ).toHaveBeenCalledWith( 'Insufficient balance' );
+      expect( walletApiMocks.withdraw ).not.toHaveBeenCalled();
+      expect( result.current.showWithdraw ).toBe( false );
+    } );
+
+    it( 'allows a withdrawal equal to the full balance', async () => {
+      walletApiMocks.withdraw.mockResolvedValue( { success: true } );
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      act( () => {
+        result.current.setWithdrawAmount( '100' );
+        result.current.setWithdrawBank( 'JO00BANK123' );
+      } );
+      await act( async () => { await result.current.handleWithdraw(); } );
+
+      expect( walletApiMocks.withdraw ).toHaveBeenCalledWith( 'user-1', 100, 'JO00BANK123', 'bank_transfer' );
+    } );
   } );
 
   describe( 'handleAutoTopUpToggle — optimistic update', () => {
@@ -279,6 +366,34 @@ describe( 'useWalletDashboardController', () => {
       expect( walletApiMocks.setPin ).toHaveBeenCalledWith( 'user-1', '1234' );
       expect( toastMock.success ).toHaveBeenCalledWith( 'PIN set successfully' );
       expect( result.current.showPinSetup ).toBe( false );
+    } );
+  } );
+
+  describe( 'insights lifecycle', () => {
+    it( 'surfaces an insights error state instead of leaving a permanent spinner', async () => {
+      walletApiMocks.getInsights.mockRejectedValue( new Error( 'insights down' ) );
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      act( () => result.current.setTab( 'insights' ) );
+
+      await waitFor( () => expect( result.current.insightsError ).toBe( true ) );
+      expect( result.current.insights ).toBeNull();
+      expect( result.current.insightsLoading ).toBe( false );
+    } );
+
+    it( 'recovers on retry and clears the error state', async () => {
+      walletApiMocks.getInsights.mockRejectedValueOnce( new Error( 'insights down' ) );
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      act( () => result.current.setTab( 'insights' ) );
+      await waitFor( () => expect( result.current.insightsError ).toBe( true ) );
+
+      await act( async () => { await result.current.fetchInsights(); } );
+
+      expect( result.current.insightsError ).toBe( false );
+      expect( result.current.insights ).toEqual( { totalTransactions: 0 } );
     } );
   } );
 

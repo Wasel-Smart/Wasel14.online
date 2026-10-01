@@ -284,7 +284,6 @@ export const CITIES = [
   'Salt',
 ];
 
-export const RIDE_BOOKINGS_KEY = 'wasel-find-ride-bookings';
 export const RIDE_SEARCHES_KEY = 'wasel-find-ride-searches';
 export const OFFER_RIDE_DRAFT_KEY = 'wasel-offer-ride-draft';
 

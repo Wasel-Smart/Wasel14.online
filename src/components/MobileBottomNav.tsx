@@ -4,12 +4,13 @@
  */
 
 import { Bus, Clock, Network, Package, PlusCircle, Search } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation } from 'react-router';
 import { CORE_NAV_ITEMS } from '../config/user-navigation';
 import { useLanguage } from '../contexts/LanguageContext';
-import { C, F, GRAD_GOLD, TYPE } from '../utils/wasel-ds';
+import { useIframeSafeNavigate, type SafeNavigate } from '../hooks/useIframeSafeNavigate';
+import { C, F, GRAD_GOLD, TYPE, Z } from '../utils/wasel-ds';
 
-const BG = 'rgba(6,19,31,0.96)';
+const BG = 'rgba(8,29,57,0.96)';
 const CYAN = C.cyan;
 const GOLD = C.gold;
 const INACTIVE = C.textDim;
@@ -32,7 +33,11 @@ function NavItem({ item, isActive, isArabic, navigate }: {
   item: typeof CORE_NAV_ITEMS[number];
   isActive: boolean;
   isArabic: boolean;
-  navigate: ReturnType<typeof useNavigate>;
+  // MUST be the /app-normalising navigate, not react-router's raw one: the nav
+  // config stores legacy bare paths ('/bus', '/find-ride') that only resolve
+  // once mapped into the mounted '/app/...' namespace. Raw navigate() sent every
+  // tap to a route that does not exist, so the user landed on the 404 screen.
+  navigate: SafeNavigate;
 }) {
   const Icon = ICONS[item.id as keyof typeof ICONS];
   const isPost = item.id === 'post';
@@ -40,6 +45,7 @@ function NavItem({ item, isActive, isArabic, navigate }: {
 
   return (
     <button
+      type="button"
       onClick={() => { void navigate(item.path); }}
       aria-label={isArabic ? item.labelAr : item.label}
       aria-current={isActive ? 'page' : undefined}
@@ -57,7 +63,6 @@ function NavItem({ item, isActive, isArabic, navigate }: {
         border: 'none',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
-        outline: 'none',
         position: 'relative',
         transform: isActive ? 'scale(1.05)' : 'scale(1)',
         transition: 'transform 0.15s ease',
@@ -100,7 +105,7 @@ function NavItem({ item, isActive, isArabic, navigate }: {
           <Icon
             size={22}
             strokeWidth={isActive ? 2.5 : 2}
-            color={isActive ? '#111316' : GOLD}
+            color={isActive ? C.bgDeep : GOLD}
           />
         </div>
       ) : (
@@ -137,7 +142,7 @@ function NavItem({ item, isActive, isArabic, navigate }: {
           letterSpacing: isActive ? '0.01em' : '0',
         }}
       >
-        {isArabic ? item.labelAr : item.label}
+        {isArabic ? item.labelAr : item.id === 'mobility-os' ? 'Network' : item.label}
       </span>
     </button>
   );
@@ -146,7 +151,7 @@ function NavItem({ item, isActive, isArabic, navigate }: {
 export function MobileBottomNav({ language }: MobileBottomNavProps) {
   const { language: activeLanguage } = useLanguage();
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useIframeSafeNavigate();
   const resolvedLanguage = language ?? activeLanguage;
   const isArabic = resolvedLanguage === 'ar';
 
@@ -161,11 +166,9 @@ export function MobileBottomNav({ language }: MobileBottomNavProps) {
   return (
     <>
       <style>{`
-        .wasel-bottom-nav {
-          display: flex !important;
-        }
-        .wrl-main-content {
-          padding-bottom: 80px !important;
+        .wasel-bottom-nav { display: flex; }
+        @media (min-width: 900px) {
+          .wasel-bottom-nav { display: none !important; }
         }
       `}</style>
 
@@ -177,16 +180,14 @@ export function MobileBottomNav({ language }: MobileBottomNavProps) {
           bottom: 0,
           left: 0,
           right: 0,
-          zIndex: 600,
+          zIndex: Z.sticky,
           background: BG,
           borderTop: `1px solid ${BORDER}`,
-          boxShadow: '0 -12px 36px rgba(0,0,0,0.42), 0 -1px 0 rgba(88,221,255,0.08)',
+          boxShadow: '0 -12px 36px rgba(8,29,57,0.5), 0 -1px 0 rgba(0,229,255,0.1)',
           paddingBottom: 'max(8px, env(safe-area-inset-bottom, 8px))',
           flexDirection: 'row',
           justifyContent: 'space-around',
           alignItems: 'stretch',
-          willChange: 'transform',
-          transform: 'translateZ(0)',
         }}
       >
         {CORE_NAV_ITEMS.map(item => (

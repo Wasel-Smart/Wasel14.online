@@ -6,7 +6,7 @@
  */
 
 import { Suspense, lazy, useState } from 'react';
-import { Activity, Gift, Lock, RefreshCw, Wallet } from 'lucide-react';
+import { Activity, AlertCircle, Gift, Lock, RefreshCw, Wallet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -40,6 +40,7 @@ export function WalletDashboard() {
     autoTopUpEnabled,
     autoTopUpThreshold,
     balanceVisible,
+    fetchInsights,
     handleAutoTopUpToggle,
     handleClaimReward,
     handleRefresh,
@@ -49,6 +50,8 @@ export function WalletDashboard() {
     handleTopUp,
     handleWithdraw,
     insights,
+    insightsError,
+    insightsLoading,
     isRTL,
     loading,
     pinValue,
@@ -84,6 +87,7 @@ export function WalletDashboard() {
     topUpMethod,
     walletData,
     walletCapabilities,
+    walletError,
     walletSubtitle,
     walletUnavailable,
     withdrawAmount,
@@ -104,10 +108,10 @@ export function WalletDashboard() {
   const loadingDescription = t.loadingDescription ?? 'Fetching balance, movements, and rewards.';
   const walletUnavailableTitle = t.walletUnavailableTitle ?? 'Wallet unavailable';
   const jodLabel = t.jod ?? 'JOD';
-  const refreshLabel = isRTL ? '?????' : 'Refresh';
-  const heroDescription = isRTL
-    ? `?????? ?????????? ????????? ???? ?? ??? ???? ????. ${walletData?.currency || 'JOD'}`
-    : `Balance, transfers, and rewards in one clear surface. ${walletData?.currency || 'JOD'}`;
+  const currencyCode = walletData?.currency || 'JOD';
+  const refreshLabel = t.refresh ?? 'Refresh';
+  const heroCopy = t.heroDescription ?? 'Balance, transfers, and rewards in one clear surface.';
+  const heroDescription = `${heroCopy} ${currencyCode}`;
   const insightsFallback = (
     <Card className="rounded-xl">
       <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -160,10 +164,29 @@ export function WalletDashboard() {
   return (
     <PageShell maxWidth={1120} dir={isRTL ? 'rtl' : 'ltr'}>
       <div style={{ paddingInline: SPACE[4] }}>
+        {walletError ? (
+          <Card className="mb-4 rounded-xl border-destructive/40 bg-destructive/5">
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+              <span className="flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {t.walletLoadError ?? 'Unable to load wallet right now'}
+              </span>
+              <Button
+                variant="outline"
+                onClick={() => { void handleRefresh(); }}
+                disabled={refreshing}
+                className="shrink-0"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                {refreshLabel}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
         <PageHero
-          eyebrow={isRTL ? '?????????' : 'Payments'}
+          eyebrow={t.paymentsEyebrow ?? 'Payments'}
           icon={<StatusBadge label={activeLabel} accent={C.green} />}
-          title={isRTL ? '????? ????' : 'Wasel Wallet'}
+          title={walletTitle}
           description={heroDescription}
           accent={C.cyan}
           actions={
@@ -190,24 +213,18 @@ export function WalletDashboard() {
           aside={
             <div style={{ display: 'grid', gap: 12 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <StatusBadge label={walletData?.currency || 'JOD'} accent={C.cyan} />
+                <StatusBadge label={currencyCode} accent={C.cyan} />
                 <StatusBadge
                   label={
                     autoTopUpEnabled
-                      ? isRTL
-                        ? '??? ??????'
-                        : 'Auto top-up on'
-                      : isRTL
-                        ? '??? ????'
-                        : 'Manual top-up'
+                      ? (t.autoTopUpOn ?? 'Auto top-up on')
+                      : (t.manualTopUp ?? 'Manual top-up')
                   }
                   accent={autoTopUpEnabled ? C.green : C.gold}
                 />
               </div>
               <div style={{ color: C.textMuted, fontSize: '0.88rem', lineHeight: 1.7 }}>
-                {isRTL
-                  ? '?????? ?????????? ????????? ?? ??? ???? ????.'
-                  : 'Balance, transfers, and rewards in one clear surface.'}
+                {heroCopy}
               </div>
             </div>
           }
@@ -216,31 +233,31 @@ export function WalletDashboard() {
         <WaselStatsGrid
           stats={[
             {
-              value: `JOD ${bal.toFixed(2)}`,
-              label: isRTL ? '?????? ??????' : 'Available',
+              value: `${currencyCode} ${balanceVisible ? bal.toFixed(2) : t.maskedBalance}`,
+              label: t.availableLabel ?? 'Available',
               icon: <Wallet size={18} />,
               sublabel: walletSubtitle,
               accent: C.cyan,
             },
             {
-              value: `JOD ${pending.toFixed(2)}`,
-              label: isRTL ? '??????' : 'Pending',
+              value: `${currencyCode} ${balanceVisible ? pending.toFixed(2) : t.maskedShort}`,
+              label: t.pending ?? 'Pending',
               icon: <RefreshCw size={18} />,
-              sublabel: isRTL ? '????? ????? ??????? ?? ?????.' : 'Funds waiting for settlement or withdrawal.',
+              sublabel: t.pendingSublabel ?? 'Funds waiting for settlement or withdrawal.',
               accent: C.gold,
             },
             {
-              value: `JOD ${rewardsBal.toFixed(2)}`,
-              label: isRTL ? '????????' : 'Rewards',
+              value: `${currencyCode} ${balanceVisible ? rewardsBal.toFixed(2) : t.maskedShort}`,
+              label: t.rewards ?? 'Rewards',
               icon: <Gift size={18} />,
-              sublabel: isRTL ? '?????? ????? ???? ?????? ???????.' : 'Reward value available in the current cycle.',
+              sublabel: t.rewardsSublabel ?? 'Reward value available in the current cycle.',
               accent: C.green,
             },
             {
               value: transactionCount,
-              label: isRTL ? '???????' : 'Transactions',
+              label: t.transactions ?? 'Transactions',
               icon: <Activity size={18} />,
-              sublabel: isRTL ? '??? ??????? ??????? ??????.' : 'Visible transaction count right now.',
+              sublabel: t.transactionsSublabel ?? 'Visible transaction count right now.',
               accent: C.blue,
             },
           ]}
@@ -303,7 +320,7 @@ export function WalletDashboard() {
                       type="search"
                       value={txSearch}
                       onChange={e => setTxSearch(e.target.value)}
-                      placeholder={isRTL ? '???? ?? ???????...' : 'Search transactions...'}
+                      placeholder={t.searchTransactions ?? 'Search transactions...'}
                       style={{
                         width: '100%',
                         padding: '8px 12px',
@@ -372,7 +389,7 @@ export function WalletDashboard() {
                           size="sm"
                           onClick={() => { setTab('overview'); }}
                         >
-                          {isRTL ? '???? ???? ???? ??????' : 'Book a ride to earn rewards'}
+                          {t.bookRideToEarnRewards ?? 'Book a ride to earn rewards'}
                         </WaselButton>
                       }
                       accent={C.orange}
@@ -423,7 +440,14 @@ export function WalletDashboard() {
 
             <TabsContent value="insights" className="mt-4 space-y-4">
               <Suspense fallback={insightsFallback}>
-                <InsightsTab insights={insights} isRTL={isRTL} t={t} />
+                <InsightsTab
+                  insights={insights}
+                  insightsError={insightsError}
+                  insightsLoading={insightsLoading}
+                  isRTL={isRTL}
+                  onRetryInsights={() => { void fetchInsights(); }}
+                  t={t}
+                />
               </Suspense>
             </TabsContent>
 

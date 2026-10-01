@@ -10,10 +10,17 @@ import { WaselButton } from '../../components/wasel-ui/WaselButton';
 import { WaselInput } from '../../components/wasel-ui/WaselInput';
 import { WaselLogo } from '../../components/wasel-ui';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useLocalAuth } from '../../contexts/LocalAuth';
 import { useIframeSafeNavigate } from '../../hooks/useIframeSafeNavigate';
 import { C, R, SH, SPACE, TYPE } from '../../utils/wasel-ds';
 import { useState, useCallback } from 'react';
-import { enable2FA, verify2FACode, disable2FA, type TwoFactorSetup } from '../../utils/security';
+import {
+  disable2FA,
+  enable2FA,
+  isTwoFactorAvailable,
+  verify2FACode,
+  type TwoFactorSetup,
+} from '../../utils/security';
 
 const controls = [
   {
@@ -139,14 +146,14 @@ export function SecurityPage() {
               <WaselButton
                 type="button"
                 variant="primary"
-                onClick={() => { void nav(); }}
+                onClick={() => { void nav('/app/settings?section=security'); }}
               >
                 {ar ? 'إدارة أمان الحساب' : 'Manage account security'}
               </WaselButton>
               <WaselButton
                 type="button"
                 variant="outline"
-                onClick={() => { void nav(); }}
+                onClick={() => { void nav('/trust'); }}
                 style={{ background: C.elevated, color: C.text }}
               >
                 {ar ? 'افتح مركز الثقة' : 'Open trust center'}
@@ -304,7 +311,13 @@ export function SecurityPage() {
 
 function TwoFactorSection() {
   const { language } = useLanguage();
+  const { user } = useLocalAuth();
   const ar = language === 'ar';
+  // Every 2FA call is keyed by the authenticated user id. A literal placeholder
+  // here would enrol the secret against a non-existent account, so the user
+  // would set it up, scan the QR code, and then be silently locked out.
+  const userId = user?.id ?? '';
+  const available = isTwoFactorAvailable();
   const [setup, setSetup] = useState<TwoFactorSetup | null>(null);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -312,28 +325,40 @@ function TwoFactorSection() {
   const [enabled, setEnabled] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  const unavailableReason = !available
+    ? (ar ? 'التحقق الثنائي غير متاح في هاي البيئة.' : 'Two-factor authentication is not available in this environment.')
+    : !userId
+      ? (ar ? 'سجّل الدخول لإدارة التحقق الثنائي لحسابك.' : 'Sign in to manage two-factor authentication for your account.')
+      : null;
+
   const handleSetup = useCallback(async () => {
     setError(null);
+    if (!userId || !available) {
+      return;
+    }
     setLoading(true);
     try {
-      const result = await enable2FA('current-user');
+      const result = await enable2FA(userId);
       setSetup(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to set up 2FA.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [available, userId]);
 
   const handleVerify = useCallback(async () => {
     setError(null);
+    if (!userId) {
+      return;
+    }
     if (!code.trim() || code.length < 6) {
       setError('Enter the 6-digit verification code.');
       return;
     }
     setVerifying(true);
     try {
-      const valid = await verify2FACode('current-user', code);
+      const valid = await verify2FACode(userId, code);
       if (valid) {
         setEnabled(true);
         setSetup(null);
@@ -346,17 +371,20 @@ function TwoFactorSection() {
     } finally {
       setVerifying(false);
     }
-  }, [code]);
+  }, [code, userId]);
 
   const handleDisable = useCallback(async () => {
     setError(null);
+    if (!userId) {
+      return;
+    }
     if (!code.trim() || code.length < 6) {
       setError('Enter the 6-digit verification code to disable 2FA.');
       return;
     }
     setVerifying(true);
     try {
-      const disabled = await disable2FA('current-user', code);
+      const disabled = await disable2FA(userId, code);
       if (disabled) {
         setEnabled(false);
         setCode('');
@@ -368,7 +396,7 @@ function TwoFactorSection() {
     } finally {
       setVerifying(false);
     }
-  }, [code]);
+  }, [code, userId]);
 
   const handleCopyBackupCodes = useCallback(() => {
     if (setup?.backupCodes) {
@@ -387,6 +415,15 @@ function TwoFactorSection() {
       icon={<KeyRound size={18} color={C.gold} />}
     >
       <div style={{ display: 'grid', gap: 12 }}>
+        {unavailableReason ? (
+          <div
+            role="status"
+            style={{ color: C.textMuted, fontSize: TYPE.size.sm, padding: SPACE[3], background: C.elevated, borderRadius: R.lg }}
+          >
+            {unavailableReason}
+          </div>
+        ) : null}
+
         {error ? (
           <div style={{ color: C.error, fontSize: TYPE.size.sm, padding: SPACE[3], background: `${C.error}15`, borderRadius: R.lg }}>
             {error}
@@ -400,7 +437,7 @@ function TwoFactorSection() {
               variant="primary"
               onClick={() => { void handleSetup(); }}
               loading={loading}
-              disabled={loading}
+              disabled={loading || Boolean(unavailableReason)}
               icon={<Smartphone size={16} />}
             >
               {ar ? 'فعّل التحقق الثنائي' : 'Enable 2FA'}

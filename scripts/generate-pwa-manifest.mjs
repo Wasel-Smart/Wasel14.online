@@ -70,7 +70,12 @@ for (const url of staticAssets) {
 
 const manifest = {
   version: buildVersion,
-  urls: Array.from(assetUrls).sort(),
+  // Same-origin only. Cross-origin URLs (e.g. the Google Fonts stylesheet) come
+  // back as opaque responses, which make cache.addAll() reject and would fail
+  // service-worker installation.
+  urls: Array.from(assetUrls)
+    .filter(url => url.startsWith('/') && !url.startsWith('//'))
+    .sort(),
 };
 
 fs.writeFileSync(outputPath, JSON.stringify(manifest, null, 2));

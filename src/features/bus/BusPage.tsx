@@ -594,6 +594,7 @@ export function BusPage() {
             seatPreference={seatPreference}
             setSeatPreference={setSeatPreference}
             tripDate={tripDate}
+            setTripDate={setTripDate}
             today={today}
             totalPrice={totalPrice}
             bookingDisabled={bookingDisabled}

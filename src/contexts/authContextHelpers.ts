@@ -186,9 +186,59 @@ function resolveUserName(
   );
 }
 
+/**
+ * Maps the raw `profiles.role` / `users.role` DB string to the local
+ * `WaselUser['role']` union.
+ *
+ * SCHEMA LIMITATION (verified against supabase/migrations/, 2026-09-30):
+ *   - `public.profiles.role` is constrained by
+ *     supabase/migrations/20260224000002_wasel_complete_schema.sql:104
+ *       CHECK (role IN ('rider', 'driver', 'admin', 'support'))
+ *   - `public.users.role` is typed by
+ *     supabase/migrations/20260327090000_production_operating_model.sql:7
+ *       user_role_v2 AS ENUM ('passenger', 'driver', 'admin')
+ *   - No migration ever ADDs corporate / school / finance / trust /
+ *     operator / medical / package_agent / bus_operator to either column.
+ *
+ * The canonical RBAC matrix (packages/rbac/src/index.ts) therefore models
+ * staff roles that the live database schema CANNOT actually store. This
+ * function is the honest boundary: it preserves the rider-facing behaviour
+ * the app already relies on, and it refuses to fabricate a staff role.
+ *
+ * Rider-facing mapping (unchanged behaviour):
+ *   'rider'/'passenger' -> 'rider'  (RBAC 'user' permission set)
+ *   'driver'           -> 'driver' (RBAC 'driver' permission set)
+ *   'both'             -> 'both'   (driver + rider surfaces; RBAC 'driver')
+ *   'admin'            -> 'admin'  (full access)
+ *   'support'          -> 'rider'  (see below)
+ *
+ * 'support' is the only CHECK-allowed value that is NOT a rider-facing role.
+ * The DB permits it, but the local type does not, and collapsing it to
+ * 'rider' here is a deliberate, documented loss: a 'support' account is
+ * signed in and is shown the signed-out preview on every gated surface,
+ * including the surfaces it legitimately owns (admin/users, admin/disputes).
+ * That is a fail-closed misfire, not a security regression — the gates still
+ * reject it, they just reject it at the preview instead of the gate. Fixing
+ * it requires a schema migration (widening the CHECK/enum), which is out of
+ * scope for this frontend-only change.
+ *
+ * GATE OUTCOME AFTER THIS CHANGE (9 gated surfaces, all still fail-closed):
+ *   services/corporate  (corporate:read)  -> UNREACHABLE (schema has no 'corporate' role)
+ *   services/school     (school:read)     -> UNREACHABLE (schema has no 'school' role)
+ *   innovation-hub      (operations:read)  -> UNREACHABLE (schema has no 'operator' role)
+ *   ai-intelligence     (operations:read)  -> UNREACHABLE (schema has no 'operator' role)
+ *   analytics           (analytics:read)   -> UNREACHABLE (no role in the schema holds it)
+ *   moderation          (trust:moderate)   -> UNREACHABLE (schema has no 'trust' role)
+ *   admin/users         (users:read)       -> UNREACHABLE (no role in the schema holds it)
+ *   admin/disputes      (disputes:read)    -> UNREACHABLE (no role in the schema holds it)
+ *   admin               (config:write)     -> admin ONLY (correct today)
+ * Only 'admin' can pass any gate, exactly as before. No gate is weakened.
+ */
 function resolveUserRole(profileRole: string | null | undefined): WaselUser['role'] {
   if (profileRole === 'driver' || profileRole === 'both') {return profileRole;}
   if (profileRole === 'admin') {return 'admin';}
+  // 'support' is schema-valid but has no local representation; collapse to
+  // 'rider' rather than inventing a role the DB cannot store.
   return 'rider';
 }
 

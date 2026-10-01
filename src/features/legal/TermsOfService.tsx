@@ -241,13 +241,17 @@ export function TermsOfService() {
           accent={C.blueLight}
           actions={
             <>
-              <WaselButton type="button" variant="primary" onClick={() => { void nav(); }}>
+              <WaselButton
+                type="button"
+                variant="primary"
+                onClick={() => { void nav('/app/support'); }}
+              >
                 {ar ? 'افتح الدعم' : 'Open support'}
               </WaselButton>
               <WaselButton
                 type="button"
                 variant="outline"
-                onClick={() => { void nav(); }}
+                onClick={() => { void nav('/app/security'); }}
                 style={{ background: C.elevated, color: C.text }}
               >
                 {ar ? 'راجع الأمان' : 'Review security'}

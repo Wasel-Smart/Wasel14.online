@@ -9,7 +9,8 @@ interface SignedInUtilitySectionProps {
   ar: boolean;
   loading: boolean;
   walletBalance: string;
-  trustScore: number;
+  /** `null` while the signed-in user's real trust score is still resolving. */
+  trustScore: number | null;
   user?: {
     emailVerified?: boolean;
     phoneVerified?: boolean;

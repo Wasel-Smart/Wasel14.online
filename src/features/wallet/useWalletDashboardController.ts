@@ -21,6 +21,14 @@ export const walletLocation = {
   },
 };
 
+function describeWalletPinError(err: unknown, t: Record<string, string>): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (/too many/i.test(message)) {
+    return t.walletPinTooManyAttempts ?? message;
+  }
+  return message;
+}
+
 export function useWalletDashboardController() {
   const location = useLocation();
   const { user } = useAuth();
@@ -37,12 +45,16 @@ export function useWalletDashboardController() {
   });
   const walletCapabilities = getWalletCapabilities();
   const [walletError, setWalletError] = useState<string | null>(null);
-  const walletUnavailable = runtimeMode === 'unavailable' || walletError === 'unavailable';
+  // Only a hard runtime-mode failure is unrecoverable; a failed fetch keeps the
+  // dashboard mounted so the Refresh action stays reachable and can clear it.
+  const walletUnavailable = runtimeMode === 'unavailable';
   const shouldRedirectToAuth = runtimeMode === 'redirect';
 
   const [tab, setTab] = useState('overview');
   const [walletData, setWalletData] = useState<WalletData | null>(null);
   const [insights, setInsights] = useState<InsightsData | null>(null);
+  const [insightsError, setInsightsError] = useState(false);
+  const [insightsLoading, setInsightsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -64,21 +76,23 @@ export function useWalletDashboardController() {
   const [autoTopUpAmount, setAutoTopUpAmount] = useState('20');
   const [autoTopUpThreshold, setAutoTopUpThreshold] = useState('5');
 
-  const fetchWallet = useCallback(async () => {
+  const fetchWallet = useCallback(async (): Promise<boolean> => {
     if (shouldRedirectToAuth) {
       setWalletData(null);
       setInsights(null);
+      setInsightsError(false);
       setWalletError(null);
       setLoading(false);
-      return;
+      return true;
     }
 
     if (!effectiveUserId) {
       setWalletData(null);
       setInsights(null);
+      setInsightsError(false);
       setWalletError('unavailable');
       setLoading(false);
-      return;
+      return false;
     }
 
     try {
@@ -87,30 +101,42 @@ export function useWalletDashboardController() {
       setWaselPlusActive(Boolean(data.subscription));
       setWalletData(data);
       setAutoTopUpEnabled(data.wallet.autoTopUp || false);
-      setAutoTopUpAmount(String(data.wallet.autoTopUpAmount || 20));
-      setAutoTopUpThreshold(String(data.wallet.autoTopUpThreshold || 5));
+      // `??` keeps a legitimately configured 0 instead of coercing it to a default.
+      setAutoTopUpAmount(String(data.wallet.autoTopUpAmount ?? 20));
+      setAutoTopUpThreshold(String(data.wallet.autoTopUpThreshold ?? 5));
+      return true;
     } catch (err) {
       console.error('[Wallet] fetch error:', err);
       setWalletData(null);
       setInsights(null);
+      setInsightsError(false);
       setWalletError('unavailable');
+      return false;
     } finally {
       setLoading(false);
     }
   }, [effectiveUserId, shouldRedirectToAuth]);
 
-  const fetchInsights = useCallback(async () => {
+  const fetchInsights = useCallback(async (): Promise<boolean> => {
     if (shouldRedirectToAuth) {
       setInsights(null);
-      return;
+      setInsightsError(false);
+      return false;
     }
 
+    setInsightsLoading(true);
     try {
       const data = await walletApi.getInsights(effectiveUserId);
       setInsights(data);
+      setInsightsError(false);
+      return true;
     } catch (err) {
       console.error('[Wallet] insights error:', err);
       setInsights(null);
+      setInsightsError(true);
+      return false;
+    } finally {
+      setInsightsLoading(false);
     }
   }, [effectiveUserId, shouldRedirectToAuth]);
 
@@ -155,12 +181,15 @@ export function useWalletDashboardController() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setLoading(true);
-    await fetchWallet();
+    // `refreshing` covers the in-flight state; flipping `loading` here would
+    // unmount the Refresh button we are retrying from.
+    const succeeded = await fetchWallet();
     if (tab === 'insights') {await fetchInsights();}
     setRefreshing(false);
-    if (!walletUnavailable) {
+    if (succeeded) {
       toast.success(t.refreshed);
+    } else {
+      toast.error(t.walletLoadError);
     }
   };
 
@@ -204,18 +233,30 @@ export function useWalletDashboardController() {
   const handleWithdraw = async () => {
     const amt = parseFloat(withdrawAmount);
     if (!amt || amt <= 0) {return toast.error(t.invalidAmount);}
+    if (amt > (walletData?.balance ?? 0)) {return toast.error(t.insufficientBalance);}
     if (!withdrawBank.trim()) {return toast.error(t.enterBankAccount);}
+    const pinRequired = Boolean(walletData?.pinSet);
+    if (pinRequired && !/^\d{4}$/.test(pinValue)) {
+      return toast.error(t.walletPinRequired ?? t.pinMustBeFourDigits);
+    }
 
     setActionLoading(true);
     try {
-      await walletApi.withdraw(effectiveUserId, amt, withdrawBank, withdrawMethod);
+      // The server enforces the PIN; it is only sent when the wallet has one.
+      if (pinRequired) {
+        await walletApi.withdraw(effectiveUserId, amt, withdrawBank, withdrawMethod, pinValue);
+      } else {
+        await walletApi.withdraw(effectiveUserId, amt, withdrawBank, withdrawMethod);
+      }
       toast.success((t.withdrawnSuccess ?? 'JOD {amount} withdrawn successfully').replace('{amount}', String(amt)));
       setShowWithdraw(false);
       setWithdrawAmount('');
       setWithdrawBank('');
+      setPinValue('');
       await fetchWallet();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      setPinValue('');
+      toast.error(describeWalletPinError(err, t));
     } finally {
       setActionLoading(false);
     }
@@ -225,18 +266,28 @@ export function useWalletDashboardController() {
     const amt = parseFloat(sendAmount);
     if (!amt || amt <= 0) {return toast.error(t.invalidAmount);}
     if (!sendRecipient.trim()) {return toast.error(t.enterRecipientId);}
+    const pinRequired = Boolean(walletData?.pinSet);
+    if (pinRequired && !/^\d{4}$/.test(pinValue)) {
+      return toast.error(t.walletPinRequired ?? t.pinMustBeFourDigits);
+    }
 
     setActionLoading(true);
     try {
-      await walletApi.sendMoney(effectiveUserId, sendRecipient, amt, sendNote || undefined);
+      if (pinRequired) {
+        await walletApi.sendMoney(effectiveUserId, sendRecipient, amt, sendNote || undefined, pinValue);
+      } else {
+        await walletApi.sendMoney(effectiveUserId, sendRecipient, amt, sendNote || undefined);
+      }
       toast.success((t.sentSuccess ?? 'JOD {amount} sent successfully').replace('{amount}', String(amt)));
       setShowSend(false);
       setSendAmount('');
       setSendRecipient('');
       setSendNote('');
+      setPinValue('');
       await fetchWallet();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err));
+      setPinValue('');
+      toast.error(describeWalletPinError(err, t));
     } finally {
       setActionLoading(false);
     }
@@ -355,6 +406,8 @@ export function useWalletDashboardController() {
     handleTopUp,
     handleWithdraw,
     insights,
+    insightsError,
+    insightsLoading,
     isRTL,
     loading,
     pinValue,
@@ -390,6 +443,7 @@ export function useWalletDashboardController() {
     topUpMethod,
     walletData,
     walletCapabilities,
+    walletError,
     walletSubtitle: t.walletSubtitle,
     walletUnavailable,
     withdrawAmount,

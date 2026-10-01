@@ -46,6 +46,23 @@ export const busPage = {
       corridor_saved_in_your_account_with_departure_reminders:
         'corridor. Saved in your account with departure reminders.',
       open_support: 'Open support',
+      depart_now: 'Depart now',
+      book_later: 'Book later',
+      booking_date: 'Booking date',
+      seat_fare: 'Seat fare',
+      schedule_days: 'Operating days',
+      available_on_this_coach: 'Available on this coach',
+      seats_count: '{{count}} seats',
+      reserve_seat: 'Reserve seat',
+      reserving_seat: 'Reserving seat...',
+      try_another_departure: 'Try another departure',
+      pick_another_departure_same_corridor:
+        'This coach is full right now. Pick another departure below and keep the same corridor details.',
+      seat_boarding_stop_and_alerts_stay_linked:
+        'Your seat, boarding stop, and departure alerts stay linked in your account. If the schedule changes, Wasel updates you.',
+      pending: 'pending',
+      secure_confirmation_pending:
+        ' Secure confirmation will sync when the booking backend reconnects.',
       live_route_view: 'Live route view',
       see_pickup_destination_and_route_direction_before_checkout:
         'See pickup, destination, and route direction before checkout.',
@@ -108,6 +125,23 @@ export const busPage = {
       corridor_saved_in_your_account_with_departure_reminders:
         'الممرّ. محفوظ في حسابك مع تذكيرات المغادرة.',
       open_support: 'فتح الدعم',
+      depart_now: 'غادر الآن',
+      book_later: 'احجز لاحقًا',
+      booking_date: 'تاريخ الحجز',
+      seat_fare: 'سعر المقعد',
+      schedule_days: 'أيام التشغيل',
+      available_on_this_coach: 'المتاح في هذه الحافلة',
+      seats_count: '{{count}} مقعد',
+      reserve_seat: 'احجز المقعد',
+      reserving_seat: 'جارٍ حجز المقعد...',
+      try_another_departure: 'جرّب مغادرة أخرى',
+      pick_another_departure_same_corridor:
+        'هذه الحافلة ممتلئة حالياً. اختر مغادرة أخرى بالأسفل وابقَ على تفاصيل الممرّ نفسها.',
+      seat_boarding_stop_and_alerts_stay_linked:
+        'مقعدك ونقطة الصعود وتنبيهات المغادرة تبقى مرتبطة بحسابك، وإذا تغيّر الجدول سيخبرك واصل.',
+      pending: 'قيد الإصدار',
+      secure_confirmation_pending:
+        ' سيتزامن التأكيد الآمن عند عودة نظام الحجز إلى الاتصال.',
       live_route_view: 'عرض المسار الحي',
       see_pickup_destination_and_route_direction_before_checkout:
         'شاهد نقطة الانطلاق والوجهة واتجاه المسار قبل الدفع.',

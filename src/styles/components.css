@@ -1,30 +1,43 @@
 /**
  * Wasel Design System - Component Styles
  * Buttons, cards, forms, and UI components
+ *
+ * Palette: brand ink #081D39 · connection cyan #00E5FF · movement lime #72C70D
+ * · journey ember #FF8A0B · gold #FFBE5C · error #FF7C8B.
+ * Logical properties + [dir='rtl'] rules keep every control correct in Arabic.
  */
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .btn-wasel-primary {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #00E5FF 0%, #38beff 55%, #32d8a6 100%);
-  color: #041018;
+  background: linear-gradient(135deg, #00e5ff 0%, #38beff 55%, #32d8a6 100%);
+  color: #081d39;
   font-weight: 800;
   border-radius: 14px;
   padding: 12px 24px;
   border: none;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 10px 28px rgba(56, 190, 255, 0.28);
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease,
+    opacity 0.2s ease;
+  box-shadow: 0 10px 28px rgba(0, 229, 255, 0.24);
 }
 
 .btn-wasel-primary:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 14px 36px rgba(56, 190, 255, 0.36);
+  box-shadow: 0 14px 36px rgba(0, 229, 255, 0.32);
 }
 
 .btn-wasel-primary:active:not(:disabled) {
   transform: scale(0.97);
+}
+
+.btn-wasel-primary:focus-visible,
+.btn-wasel-outline:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
 }
 
 .btn-wasel-primary:disabled {
@@ -45,9 +58,9 @@
 }
 
 .btn-wasel-outline:hover:not(:disabled) {
-  background: rgba(103, 232, 255, 0.1);
-  border-color: #7fedff;
-  box-shadow: 0 0 20px rgba(103, 232, 255, 0.2);
+  background: rgba(0, 229, 255, 0.1);
+  border-color: #66e0ff;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
   transform: translateY(-1px);
 }
 
@@ -66,14 +79,15 @@
   box-shadow: var(--wasel-shadow-md);
   transition:
     transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.3s ease;
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
   padding: 24px;
 }
 
 .wasel-card:hover {
   transform: translateY(-3px);
   box-shadow: var(--wasel-shadow-lg);
-  border-color: rgba(103, 232, 255, 0.3);
+  border-color: rgba(0, 229, 255, 0.28);
 }
 
 .wasel-card-interactive {
@@ -118,7 +132,7 @@
 
 .input-wasel:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(103, 232, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2);
   background: var(--background);
 }
 
@@ -134,17 +148,17 @@
 
 /* Error state */
 .input-wasel[aria-invalid='true'] {
-  border-color: #ff6b9d;
+  border-color: var(--destructive);
 }
 
 .input-wasel[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.15);
+  box-shadow: 0 0 0 3px rgba(255, 124, 139, 0.2);
 }
 
 /* ── Select Dropdown ─────────────────────────────────────────────────────── */
 .select-wasel {
   width: 100%;
-  padding: 12px 16px;
+  padding: 12px 40px 12px 16px;
   background: var(--input);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
@@ -154,15 +168,20 @@
   transition: all 0.2s ease;
   outline: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2367E8FF' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2300E5FF' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
-  padding-right: 40px;
+}
+
+/* Arabic / RTL: arrow and padding move to the leading edge */
+[dir='rtl'] .select-wasel {
+  padding: 12px 16px 12px 40px;
+  background-position: left 12px center;
 }
 
 .select-wasel:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(103, 232, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2);
 }
 
 /* ── Checkbox & Radio ────────────────────────────────────────────────────── */
@@ -175,6 +194,11 @@
   cursor: pointer;
   transition: all 0.2s ease;
   outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
 }
 
 .checkbox-wasel {
@@ -191,9 +215,38 @@
   border-color: var(--primary);
 }
 
-.checkbox-wasel:focus,
-.radio-wasel:focus {
-  box-shadow: 0 0 0 3px rgba(103, 232, 255, 0.15);
+/* Visible check / dot so the checked state is never colour-only */
+.checkbox-wasel::after {
+  content: '';
+  width: 10px;
+  height: 5px;
+  border-inline-start: 2px solid #081d39;
+  border-block-end: 2px solid #081d39;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transition: transform 0.15s ease;
+}
+
+.checkbox-wasel:checked::after {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.radio-wasel::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #081d39;
+  transform: scale(0);
+  transition: transform 0.15s ease;
+}
+
+.radio-wasel:checked::after {
+  transform: scale(1);
+}
+
+.checkbox-wasel:focus-visible,
+.radio-wasel:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.3);
 }
 
 /* ── Pills/Badges ────────────────────────────────────────────────────────── */
@@ -210,33 +263,39 @@
 }
 
 .pill-cyan {
-  background: rgba(103, 232, 255, 0.12);
-  color: #00E5FF;
-  border-color: rgba(103, 232, 255, 0.25);
+  background: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+  border-color: rgba(0, 229, 255, 0.25);
 }
 
 .pill-green {
-  background: rgba(94, 231, 176, 0.12);
-  color: #5ee7b0;
-  border-color: rgba(94, 231, 176, 0.25);
+  background: rgba(114, 199, 13, 0.14);
+  color: #72c70d;
+  border-color: rgba(114, 199, 13, 0.3);
 }
 
 .pill-gold {
-  background: rgba(255, 208, 112, 0.12);
-  color: #ffd070;
-  border-color: rgba(255, 208, 112, 0.25);
+  background: rgba(255, 190, 92, 0.14);
+  color: #ffbe5c;
+  border-color: rgba(255, 190, 92, 0.3);
+}
+
+.pill-orange {
+  background: rgba(255, 138, 11, 0.14);
+  color: #ff8a0b;
+  border-color: rgba(255, 138, 11, 0.3);
 }
 
 .pill-red {
-  background: rgba(255, 107, 157, 0.12);
-  color: #ff6b9d;
-  border-color: rgba(255, 107, 157, 0.25);
+  background: rgba(255, 124, 139, 0.14);
+  color: #ff7c8b;
+  border-color: rgba(255, 124, 139, 0.3);
 }
 
 /* ── Tooltips ────────────────────────────────────────────────────────────── */
 .tooltip {
   position: absolute;
-  z-index: 400;
+  z-index: 500;
   padding: 8px 12px;
   background: var(--popover);
   color: var(--popover-foreground);
@@ -291,7 +350,7 @@
   justify-content: center;
   border-radius: 50%;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(103, 232, 255, 0.2), rgba(94, 231, 176, 0.16));
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.22), rgba(114, 199, 13, 0.18));
   border: 2px solid var(--border);
 }
 
@@ -327,10 +386,16 @@
 
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #00E5FF, #32d8a6);
+  background: linear-gradient(90deg, #00e5ff, #72c70d);
   border-radius: var(--radius-full);
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 8px rgba(103, 232, 255, 0.5);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.45);
+}
+
+/* RTL: fill grows from the right */
+[dir='rtl'] .progress-bar {
+  margin-inline-start: auto;
+  background: linear-gradient(270deg, #00e5ff, #72c70d);
 }
 
 /* ── Switch Toggle ───────────────────────────────────────────────────────── */
@@ -340,6 +405,7 @@
   width: 48px;
   height: 24px;
   background: var(--secondary);
+  border: 1px solid var(--border);
   border-radius: var(--radius-full);
   cursor: pointer;
   transition: background 0.2s ease;
@@ -348,11 +414,11 @@
 .switch::after {
   content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: 1px;
+  inset-inline-start: 2px;
   width: 20px;
   height: 20px;
-  background: white;
+  background: #fff;
   border-radius: 50%;
   transition: transform 0.2s ease;
 }
@@ -363,6 +429,16 @@
 
 .switch[aria-checked='true']::after {
   transform: translateX(24px);
+}
+
+/* RTL: knob travels leftwards */
+[dir='rtl'] .switch[aria-checked='true']::after {
+  transform: translateX(-24px);
+}
+
+.switch:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
 }
 
 /* ── Light Mode Improvements ─────────────────────────────────────────────── */
@@ -403,8 +479,28 @@
   box-shadow: 0 0 0 3px rgba(3, 105, 161, 0.15);
 }
 
+/* Light-mode status pills need darker text to hit 4.5:1 on white */
 .light .pill-cyan {
   background: rgba(3, 105, 161, 0.1);
   color: #0369a1;
   border-color: rgba(3, 105, 161, 0.2);
+}
+
+.light .pill-green {
+  background: rgba(63, 110, 6, 0.1);
+  color: #3f6e06;
+  border-color: rgba(63, 110, 6, 0.25);
+}
+
+.light .pill-gold,
+.light .pill-orange {
+  background: rgba(176, 86, 0, 0.1);
+  color: #a24d00;
+  border-color: rgba(176, 86, 0, 0.25);
+}
+
+.light .pill-red {
+  background: rgba(194, 24, 49, 0.08);
+  color: #b4142c;
+  border-color: rgba(194, 24, 49, 0.22);
 }

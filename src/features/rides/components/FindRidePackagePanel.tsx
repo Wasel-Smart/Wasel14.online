@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Shield } from 'lucide-react';
 import { MapWrapper } from '../../../components/MapWrapper';
 import { CITIES } from '../../../pages/waselCoreRideData';
 import { DS, midpoint, pill, r, resolveCityCoord } from '../../../pages/waselServiceShared';
 import { FIND_RIDE_PACKAGE_WEIGHTS, type FindRideStaticCopy } from '../findRideContent';
+import { createConnectedPackage, type PackageRequest } from '../../../services/journeyLogistics';
+import { notificationsAPI } from '../../../services/notifications.js';
 
 type PackageState = {
   from: string;
@@ -31,6 +35,68 @@ type FindRidePackagePanelProps = {
 };
 
 export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePackagePanelProps) {
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<PackageRequest | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const handleCreate = async () => {
+    if (creating) { return; }
+
+    if (pkg.from === pkg.to) {
+      setCreateError(ar ? 'اختار مدينتين مختلفتين للطرد.' : 'Pick two different cities for the package.');
+      return;
+    }
+
+    setCreating(true);
+    setCreateError(null);
+
+    try {
+      const packageRequest = await createConnectedPackage({
+        from: pkg.from,
+        to: pkg.to,
+        weight: pkg.weight,
+        note: pkg.note,
+      });
+
+      setCreated(packageRequest);
+      setPkg(previous => ({ ...previous, sent: true }));
+
+      void notificationsAPI
+        .createNotification({
+          title: ar ? 'تم إنشاء طلب الطرد' : 'Package request created',
+          message: packageRequest.matchedRideId
+            ? ar
+              ? `رقم التتبع: ${packageRequest.trackingId}. تمت المطابقة مع رحلة مباشرة.`
+              : `Tracking ID: ${packageRequest.trackingId}. Matched to a live ride.`
+            : ar
+              ? `رقم التتبع: ${packageRequest.trackingId}. نبحث عن أقرب رحلة مطابقة.`
+              : `Tracking ID: ${packageRequest.trackingId}. Searching for the next matching ride.`,
+          type: 'booking',
+          priority: 'high',
+          action_url: '/app/packages',
+        })
+        .catch(() => {});
+    } catch (error) {
+      setCreated(null);
+      setPkg(previous => ({ ...previous, sent: false }));
+      setCreateError(
+        error instanceof Error
+          ? error.message
+          : ar
+            ? 'لم نتمكن من إنشاء طلب الطرد الآن.'
+            : 'We could not create the package request right now.',
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleReset = () => {
+    setCreated(null);
+    setCreateError(null);
+    setPkg(previous => ({ ...previous, sent: false }));
+  };
+
   return (
     <div
       style={{
@@ -40,17 +106,58 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
         border: `1px solid ${DS.border}`,
       }}
     >
-      {pkg.sent ? (
+      {created ? (
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <div style={{ fontSize: '3rem', marginBottom: 16 }}>{copy.packageIcon}</div>
           <h3 style={{ color: DS.green, fontWeight: 900, fontSize: '1.3rem' }}>
             {copy.packageSent}
           </h3>
           <p style={{ color: DS.sub, marginTop: 8 }}>
-            {copy.packageHint} {pkg.to}.
+            {copy.packageHint} {created.to}.
           </p>
+          <div
+            style={{
+              maxWidth: 380,
+              margin: '18px auto 0',
+              background: DS.card2,
+              borderRadius: r(16),
+              padding: '16px 20px',
+              border: `1px solid ${DS.border}`,
+              textAlign: 'left',
+            }}
+          >
+            <p style={{ color: DS.muted, fontSize: '0.72rem', margin: '0 0 4px' }}>
+              {ar ? 'رقم التتبع' : 'Tracking ID'}
+            </p>
+            <p
+              data-testid="find-ride-package-tracking-id"
+              style={{
+                color: DS.cyan,
+                fontWeight: 900,
+                fontSize: '1.15rem',
+                margin: '0 0 12px',
+              }}
+            >
+              {created.trackingId}
+            </p>
+            <p style={{ color: DS.muted, fontSize: '0.72rem', margin: '0 0 4px' }}>
+              {ar ? 'رمز التسليم' : 'Handoff code'}
+            </p>
+            <p style={{ color: DS.gold, fontWeight: 800, fontSize: '1rem', margin: '0 0 12px' }}>
+              {created.handoffCode}
+            </p>
+            <p style={{ color: DS.sub, fontSize: '0.8rem', margin: 0 }}>
+              {created.matchedRideId
+                ? ar
+                  ? `تم التعيين إلى ${created.matchedDriver ?? 'كابتن متصل'} على رحلة مباشرة.`
+                  : `Assigned to ${created.matchedDriver ?? 'a connected captain'} on a live ride.`
+                : ar
+                  ? 'بانتظار أقرب رحلة مطابقة على نفس المسار.'
+                  : 'Waiting for the next matching ride on this corridor.'}
+            </p>
+          </div>
           <button
-            onClick={() => setPkg(previous => ({ ...previous, sent: false }))}
+            onClick={handleReset}
             style={{
               marginTop: 20,
               padding: '10px 24px',
@@ -259,9 +366,31 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
             />
           </div>
 
+          {createError && (
+            <div
+              style={{
+                marginTop: 16,
+                display: 'flex',
+                gap: 10,
+                alignItems: 'center',
+                background: `${DS.gold}12`,
+                border: `1px solid ${DS.gold}30`,
+                borderRadius: r(14),
+                padding: '12px 14px',
+                color: DS.text,
+                fontSize: '0.84rem',
+                textAlign: 'left',
+              }}
+            >
+              <Shield size={16} color={DS.gold} />
+              <span data-testid="find-ride-package-error">{createError}</span>
+            </div>
+          )}
+
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setPkg(previous => ({ ...previous, sent: true }))}
+            disabled={creating}
+            onClick={() => { void handleCreate(); }}
             style={{
               marginTop: 20,
               width: '100%',
@@ -272,10 +401,16 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
               color: DS.text,
               fontWeight: 800,
               fontSize: '0.95rem',
-              cursor: 'pointer',
+              cursor: creating ? 'wait' : 'pointer',
+              opacity: creating ? 0.75 : 1,
             }}
           >
-            {copy.packageIcon} {t.sendPackageBtn}
+            {copy.packageIcon}{' '}
+            {creating
+              ? ar
+                ? 'جاري إنشاء طلب الطرد...'
+                : 'Creating package request...'
+              : t.sendPackageBtn}
           </motion.button>
         </>
       )}

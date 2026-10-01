@@ -28,6 +28,8 @@ import { homeSections } from './chunks/homeSections';
 import { offerRide } from './chunks/offerRide';
 import { activity } from './chunks/activity';
 import { trustCenterExpanded } from './chunks/trustCenterExpanded';
+import { scheduleExpanded } from './chunks/scheduleExpanded';
+import { safetyExpanded } from './chunks/safetyExpanded';
 import { app } from './chunks/app';
 import { errorBoundary } from './chunks/errorBoundary';
 import { accountDeletionDialog } from './chunks/accountDeletionDialog';
@@ -91,6 +93,7 @@ import { waselServiceShared } from './chunks/waselServiceShared';
 import { worldClassAuthPage } from './chunks/worldClassAuthPage';
 import { liveGeoTracking } from './chunks/liveGeoTracking';
 import { protectedOutlet } from './chunks/protectedOutlet';
+import { routeFallback } from './chunks/routeFallback';
 
 export type Language = 'en' | 'ar';
 
@@ -128,6 +131,8 @@ export const translations: Record<Language, TranslationNode> = {
     ...offerRide.en,
     ...activity.en,
     ...trustCenterExpanded.en,
+    ...scheduleExpanded.en,
+    ...safetyExpanded.en,
     ...app.en,
     ...errorBoundary.en,
     ...accountDeletionDialog.en,
@@ -191,6 +196,7 @@ export const translations: Record<Language, TranslationNode> = {
     ...worldClassAuthPage.en,
     ...liveGeoTracking.en,
     ...protectedOutlet.en,
+    ...routeFallback.en,
   },
   ar: {
     ...common.ar,
@@ -223,6 +229,8 @@ export const translations: Record<Language, TranslationNode> = {
     ...offerRide.ar,
     ...activity.ar,
     ...trustCenterExpanded.ar,
+    ...scheduleExpanded.ar,
+    ...safetyExpanded.ar,
     ...app.ar,
     ...errorBoundary.ar,
     ...accountDeletionDialog.ar,
@@ -286,6 +294,7 @@ export const translations: Record<Language, TranslationNode> = {
     ...worldClassAuthPage.ar,
     ...liveGeoTracking.ar,
     ...protectedOutlet.ar,
+    ...routeFallback.ar,
   },
 };
 

@@ -1,97 +1,201 @@
 # Credential Rotation Guide
 
-This guide provides step-by-step instructions for rotating all credentials listed in `SECURITY_CHECKLIST.md` that were exposed in `.env.local`.
+Step-by-step instructions for rotating every credential listed in `SECURITY_CHECKLIST.md`.
+Rotation means **invalidating the old value at the provider**. Editing or deleting a local
+file does not do that.
+
+> **Where to store the new values:** never inside this project folder while it lives in
+> OneDrive. Set `WASEL_ENV_DIR` to a folder outside any synced location (for example
+> `%USERPROFILE%\.wasel-secrets`, which `scripts\finish-hardening.ps1` creates) and keep the
+> real `.env*` files there, or set them only in Vercel / Supabase secret management.
+> Where a step below says "your env folder", it means that external folder.
+> Never paste a secret into chat, a ticket, a commit message, or a markdown file.
 
 ---
 
-## 1. Stripe Live Credentials
+## 0. Order of work
 
-### 1.1 Webhook Secret
-1. Go to the [Stripe Webhooks Settings Page](https://dashboard.stripe.com/webhooks).
-2. Select the webhook endpoint used by Wasel (e.g. pointing to `https://api.wasel14.online/v1/webhooks/stripe`).
-3. Click **Signing Secret** → **Reveal** → **Rotate**.
-4. Set expiration (e.g., immediate or 24-hour grace period if deploying immediately).
-5. Copy the new secret (starts with `whsec_`).
-6. Update `STRIPE_WEBHOOK_SECRET` in `.env.local` and your Vercel/Kubernetes secrets.
+1. **Prepare the destinations first** so nothing is down while the old key is still live:
+   open the Vercel project env settings and have the Supabase secrets command ready (section 7).
+2. **Create the new credential** at the provider (do not revoke the old one yet when the provider
+   offers a grace period or a second slot).
+3. **Deploy the new value** to every consumer (external env folder, Vercel, Supabase secrets).
+4. **Verify** (section 8).
+5. **Revoke the old credential.**
+6. Tick the row in `SECURITY_CHECKLIST.md` only after step 5. Do not write the value there.
 
-### 1.2 Publishable & Secret Keys
-1. Go to [Stripe API Keys Dashboard](https://dashboard.stripe.com/apikeys).
-2. Under **Standard keys**:
-   - For `Secret key` (`sk_live_...`): Click **Roll key...**, select expiration time, and copy the new value.
-   - For `Publishable key` (`pk_live_...`): Copy the new rolled value.
-3. Update `VITE_STRIPE_PUBLISHABLE_KEY` and `STRIPE_SECRET_KEY` in `.env.local` and staging/production configs.
+Suggested priority: Supabase service role and DB password, Stripe, Twilio, Google service
+account key, Vercel token, then OAuth providers, email providers, and worker secrets.
 
----
-
-## 2. Twilio Credentials
-
-### 2.1 Auth Token & API Keys
-1. Go to [Twilio Console Credentials Page](https://console.twilio.com/us1/account/keys-credentials/api-keys).
-2. To rotate the main Auth Token:
-   - Go to Console Dashboard.
-   - Find **Auth Token** and click **Rotate Token**. Confirm rotation.
-3. To rotate API Key Secret:
-   - Click **Create API Key**.
-   - Generate a new standard API key.
-   - Save the Secret and SID. Delete the old key `SKd72935...`.
-4. Update `TWILIO_AUTH_TOKEN` and `TWILIO_API_KEY_SECRET` in `.env.local` and runtime configurations.
+Webhook URLs in this project live under the edge function, for example:
+`https://<project-ref>.supabase.co/functions/v1/make-server-0b1f4071/payments/webhooks/stripe`
+(other routes: `/communications/webhooks/twilio`, `/communications/webhooks/resend`,
+`/trust/webhooks/sanad`, `/payments/webhooks/cliq`, `/auth/hooks/send-sms`).
 
 ---
 
-## 3. Supabase Credentials
+## 1. Stripe
 
-### 3.1 Anon & Service Role Keys
-1. Go to your [Supabase Dashboard API Settings](https://supabase.com/dashboard/project/_/settings/api).
-2. Click **JWT Settings** → **Generate a new JWT Secret**. This invalidates all active tokens.
-3. Roll the **anon/public** key and **service_role** key.
-4. Copy the new `service_role` and `anon` keys.
-5. Update `SUPABASE_SERVICE_ROLE_KEY` and `VITE_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+### 1.1 Secret key (`STRIPE_SECRET_KEY`) and publishable key (`VITE_STRIPE_PUBLISHABLE_KEY`)
+1. Open [Stripe API keys](https://dashboard.stripe.com/apikeys).
+2. Secret key: **Roll key**, choose an expiry for the old key (a short grace period such as
+   1 to 24 hours lets you deploy first), copy the new value.
+3. Publishable key: copy the rolled value if Stripe issued a new one.
+4. Update both in your env folder, Vercel, and Supabase secrets (section 7). Redeploy.
+5. After verification, let the old key expire or expire it immediately.
 
----
+### 1.2 Webhook signing secret (`STRIPE_WEBHOOK_SECRET`)
+1. Open [Stripe Webhooks](https://dashboard.stripe.com/webhooks) and select the Wasel endpoint
+   (the URL above, not a generic `/v1/webhooks/stripe` path).
+2. **Roll secret**, set an expiry for the old one, copy the new `whsec_...` value.
+3. Update it in Supabase secrets and redeploy the function.
+4. Test with `stripe trigger checkout.session.completed` (section 8).
 
-## 4. Third-Party Auth Providers
-
-### 4.1 Google Client Secret
-1. Go to the [Google Cloud Credentials Console](https://console.cloud.google.com/apis/credentials).
-2. Find the OAuth 2.0 Client ID for Wasel.
-3. Click the edit icon. Click **Reset client secret** (or delete/recreate secret).
-4. Copy the new client secret.
-5. Update `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET` in your Supabase Auth configurations.
-
-### 4.2 Facebook Client Secret
-1. Go to the [Meta Developers Console](https://developers.facebook.com/).
-2. Select your app → **App settings** → **Basic**.
-3. Under **App Secret**, click **Reset** or **Show** to regenerate.
-4. Update `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET` in Supabase Auth settings.
+### 1.3 Stripe account recovery codes (`stripe_backup_code.txt`)
+Regenerate the 2FA backup codes in Stripe (Settings, Personal details, Two-step authentication)
+and store them in a password manager, not in the repo or OneDrive.
 
 ---
 
-## 5. Other Integrations & Worker Secrets
+## 2. Twilio
 
-### 5.1 Resend API Key
-1. Go to [Resend API Keys Dashboard](https://resend.com/api-keys).
-2. Delete the old API key.
-3. Click **Create API Key**, name it `wasel-prod`, and copy the new value.
-4. Update `RESEND_API_KEY` in config.
+### 2.1 Auth token (`TWILIO_AUTH_TOKEN`)
+1. Open the [Twilio Console](https://console.twilio.com/), Account, API keys & tokens.
+2. Create a **secondary auth token**, deploy it, then **promote** it to primary. This avoids downtime.
+3. Update `TWILIO_AUTH_TOKEN` in Supabase secrets.
 
-### 5.2 SendGrid API Key
-1. Go to [SendGrid API Keys Console](https://app.sendgrid.com/settings/api_keys).
-2. Click **Create API Key** → Full Access.
-3. Save the new API key. Delete the compromised key.
-4. Update `SENDGRID_API_KEY`.
+### 2.2 API key (`TWILIO_API_KEY_SID` / `TWILIO_API_KEY_SECRET`)
+1. **Create API key** (Standard), copy the SID and secret once (the secret is shown only once).
+2. Deploy both values, verify, then **delete the old (exposed) API key**.
 
-### 5.3 Communication Worker Token
-1. Run this command to generate a new 64-character token:
+### 2.3 Service SIDs
+`TWILIO_MESSAGING_SERVICE_SID` and `TWILIO_VERIFY_SERVICE_SID` are identifiers, not secrets.
+Just confirm they were not shared alongside the auth token; no rotation needed unless you
+want to recreate the services.
+
+---
+
+## 3. Supabase
+
+### 3.1 API keys (`SUPABASE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, publishable/anon key)
+1. Open [Supabase project settings, API keys](https://supabase.com/dashboard/project/_/settings/api-keys).
+2. Create a new **secret** key (`sb_secret_...`) and use it for server code. Delete the old one
+   after deploying.
+3. For the legacy `service_role` / `anon` JWT keys, rotate the **JWT secret**
+   (Settings, JWT keys). This invalidates every legacy key and **signs all users out**, so
+   do it in a quiet window and deploy the new keys immediately.
+4. The publishable key (`sb_publishable_...`) is public by design. Rotate it only if you want to
+   invalidate old builds.
+5. Update `VITE_SUPABASE_PUBLISHABLE_KEY` in Vercel and rebuild; update the secret key in Supabase
+   secrets and Vercel server-side variables.
+
+### 3.2 Database password (`DATABASE_URL`)
+Settings, Database, **Reset database password**. Update `DATABASE_URL` everywhere it is used and
+restart anything holding connections.
+
+### 3.3 Send-SMS auth hook secret (`SUPABASE_AUTH_HOOK_SEND_SMS_SECRET`)
+Regenerate the hook secret in Authentication, Hooks, and update the same value in Supabase
+secrets so `handleSendSmsHook` accepts it.
+
+---
+
+## 4. Auth providers
+
+### 4.1 Google OAuth client secret (`SUPABASE_AUTH_GOOGLE_CLIENT_SECRET`)
+1. Open [Google Cloud Credentials](https://console.cloud.google.com/apis/credentials) and the
+   Wasel OAuth 2.0 client.
+2. **Add secret** (a new one), copy it, paste it into Supabase Authentication, Providers, Google.
+3. Verify Google sign-in, then **disable and delete the old secret**.
+4. Delete any older OAuth clients that are no longer used (including the previous client id that
+   used to be in `.env.example`). Keep the authorized redirect URI
+   `https://<project-ref>.supabase.co/auth/v1/callback` on the client you keep.
+
+### 4.2 Google service account key (`docs/wasel-planning-with-ai.json`)
+In [IAM, Service accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) open the
+account, Keys, **delete the exposed key**, and create a new one only if something still needs it.
+Store any new key outside the project folder.
+
+### 4.3 Facebook app secret (`SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET`)
+1. [Meta for Developers](https://developers.facebook.com/), your app, Settings, Basic.
+2. **Reset** the App Secret (this takes effect immediately), paste the new value into Supabase
+   Authentication, Providers, Facebook, and verify sign-in right away.
+
+---
+
+## 5. Email providers
+
+### 5.1 Resend (`RESEND_API_KEY`)
+Create a new key named for the environment (for example `wasel-prod`), deploy it, verify sending,
+then delete the old key at [Resend API keys](https://resend.com/api-keys). If you use Resend
+webhooks, regenerate the webhook signing secret too.
+
+### 5.2 SendGrid (`SENDGRID_API_KEY`)
+Create a new key with the minimum scope needed (Mail Send is usually enough, not Full Access),
+deploy it, verify, then delete the old key in
+[SendGrid API keys](https://app.sendgrid.com/settings/api_keys).
+
+---
+
+## 6. Platform and worker secrets
+
+### 6.1 Vercel token / OIDC token (`VERCEL_OIDC_TOKEN`)
+OIDC tokens are short-lived; make sure none was committed or synced, then revoke any
+long-lived access tokens in Vercel, Settings, Tokens, and create new ones as needed.
+
+### 6.2 Worker and webhook tokens (`COMMUNICATION_WORKER_SECRET`, `COMMUNICATION_WEBHOOK_TOKEN`)
+1. Generate two separate random values (do not reuse one for both):
    ```bash
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
-2. Update `COMMUNICATION_WORKER_SECRET` and `COMMUNICATION_WEBHOOK_TOKEN` with this new token across both the dispatch service and the receiving Edge Function.
+2. Set them in Supabase secrets and in whatever calls the dispatch endpoints (for example the
+   Resend/Twilio webhook URL tokens). Update the provider webhook URLs that embed the token.
 
 ---
 
-## 6. Verification
-To verify the rotated keys are fully integrated and functional, run:
-```bash
-npm run verify:live-integrations
+## 7. Deploying new values
+
+Do not type secrets on the command line (they end up in shell history). Put them in a file in
+your external env folder and load that file:
+
+```powershell
+# Edge function secrets (server-side values read by the Supabase function)
+supabase secrets set --env-file "$env:WASEL_ENV_DIR\edge-secrets.env" --project-ref <project-ref>
+
+# Redeploy so the function picks them up
+npm run edge:deploy
 ```
-Check that all subsystems report a green status.
+
+For Vercel, set them in Project Settings, Environment Variables (server-side variables must not
+use the `VITE_` prefix), then redeploy. `docs/WIRING_ARCHITECTURE.md` lists which variable belongs
+where. Delete `edge-secrets.env` when finished.
+
+---
+
+## 8. Verification
+
+There is no `verify:live-integrations` script in this repository. Use these instead:
+
+```bash
+npm run secrets:check     # no secrets in tracked files or local env files
+npm run env:check         # env files are placeholders in templates, not synced
+npm run verify:oauth      # OAuth config and live provider settings
+npm run verify:wiring     # frontend can reach the backend (needs VITE_SUPABASE_* set)
+```
+
+Then check the live system:
+
+- `GET https://<project-ref>.supabase.co/functions/v1/make-server-0b1f4071/health` returns healthy.
+- Sign in with Google, Facebook, email, and a phone OTP.
+- `stripe trigger checkout.session.completed` is received and handled (no 401).
+- Send a test email and SMS from the admin diagnostics route.
+
+Only after these pass, revoke the old credentials and tick `SECURITY_CHECKLIST.md`.
+
+---
+
+## 9. If a secret was ever committed
+
+Rotation comes first (the value is already public to anyone with repo access). Then scrub history
+with `git filter-repo` (see `scripts\finish-hardening.ps1` for the scan), force-push with
+`--force-with-lease`, ask collaborators to re-clone, and enable GitHub secret scanning and
+push protection.

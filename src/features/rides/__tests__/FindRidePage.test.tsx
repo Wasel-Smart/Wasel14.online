@@ -74,7 +74,8 @@ vi.mock('../../../services/movementMembership', () => ({
 }));
 
 vi.mock('../../../services/movementRetention', () => ({
-  createReminderFromSuggestion: vi.fn(),
+    areRouteRemindersEqual: vi.fn(() => false),
+    createReminderFromSuggestion: vi.fn(),
   formatRouteReminderSchedule: vi.fn(() => ''),
   getRecurringRouteSuggestions: vi.fn(() => []),
   getRouteReminderForCorridor: vi.fn(() => null),

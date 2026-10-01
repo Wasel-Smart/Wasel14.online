@@ -45,6 +45,7 @@ export const trustCenterExpanded = {
     checksDoneDetail: 'Identity, contact, documents, and wallet.',
     blockedChecks: 'Blocked checks',
     blockedChecksDetail: 'Failed steps show a reason instead of staying stuck.',
+    failedStepsDetail: 'Each blocked step names what is missing and how to clear it.',
     walletStatus: 'Wallet status',
     walletDetail: 'Healthy wallet standing keeps operations available.',
     stepCounter: '{completed}/{total} complete',
@@ -101,6 +102,10 @@ export const trustCenterExpanded = {
     reviewHistoryNoDate: 'No date',
     trustScoreBreakdownTitle: 'How your score is calculated',
     trustScoreBreakdownSubtitle: 'Your trust score reflects account verification and activity.',
+    trustScoreBreakdownCapped:
+      'These components can add up to more than 100, so your final score is capped at 100.',
+    trustScoreBreakdownUnavailable:
+      'The per-factor breakdown is unavailable for this account, so only your current score is shown.',
     trustScoreFactorEmail: 'Email verification',
     trustScoreFactorPhone: 'Phone verification',
     trustScoreFactorBoth: 'Email + phone bonus',
@@ -183,6 +188,7 @@ export const trustCenterExpanded = {
     checksDoneDetail: 'هوية واتصال ووثائق ومحفظة.',
     blockedChecks: 'الخطوات المحظورة',
     blockedChecksDetail: 'الخطوات الفاشلة تعرض السبب بدل البقاء عالقة.',
+    failedStepsDetail: 'كل خطوة محظورة توضّح ما هو ناقص وكيف تحلّه.',
     walletStatus: 'حالة المحفظة',
     walletDetail: 'حالة المحفظة السليمة تُبقي العمليات متاحة.',
     stepCounter: '{completed}/{total} مكتمل',
@@ -233,6 +239,10 @@ export const trustCenterExpanded = {
     reviewHistoryNoDate: 'غير محدد',
     trustScoreBreakdownTitle: 'كيف يتم حساب درجتك',
     trustScoreBreakdownSubtitle: 'درجة الثقة تعكس التحقق من الحساب والنشاط.',
+    trustScoreBreakdownCapped:
+      'قد يزيد مجموع هذه العناصر على 100، لذلك تُحدّ درجتك النهائية عند 100.',
+    trustScoreBreakdownUnavailable:
+      'تفصيل العوامل غير متاح لهذا الحساب، لذلك تُعرض درجتك الحالية فقط.',
     trustScoreFactorEmail: 'تأكيد البريد',
     trustScoreFactorPhone: 'تأكيد الهاتف',
     trustScoreFactorBoth: 'مكافأة البريد والهاتف',

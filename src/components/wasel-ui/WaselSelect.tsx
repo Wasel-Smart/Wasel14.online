@@ -30,18 +30,17 @@ interface WaselSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>,
   containerStyle?: CSSProperties;
 }
 
-function SelectLabel({ label, description, selectId, dir }: {
+function SelectLabel({ label, description, selectId }: {
   label?: string;
   description?: string;
   selectId: string;
-  dir: 'ltr' | 'rtl';
 }) {
   if (!label && !description) {return null;}
   return (
     <div
       style={{
         display: 'flex',
-        justifyContent: dir === 'rtl' ? 'flex-end' : 'space-between',
+        justifyContent: 'space-between',
         alignItems: 'baseline',
         gap: '8px',
       }}
@@ -72,8 +71,7 @@ function SelectLabel({ label, description, selectId, dir }: {
   );
 }
 
-function SelectField({ dir, focused, disabled, hasError, borderColor, boxShadow, style, selectId, value, defaultValue, placeholder, options, onChange, rest, onFocus, onBlur }: {
-  dir: 'ltr' | 'rtl';
+function SelectField({ focused, disabled, hasError, borderColor, boxShadow, style, selectId, describedBy, value, defaultValue, placeholder, options, onChange, rest, onFocus, onBlur }: {
   focused: boolean;
   disabled: boolean;
   hasError: boolean;
@@ -81,6 +79,7 @@ function SelectField({ dir, focused, disabled, hasError, borderColor, boxShadow,
   boxShadow: string;
   style: CSSProperties | undefined;
   selectId: string;
+  describedBy?: string;
   value: string | number | readonly string[] | undefined;
   defaultValue: string | number | readonly string[] | undefined;
   placeholder?: string;
@@ -109,9 +108,12 @@ function SelectField({ dir, focused, disabled, hasError, borderColor, boxShadow,
         {...rest}
         id={selectId}
         value={value}
-        defaultValue={defaultValue ?? (placeholder ? '' : undefined)}
+        // Passing both value and defaultValue makes React warn and ignore one;
+        // only seed the placeholder default for uncontrolled selects.
+        defaultValue={value === undefined ? (defaultValue ?? (placeholder ? '' : undefined)) : undefined}
         disabled={disabled}
         aria-invalid={hasError || undefined}
+        aria-describedby={describedBy}
         onChange={e => onChange?.(e.target.value)}
         onFocus={onFocus}
         onBlur={onBlur}
@@ -119,7 +121,8 @@ function SelectField({ dir, focused, disabled, hasError, borderColor, boxShadow,
           width: '100%',
           minWidth: 0,
           minHeight: '48px',
-          padding: dir === 'rtl' ? '0 14px 0 42px' : '0 42px 0 14px',
+          padding: '0 14px',
+          paddingInlineEnd: '42px',
           appearance: 'none',
           WebkitAppearance: 'none',
           border: 'none',
@@ -149,8 +152,7 @@ function SelectField({ dir, focused, disabled, hasError, borderColor, boxShadow,
         size={16}
         style={{
           position: 'absolute',
-          right: dir === 'rtl' ? undefined : '14px',
-          left: dir === 'rtl' ? '14px' : undefined,
+          insetInlineEnd: '14px',
           pointerEvents: 'none',
           color: C.textMuted,
         }}
@@ -166,7 +168,7 @@ export function WaselSelect({
   hint,
   options,
   placeholder,
-  dir = 'ltr',
+  dir,
   onChange,
   id,
   value,
@@ -181,12 +183,16 @@ export function WaselSelect({
   const [focused, setFocused] = useState(false);
 
   const hasError = Boolean(error);
-  const borderColor = hasError ? C.error : focused ? C.borderHov : C.border;
+  const borderColor = hasError ? C.error : focused ? C.cyan : C.border;
   const boxShadow = hasError
     ? `0 0 0 3px ${C.errorDim}`
     : focused
-      ? `0 0 0 3px ${C.cyanDim}`
+      ? `0 0 0 3px ${C.cyanGlow}`
       : 'none';
+  const describedBy = [
+    description ? `${selectId}-description` : null,
+    hasError ? `${selectId}-error` : null,
+  ].filter(Boolean).join(' ') || undefined;
 
   return (
     <div
@@ -198,10 +204,9 @@ export function WaselSelect({
         ...containerStyle,
       }}
     >
-      <SelectLabel label={label} description={description} selectId={selectId} dir={dir} />
+      <SelectLabel label={label} description={description} selectId={selectId} />
 
       <SelectField
-        dir={dir}
         focused={focused}
         disabled={disabled ?? false}
         hasError={hasError}
@@ -209,6 +214,7 @@ export function WaselSelect({
         boxShadow={boxShadow}
         style={style}
         selectId={selectId}
+        describedBy={describedBy}
         value={value}
         defaultValue={defaultValue}
         placeholder={placeholder}
@@ -226,7 +232,7 @@ export function WaselSelect({
       />
 
       {error && (
-        <span id={`${selectId}-error`} style={{ fontSize: TYPE.size.xs, color: C.error, fontFamily: F }}>
+        <span id={`${selectId}-error`} role="alert" style={{ fontSize: TYPE.size.xs, color: C.error, fontFamily: F }}>
           {error}
         </span>
       )}

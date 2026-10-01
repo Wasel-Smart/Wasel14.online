@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getAllCorridorOpportunities,
   getCorridorOpportunity,
@@ -315,8 +315,38 @@ export function getLiveCorridorSignal(
   return buildRouteIntelligenceSnapshot({ from, to, membership }).selectedSignal;
 }
 
+/**
+ * Consumers refresh derived state in an effect keyed on `updatedAt`, so the
+ * timestamp has to mean "the underlying data changed" - not "this hook was
+ * recomputed". Rebuilding a snapshot that carries identical data under a fresh
+ * `updatedAt` re-fires those effects, and because they set state from freshly
+ * built arrays, React re-renders, the snapshot is rebuilt again, and the page
+ * spins until it trips the update-depth limit. Hold the previous snapshot
+ * (timestamp included) while the payload is deep-equal.
+ */
+function useContentStableSnapshot(
+  snapshot: RouteIntelligenceSnapshot,
+): RouteIntelligenceSnapshot {
+  const heldRef = useRef<RouteIntelligenceSnapshot>(snapshot);
+  const held = heldRef.current;
+
+  if (held !== snapshot) {
+    const { updatedAt: _heldAt, ...heldRest } = held;
+    const { updatedAt: _nextAt, ...nextRest } = snapshot;
+    if (JSON.stringify(heldRest) === JSON.stringify(nextRest)) {
+      return held;
+    }
+    heldRef.current = snapshot;
+  }
+
+  return snapshot;
+}
+
 export function useLiveRouteIntelligence(args?: { from?: string | null; to?: string | null }) {
   const [tick, setTick] = useState(0);
+
+  const from = args?.from ?? null;
+  const to = args?.to ?? null;
 
   useEffect(() => {
     if (typeof window === 'undefined') {return undefined;}
@@ -329,5 +359,13 @@ export function useLiveRouteIntelligence(args?: { from?: string | null; to?: str
     };
   }, []);
 
-  return useMemo(() => buildRouteIntelligenceSnapshot(args), [args, tick]);
+  // Depend on the primitive corridor values rather than the `args` object. Every
+  // caller passes an inline literal, so `args` had a new identity on each
+  // render and this memo never held.
+  const snapshot = useMemo(
+    () => buildRouteIntelligenceSnapshot({ from, to }),
+    [from, to, tick],
+  );
+
+  return useContentStableSnapshot(snapshot);
 }

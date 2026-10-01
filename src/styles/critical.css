@@ -8,13 +8,15 @@ body,
   min-height: 100dvh;
 }
 
+/* Brand ink (#081D39) — must match --background in globals.css and the
+   theme-color meta so first paint never flashes an off-brand shade. */
 html {
-  background: #071521;
+  background: #081d39;
 }
 
 body {
   margin: 0;
-  background: #071521;
+  background: #081d39;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

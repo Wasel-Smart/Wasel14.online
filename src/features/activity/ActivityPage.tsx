@@ -36,6 +36,12 @@ type ScheduledPickupRow = {
   estimated_price?: number;
 };
 
+const GROUP_LABEL: Record<DateGroupKey, { en: string; ar: string }> = {
+  today: { en: 'Today', ar: 'اليوم' },
+  week: { en: 'This week', ar: 'هذا الأسبوع' },
+  earlier: { en: 'Earlier', ar: 'في وقت سابق' },
+};
+
 const STATUS_LABEL: Record<string, { en: string; ar: string }> = {
   pending_driver: { en: 'Pending driver', ar: 'بانتظار السائق' },
   pending: { en: 'Pending', ar: 'قيد الانتظار' },
@@ -56,14 +62,16 @@ const EMPTY_CTA: Record<ItemKind, { en: string; ar: string; path: string }> = {
   scheduled: { en: 'Schedule a pickup', ar: 'جدول استلاماً', path: '/app/schedule' },
 };
 
-function groupByDate(items: TimelineItem[]): { label: string; items: TimelineItem[] }[] {
+type DateGroupKey = 'today' | 'week' | 'earlier';
+
+function groupByDate(items: TimelineItem[]): { key: DateGroupKey; items: TimelineItem[] }[] {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0] ?? '';
   const weekAgo = new Date(now);
   weekAgo.setDate(weekAgo.getDate() - 7);
   const weekAgoStr = weekAgo.toISOString().split('T')[0] ?? '';
 
-  const groups: { today: TimelineItem[]; week: TimelineItem[]; earlier: TimelineItem[] } = {
+  const groups: Record<DateGroupKey, TimelineItem[]> = {
     today: [],
     week: [],
     earlier: [],
@@ -75,9 +83,9 @@ function groupByDate(items: TimelineItem[]): { label: string; items: TimelineIte
   }
 
   return [
-    { label: 'Today', items: groups.today },
-    { label: 'This week', items: groups.week },
-    { label: 'Earlier', items: groups.earlier },
+    { key: 'today' as DateGroupKey, items: groups.today },
+    { key: 'week' as DateGroupKey, items: groups.week },
+    { key: 'earlier' as DateGroupKey, items: groups.earlier },
   ].filter(g => g.items.length > 0);
 }
 
@@ -132,7 +140,7 @@ export function ActivityPage() {
                 ? C.cyan
                 : C.gold,
         Icon: Car,
-        path: isActive ? `/app/live-trip?id=${b.id}` : '/app/trips',
+        path: isActive ? `/app/live-trip?id=${b.id}` : '/app/my-trips',
       });
     });
 
@@ -331,7 +339,7 @@ export function ActivityPage() {
         ) : (
           <div style={{ marginTop: 16 }}>
             {grouped.map(group => (
-              <div key={group.label}>
+              <div key={group.key}>
                 <div
                   style={{
                     padding: '10px 0 6px',
@@ -342,7 +350,7 @@ export function ActivityPage() {
                     letterSpacing: '0.12em',
                   }}
                 >
-                  {group.label}
+                  {GROUP_LABEL[group.key][ar ? 'ar' : 'en']}
                 </div>
                 {group.items.map(item => {
                   const statusEntry = STATUS_LABEL[item.status];

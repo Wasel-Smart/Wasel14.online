@@ -7,8 +7,8 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import { translations, type Language, type TranslationNode } from '../locales/translations';
-import { setCurrentLang } from '../locales/tx';
+import type { Language } from '../locales/translations';
+import { interpolateSingleBrace, resolve, setCurrentLang } from '../locales/tx';
 
 interface LanguageContextType {
   language: Language;
@@ -71,23 +71,13 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
     document.documentElement.lang = language;
   }, [language]);
 
-  // Memoized translation function
+  // Delegates to the shared resolver in locales/tx. It MUST NOT be a second,
+  // hand-rolled walk of the translation table: chunks are merged into one FLAT
+  // table per language (see translations.ts), so a nested-only walk resolves
+  // nothing and every `t('namespace.key')` call site renders its raw key.
   const t = useCallback(
-    (key: string, params?: Record<string, string | number>): string => {
-      const keys = key.split('.');
-      let value: TranslationNode | undefined = translations[language];
-      for (const k of keys) {
-        value = typeof value === 'object' ? value[k] : undefined;
-      }
-      if (typeof value === 'string') {return interpolate(value, params);}
-
-      const fallbackLang = language === 'en' ? 'ar' : 'en';
-      let fallback: TranslationNode | undefined = translations[fallbackLang];
-      for (const k of keys) {
-        fallback = typeof fallback === 'object' ? fallback[k] : undefined;
-      }
-      return interpolate(typeof fallback === 'string' ? fallback : key, params);
-    },
+    (key: string, params?: Record<string, string | number>): string =>
+      interpolateSingleBrace(resolve(key, language), params),
     [language],
   );
 
@@ -106,11 +96,4 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
-}
-
-function interpolate(template: string, params?: Record<string, string | number>): string {
-  if (typeof template !== 'string' || !params) {return template;}
-  return template.replace(/\{(\w+)\}/g, (_match, name: string) =>
-    params[name] !== undefined ? String(params[name]) : `{${name}}`,
-  );
 }

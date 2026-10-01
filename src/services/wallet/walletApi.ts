@@ -101,10 +101,15 @@ function sanitizeTransactions(transactions: WalletTransaction[]): WalletTransact
 }
 
 function sanitizeWalletData(data: WalletData): WalletData {
+  // Partial edge payloads must not throw outside the caller's try/catch:
+  // absent collections are treated as empty.
+  const transactions = Array.isArray(data.transactions) ? data.transactions : [];
+  const activeRewards = Array.isArray(data.activeRewards) ? data.activeRewards : [];
+
   return {
     ...data,
-    transactions: sanitizeTransactions(data.transactions),
-    activeRewards: data.activeRewards.map(reward => ({
+    transactions: sanitizeTransactions(transactions),
+    activeRewards: activeRewards.map(reward => ({
       ...reward,
       description: sanitizeString(reward.description),
     })),
@@ -196,16 +201,16 @@ export const walletApi = {
     throw new Error('Secure wallet top-up is unavailable because the checkout backend is not configured. Deploy the wallet edge function and configure Stripe server secrets before adding funds.');
   },
 
-  async withdraw(userId: string, amount: number, bankAccount: string, method = 'bank_transfer') {
+  async withdraw(userId: string, amount: number, bankAccount: string, method = 'bank_transfer', pin?: string) {
     return tryEdgeThenDirect(
-      () => requestWalletJson(userId, '/withdraw', 'Withdraw wallet funds', { method: 'POST', body: { amount, bankAccount, method } }),
+      () => requestWalletJson(userId, '/withdraw', 'Withdraw wallet funds', { method: 'POST', body: { amount, bankAccount, method, ...(pin ? { pin } : {}) } }),
       () => withdrawWalletFundsDirect(userId, amount, bankAccount, method),
     );
   },
 
-  async sendMoney(userId: string, recipientId: string, amount: number, note?: string) {
+  async sendMoney(userId: string, recipientId: string, amount: number, note?: string, pin?: string) {
     return tryEdgeThenDirect(
-      () => requestWalletJson<{ success: boolean; note?: string; wallet: WalletData }>(userId, '/send', 'Send wallet funds', { method: 'POST', body: { recipientId, amount, note } }),
+      () => requestWalletJson<{ success: boolean; note?: string; wallet: WalletData }>(userId, '/send', 'Send wallet funds', { method: 'POST', body: { recipientId, amount, note, ...(pin ? { pin } : {}) } }),
       async () => ({ success: true, note, wallet: await transferWalletFundsDirect(userId, recipientId, amount) }),
     );
   },

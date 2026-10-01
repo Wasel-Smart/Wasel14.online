@@ -408,16 +408,51 @@ function saveRides ( ...lists: PostedRide[][] ): PostedRide[] {
   return rides;
 }
 
+const CAPACITY_RANK: Record<PostedRide['packageCapacity'], number> = {
+  small: 1,
+  medium: 5,
+  large: 10,
+};
+
+/**
+ * A ride can carry a package only when it accepts packages, runs the exact
+ * requested corridor, and has room for the requested weight. Shared by the
+ * auto-matcher and by `canAttachPackageToRide` so the UI can pre-check the
+ * rider's own selection with the same rules the service applies.
+ */
+export function rideCanCarryPackage (
+  ride: PostedRide,
+  input: { from: string; to: string; weight: string },
+): boolean {
+  return (
+    ride.acceptsPackages &&
+    ride.from === input.from &&
+    ride.to === input.to &&
+    CAPACITY_RANK[ ride.packageCapacity ] >= parseWeight( input.weight )
+  );
+}
+
+/**
+ * Resolve an explicitly chosen ride. Returns null when the ride is unknown or
+ * cannot carry the package, so callers can fall back to auto-matching (or
+ * report honestly) instead of attaching the parcel to a ride nobody picked.
+ */
+export function findRequestedRide (
+  rides: PostedRide[],
+  rideId: string,
+  input: { from: string; to: string; weight: string },
+): PostedRide | undefined {
+  const normalized = rideId.trim();
+  if ( !normalized ) { return undefined; }
+  const ride = rides.find( candidate => candidate.id === normalized );
+  return ride && rideCanCarryPackage( ride, input ) ? ride : undefined;
+}
+
 function findBestMatchingRide (
   rides: PostedRide[],
   input: { from: string; to: string; weight: string },
 ): PostedRide | undefined {
-  const requestedWeight = parseWeight( input.weight );
-  const capacityRank = { small: 1, medium: 5, large: 10 };
-
-  return sortByCreatedAtDesc( rides )
-    .filter( ride => ride.acceptsPackages && ride.from === input.from && ride.to === input.to )
-    .find( ride => capacityRank[ ride.packageCapacity ] >= requestedWeight );
+  return sortByCreatedAtDesc( rides ).find( ride => rideCanCarryPackage( ride, input ) );
 }
 
 export function getConnectedRides (): PostedRide[] {
@@ -517,7 +552,10 @@ export function getConnectedPackages (): PackageRequest[] {
   return packages;
 }
 
-function buildServerPackagePayload ( pkg: PackageRequest ) {
+function buildServerPackagePayload (
+  pkg: PackageRequest,
+  rideId?: string,
+) {
   return {
     from: pkg.from,
     to: pkg.to,
@@ -528,6 +566,7 @@ function buildServerPackagePayload ( pkg: PackageRequest ) {
     ...( pkg.recipientName ? { recipientName: pkg.recipientName } : {} ),
     ...( pkg.recipientPhone ? { recipientPhone: pkg.recipientPhone } : {} ),
     ...( pkg.packageType === 'return' ? { packageType: pkg.packageType } : {} ),
+    ...( rideId ? { trip_id: rideId } : {} ),
   };
 }
 
@@ -539,6 +578,14 @@ export async function createConnectedPackage ( input: {
   packageType?: 'delivery' | 'return';
   recipientName?: string;
   recipientPhone?: string;
+  /**
+   * Explicit ride chosen by the user. When it resolves to a live
+   * package-ready ride on this exact corridor it is attached instead of
+   * re-running automatic matching. When it does not resolve, automatic
+   * matching still runs and the returned record reflects what actually
+   * happened — the service never pretends the request landed elsewhere.
+   */
+  rideId?: string;
 } ): Promise<PackageRequest> {
   const from = input.from.trim();
   const to = input.to.trim();
@@ -572,6 +619,31 @@ export async function createConnectedPackage ( input: {
     timeline: buildTimeline( 'searching', undefined, {} ),
   };
 
+  const requestedRideId = input.rideId?.trim() || undefined;
+  const matchInput = { from, to, weight: input.weight };
+  const requestedRide = requestedRideId
+    ? findRequestedRide( getConnectedRides(), requestedRideId, matchInput )
+    : undefined;
+
+  /**
+   * The edge `/packages` POST only auto-assigns a trip; it ignores an explicit
+   * trip choice. When it left the parcel unassigned we attach the ride the user
+   * actually picked. When the edge assigned a *different* ride we keep the
+   * server's answer — that parcel really is on that trip — and callers compare
+   * `matchedRideId` against what they asked for to report the difference.
+   */
+  const applyRequestedRide = ( created: PackageRequest ): PackageRequest => {
+    if ( !requestedRide || created.matchedRideId ) { return created; }
+    const status: PackageStatus = created.status === 'searching' ? 'matched' : created.status;
+    return {
+      ...created,
+      matchedRideId: requestedRide.id,
+      matchedDriver: pickDriverName( requestedRide.carModel ),
+      status,
+      timeline: buildTimeline( status, requestedRide.id, created.verification ),
+    };
+  };
+
   try {
     const { token, userId } = await getAuthDetails();
 
@@ -582,12 +654,14 @@ export async function createConnectedPackage ( input: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${ token }`,
         },
-        body: JSON.stringify( buildServerPackagePayload( pkg ) ),
+        body: JSON.stringify( buildServerPackagePayload( pkg, requestedRide?.id ) ),
       } );
 
       if ( response.ok ) {
         const server = await response.json();
-        const created = normalizeServerPackage( server.package as Record<string, unknown>, pkg );
+        const created = applyRequestedRide(
+          normalizeServerPackage( server.package as Record<string, unknown>, pkg ),
+        );
         savePackages( [ created ], getConnectedPackages() );
         void trackGrowthEvent( {
           userId,
@@ -616,12 +690,14 @@ export async function createConnectedPackage ( input: {
         recipientPhone: pkg.recipientPhone,
       } );
 
-      const created = normalizeServerPackage( createdDirect as Record<string, unknown>, {
-        ...pkg,
-        from: String( createdDirect.origin_name ?? pkg.from ),
-        to: String( createdDirect.destination_name ?? pkg.to ),
-        weight: sanitizeWeight( String( createdDirect.weight_kg ?? pkg.weight ) ),
-      } );
+      const created = applyRequestedRide(
+        normalizeServerPackage( createdDirect as Record<string, unknown>, {
+          ...pkg,
+          from: String( createdDirect.origin_name ?? pkg.from ),
+          to: String( createdDirect.destination_name ?? pkg.to ),
+          weight: sanitizeWeight( String( createdDirect.weight_kg ?? pkg.weight ) ),
+        } ),
+      );
       savePackages( [ created ], getConnectedPackages() );
       void trackGrowthEvent( {
         userId,
@@ -643,7 +719,7 @@ export async function createConnectedPackage ( input: {
   }
 
   const rides = getConnectedRides();
-  const matchedRide = findBestMatchingRide( rides, { from, to, weight: input.weight } );
+  const matchedRide = requestedRide ?? findBestMatchingRide( rides, matchInput );
   const fallbackStatus: PackageStatus = matchedRide ? 'matched' : 'searching';
   const fallbackPackage: PackageRequest = {
     ...pkg,

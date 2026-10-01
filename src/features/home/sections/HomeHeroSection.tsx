@@ -4,7 +4,6 @@ import {
   ArrowRight,
   ArrowLeft,
   BadgeCheck,
-  CheckCircle,
   CircleDollarSign,
   Clock,
   MapPinned,
@@ -23,21 +22,12 @@ import { C, InlineCurrencySwitcher } from '../HomePageShared';
 const MobilityOSLandingMap = lazy( () =>
   import( '../MobilityOSLandingMap' ).then( m => ( { default: m.MobilityOSLandingMap } ) ),
 );
-import type { TripMode } from './types';
-
 interface HomeHeroSectionProps {
   ar: boolean;
   user: User | null;
   firstName: string;
-  tripMode: TripMode;
-  onTripModeChange: ( mode: TripMode ) => void;
   onNavigate: ( path: string, source?: string ) => void;
   primaryTripPath: string;
-}
-
-interface TripModeCardProps {
-  tripMode: TripMode;
-  onTripModeChange: ( mode: TripMode ) => void;
 }
 
 const heroProof = [
@@ -75,62 +65,6 @@ const liveTimelineAr = [
   { labelKey: 'homeHeroSection.timeline_bus_fallback_label', value: '18:40', accent: C.blueLight },
 ] as const;
 
-function TripModeCard ( { tripMode, onTripModeChange }: TripModeCardProps ) {
-  const { t } = useLanguage();
-  const options = [
-    {
-      key: 'one-way' as TripMode,
-      title: tx( 'homeHeroSection.trip_mode_one_way_title' ),
-      desc: tx( 'homeHeroSection.trip_mode_one_way_desc' ),
-    },
-    {
-      key: 'round' as TripMode,
-      title: tx( 'homeHeroSection.trip_mode_round_title' ),
-      desc: tx( 'homeHeroSection.trip_mode_round_desc' ),
-    },
-  ];
-
-  return (
-    <div className="wasel-home-start-panel">
-      <div className="wasel-home-start-copy">
-        <div className="wasel-home-kicker">{ tx( 'homeHeroSection.trip_type_kicker' ) }</div>
-        <div className="wasel-home-start-text">
-          { tx( 'homeHeroSection.trip_type_desc' ) }
-        </div>
-      </div>
-
-      <div
-        className="wasel-home-mode-grid"
-        role="group"
-        aria-label={ t( 'homeHeroSection.trip_mode' ) }
-      >
-        { options.map( option => {
-          const selected = tripMode === option.key;
-          return (
-            <button
-              type="button"
-              aria-pressed={ selected }
-              key={ option.key }
-              onClick={ () => onTripModeChange( option.key ) }
-              className="wasel-home-mode-button"
-              style={ {
-                background: selected ? C.cyanDim : 'transparent',
-                borderColor: selected ? C.borderHov : 'rgba(20,127,228,0.12)',
-                color: C.text,
-              } }
-            >
-              <span>
-                <strong>{ option.title }</strong>
-                <small>{ option.desc }</small>
-              </span>
-              { selected ? <CheckCircle size={ 15 } color={ C.cyan } /> : null }
-            </button>
-          );
-        } ) }
-      </div>
-    </div>
-  );
-}
 
 function ProductCommandPreview ( { ar }: { ar: boolean } ) {
   const { t } = useLanguage();
@@ -237,8 +171,6 @@ export function HomeHeroSection ( {
   ar,
   user,
   firstName,
-  tripMode,
-  onTripModeChange,
   onNavigate,
   primaryTripPath,
 }: HomeHeroSectionProps ) {
@@ -316,8 +248,6 @@ export function HomeHeroSection ( {
             { tx( 'homeHeroSection.cta_offer_seats' ) }
           </WaselButton>
         </div>
-
-        <TripModeCard tripMode={ tripMode } onTripModeChange={ onTripModeChange } />
       </div>
 
       <div className="wasel-home-hero-aside">

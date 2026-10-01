@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, ChevronRight, ChevronUp, Info, Phone } from 'lucide-react';
 import { CurrencyService, type SupportedCurrency } from '../../utils/currency';
 import { C as TOKENS, F as FONT_SANS, R, SH, TYPE } from '../../utils/wasel-ds';
+import { tx } from '../../locales/tx';
 
 export const C = {
   ...TOKENS,
@@ -354,7 +355,8 @@ export function TrustScoreCard({
   ar,
   user,
 }: {
-  score: number;
+  /** `null` until the signed-in user's real score resolves — never a mock. */
+  score: number | null;
   ar: boolean;
   user?: {
     emailVerified?: boolean;
@@ -366,7 +368,8 @@ export function TrustScoreCard({
   };
 }) {
   const [expanded, setExpanded] = useState(false);
-  const pct = score;
+  const resolved = typeof score === 'number' && Number.isFinite(score);
+  const pct = resolved ? Math.max(0, Math.min(100, score)) : 0;
   const emailPoints = user?.emailVerified ? 10 : 0;
   const phonePoints = user?.phoneVerified ? 10 : 0;
   const identityPoints = user?.sanadVerified || user?.verified ? 15 : 0;
@@ -415,11 +418,13 @@ export function TrustScoreCard({
               boxShadow: `0 0 0 6px ${color}10`,
             }}
           >
-            <span
-              style={{ fontSize: '1.25rem', fontWeight: TYPE.weight.ultra, color, fontFamily: F }}
-            >
-              {score}
-            </span>
+            {resolved ? (
+              <span style={{ fontSize: '1.25rem', fontWeight: TYPE.weight.ultra, color, fontFamily: F }}>
+                {score}
+              </span>
+            ) : (
+              <Skeleton w={26} h={18} radius={6} />
+            )}
           </div>
           <div style={{ display: 'grid', gap: 4 }}>
             <div
@@ -433,47 +438,51 @@ export function TrustScoreCard({
               {ar ? 'مؤشر الثقة' : 'Trust score'}
             </div>
             <div style={{ fontSize: TYPE.size.sm, color: C.textMuted, fontFamily: F }}>
-              {pct >= 80
-                ? ar
-                  ? 'مؤشر قوي قبل الحجز أو العرض'
-                  : 'Strong standing before booking or offering'
-                : pct >= 60
+              {!resolved
+                ? tx('homeSections.trustScoreLoading')
+                : pct >= 80
                   ? ar
-                    ? 'مؤشر جيد ويستفيد من مزيد من النشاط'
-                    : 'Healthy standing with room to improve'
-                  : ar
-                    ? 'يحتاج إلى تقوية قبل الاعتماد الكامل'
-                    : 'Needs stronger standing before full trust'}
+                    ? 'مؤشر قوي قبل الحجز أو العرض'
+                    : 'Strong standing before booking or offering'
+                  : pct >= 60
+                    ? ar
+                      ? 'مؤشر جيد ويستفيد من مزيد من النشاط'
+                      : 'Healthy standing with room to improve'
+                    : ar
+                      ? 'يحتاج إلى تقوية قبل الاعتماد الكامل'
+                      : 'Needs stronger standing before full trust'}
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => { void setExpanded(value => !value); }}
-          style={{
-            height: 34,
-            padding: '0 12px',
-            borderRadius: R.full,
-            background: C.elevated,
-            border: `1px solid ${C.borderFaint}`,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: TYPE.size.xs,
-            color: C.textSub,
-            fontWeight: TYPE.weight.semibold,
-            fontFamily: F,
-          }}
-        >
-          <Info size={12} color={C.cyan} />
-          {ar ? 'طريقة الحساب' : 'How it works'}
-          {expanded ? (
-            <ChevronUp size={12} color={C.textMuted} />
-          ) : (
-            <ChevronDown size={12} color={C.textMuted} />
-          )}
-        </button>
+        {resolved ? (
+          <button
+            type="button"
+            onClick={() => { void setExpanded(value => !value); }}
+            style={{
+              height: 34,
+              padding: '0 12px',
+              borderRadius: R.full,
+              background: C.elevated,
+              border: `1px solid ${C.borderFaint}`,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: TYPE.size.xs,
+              color: C.textSub,
+              fontWeight: TYPE.weight.semibold,
+              fontFamily: F,
+            }}
+          >
+            <Info size={12} color={C.cyan} />
+            {ar ? 'طريقة الحساب' : 'How it works'}
+            {expanded ? (
+              <ChevronUp size={12} color={C.textMuted} />
+            ) : (
+              <ChevronDown size={12} color={C.textMuted} />
+            )}
+          </button>
+        ) : null}
       </div>
       <div
         style={{

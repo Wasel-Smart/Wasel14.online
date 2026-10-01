@@ -33,13 +33,19 @@ const APP_ROUTE_PREFIXES = [
   '/notifications',
   '/trust',
   '/driver',
+  '/safety',
+  '/schedule',
+  '/admin',
+  '/403',
+  '/500',
   '/privacy',
   '/terms',
   '/legal',
   '/moderation',
+  '/support',
 ];
 
-function normalizePathname(pathname: string): string {
+export function normalizePathname(pathname: string): string {
   if (!pathname.startsWith('/') || pathname.startsWith('/app') || pathname.startsWith('//')) {
     return pathname;
   }

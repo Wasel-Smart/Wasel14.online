@@ -42,6 +42,16 @@ let errors = 0;
 let warnings = 0;
 let checkedFiles = 0;
 
+// --strict: every warning is promoted to an error (use in CI once clean).
+const STRICT = process.argv.includes('--strict');
+
+// Whitespace- and case-insensitive forms of the deprecated colours, so that
+// `rgba(20,127,228,0.16)` is caught just like `rgba(20, 127, 228, 0.16)`.
+const DEPRECATED_NORMALIZED = Object.entries(DEPRECATED_COLORS).map(([key, suggestion]) => [
+  key.replace(/\s+/g, '').toLowerCase(),
+  suggestion,
+]);
+
 const SAFE_COLORS = new Set([
   '#fff', '#FFFFFF', '#ffffff',
   '#000', '#000000',
@@ -68,7 +78,6 @@ const SAFE_COLORS = new Set([
   '#22d3ee', '#2dd4bf', '#4ade80', '#fbbf24', '#60a5fa',
   '#fcd34d', '#c084fc', '#fda4af', '#fca5a5',
   '#0b1220', '#213047',
-  '#f7f1e8', '#b88a52',
   '#5e7257', '#a9b98d',
   '#0a1f3d', '#081220', '#081d39', '#0a1f3a', '#0e2240', '#132b4d',
   '#95b2c9', '#9af1cf', '#58ddff',
@@ -94,6 +103,23 @@ function checkFile(filePath) {
         console.error(`           ${suggestion}`);
         console.error(`           Line: ${trimmed.slice(0, 120)}`);
         errors++;
+      }
+    }
+
+    // Catch spacing/case variants the exact-match pass above misses.
+    const compact = trimmed.replace(/\s+/g, '').toLowerCase();
+    for (const [deprecated, suggestion] of DEPRECATED_NORMALIZED) {
+      const alreadyReported = Object.keys(DEPRECATED_COLORS).some(key => trimmed.includes(key));
+      if (!alreadyReported && compact.includes(deprecated)) {
+        const relative = path.relative(ROOT, filePath);
+        const label = STRICT ? 'BRAND ERROR' : 'BRAND WARN';
+        console.error(`  [${label}] ${relative}:${lineNum}: Deprecated color variant "${deprecated}"`);
+        console.error(`           ${suggestion}`);
+        if (STRICT) {
+          errors++;
+        } else {
+          warnings++;
+        }
       }
     }
 
@@ -189,7 +215,7 @@ function main() {
 
   console.log(`\n📊 Results: ${checkedFiles} files checked, ${errors} errors, ${warnings} warnings\n`);
 
-  if (errors > 0) {
+  if (errors > 0 || (STRICT && warnings > 0)) {
     console.log('❌ Brand consistency check FAILED\n');
     process.exit(1);
   } else if (warnings > 0) {

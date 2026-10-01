@@ -10,7 +10,8 @@ export const WaselColors = {
   cyan: C.cyan,
   cyanLight: C.cyanDark,
   gold: C.gold,
-  goldLight: C.blueLight,
+  // Was mistakenly aliased to C.blueLight (a cyan). Brand orange-gradient midpoint.
+  goldLight: '#FFB35C',
   green: C.green,
   greenDark: C.greenDark,
   lime: C.lime,
@@ -104,7 +105,7 @@ export const WaselTransitions = {
 
 export const WaselGlass = {
   card: {
-    background: 'rgba(24,28,34,0.85)',
+    background: 'rgba(14,34,64,0.85)', // brand navyMid (#0e2240)
     backdropFilter: 'blur(20px)',
     border: `1px solid ${C.border}`,
   },
@@ -113,7 +114,7 @@ export const WaselGlass = {
     backdropFilter: 'blur(28px)',
   },
   panel: {
-    background: 'rgba(19,22,26,0.97)',
+    background: 'rgba(8,29,57,0.97)', // brand ink (#081D39)
     backdropFilter: 'blur(32px)',
     border: `1px solid ${C.borderFaint}`,
   },
@@ -123,6 +124,6 @@ export const WaselGradients = {
   primaryBtn: GRAD,
   accentBtn: GRAD_GOLD,
   successBtn: GRAD_GREEN,
-  heroCard: 'linear-gradient(135deg, rgba(244,239,232,0.10) 0%, rgba(184,138,82,0.06) 100%)',
-  constellation: 'linear-gradient(135deg, #F7F1E8 0%, #B88A52 100%)',
+  heroCard: 'linear-gradient(135deg, rgba(0,229,255,0.10) 0%, rgba(114,199,13,0.06) 100%)',
+  constellation: GRAD,
 } as const;

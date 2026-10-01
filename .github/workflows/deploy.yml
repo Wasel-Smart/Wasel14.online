@@ -3,6 +3,10 @@ name: Deploy
 on:
   push:
     branches: [main, master]
+  # Preview deployments for every pull request (was missing, so the preview job
+  # below could never run).
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       environment:
@@ -15,74 +19,136 @@ on:
           - production
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # Not a secret: the project ref is already in package.json (edge:deploy).
+  SUPABASE_PROJECT_REF: zexlxabdcsjefptmjhuq
+
 jobs:
-  # ── Deploy to Vercel (Preview) ───────────────────────────────────────────────
+  # ── Quality gate (shared by every deploy path) ───────────────────────────────
+  # Deploys must not depend on a *separate* workflow having passed, because
+  # GitHub runs workflows in parallel. The gate is repeated here so a red
+  # build can never reach production.
+  verify:
+    name: Verify (types, lint, unit, edge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # Same flag as ci.yml so both workflows resolve dependencies identically.
+      # Drop --legacy-peer-deps everywhere once `npm install` has been run after
+      # the @eslint/js bump and `npm ci` passes without it.
+      - run: npm ci --legacy-peer-deps
+      - run: npm run verify:ci
+      - run: npm run build
+
+  # ── Preview (pull requests) ──────────────────────────────────────────────────
   deploy-preview:
     name: Deploy Preview
     if: github.event_name == 'pull_request'
+    needs: [verify]
     runs-on: ubuntu-latest
     environment: preview
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - run: npm ci
-      - run: npm run build
-
       - uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: ./
 
-  # ── Deploy to Production ─────────────────────────────────────────────────────
-  deploy-production:
-    name: Deploy Production
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+  # ── Backend: migrations first, then edge functions ───────────────────────────
+  # Runs before the frontend so a new client never ships against an old API.
+  # Gated by the GitHub `production` environment, so required reviewers apply.
+  deploy-backend:
+    name: Deploy Backend (migrations + edge functions)
+    if: github.event_name != 'pull_request'
+    needs: [verify]
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm ci --legacy-peer-deps
+      - name: Check Supabase credentials
+        id: creds
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::warning::SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD not set - backend deploy skipped. Migrations and edge functions were NOT deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Link project
+        if: steps.creds.outputs.ready == 'true'
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      - name: Apply database migrations
+        if: steps.creds.outputs.ready == 'true'
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+      - name: Deploy edge function
+        if: steps.creds.outputs.ready == 'true'
+        run: npm run edge:deploy
 
-      - run: npm ci
-      - run: npm run verify:ci
-      - run: npm run build
-
+  # ── Frontend (Vercel) ────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend
+    if: github.event_name != 'pull_request'
+    needs: [verify, deploy-backend]
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+      # Vercel builds the app itself from source with the project's environment
+      # variables, so no local build is needed here (verify already proved it).
       - uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+          # staging => preview deployment; push to main or explicit production => --prod
+          vercel-args: ${{ (github.event_name == 'push' || inputs.environment == 'production') && '--prod' || '' }}
           working-directory: ./
 
-  # ── Smoke Tests After Deploy ─────────────────────────────────────────────────
+  # ── Smoke tests after deploy ─────────────────────────────────────────────────
   smoke-tests:
     name: Post-Deploy Smoke Tests
+    if: github.event_name != 'pull_request'
+    needs: [deploy-frontend]
     runs-on: ubuntu-latest
-    needs: [deploy-production]
+    env:
+      BASE_URL: ${{ vars.PRODUCTION_URL }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - run: npm ci
-      - run: npm run test:load:smoke
-        env:
-          BASE_URL: ${{ vars.PRODUCTION_URL }}
+      # k6 is not preinstalled on GitHub runners; `npm run test:load:smoke`
+      # shells out to it and failed with "command not found".
+      - uses: grafana/setup-k6-action@v1
+      - name: Run smoke test
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::warning::PRODUCTION_URL repository variable is not set - smoke test skipped."
+            exit 0
+          fi
+          npm run test:load:smoke

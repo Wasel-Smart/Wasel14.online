@@ -9,6 +9,20 @@ const DEFAULT_LOCAL_ORIGINS = [
   'http://127.0.0.1:3000',
 ];
 
+/**
+ * Preview-origin wildcarding is opt-in via an explicit environment flag.
+ *
+ * It used to be implied by `APP_ENV`/`NODE_ENV === 'development'`, which meant
+ * a function deployed with either variable set to 'development' would accept
+ * CORS requests from *any* `*.vercel.app` host — a cross-origin allowance wide
+ * enough for a third party to host attacker code and call the API with a
+ * victim's cookies. The env flag alone was also the wrong control: a
+ * misconfigured production function would have silently opened the same hole.
+ */
+function previewOriginsEnabled(): boolean {
+  return Deno.env.get('ALLOW_PREVIEW_ORIGINS') === 'true';
+}
+
 function isVercelPreviewUrl ( hostname: string ): boolean {
   return /^(?:wasel|wasel14|wasel-14|wasel14\.online)-[a-z0-9-]*--[^\.]+\.vercel\.app$/.test( hostname )
     || hostname.endsWith( '.vercel.app' )
@@ -75,9 +89,8 @@ export function buildAllowedOrigins(
     }
   }
 
-  // In dev mode, accept all Vercel preview URLs automatically.
-  const env = Deno.env.get('APP_ENV') ?? Deno.env.get('NODE_ENV') ?? 'production';
-  if (env === 'development') {
+  // Accept any Vercel preview URL only when explicitly enabled.
+  if (previewOriginsEnabled()) {
     candidates.push('https://*.vercel.app');
   }
 
@@ -118,8 +131,7 @@ export function resolveAllowedOrigin(
   }
 
   // Support wildcard origins (e.g. 'https://*.vercel.app') for preview deployments
-  const isDevEnv = Deno.env.get('APP_ENV') === 'development' || Deno.env.get('NODE_ENV') === 'development';
-  if (allowLocalOrigins || isDevEnv) {
+  if (allowLocalOrigins || previewOriginsEnabled()) {
     for (const entry of allowed) {
       if (entry.endsWith('*.vercel.app')) {
         const prefix = entry.slice(0, -'*.vercel.app'.length);
@@ -131,8 +143,7 @@ export function resolveAllowedOrigin(
   }
 
   if (typeof console !== 'undefined' && console.warn) {
-    const env = Deno.env.get('APP_ENV') ?? Deno.env.get('NODE_ENV') ?? 'production';
-    if (env === 'development') {
+    if (previewOriginsEnabled() || allowLocalOrigins) {
       console.warn('[security] Origin not allowed:', normalizedOrigin, 'allowed:', allowed);
     }
   }

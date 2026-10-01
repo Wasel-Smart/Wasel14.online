@@ -6,6 +6,12 @@ export const cookieConsentBanner = {
       for_details: 'for details.',
       decline: 'Decline',
       accept: 'Accept',
+      title: 'Cookie Consent',
+      description:
+        'We use cookies to keep you signed in, remember your language, and understand which parts of Wasel are used.',
+      privacy_policy: 'Privacy Policy',
+      reject_all: 'Reject all',
+      accept_all: 'Accept all',
   },
   ar: {
       cookie_consent: 'موافقة ملفات التتبّع',
@@ -14,6 +20,12 @@ export const cookieConsentBanner = {
       for_details: 'للتفاصيل.',
       decline: 'رفض',
       accept: 'موافقة',
+      title: 'موافقة ملفات التتبّع',
+      description:
+        'نستخدم ملفات التتبّع لإبقاء تسجيل دخولك فعّالاً، ولحفظ لغتك، ولفهم أي أجزاء من واصل تُستخدم.',
+      privacy_policy: 'سياسة الخصوصية',
+      reject_all: 'رفض الكل',
+      accept_all: 'موافقة على الكل',
   }
 } as const;
 

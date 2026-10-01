@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Headphones, Phone, Shield, ShieldCheck, Siren, UserCheck } from 'lucide-react';
 import {
   PageHero,
@@ -12,7 +11,6 @@ import { C, R, SH, SPACE, TYPE, card, pillStyle } from '../../utils/wasel-ds';
 export default function SafetyPage() {
   const { language, t } = useLanguage();
   const ar = language === 'ar';
-  const [sosActive, setSosActive] = useState(false);
 
   const SAFETY_STACK = [
     {
@@ -66,12 +64,12 @@ export default function SafetyPage() {
   return (
     <PageShell maxWidth={1120} dir={ar ? 'rtl' : 'ltr'}>
       <div style={{ paddingInline: SPACE[4] }}>
-        {/* ── SOS Banner — always visible, no auth required ── */}
+        {/* ── Help banner — always visible, no auth required ── */}
         <div
           style={{
             ...card({ padding: SPACE[4], radius: R.xxl }),
             borderColor: `${C.error}40`,
-            background: sosActive ? `${C.error}22` : `${C.error}12`,
+            background: `${C.error}12`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -94,22 +92,14 @@ export default function SafetyPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => { void setSosActive(v => !v); }}
-              style={{
-                ...pillStyle(C.error),
-                border: 'none',
-                cursor: 'pointer',
-                background: sosActive ? C.error : `${C.error}20`,
-                color: sosActive ? '#fff' : C.error,
-                padding: '10px 18px',
-                fontSize: '0.84rem',
-                fontWeight: 800,
-                transition: 'all 0.2s',
-              }}
-            >
-              {sosActive ? t('safetyExpanded.sosSent') : t('safetyExpanded.sendSOS')}
-            </button>
+            {/*
+              No emergency dispatch path exists in this codebase: nothing here
+              contacts a responder, a monitoring desk or the emergency number.
+              So this banner offers only the two channels that really work —
+              Wasel urgent support and the local emergency line — instead of a
+              control that used to relabel itself "SOS sent" without sending
+              anything.
+            */}
             <a
               href="/app/support?urgent=1"
               style={{
@@ -117,8 +107,15 @@ export default function SafetyPage() {
                 textDecoration: 'none',
                 whiteSpace: 'nowrap',
                 padding: '10px 18px',
+                background: C.error,
+                color: '#fff',
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
+              <Siren size={14} />
               {t('safetyExpanded.getHelpNow')}
             </a>
             <a

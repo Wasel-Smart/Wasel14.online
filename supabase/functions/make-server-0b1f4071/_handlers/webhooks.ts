@@ -78,7 +78,7 @@ export async function handleStripeWebhook ( request: Request ) {
   const event = JSON.parse( rawPayload );
   const admin = getAdminClient();
 
-  if ( event?.type === 'checkout.session.completed' ) {
+  if ( event?.type === 'checkout.session.completed' || event?.type === 'checkout.session.async_payment_succeeded' ) {
     const session = event?.data?.object ?? {};
     if ( String( session?.mode ?? '' ) === 'subscription' ) {
       const subscriptionId = String( session?.subscription ?? '' );
@@ -98,6 +98,13 @@ export async function handleStripeWebhook ( request: Request ) {
     const transactionId = String( session?.metadata?.transaction_id ?? session?.client_reference_id ?? '' );
     if ( !transactionId ) {
       return json( { received: true, ignored: true } );
+    }
+
+    // `checkout.session.completed` also fires for delayed-notification payment
+    // methods while the money is still unpaid. Only credit the wallet once Stripe
+    // reports the session as paid; `async_payment_succeeded` covers the late case.
+    if ( String( session?.payment_status ?? '' ) !== 'paid' ) {
+      return json( { received: true, transactionId, pending: true, paymentStatus: String( session?.payment_status ?? '' ) } );
     }
 
     await finalizeTopUpTransaction( transactionId, String( session?.id ?? '' ), event );
@@ -270,6 +277,12 @@ export async function handleSanadWebhook ( request: Request ) {
   const admin = getAdminClient();
   const verified = isSuccessfulProviderStatus( status );
   const failed = isFailedProviderStatus( status );
+  // `pending` is the state already written when the request was submitted. A late
+  // or replayed non-terminal callback must not overwrite a verified/rejected
+  // record (it used to reset verified users back to level_1).
+  if ( !verified && !failed ) {
+    return json( { received: true, providerReference, ignored: true, reason: 'non_terminal_status' } );
+  }
   const sanadStatus = verified ? 'verified' : failed ? 'rejected' : 'pending';
   const verificationLevel = verified ? 'level_2' : 'level_1';
   const failureReason = failed
@@ -285,6 +298,9 @@ export async function handleSanadWebhook ( request: Request ) {
       updated_at: new Date().toISOString(),
     } )
     .eq( 'provider_reference', providerReference )
+    // level_3 (approved driver) already implies verified identity; a Sanad callback
+    // must never lower it to level_2 or level_1.
+    .neq( 'verification_level', 'level_3' )
     .select( 'user_id' );
 
   if ( recordError ) {
@@ -378,19 +394,59 @@ export async function handleTwilioWebhook ( request: Request ) {
   return json( { received: true, status } );
 }
 
+/**
+ * Verifies a Standard Webhooks signature, the scheme Supabase uses to sign HTTPS
+ * Auth Hooks. Headers: webhook-id, webhook-timestamp, webhook-signature
+ * ("v1,<base64> v1,<base64>"). The dashboard secret looks like "v1,whsec_<base64>".
+ * Supabase does NOT send the secret as a Bearer token, so the previous check could
+ * never succeed against a real hook call.
+ */
+async function verifyStandardWebhookSignature ( headers: Headers, rawBody: string, secret: string ): Promise<boolean> {
+  const id = headers.get( 'webhook-id' ) ?? '';
+  const timestamp = headers.get( 'webhook-timestamp' ) ?? '';
+  const signatures = headers.get( 'webhook-signature' ) ?? '';
+  if ( !id || !timestamp || !signatures || !secret ) return false;
+
+  const issuedAt = Number( timestamp );
+  if ( !Number.isFinite( issuedAt ) || Math.abs( Date.now() / 1000 - issuedAt ) > 300 ) return false;
+
+  const base64Secret = secret.replace( /^v1,/, '' ).replace( /^whsec_/, '' );
+  let key: CryptoKey;
+  try {
+    const keyBytes = Uint8Array.from( atob( base64Secret ), ( char ) => char.charCodeAt( 0 ) );
+    key = await crypto.subtle.importKey( 'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, [ 'sign' ] );
+  } catch {
+    return false;
+  }
+
+  const mac = await crypto.subtle.sign( 'HMAC', key, new TextEncoder().encode( `${ id }.${ timestamp }.${ rawBody }` ) );
+  const expected = btoa( String.fromCharCode( ...new Uint8Array( mac ) ) );
+
+  return signatures.split( ' ' ).some( ( part ) => {
+    const [ version, signature ] = part.split( ',' );
+    return version === 'v1' && signature !== undefined && constantTimeEquals( signature, expected );
+  } );
+}
+
 export async function handleSendSmsHook ( request: Request ): Promise<Response> {
   if ( !SUPABASE_AUTH_HOOK_SEND_SMS_SECRET ) {
     return json( { error: 'SMS hook secret is not configured.' }, 503 );
   }
 
   // Verify Supabase webhook signature: Authorization: Bearer <whsec_...>
-  const authHeader = request.headers.get( 'authorization' ) ?? '';
-  const token = authHeader.startsWith( 'Bearer ' ) ? authHeader.slice( 7 ).trim() : '';
-  if ( !token || !constantTimeEquals( token, SUPABASE_AUTH_HOOK_SEND_SMS_SECRET ) ) {
+  const rawBody = await request.text();
+  const signatureValid = await verifyStandardWebhookSignature( request.headers, rawBody, SUPABASE_AUTH_HOOK_SEND_SMS_SECRET );
+  // Signature is verified against the raw body (Standard Webhooks), see above.
+  if ( !signatureValid ) {
     return json( { error: 'Invalid webhook signature.' }, 401 );
   }
 
-  const body = await request.json().catch( () => null );
+  let body: unknown = null;
+  try {
+    body = JSON.parse( rawBody );
+  } catch {
+    body = null;
+  }
   if ( !body || typeof body !== 'object' ) {
     return json( { error: 'Invalid request body.' }, 400 );
   }

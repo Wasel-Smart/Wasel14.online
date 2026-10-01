@@ -35,6 +35,7 @@ import {
   stateAccent,
 } from './components';
 import { useAuth } from '../../contexts/AuthContext';
+import { deriveAccountTrustScoreFactors } from '../../domain/trust/score';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalAuth } from '../../contexts/LocalAuth';
 import { useIframeSafeNavigate } from '../../hooks/useIframeSafeNavigate';
@@ -609,7 +610,17 @@ export default function TrustCenterPage () {
                     }
                     dir={ ar ? 'rtl' : 'ltr' }
                   />
-                  <TrustScoreExplanation score={ user.trustScore } t={ t } compact />
+                  <TrustScoreExplanation
+                    score={ user.trustScore }
+                    factors={ deriveAccountTrustScoreFactors( {
+                      emailVerified: user.emailVerified,
+                      phoneVerified: user.phoneVerified,
+                      trips: user.trips,
+                      rating: user.rating,
+                    } ) }
+                    t={ t }
+                    compact
+                  />
                   <div style={ { color: C.textMuted, fontSize: TYPE.size.sm, lineHeight: TYPE.lineHeight.relaxed, fontFamily: F } }>
                     { t( 'trustCenterExpanded.eachCardShowsState' ) }
                   </div>

@@ -129,6 +129,37 @@ export function getRouteReminderForCorridor(corridorId: string) {
   return readReminders().find(reminder => reminder.corridorId === corridorId) ?? null;
 }
 
+/**
+ * `getRouteReminders()` returns a newly sorted array on every call, so feeding it
+ * straight into `setState` inside an effect re-renders unconditionally. Pages
+ * that refresh reminders from an effect therefore use this to keep the previous
+ * array identity when nothing actually changed, which stops the
+ * render -> effect -> setState -> render cycle from becoming unbounded.
+ */
+export function areRouteRemindersEqual(
+  left: RouteReminder[],
+  right: RouteReminder[],
+): boolean {
+  if (left === right) {return true;}
+  if (left.length !== right.length) {return false;}
+  return left.every((reminder, index) => {
+    const other = right[index];
+    // Compared field names must match `RouteReminder` (`preferredTime` /
+    // `frequency`). They previously read `recommendedTime` /
+    // `recommendedFrequency`, which do not exist on the type, so this
+    // identity check silently reduced to a corridor+date comparison and the
+    // render loop it was written to stop could never detect a preference edit.
+    return (
+      other !== undefined &&
+      reminder.corridorId === other.corridorId &&
+      reminder.nextReminderAt === other.nextReminderAt &&
+      reminder.preferredTime === other.preferredTime &&
+      reminder.frequency === other.frequency &&
+      reminder.enabled === other.enabled
+    );
+  });
+}
+
 export function getRecurringRouteSuggestions(limit = 4) {
   const snapshot = buildRouteIntelligenceSnapshot();
   const events = getGrowthEventFeed();

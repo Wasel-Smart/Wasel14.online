@@ -59,7 +59,10 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_manual_linking = true
 enable_signup = true
-enable_anonymous_sign_ins = true
+# Anonymous users receive the `authenticated` role, which would satisfy any RLS
+# policy written as `to authenticated`. Keep off unless a guest flow needs it AND
+# every policy also checks `(auth.jwt() ->> 'is_anonymous')::boolean is not true`.
+enable_anonymous_sign_ins = false
 minimum_password_length = 8
 password_requirements = "lower_upper_letters_digits_symbols"
 
@@ -107,24 +110,34 @@ auth_token = ""
 # empty here on purpose: they live in the Supabase dashboard, so this file must
 # not carry secrets or claim the providers are off.
 enabled = true
-client_id = ""
-secret = ""
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_CLIENT_SECRET)"
 redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"
 skip_nonce_check = false
 email_optional = true
 [auth.external.facebook]
 enabled = true
-client_id = ""
-secret = ""
+client_id = "env(SUPABASE_AUTH_FACEBOOK_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET)"
 redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"
 skip_nonce_check = false
 email_optional = true
+# Wallet logins are not a shipped sign-in method; leave disabled to shrink the
+# attack surface. Mirror this in the dashboard (Auth -> Sign In / Providers).
 [auth.web3.solana]
-enabled = true
+enabled = false
 
 [auth.web3.ethereum]
-enabled = true
+enabled = false
 
+# SECURITY TODO (blocker until verified): this single function also serves the
+# Stripe / CliQ / Sanad / Resend / Twilio webhooks and the Send-SMS auth hook.
+# Those callers do not send a Supabase JWT, so with verify_jwt = true the gateway
+# answers 401 before the signature checks in _handlers/webhooks.ts ever run.
+# Preferred fix: move the webhook routes into their own function with
+# verify_jwt = false (each route verifies its provider signature), and keep this
+# function at true. Verify with `stripe trigger checkout.session.completed` and a
+# real phone-OTP login against the deployed project.
 [functions.make-server-0b1f4071]
 verify_jwt = true
 

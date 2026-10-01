@@ -41,18 +41,45 @@ function lookup(key: string, lang: Language): string | undefined {
 }
 
 export function tx(key: string, params?: Record<string, string | number>): string {
-  const direct = lookup(key, currentLang);
-  if (direct !== undefined) {return interpolate(direct, params);}
+  return interpolate(resolve(key, currentLang), params);
+}
 
-  const fallbackLang: Language = currentLang === 'en' ? 'ar' : 'en';
-  const fallback = lookup(key, fallbackLang);
-  return interpolate(fallback !== undefined ? fallback : key, params);
+/**
+ * Language-agnostic key resolution, with the other-language fallback.
+ *
+ * `tx()` resolves against the module-level `currentLang`; this variant takes the
+ * language explicitly so `useLanguage().t` can share ONE resolver instead of
+ * reimplementing (and slowly diverging from) the flat-table fallback in `lookup`.
+ *
+ * Interpolation is left to the caller because the two entry points use
+ * different placeholder syntax: `tx` fills `{{name}}`, `t` fills `{name}`.
+ */
+export function resolve(key: string, lang: Language): string {
+  const direct = lookup(key, lang);
+  if (direct !== undefined) {return direct;}
+
+  const fallbackLang: Language = lang === 'en' ? 'ar' : 'en';
+  return lookup(key, fallbackLang) ?? key;
 }
 
 function interpolate(template: string, params?: Record<string, string | number>): string {
   if (typeof template !== 'string' || !params) {return template;}
   return template.replace(/\{\{(\w+)\}\}/g, (_match, name: string) =>
     params[name] !== undefined ? String(params[name]) : `{{${name}}}`,
+  );
+}
+
+/**
+ * `t()`-style interpolation for the single-brace `{name}` placeholders used by
+ * the settings/messaging chunks (e.g. `'Ready for {phone}'`).
+ */
+export function interpolateSingleBrace(
+  template: string,
+  params?: Record<string, string | number>,
+): string {
+  if (typeof template !== 'string' || !params) {return template;}
+  return template.replace(/\{(\w+)\}/g, (_match, name: string) =>
+    params[name] !== undefined ? String(params[name]) : `{${name}}`,
   );
 }
 

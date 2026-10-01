@@ -270,13 +270,17 @@ export function TrustCenterPage() {
           accent={C.green}
           actions={
             <>
-              <WaselButton type="button" variant="primary" onClick={() => { void nav(); }}>
+              <WaselButton
+                type="button"
+                variant="primary"
+                onClick={() => { void nav('/app/settings?section=security'); }}
+              >
                 {ar ? 'إدارة أمان الحساب' : 'Manage account security'}
               </WaselButton>
               <WaselButton
                 type="button"
                 variant="outline"
-                onClick={() => { void nav(); }}
+                onClick={() => { void nav('/app/support'); }}
                 style={{ background: C.elevated, color: C.text }}
               >
                 {ar ? 'تواصل مع الدعم' : 'Contact support'}
@@ -613,7 +617,7 @@ export function TrustCenterPage() {
               <WaselButton
                 type="button"
                 variant="primary"
-                onClick={() => { void nav(); }}
+                onClick={() => { void nav('/app/support'); }}
                 style={{ alignSelf: 'flex-start' }}
               >
                 {ar ? 'افتح الدعم' : 'Open support'}

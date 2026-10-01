@@ -83,8 +83,10 @@ export default function SettingsPage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorSaving, setTwoFactorSaving] = useState(false);
   const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetup | null>(null);
-  const [sessions, setSessions] = useState<Array<{ id: string; device: string; lastActive: string }>>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // supabase-js exposes no per-session listing or per-session revoke on the
+  // client, so this block shows the one session the client can actually prove
+  // (the current one) and offers the one real revocation GoTrue supports.
+  const [signingOutOthers, setSigningOutOthers] = useState(false);
 
   const [notifs, setNotifs] = useState<CommunicationPreferences>({
     inApp: true,
@@ -194,18 +196,7 @@ export default function SettingsPage() {
      };
    }, [user?.id]);
 
-    useEffect(() => {
-      const loadSessionsEffect = async () => {
-        if (!supabase) {return;}
-        const currentSession = await supabase.auth.getSession();
-        const currentSessionId = currentSession.data.session?.user?.id ?? null;
-        setActiveSessionId(currentSessionId);
-      };
-
-      void loadSessionsEffect();
-    }, [user?.id, ar]);
-
-   const saveNotificationPreferences = async (
+    const saveNotificationPreferences = async (
     updates: Partial<CommunicationPreferences>,
     savingKey: string,
   ) => {
@@ -338,10 +329,41 @@ export default function SettingsPage() {
     );
   };
 
-  const revokeSession = async (sessionId: string) => {
-    if (!supabase) {return;}
-    toast.success(ar ? 'تم إنهاء الجلسة.' : 'Session revoked.');
-    setSessions(previous => previous.filter(s => s.id !== sessionId));
+  const signOutOtherSessions = async () => {
+    if (!supabase) {
+      toast.error(
+        ar
+          ? 'خدمة الجلسة غير متاحة في هذه البيئة.'
+          : 'Session service is unavailable in this environment.',
+      );
+      return;
+    }
+
+    setSigningOutOthers(true);
+    try {
+      // scope: 'others' is the only per-session revocation GoTrue supports from
+      // the client — it signs every other device out and leaves this one alone.
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      if (error) {
+        toast.error(
+          ar ? 'تعذّر إنهاء الجلسات الأخرى.' : 'Could not sign out the other sessions.',
+        );
+        return;
+      }
+      toast.success(
+        ar ? 'تم إنهاء كل الجلسات الأخرى.' : 'Signed out of every other device.',
+      );
+    } catch (caught) {
+      toast.error(
+        caught instanceof Error
+          ? caught.message
+          : ar
+            ? 'تعذّر إنهاء الجلسات الأخرى.'
+            : 'Could not sign out the other sessions.',
+      );
+    } finally {
+      setSigningOutOthers(false);
+    }
   };
 
   const turnOnTwoFactor = async () => {
@@ -921,9 +943,9 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                <div className={styles.settingsSectionCaption}>{sessionSummary}</div>
+<div className={styles.settingsSectionCaption}>{sessionSummary}</div>
 
-                {sessions.length > 0 && (
+                {user && (
                   <div className={styles.settingsStackSm}>
                     <div
                       style={{
@@ -935,59 +957,50 @@ export default function SettingsPage() {
                     >
                       {t('settingsExpanded.activeSessions')}
                     </div>
-                    {sessions.map(session => (
-                      <div
-                        key={session.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: 8,
-                          padding: '8px 10px',
-                          borderRadius: R.md,
-                          background: C.elevated,
-                          border: `1px solid ${C.border}`,
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: '0.78rem',
-                              color: C.text,
-                              fontFamily: F,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {session.device}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: '0.7rem',
-                              color: C.textDim,
-                              fontFamily: F,
-                            }}
-                          >
-                            {session.lastActive}
-                            {session.id === activeSessionId
-                              ? ar
-                                ? ' • الجلسة الحالية'
-                                : ' • Current session'
-                              : null}
-                          </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 10px',
+                        borderRadius: R.md,
+                        background: C.elevated,
+                        border: `1px solid ${C.border}`,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: '0.78rem',
+                            color: C.text,
+                            fontFamily: F,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {t('settingsExpanded.thisDeviceCurrentSession')}
                         </div>
-                        {session.id !== activeSessionId && (
-                          <ActionButton
-                            label={t('settingsExpanded.revokeSession')}
-                      onClick={async () => {
-                              void revokeSession(session.id);
-                            }}
-                            variant="danger"
-                          />
-                        )}
+                        <div
+                          style={{
+                            fontSize: '0.7rem',
+                            color: C.textDim,
+                            fontFamily: F,
+                          }}
+                        >
+                          {t('settingsExpanded.currentSessionRowDetail')}
+                        </div>
                       </div>
-                    ))}
+                      <ActionButton
+                        label={t('settingsExpanded.signOutOtherDevices')}
+                        disabled={signingOutOthers}
+                        onClick={() => {
+                          void signOutOtherSessions();
+                        }}
+                        variant="danger"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

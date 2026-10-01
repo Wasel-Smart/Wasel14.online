@@ -10,6 +10,7 @@ import { initializeCsrfProtection } from './utils/csrf';
 import { initializeSessionManagement } from './utils/session';
 import { verifyBackendConnection, startHealthCheckMonitoring } from './utils/healthCheck';
 import { clearMasterKey } from './utils/encryption';
+import { installBenignRuntimeErrorFilter } from './components/system/ErrorBoundary';
 
 const LOCAL_DEV_RESET_KEY = 'wasel-local-dev-cache-reset';
 
@@ -110,12 +111,28 @@ class RootErrorBoundary extends React.Component<React.PropsWithChildren, { hasEr
 
   render() {
     if (this.state.hasError) {
+      // LanguageProvider may not have mounted, so read the language that
+      // /initial-locale.js applied to <html> before first paint.
+      const ar = typeof document !== 'undefined' && document.documentElement.lang === 'ar';
       return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', color: '#fff', background: '#050B12' }}>
-          <div style={{ maxWidth: '560px', background: '#0e2240', border: '1px solid rgba(20,127,228,0.16)', borderRadius: '16px', padding: '28px' }}>
-            <h1 style={{ margin: 0, color: '#FF8A0B' }}>Application Error</h1>
-            <p style={{ marginTop: '12px' }}>A runtime error prevented the app from rendering.</p>
-            <p style={{ fontFamily: 'monospace', fontSize: '13px', opacity: 0.85 }}>{this.state.message}</p>
+        <div
+          role="alert"
+          dir={ar ? 'rtl' : 'ltr'}
+          style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', color: '#F8FBFF', background: '#050B12', fontFamily: "'Plus Jakarta Sans', 'Cairo', 'Tajawal', sans-serif" }}
+        >
+          <div style={{ maxWidth: '560px', background: '#0e2240', border: '1px solid rgba(0,229,255,0.16)', borderRadius: '16px', padding: '28px' }}>
+            <h1 style={{ margin: 0, color: '#FF8A0B' }}>{ar ? 'خطأ في التطبيق' : 'Application Error'}</h1>
+            <p style={{ marginTop: '12px' }}>
+              {ar ? 'حدث خطأ منع واصل من العرض. يرجى إعادة المحاولة.' : 'A runtime error prevented Wasel from rendering. Please try again.'}
+            </p>
+            <p style={{ fontFamily: "'JetBrains Mono', 'Fira Mono', monospace", fontSize: '13px', opacity: 0.85 }}>{this.state.message}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{ marginTop: '16px', padding: '10px 20px', border: 'none', borderRadius: '12px', background: '#00E5FF', color: '#081D39', fontWeight: 700, fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              {ar ? 'إعادة تحميل' : 'Reload'}
+            </button>
           </div>
         </div>
       );
@@ -231,6 +248,12 @@ async function waselHardRecover(): Promise<void> {
 }
 
 (window as unknown as { waselHardRecover?: () => Promise<void> }).waselHardRecover = waselHardRecover;
+
+// Benign cross-origin iframe / postMessage aborts must never reach React: the
+// error boundary cannot ignore an error without re-rendering the children that
+// threw, which loops forever on a recurring abort. Absorbed here, in the
+// capture phase, before React's own listeners see them.
+installBenignRuntimeErrorFilter();
 
 if (import.meta.env.PROD && import.meta.env.MODE !== 'test') {
   window.addEventListener('unhandledrejection', (event) => {

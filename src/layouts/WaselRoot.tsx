@@ -1,5 +1,7 @@
-import React, { memo, Suspense, lazy, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { memo, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Menu } from 'lucide-react';
 import { Outlet, useLocation } from 'react-router';
+import { CORE_NAV_ITEMS } from '../config/user-navigation';
 import { SkipToContent } from '../components/SkipToContent';
 import { WaselLogo } from '../components/wasel-ui/WaselLogo';
 import { WaselButton } from '../components/wasel-ui/WaselButton';
@@ -13,12 +15,8 @@ import { getRouteMeta } from '../router/routeMeta';
 import { WaselRouteTransition } from '../components/wasel-ui/WaselPageTransition';
 import { resetBodyScrollLock } from '../utils/bodyScrollLock';
 import { useSeo, OrganizationJsonLd, WebSiteJsonLd } from '../utils/seo';
-import {
-  CurrencySwitcher,
-  LangToggle,
-  OnlineToggle,
-  UserMenu,
-} from './waselRootParts';
+import { CurrencySwitcher, LangToggle, OnlineToggle } from './waselRootParts';
+import { MobileDrawer, UserMenu } from './root-parts/accessible-overlays';
 
 const AvailabilityBanner = lazy( () => import( '../components/system/AvailabilityBanner' ) );
 const MobileBottomNav = lazy( async () => {
@@ -30,9 +28,7 @@ const HEADER_STYLE: React.CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: Z.sticky,
-  transition: 'all 0.25s ease',
-  willChange: 'transform',
-  transform: 'translateZ(0)',
+  transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
 };
 
 const HEADER_INNER_STYLE: React.CSSProperties = {
@@ -55,27 +51,80 @@ const BACKGROUND_OVERLAY_STYLE: React.CSSProperties = {
   inset: 0,
   pointerEvents: 'none',
   background:
-    'radial-gradient(circle at top center, rgba(88,221,255,0.07), transparent 30%), radial-gradient(circle at 80% 20%, rgba(71,214,158,0.06), transparent 24%)',
+    'radial-gradient(circle at top center, rgba(0,229,255,0.08), transparent 30%), radial-gradient(circle at 80% 20%, rgba(114,199,13,0.06), transparent 24%)',
   zIndex: -1,
 };
 
 const GLOBAL_HEADER_STYLES = `
   .wrl-header {
-    background: linear-gradient(180deg, rgba(7,21,33,0.9), rgba(7,21,33,0.84));
+    background: linear-gradient(180deg, rgba(8,29,57,0.92), rgba(8,29,57,0.86));
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
     border-bottom: 1px solid ${ C.border };
-    box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+    box-shadow: 0 6px 18px rgba(8,29,57,0.18);
   }
   .wrl-header.scrolled {
-    background: linear-gradient(180deg, rgba(7,21,33,0.98), rgba(7,21,33,0.95));
+    background: linear-gradient(180deg, rgba(8,29,57,0.98), rgba(8,29,57,0.95));
     border-bottom: 1px solid ${ C.borderHov };
-    box-shadow: 0 12px 34px rgba(0,0,0,0.28);
+    box-shadow: 0 12px 34px rgba(8,29,57,0.34);
+  }
+  .wrl-header button:focus-visible,
+  .wrl-header a:focus-visible {
+    outline: 3px solid ${ C.cyanGlow };
+    outline-offset: 2px;
   }
   .wrl-dropdown-item:hover {
     background: ${ C.cardSolid };
     transform: translateY(-1px);
   }
+  .wrl-desk-nav {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    margin-inline-start: 12px;
+  }
+  @media (min-width: 900px) {
+    .wrl-desk-nav { display: flex; }
+  }
+  .wrl-desk-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: ${ C.textSub };
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 160ms ease, color 160ms ease;
+  }
+  .wrl-desk-link:hover { background: ${ C.cyanDim }; color: ${ C.text }; }
+  .wrl-desk-link[aria-current='page'] { color: ${ C.cyan }; background: ${ C.cyanDim }; }
+  .wrl-desk-link:focus-visible { outline: 2px solid ${ C.cyan }; outline-offset: 2px; }
+  .wrl-desk-link[data-accent='gold'][aria-current='page'] { color: ${ C.gold }; background: ${ C.goldDim }; }
+  .wrl-desk-link[aria-current='page']::after {
+    content: '';
+    position: absolute;
+    inset-inline: 14px;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+  }
+  .wrl-mobile-actions {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-inline-start: auto;
+  }
   @media (max-width: 639px) {
     .wrl-desk-actions { display: none !important; }
+    .wrl-mobile-actions { display: flex; }
   }
   .wrl-main-content {
     flex: 1;
@@ -83,7 +132,7 @@ const GLOBAL_HEADER_STYLES = `
   }
   @media (max-width: 899px) {
     .wrl-main-content {
-      padding-bottom: max(80px, calc(80px + env(safe-area-inset-bottom, 0px)));
+      padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     }
   }
 `;
@@ -93,6 +142,9 @@ const ShellCopy = {
   signIn: 'Sign in',
   getStarted: 'Get started',
   mainContent: 'Main content',
+  menu: 'Menu',
+  home: 'Wasel home',
+  mainNav: 'Main navigation',
 } as const;
 
 const ShellCopyAr = {
@@ -100,7 +152,15 @@ const ShellCopyAr = {
   signIn: 'تسجيل الدخول',
   getStarted: 'ابدأ الآن',
   mainContent: 'المحتوى الرئيسي',
+  menu: 'القائمة',
+  home: 'واصل — الرئيسية',
+  mainNav: 'التنقل الرئيسي',
 } as const;
+
+function isNavPathActive(path: string, pathname: string): boolean {
+  const full = `/app${path}`;
+  return pathname === full || pathname.startsWith(`${full}/`) || pathname === path;
+}
 
 const WaselRootInner = memo( () => {
   const { user, signOut } = useLocalAuth();
@@ -110,6 +170,7 @@ const WaselRootInner = memo( () => {
   const ar = language === 'ar';
 
   const navRef = useRef<HTMLElement>( null );
+  const [ drawerOpen, setDrawerOpen ] = useState( false );
   const isDriverMode = user?.role === 'driver' || user?.role === 'both';
 
   const shellCopy = useMemo( () => ( ar ? ShellCopyAr : ShellCopy ), [ ar ] );
@@ -161,6 +222,7 @@ const WaselRootInner = memo( () => {
 
   useEffect( () => {
     resetBodyScrollLock();
+    setDrawerOpen( false );
 
     const isPwa =
       window.matchMedia( '(display-mode: standalone)' ).matches ||
@@ -188,7 +250,7 @@ const WaselRootInner = memo( () => {
 
       <div
         style={ {
-          minHeight: '100vh',
+          minHeight: '100dvh',
           background: C.bg,
           fontFamily: ar ? FA : F,
           direction: ar ? 'rtl' : 'ltr',
@@ -204,6 +266,8 @@ const WaselRootInner = memo( () => {
         >
           <div style={ HEADER_INNER_STYLE }>
             <button
+              type="button"
+              aria-label={ shellCopy.home }
               onClick={ () => { void navigate( '/app' ); } }
               style={ {
                 background: 'none',
@@ -218,6 +282,75 @@ const WaselRootInner = memo( () => {
             >
               <WaselLogo size={ 56 } theme="light" variant="full" />
             </button>
+
+            <nav className="wrl-desk-nav" aria-label={ shellCopy.mainNav }>
+              { CORE_NAV_ITEMS.map( item => {
+                const active = isNavPathActive( item.path, location.pathname );
+                const label = item.id === 'mobility-os'
+                  ? ( ar ? item.labelAr : 'Network' )
+                  : ( ar ? item.labelAr : item.label );
+                return (
+                  <button
+                    key={ item.id }
+                    type="button"
+                    className="wrl-desk-link"
+                    data-accent={ item.accent }
+                    aria-current={ active ? 'page' : undefined }
+                    onClick={ () => { void navigate( item.path ); } }
+                  >
+                    { label }
+                  </button>
+                );
+              } ) }
+            </nav>
+
+            <div style={ { flex: 1 } } />
+
+            <div className="wrl-mobile-actions">
+              { user ? (
+                <button
+                  type="button"
+                  onClick={ () => { void navigate( '/app/notifications' ); } }
+                  aria-label={ shellCopy.notifications }
+                  style={ {
+                    width: 44,
+                    height: 44,
+                    borderRadius: R.md,
+                    background: C.card,
+                    border: `1px solid ${ C.border }`,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  } }
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={ C.textSub } strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                </button>
+              ) : null }
+              <button
+                type="button"
+                onClick={ () => setDrawerOpen( true ) }
+                aria-label={ shellCopy.menu }
+                aria-haspopup="dialog"
+                aria-expanded={ drawerOpen }
+                style={ {
+                  width: 44,
+                  height: 44,
+                  borderRadius: R.md,
+                  background: C.card,
+                  border: `1px solid ${ C.border }`,
+                  color: C.text,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                } }
+              >
+                <Menu size={ 20 } aria-hidden="true" />
+              </button>
+            </div>
 
             <div
               className="wrl-desk-actions"
@@ -242,8 +375,8 @@ const WaselRootInner = memo( () => {
                     aria-label={ shellCopy.notifications }
                     style={ {
                       position: 'relative',
-                      width: 38,
-                      height: 38,
+                      width: 40,
+                      height: 40,
                       borderRadius: R.md,
                       background: C.card,
                       border: `1px solid ${ C.border }`,
@@ -262,21 +395,10 @@ const WaselRootInner = memo( () => {
                       stroke={ C.textSub }
                       strokeWidth="2"
                       strokeLinecap="round"
+                      aria-hidden="true"
                     >
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
                     </svg>
-                    <div
-                      style={ {
-                        position: 'absolute',
-                        top: 6,
-                        insetInlineEnd: 6,
-                        width: 7,
-                        height: 7,
-                        borderRadius: '50%',
-                        background: C.error,
-                        border: `1.5px solid ${ C.bg }`,
-                      } }
-                    />
                   </button>
                   <UserMenu user={ user } onSignOut={ signOut } ar={ ar } />
                 </>
@@ -304,14 +426,23 @@ const WaselRootInner = memo( () => {
           </div>
         </header>
 
+        <MobileDrawer
+          open={ drawerOpen }
+          onClose={ () => setDrawerOpen( false ) }
+          onNavigate={ navigate }
+          user={ user ? { name: user.name, email: user.email } : null }
+          onSignOut={ signOut }
+          ar={ ar }
+          isDriver={ Boolean( user && isDriverMode ) }
+        />
+
         <Suspense fallback={ null }>
           <AvailabilityBanner ar={ ar } />
         </Suspense>
 
-        <div className="wrl-main-content content-visibility-auto">
+        <div className="wrl-main-content">
           <main
             id="main-content"
-            role="main"
             aria-label={ shellCopy.mainContent }
             tabIndex={ -1 }
             style={ MAIN_CONTENT_STYLE }
@@ -324,11 +455,11 @@ const WaselRootInner = memo( () => {
               <Outlet />
             </WaselRouteTransition>
           </main>
-
-          <Suspense fallback={ null }>
-            <MobileBottomNav language={ language } />
-          </Suspense>
         </div>
+
+        <Suspense fallback={ null }>
+          <MobileBottomNav language={ language } />
+        </Suspense>
       </div>
     </>
   );

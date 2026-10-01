@@ -17,7 +17,7 @@ export const C = {
   card: 'rgba(8,29,57,0.78)',
   cardSolid: '#0e2240',
   card2: '#132b4d',
-  panel: 'rgba(20,127,228,0.06)',
+  panel: 'rgba(0,229,255,0.06)',
   elevated: 'rgba(255,255,255,0.06)',
 
   brandInk: '#081D39',
@@ -30,15 +30,15 @@ export const C = {
   navyLight: '#132b4d',
 
   blue: '#00E5FF',
-  blueLight: '#58DDFF',
+  blueLight: '#66E0FF',
   blueDim: 'rgba(0,229,255,0.12)',
   cyan: '#00E5FF',
-  cyanDark: '#58DDFF',
+  cyanDark: '#66E0FF',
   cyanDim: 'rgba(0,229,255,0.1)',
   cyanGlow: 'rgba(0,229,255,0.2)',
 
   green: '#72C70D',
-  greenDark: '#5a6b08',
+  greenDark: '#4e8a0a',
   greenDim: 'rgba(114,199,13,0.12)',
   greenGlow: 'rgba(114,199,13,0.2)',
 
@@ -61,9 +61,9 @@ export const C = {
   // which is kept as a compatibility alias for `blue` so existing "cyan"-named
   // usages that actually mean the primary interactive blue don't shift colour.
   // New info/map/data-viz UI should reference `teal`, not `cyan`.
-  teal: '#58DDFF',
-  tealDim: 'rgba(88,221,255,0.12)',
-  tealGlow: 'rgba(88,221,255,0.2)',
+  teal: '#66E0FF',
+  tealDim: 'rgba(102,224,255,0.12)',
+  tealGlow: 'rgba(102,224,255,0.2)',
 
   // Secondary success / eco-movement accent (BRAND_GUIDELINES.md).
   lime: '#9AF1CF',
@@ -72,11 +72,13 @@ export const C = {
   text: '#F8FBFF',
   textSub: 'rgba(248,251,255,0.86)',
   textMuted: 'rgba(196,220,238,0.68)',
-  textDim: 'rgba(149,178,201,0.56)',
+  textDim: 'rgba(149,178,201,0.76)',
 
-  border: 'rgba(20,127,228,0.16)',
-  borderHov: 'rgba(20,127,228,0.28)',
-  borderFaint: 'rgba(20,127,228,0.08)',
+  // Brand border = cyan at low alpha (matches --border in globals.css and
+  // BRAND_GUIDELINES.md). The legacy rgba(20,127,228,…) blue is deprecated.
+  border: 'rgba(0,229,255,0.16)',
+  borderHov: 'rgba(0,229,255,0.28)',
+  borderFaint: 'rgba(0,229,255,0.08)',
 
   error: '#FF7C8B',
   errorDim: 'rgba(255,124,139,0.14)',
@@ -94,7 +96,7 @@ export const FM = "'JetBrains Mono', 'Fira Mono', monospace";
 
 export const TYPE = {
   size: {
-    xs: '0.6875rem',
+    xs: '0.75rem',
     sm: '0.8125rem',
     base: '0.9375rem',
     md: '1rem',
@@ -110,8 +112,8 @@ export const TYPE = {
     medium: 500,
     semibold: 600,
     bold: 700,
-    black: 780,
-    ultra: 880,
+    black: 800,
+    ultra: 800,
   },
   lineHeight: {
     tight: 1.1,
@@ -170,8 +172,8 @@ export const SH = {
   lg: '0 18px 42px rgba(8,29,57,0.38)',
   xl: '0 26px 58px rgba(8,29,57,0.46)',
   navy: '0 8px 26px rgba(8,29,57,0.28)',
-  blue: '0 4px 18px rgba(20,127,228,0.16)',
-  blueL: '0 10px 28px rgba(20,127,228,0.2)',
+  blue: '0 4px 18px rgba(0,229,255,0.16)',
+  blueL: '0 10px 28px rgba(0,229,255,0.2)',
   green: '0 8px 20px rgba(114,199,13,0.18)',
   orange: '0 8px 22px rgba(255,138,11,0.2)',
   inner: 'inset 0 1px 3px rgba(8,29,57,0.3)',
@@ -194,7 +196,7 @@ export const GRAD_PURPLE = 'linear-gradient(135deg, #B7ABFF 0%, #7F91FF 100%)';
 export const GRAD_HERO = 'linear-gradient(145deg, #081D39 0%, #0a1f3a 56%, #132b4d 100%)';
 export const GRAD_SIGNAL = 'linear-gradient(135deg, #F8FBFF 0%, #8DEBFF 52%, #47D69E 100%)';
 export const GRAD_AURORA =
-  'radial-gradient(circle at top, rgba(20,127,228,0.18), rgba(114,199,13,0.08) 42%, rgba(8,29,57,0) 74%)';
+  'radial-gradient(circle at top, rgba(0,229,255,0.18), rgba(114,199,13,0.08) 42%, rgba(8,29,57,0) 74%)';
 
 export const ANIM = {
   dur: {
@@ -260,7 +262,7 @@ export function solidCard({
 }
 
 export function focusRing(color = C.brandBlue): string {
-  return `0 0 0 3px ${color}30`;
+  return `0 0 0 3px ${color}66`;
 }
 
 export function statusColor(status: 'success' | 'warning' | 'error' | 'info' | 'neutral'): string {
@@ -310,8 +312,8 @@ export const GLOBAL_STYLES = `
   50% { opacity: 0.5; transform: scale(0.9); }
 }
 @keyframes pulse-glow {
-  0%,100% { box-shadow: 0 0 12px rgba(88,221,255,0.16); }
-  50% { box-shadow: 0 0 28px rgba(88,221,255,0.34); }
+  0%,100% { box-shadow: 0 0 12px rgba(102,224,255,0.16); }
+  50% { box-shadow: 0 0 28px rgba(102,224,255,0.34); }
 }
 @keyframes shimmer {
   0% { background-position: -1000px 0; }

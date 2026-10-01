@@ -43,6 +43,8 @@
     "sweep:i18n": "node scripts/sweep-i18n.mjs",
     "cleanup:root": "node scripts/cleanup-root.mjs",
     "brand:check": "node scripts/brand-check.mjs",
+    "brand:check:strict": "node scripts/brand-check.mjs --strict",
+    "lighthouse": "npx @lhci/cli autorun --config=lighthouserc.js",
     "brand:sync": "node scripts/sync-brand-assets.mjs",
     "secrets:check": "node scripts/validate-no-secrets.mjs",
     "env:check": "node scripts/check-env-exposure.mjs",
@@ -125,7 +127,7 @@
   },
   "devDependencies": {
     "@axe-core/cli": "^4.13.0",
-    "@eslint/js": "^8.57.1",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.44.1",
     "@tailwindcss/vite": "^4.1.4",
     "@testing-library/dom": "^10.4.1",

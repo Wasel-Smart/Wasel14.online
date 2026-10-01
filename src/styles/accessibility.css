@@ -6,14 +6,15 @@
 /* ── Enhanced Color Contrast ─────────────────────────────────────────────── */
 :root {
   /* Improved contrast ratios for WCAG AA compliance */
-  --wasel-cyan-accessible: #00E5FF; /* Lightened from #66e0ff for better contrast */
-  --wasel-gold-accessible: #ffd070; /* Lightened from #FFBE5C */
-  --wasel-green-accessible: #5ee7b0; /* Lightened from #47D69E */
+  --wasel-cyan-accessible: #00e5ff; /* brand connection cyan */
+  --wasel-gold-accessible: #ffbe5c; /* brand gold */
+  --wasel-green-accessible: #72c70d; /* brand movement lime */
+  --wasel-error-accessible: #ff7c8b; /* brand error */
 
   /* Text on dark backgrounds - minimum 4.5:1 contrast */
   --text-primary-dark: #ffffff;
   --text-secondary-dark: #e0f2fe;
-  --text-muted-dark: #94a3b8;
+  --text-muted-dark: #95b2c9;
 
   /* Interactive elements - minimum 3:1 contrast */
   --interactive-primary: #00E5FF;
@@ -123,33 +124,28 @@ textarea:focus-visible {
   overflow: hidden;
 }
 
-[aria-live='polite'],
-[aria-live='assertive'] {
-  position: absolute;
-  left: -10000px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-}
+/* NOTE: do not hide every [aria-live] element — toast containers (Sonner)
+   and visible status banners use aria-live and must stay on screen.
+   Use the .aria-live-polite / .sr-only utility for visually hidden regions. */
 
 /* ── Form Accessibility ──────────────────────────────────────────────────── */
 /* Error states with proper contrast */
 .input-error,
 input[aria-invalid='true'] {
-  border-color: #ff6b9d;
+  border-color: var(--wasel-error-accessible);
   border-width: 2px;
 }
 
 .input-error:focus,
 input[aria-invalid='true']:focus {
-  outline: 3px solid #ff6b9d;
+  outline: 3px solid var(--wasel-error-accessible);
   outline-offset: 2px;
 }
 
-/* Error message styling */
-.error-message,
-[role='alert'] {
-  color: #ff6b9d;
+/* Error message styling (scoped — [role='alert'] is also used by full-page
+   error screens and toasts that bring their own layout) */
+.error-message {
+  color: var(--wasel-error-accessible);
   font-size: 0.875rem;
   margin-top: 4px;
   display: flex;
@@ -165,7 +161,7 @@ input[aria-invalid='true']:focus {
 /* Required field indicator */
 .required::after {
   content: ' *';
-  color: #ff6b9d;
+  color: var(--wasel-error-accessible);
   font-weight: 700;
 }
 
@@ -218,24 +214,29 @@ button[aria-busy='true']::after {
 }
 
 /* ── Modal/Dialog Accessibility ──────────────────────────────────────────── */
-[role='dialog'],
-[role='alertdialog'] {
+/* Opt-in centred modal. Do NOT target [role='dialog'] globally — drawers,
+   sheets and the mobile menu are dialogs too and position themselves. */
+.wasel-dialog-centered {
   position: fixed;
   top: 50%;
-  left: 50%;
+  inset-inline-start: 50%;
   transform: translate(-50%, -50%);
-  z-index: 100;
+  z-index: 300;
   max-width: 90vw;
   max-height: 90vh;
   overflow: auto;
+}
+
+[dir='rtl'] .wasel-dialog-centered {
+  transform: translate(50%, -50%);
 }
 
 /* Modal backdrop */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  z-index: 99;
+  background: rgba(4, 10, 18, 0.8);
+  z-index: 200;
 }
 
 /* Trap focus within modal */
@@ -274,21 +275,10 @@ button[aria-busy='true']::after {
   outline-offset: -2px;
 }
 
+/* Active-page styling is owned by each nav component (header underline,
+   sidebar rail, bottom-nav pill). A global rail here collided with them. */
 [aria-current='page'] {
   font-weight: 700;
-  color: var(--primary);
-  position: relative;
-}
-
-[aria-current='page']::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--primary);
-  border-radius: 0 3px 3px 0;
 }
 
 /* ── Table Accessibility ─────────────────────────────────────────────────── */
@@ -298,7 +288,7 @@ table {
 }
 
 th {
-  text-align: left;
+  text-align: start;
   font-weight: 700;
   padding: 12px;
   background: var(--secondary);
@@ -351,35 +341,35 @@ tr:hover {
 }
 
 /* ── Status Messages ─────────────────────────────────────────────────────── */
-[role='status'] {
+[role='status'][data-status] {
   padding: 12px 16px;
   border-radius: var(--radius-md);
-  border-left: 4px solid;
+  border-inline-start: 4px solid;
   margin: 16px 0;
 }
 
 [role='status'][data-status='success'] {
-  background: rgba(94, 231, 176, 0.1);
-  border-color: #5ee7b0;
-  color: #5ee7b0;
+  background: rgba(114, 199, 13, 0.12);
+  border-color: #72c70d;
+  color: #72c70d;
 }
 
 [role='status'][data-status='warning'] {
-  background: rgba(255, 208, 112, 0.1);
-  border-color: #ffd070;
-  color: #ffd070;
+  background: rgba(255, 138, 11, 0.12);
+  border-color: #ff8a0b;
+  color: #ff8a0b;
 }
 
 [role='status'][data-status='error'] {
-  background: rgba(255, 107, 157, 0.1);
-  border-color: #ff6b9d;
-  color: #ff6b9d;
+  background: rgba(255, 124, 139, 0.12);
+  border-color: #ff7c8b;
+  color: #ff7c8b;
 }
 
 [role='status'][data-status='info'] {
-  background: rgba(103, 232, 255, 0.1);
-  border-color: #00E5FF;
-  color: #00E5FF;
+  background: rgba(0, 229, 255, 0.1);
+  border-color: #00e5ff;
+  color: #00e5ff;
 }
 
 /* ── Contrast Utilities ──────────────────────────────────────────────────── */

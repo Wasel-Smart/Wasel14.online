@@ -8,20 +8,35 @@ on:
   schedule:
     - cron: '0 6 * * 1'  # Weekly on Monday at 6 AM
 
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
 jobs:
   # ── Dependency Scan ──────────────────────────────────────────────────────────
   dependency-scan:
     name: Dependency Vulnerabilities
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
+      # Blocking for runtime dependencies (what actually ships). Dev-only
+      # advisories are reported but do not fail the build.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm audit --audit-level=high
         continue-on-error: true
 
@@ -29,6 +44,7 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
@@ -38,7 +54,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
 
       - uses: github/codeql-action/init@v3
         with:
@@ -54,21 +70,23 @@ jobs:
   rbac-audit:
     name: RBAC Permission Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - run: npm run audit:rbac
 
   # ── Secret Detection ─────────────────────────────────────────────────────────
   secret-detection:
     name: Secret Detection
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
