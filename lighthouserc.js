@@ -1,8 +1,11 @@
 export default {
   ci: {
     collect: {
+      startServerCommand: 'npm run preview',
+      startServerReadyPattern: 'Local.*4173',
+      startServerReadyTimeout: 30000,
       url: ['http://127.0.0.1:4173/'],
-      numberOfRuns: 3, // median of 3 — a single run is too noisy to gate on
+      numberOfRuns: 3,
       settings: {
         onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
         formFactor: 'mobile',
@@ -22,15 +25,15 @@ export default {
     },
     assert: {
       assertions: {
-        'categories:performance': ['error', { minScore: 0.8 }],
-        'categories:accessibility': ['error', { minScore: 0.9 }],
-        'categories:best-practices': ['error', { minScore: 0.9 }],
-        'categories:seo': ['error', { minScore: 0.8 }],
-        'first-contentful-paint': ['error', { maxNumericValue: 1800 }],
-        'largest-contentful-paint': ['error', { maxNumericValue: 2500 }],
-        'cumulative-layout-shift': ['error', { maxNumericValue: 0.1 }],
-        'total-blocking-time': ['error', { maxNumericValue: 200 }],
-        'server-response-time': ['error', { maxNumericValue: 600 }],
+        'categories:performance':     ['error', { minScore: 0.8 }],
+        'categories:accessibility':   ['error', { minScore: 0.9 }],
+        'categories:best-practices':  ['error', { minScore: 0.9 }],
+        'categories:seo':             ['error', { minScore: 0.8 }],
+        'first-contentful-paint':     ['error', { maxNumericValue: 1800 }],
+        'largest-contentful-paint':   ['error', { maxNumericValue: 2500 }],
+        'cumulative-layout-shift':    ['error', { maxNumericValue: 0.1 }],
+        'total-blocking-time':        ['error', { maxNumericValue: 200 }],
+        'server-response-time':       ['error', { maxNumericValue: 600 }],
       },
     },
     upload: {

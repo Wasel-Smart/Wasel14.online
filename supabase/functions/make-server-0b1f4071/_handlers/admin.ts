@@ -53,10 +53,10 @@ async function authorize (
   permission: AccessPermission,
 ): Promise<{ error: Response } | AuthorizedContext> {
   const auth = await authenticateRequest ( request );
-  if ( 'error' in auth ) return { error: auth.error };
+  if ( 'error' in auth ) {return { error: auth.error };}
 
   const denied = enforcePermission ( auth, permission );
-  if ( denied ) return { error: denied };
+  if ( denied ) {return { error: denied };}
 
   return { admin: auth.admin, canonicalUser: auth.canonicalUser };
 }
@@ -82,7 +82,7 @@ const USER_LIST_COLUMNS =
 
 export async function handleAdminListUsers ( request: Request ) {
   const auth = await authorize ( request, 'users:read' );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const { page, limit, from, to } = parsePagination ( new URL ( request.url ) );
 
@@ -93,19 +93,19 @@ export async function handleAdminListUsers ( request: Request ) {
     .order ( 'created_at', { ascending: false } )
     .range ( from, to );
 
-  if ( error ) return json ( { error: error.message }, 500 );
+  if ( error ) {return json ( { error: error.message }, 500 );}
 
   return json ( { data: data ?? [], meta: { total: toCount ( count ), page, limit } } );
 }
 
 export async function handleAdminSetUserStatus ( request: Request, userId: string ) {
   const auth = await authorize ( request, 'users:write' );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
-  if ( !userId ) return json ( { error: 'userId is required' }, 400 );
+  if ( !userId ) {return json ( { error: 'userId is required' }, 400 );}
 
   const body = await readJsonBody ( request );
-  if ( body instanceof Response ) return body;
+  if ( body instanceof Response ) {return body;}
 
   // The UI speaks in active/inactive, but the canonical column is the
   // profile_status_v2 enum (pending | active | suspended | blocked). There is
@@ -130,8 +130,8 @@ export async function handleAdminSetUserStatus ( request: Request, userId: strin
     .select ( USER_LIST_COLUMNS )
     .maybeSingle ();
 
-  if ( error ) return json ( { error: error.message }, 500 );
-  if ( !data ) return json ( { error: 'User not found' }, 404 );
+  if ( error ) {return json ( { error: error.message }, 500 );}
+  if ( !data ) {return json ( { error: 'User not found' }, 404 );}
 
   return json ( { data } );
 }
@@ -147,7 +147,7 @@ const TERMINAL_DISPUTE_STATUSES = [ 'resolved', 'closed' ] as const;
 
 export async function handleAdminListDisputes ( request: Request ) {
   const auth = await authorize ( request, 'disputes:read' );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const { page, limit, from, to } = parsePagination ( new URL ( request.url ) );
 
@@ -157,23 +157,23 @@ export async function handleAdminListDisputes ( request: Request ) {
     .order ( 'created_at', { ascending: false } )
     .range ( from, to );
 
-  if ( error ) return json ( { error: error.message }, 500 );
+  if ( error ) {return json ( { error: error.message }, 500 );}
 
   return json ( { data: data ?? [], meta: { total: toCount ( count ), page, limit } } );
 }
 
 export async function handleAdminResolveDispute ( request: Request, disputeId: string ) {
   const auth = await authorize ( request, 'disputes:write' );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
-  if ( !disputeId ) return json ( { error: 'disputeId is required' }, 400 );
+  if ( !disputeId ) {return json ( { error: 'disputeId is required' }, 400 );}
 
   const body = await readJsonBody ( request );
-  if ( body instanceof Response ) return body;
+  if ( body instanceof Response ) {return body;}
 
   const resolution = typeof body.resolution === 'string' ? body.resolution.trim () : '';
-  if ( !resolution ) return json ( { error: 'resolution is required' }, 400 );
-  if ( resolution.length > 2000 ) return json ( { error: 'resolution is too long' }, 400 );
+  if ( !resolution ) {return json ( { error: 'resolution is required' }, 400 );}
+  if ( resolution.length > 2000 ) {return json ( { error: 'resolution is too long' }, 400 );}
 
   // The disputes.status CHECK constraint allows exactly these four values.
   const action = String ( body.action ?? 'resolved' ).trim ().toLowerCase ();
@@ -187,8 +187,8 @@ export async function handleAdminResolveDispute ( request: Request, disputeId: s
     .eq ( 'id', disputeId )
     .maybeSingle ();
 
-  if ( readError ) return json ( { error: readError.message }, 500 );
-  if ( !existing ) return json ( { error: 'Dispute not found' }, 404 );
+  if ( readError ) {return json ( { error: readError.message }, 500 );}
+  if ( !existing ) {return json ( { error: 'Dispute not found' }, 404 );}
 
   if (
     TERMINAL_DISPUTE_STATUSES.includes (
@@ -213,7 +213,7 @@ export async function handleAdminResolveDispute ( request: Request, disputeId: s
     .select ( DISPUTE_LIST_COLUMNS )
     .single ();
 
-  if ( error ) return json ( { error: error.message }, 500 );
+  if ( error ) {return json ( { error: error.message }, 500 );}
 
   return json ( { data } );
 }
@@ -234,7 +234,7 @@ const RANGE_DAYS: Record<string, number> = { '1d': 1, '7d': 7, '30d': 30 };
  */
 export async function handleAdminDashboardMetrics ( request: Request ) {
   const auth = await authorize ( request, 'analytics:read' );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const url = new URL ( request.url );
   const requestedRange = String ( url.searchParams.get ( 'range' ) ?? '1d' ).trim ().toLowerCase ();
@@ -291,10 +291,10 @@ export async function handleAdminDashboardMetrics ( request: Request ) {
 
 export async function handleAdminListPendingDrivers ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess ( request );
-  if ( accessError ) return accessError;
+  if ( accessError ) {return accessError;}
 
   const auth = await authenticateRequest ( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const role = resolveAccessRole ( auth.canonicalUser.role );
   if ( !hasPermission ( role, 'users:impersonate' ) && !hasPermission ( role, 'config:write' ) ) {
@@ -310,16 +310,16 @@ export async function handleAdminListPendingDrivers ( request: Request ) {
     .eq ( 'driver_status', 'pending_approval' )
     .order ( 'created_at', { ascending: false } );
 
-  if ( error ) return json ( { error: error.message }, 500 );
+  if ( error ) {return json ( { error: error.message }, 500 );}
   return json ( { drivers: data ?? [] } );
 }
 
 export async function handleAdminApproveDriver ( request: Request, driverId: string ) {
   const accessError = ensureRuntimeAdminAccess ( request );
-  if ( accessError ) return accessError;
+  if ( accessError ) {return accessError;}
 
   const auth = await authenticateRequest ( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const role = resolveAccessRole ( auth.canonicalUser.role );
   if ( !hasPermission ( role, 'users:impersonate' ) && !hasPermission ( role, 'config:write' ) ) {
@@ -334,6 +334,6 @@ export async function handleAdminApproveDriver ( request: Request, driverId: str
     .select ( '*' )
     .single ();
 
-  if ( error ) return json ( { error: error.message }, 500 );
+  if ( error ) {return json ( { error: error.message }, 500 );}
   return json ( { driver: data } );
 }

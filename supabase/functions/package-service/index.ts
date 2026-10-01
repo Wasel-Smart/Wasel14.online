@@ -20,13 +20,13 @@ function json(data: unknown, status = 200) {
 }
 
 function resolveAllowedOrigin(origin: string | null): string | null {
-  if (!origin) return null;
+  if (!origin) {return null;}
   try {
     const url = new URL(origin);
-    if (url.origin === new URL(APP_BASE_URL).origin) return url.origin;
-    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return url.origin;
+    if (url.origin === new URL(APP_BASE_URL).origin) {return url.origin;}
+    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {return url.origin;}
     const extra = ADDITIONAL_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-    if (extra.includes(url.origin)) return url.origin;
+    if (extra.includes(url.origin)) {return url.origin;}
   } catch { /* ignore */ }
   return null;
 }
@@ -36,29 +36,29 @@ function buildResponseHeaders(request: Request): Headers {
   const allowedOrigin = resolveAllowedOrigin(request.headers.get('origin'));
   Object.entries(responseBaseHeaders).forEach(([k, v]) => headers.set(k, v));
   headers.set('Vary', 'Origin');
-  if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
+  if (allowedOrigin) {headers.set('Access-Control-Allow-Origin', allowedOrigin);}
   return headers;
 }
 
 function getAdminClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase not configured');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {throw new Error('Supabase not configured');}
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function authenticateRequest(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) return { error: json({ error: 'Missing bearer token' }, 401) };
+  if (!token) {return { error: json({ error: 'Missing bearer token' }, 401) };}
   const admin = getAdminClient();
   const { data: authData, error: authError } = await admin.auth.getUser(token);
-  if (authError || !authData.user) return { error: json({ error: 'Invalid auth token' }, 401) };
+  if (authError || !authData.user) {return { error: json({ error: 'Invalid auth token' }, 401) };}
   const { data: byAuthUser, error: byAuthError } = await admin.from('users').select('*').eq('auth_user_id', authData.user.id).maybeSingle();
-  if (byAuthError) return { error: json({ error: byAuthError.message }, 500) };
+  if (byAuthError) {return { error: json({ error: byAuthError.message }, 500) };}
   let canonicalUser = byAuthUser;
   if (!canonicalUser) {
     const fallback = await admin.from('users').select('*').eq('id', authData.user.id).maybeSingle();
     canonicalUser = fallback.data;
-    if (fallback.error || !canonicalUser) return { error: json({ error: 'User not found' }, 404) };
+    if (fallback.error || !canonicalUser) {return { error: json({ error: 'User not found' }, 404) };}
   }
   return { admin, authUser: authData.user, canonicalUser };
 }
@@ -91,13 +91,13 @@ function calculateDirectPrice(type: string, weight?: number, distanceKm?: number
 function parseEntityRoute(path: string, prefix: string) {
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = new RegExp(`^/${escapedPrefix}/([^/]+)(?:/([^/]+))?$`).exec(path);
-  if (!match) return null;
+  if (!match) {return null;}
   return { id: decodeURIComponent(match[1]), action: match[2] ? decodeURIComponent(match[2]) : null };
 }
 
 async function handlePackageRequest(request: Request, path: string) {
   const auth = await authenticateRequest(request);
-  if ('error' in auth) return auth.error;
+  if ('error' in auth) {return auth.error;}
 
   if (request.method === 'POST' && path === '/packages') {
     const body = await request.json().catch(() => ({}));
@@ -118,7 +118,7 @@ async function handlePackageRequest(request: Request, path: string) {
       delivery_fee: calculateDirectPrice('package', toNumber(body.weight, 0), 0, toNumber(body.base_price, 5)).breakdown.base,
       status: 'posted',
     }).select('*').single();
-    if (error) return json({ error: error.message }, 500);
+    if (error) {return json({ error: error.message }, 500);}
 
     const packageId = String(data.package_id ?? data.id ?? '');
     const { data: trip } = await auth.admin.from('trips').select('trip_id, driver_id, available_seats, package_slots_remaining, trip_status').eq('allow_packages', true).eq('trip_status', 'open').gt('package_slots_remaining', 0).limit(1).maybeSingle();
@@ -138,33 +138,33 @@ async function handlePackageRequest(request: Request, path: string) {
   const packageRoute = parseEntityRoute(path, 'packages');
   if (request.method === 'GET' && packageRoute?.id) {
     const { data, error } = await auth.admin.from('packages').select('*').eq('package_id', packageRoute.id).maybeSingle();
-    if (error) return json({ error: error.message }, 500);
-    if (!data) return json({ error: 'Package not found' }, 404);
+    if (error) {return json({ error: error.message }, 500);}
+    if (!data) {return json({ error: 'Package not found' }, 404);}
     const isOwner = data.sender_id === auth.canonicalUser.id || data.carrier_id === auth.canonicalUser.id;
-    if (!isOwner) return json({ error: 'Not authorized to view this package.' }, 403);
+    if (!isOwner) {return json({ error: 'Not authorized to view this package.' }, 403);}
     return json(mapPackageRow(data));
   }
 
   if (request.method === 'GET' && path.startsWith('/packages/sender/')) {
     const userId = path.split('/packages/sender/')[1]?.split('/')[0];
-    if (!userId) return json({ error: 'User ID required' }, 400);
+    if (!userId) {return json({ error: 'User ID required' }, 400);}
     if (userId !== auth.canonicalUser.id && userId !== auth.authUser.id) {
       return json({ error: 'Not authorized to view these packages.' }, 403);
     }
     const { data, error } = await auth.admin.from('packages').select('*').eq('sender_id', auth.canonicalUser.id).order('created_at', { ascending: false });
-    if (error) return json({ error: error.message }, 500);
+    if (error) {return json({ error: error.message }, 500);}
     return json((Array.isArray(data) ? data : []).map(mapPackageRow));
   }
 
   if (request.method === 'POST' && packageRoute?.id && packageRoute.action === 'deliver') {
     const { data: pkg, error: pkgErr } = await auth.admin.from('packages').select('package_id, sender_id, carrier_id').eq('package_id', packageRoute.id).maybeSingle();
-    if (pkgErr) return json({ error: pkgErr.message }, 500);
-    if (!pkg) return json({ error: 'Package not found' }, 404);
+    if (pkgErr) {return json({ error: pkgErr.message }, 500);}
+    if (!pkg) {return json({ error: 'Package not found' }, 404);}
     const isCarrier = pkg.carrier_id === auth.canonicalUser.id;
     const isSender = pkg.sender_id === auth.canonicalUser.id;
-    if (!isCarrier && !isSender) return json({ error: 'Not authorized to deliver this package.' }, 403);
+    if (!isCarrier && !isSender) {return json({ error: 'Not authorized to deliver this package.' }, 403);}
     const { data, error } = await auth.admin.from('packages').update({ status: 'delivered', delivered_at: new Date().toISOString() }).eq('package_id', packageRoute.id).select('*').single();
-    if (error) return json({ error: error.message }, 500);
+    if (error) {return json({ error: error.message }, 500);}
     return json(mapPackageRow(data));
   }
 
@@ -174,7 +174,7 @@ async function handlePackageRequest(request: Request, path: string) {
 Deno.serve(async (request: Request) => {
   const headers = buildResponseHeaders(request);
   headers.set('X-Api-Version', 'v1');
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (request.method === 'OPTIONS') {return new Response(null, { status: 204, headers });}
 
   try {
     const url = new URL(request.url);
@@ -185,7 +185,7 @@ Deno.serve(async (request: Request) => {
 
     if (path.startsWith('/packages')) {
       response = await handlePackageRequest(request, path);
-      if (!response) response = json({ error: 'Not found' }, 404);
+      if (!response) {response = json({ error: 'Not found' }, 404);}
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'package-service', timestamp: new Date().toISOString() });
     } else {

@@ -143,7 +143,7 @@ export async function checkDbRateLimit(
       p_max_attempts: config.maxAttempts,
       p_window_minutes: config.windowMinutes,
     });
-    if (error) return { allowed: false };
+    if (error) {return { allowed: false };}
     return { allowed: Boolean(data) };
   } catch {
     // Fail closed: deny when DB is unreachable.

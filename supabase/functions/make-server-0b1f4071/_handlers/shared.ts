@@ -3,47 +3,28 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Client } from 'https://deno.land/x/postgres@v0.19.3/mod.ts';
 import Stripe from 'https://esm.sh/stripe@12.12.0?target=deno';
 import {
-  buildFailurePatch,
-  buildIdempotencyKey,
-  buildResendPayload,
-  buildSendgridPayload,
-  buildTwilioRequest,
-  determineProviderName,
-  hasValidWebhookToken,
-  mapResendEventToStatus,
-  mapTwilioStatusToLifecycle,
-  type CommunicationDeliveryRecord,
-  type DeliveryProcessorEnv,
+    buildFailurePatch,
+    buildResendPayload,
+    buildSendgridPayload,
+    buildTwilioRequest,
+    determineProviderName,
+    type CommunicationDeliveryRecord,
+    type DeliveryProcessorEnv,
 } from '../_shared/communication-runtime.ts';
 import {
-  generateBackupCodes,
-  generateQRCode,
-  generateTOTPSecret,
-  hashBackupCode,
-  hashBackupCodes,
-  verifyTwoFactorChallenge,
-} from '../_shared/two-factor-runtime.ts';
-import {
-  buildPublicHealthPayload,
-  isRuntimeAdminEnabled,
-  resolveAllowedOrigin,
+    isRuntimeAdminEnabled,
+    resolveAllowedOrigin,
 } from '../_shared/request-security.ts';
 import {
-  advanceCorridorAfterBooking,
-  buildMobilitySnapshot,
-  MOBILITY_OS_SEED_SQL,
-  MOBILITY_OS_RUNTIME_SQL,
-  EVENT_OUTBOX_SQL,
-  type MobilityBookingType,
-  type MobilityCorridorRow,
+    MOBILITY_OS_SEED_SQL,
+    MOBILITY_OS_RUNTIME_SQL,
 } from '../_shared/mobility-os-runtime.ts';
-import { calculateDirectPrice, toNumber } from '../_shared/pricing.ts';
-import { normalizePhoneNumber, isValidE164Phone } from '../_shared/phone.ts';
+import { toNumber } from '../_shared/pricing.ts';
+import type {
+  AccessPermission} from '../_shared/rbac.ts';
 import {
-  AccessRole,
-  AccessPermission,
-  hasPermission,
-  resolveAccessRole,
+    hasPermission,
+    resolveAccessRole,
 } from '../_shared/rbac.ts';
 
 
@@ -578,7 +559,7 @@ export function enforceRequestSecurity ( request: Request, path: string ): Respo
   const method = request.method;
   const isMutating =
     method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
-  if ( !isMutating || isWebhookRoute( path ) ) return null;
+  if ( !isMutating || isWebhookRoute( path ) ) {return null;}
 
   const authHeader = request.headers.get( 'authorization' ) ?? '';
   const csrfToken = request.headers.get( 'x-csrf-token' );
@@ -642,7 +623,7 @@ export async function authenticateRequest ( request: Request ): Promise<AuthResu
 }
 
 export function constantTimeEqual ( a: string, b: string ): boolean {
-  if ( a.length !== b.length ) return false;
+  if ( a.length !== b.length ) {return false;}
   let result = 0;
   for ( let i = 0; i < a.length; i++ ) {
     result |= a.charCodeAt( i ) ^ b.charCodeAt( i );
@@ -656,7 +637,7 @@ export function getWorkerSecret () {
 
 export function hasWorkerAccess ( request: Request ): boolean {
   const secret = getWorkerSecret();
-  if ( !secret ) return false;
+  if ( !secret ) {return false;}
   return constantTimeEqual( request.headers.get( 'x-communication-worker-secret' ) ?? '', secret );
 }
 
@@ -676,7 +657,7 @@ export function enforcePermission (
   auth: Awaited<ReturnType<typeof authenticateRequest>>,
   permission: AccessPermission,
 ): Response | null {
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   if ( !hasPermission( role, permission ) ) {
@@ -708,7 +689,7 @@ export async function consumeRateLimit (
       p_limit: limit,
       p_window_seconds: windowSeconds,
     } );
-    if ( error ) throw new Error( error.message );
+    if ( error ) {throw new Error( error.message );}
 
     const row = Array.isArray( data ) ? data[ 0 ] : data;
     if ( row && row.allowed === false ) {
@@ -752,7 +733,7 @@ export function hasAnyPermission (
   auth: Awaited<ReturnType<typeof authenticateRequest>>,
   permissions: AccessPermission[],
 ): boolean {
-  if ( 'error' in auth ) return false;
+  if ( 'error' in auth ) {return false;}
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   return permissions.some( ( permission ) => hasPermission( role, permission ) );
@@ -789,13 +770,13 @@ export function matchesAuthenticatedUser (
   auth: Awaited<ReturnType<typeof authenticateRequest>>,
   requestedUserId: string,
 ): boolean {
-  if ( 'error' in auth ) return false;
+  if ( 'error' in auth ) {return false;}
   return requestedUserId === auth.canonicalUser.id || requestedUserId === auth.authUser.id;
 }
 
 export function parseWalletRoute ( path: string ) {
   const match = /^\/wallet\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec( path );
-  if ( !match ) return null;
+  if ( !match ) {return null;}
   return {
     userId: decodeURIComponent( match[ 1 ] ),
     action: match[ 2 ] ? decodeURIComponent( match[ 2 ] ) : '',
@@ -806,7 +787,7 @@ export function parseWalletRoute ( path: string ) {
 export function parseEntityRoute ( path: string, prefix: string ) {
   const escapedPrefix = prefix.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' );
   const match = new RegExp( `^/${ escapedPrefix }/([^/]+)(?:/([^/]+))?$` ).exec( path );
-  if ( !match ) return null;
+  if ( !match ) {return null;}
   return {
     id: decodeURIComponent( match[ 1 ] ),
     action: match[ 2 ] ? decodeURIComponent( match[ 2 ] ) : null,
@@ -815,13 +796,13 @@ export function parseEntityRoute ( path: string, prefix: string ) {
 
 export function formatDate ( value: unknown, fallback = new Date().toISOString().slice( 0, 10 ) ): string {
   const date = new Date( String( value ?? '' ) );
-  if ( Number.isNaN( date.getTime() ) ) return fallback;
+  if ( Number.isNaN( date.getTime() ) ) {return fallback;}
   return date.toISOString().slice( 0, 10 );
 }
 
 export function formatTime ( value: unknown ): string {
   const date = new Date( String( value ?? '' ) );
-  if ( Number.isNaN( date.getTime() ) ) return String( value ?? '' ).slice( 0, 5 ) || '08:00';
+  if ( Number.isNaN( date.getTime() ) ) {return String( value ?? '' ).slice( 0, 5 ) || '08:00';}
   return date.toISOString().slice( 11, 16 );
 }
 
@@ -901,8 +882,8 @@ export async function ensureCanonicalUserForAuth (
     .select( '*' )
     .eq( 'auth_user_id', authUserId )
     .maybeSingle();
-  if ( selectError ) throw selectError;
-  if ( existing ) return existing;
+  if ( selectError ) {throw selectError;}
+  if ( existing ) {return existing;}
 
   const { data, error } = await admin
     .from( 'users' )
@@ -918,7 +899,7 @@ export async function ensureCanonicalUserForAuth (
     } )
     .select( '*' )
     .single();
-  if ( error ) throw error;
+  if ( error ) {throw error;}
 
   try {
     await admin
@@ -943,7 +924,7 @@ export async function getWalletForUser ( admin: ReturnType<typeof getAdminClient
     .select( '*' )
     .eq( 'user_id', userId )
     .maybeSingle();
-  if ( error ) throw error;
+  if ( error ) {throw error;}
   return data;
 }
 
@@ -955,7 +936,7 @@ export async function getVerificationForUser ( admin: ReturnType<typeof getAdmin
     .order( 'updated_at', { ascending: false } )
     .limit( 1 )
     .maybeSingle();
-  if ( error ) return null;
+  if ( error ) {return null;}
   return data;
 }
 
@@ -965,13 +946,13 @@ export async function getDriverForUser ( admin: ReturnType<typeof getAdminClient
     .select( '*' )
     .eq( 'user_id', userId )
     .maybeSingle();
-  if ( error ) return null;
+  if ( error ) {return null;}
   return data;
 }
 
 export async function ensureDriverForUser ( admin: ReturnType<typeof getAdminClient>, user: Record<string, unknown> ) {
   const existing = await getDriverForUser( admin, String( user.id ) );
-  if ( existing ) return existing;
+  if ( existing ) {return existing;}
 
   const { data, error } = await admin
     .from( 'drivers' )
@@ -983,7 +964,7 @@ export async function ensureDriverForUser ( admin: ReturnType<typeof getAdminCli
     } )
     .select( '*' )
     .single();
-  if ( error ) throw error;
+  if ( error ) {throw error;}
   return data;
 }
 
@@ -1110,7 +1091,7 @@ export async function fetchDriverProfiles (
   driverIds: string[],
 ): Promise<Record<string, Record<string, unknown>>> {
   const uniqueIds = Array.from( new Set( driverIds.filter( Boolean ) ) );
-  if ( uniqueIds.length === 0 ) return {};
+  if ( uniqueIds.length === 0 ) {return {};}
 
   const { data: drivers } = await admin.from( 'drivers' ).select( '*' ).in( 'driver_id', uniqueIds );
   const driverRows = Array.isArray( drivers ) ? drivers : [];
@@ -1143,7 +1124,7 @@ export async function ensureMobilitySeed ( admin: ReturnType<typeof getAdminClie
     await executeSqlStatements( MOBILITY_OS_RUNTIME_SQL ).catch( () => undefined );
   }
   const { data } = await admin.from( 'mobility_corridors' ).select( 'id' ).limit( 1 );
-  if ( Array.isArray( data ) && data.length > 0 ) return;
+  if ( Array.isArray( data ) && data.length > 0 ) {return;}
   if ( SUPABASE_DB_URL ) {
     await executeSqlStatements( MOBILITY_OS_SEED_SQL ).catch( () => undefined );
   }
@@ -1186,8 +1167,8 @@ export function buildCliqCheckoutUrl ( template: string, values: Record<string, 
 }
 
 export function joinProviderUrl ( baseUrl: string, endpoint: string ): string {
-  if ( !baseUrl ) return '';
-  if ( /^https?:\/\//i.test( endpoint ) ) return endpoint;
+  if ( !baseUrl ) {return '';}
+  if ( /^https?:\/\//i.test( endpoint ) ) {return endpoint;}
   return `${ baseUrl }${ endpoint.startsWith( '/' ) ? endpoint : `/${ endpoint }` }`;
 }
 
@@ -1208,27 +1189,27 @@ export function isFailedProviderStatus ( value: unknown ): boolean {
 export function firstStringValue ( source: Record<string, unknown>, keys: string[] ): string {
   for ( const key of keys ) {
     const value = source[ key ];
-    if ( typeof value === 'string' && value.trim() ) return value.trim();
-    if ( typeof value === 'number' && Number.isFinite( value ) ) return String( value );
+    if ( typeof value === 'string' && value.trim() ) {return value.trim();}
+    if ( typeof value === 'number' && Number.isFinite( value ) ) {return String( value );}
   }
   return '';
 }
 
 export function mapSubscriptionPlan ( planName: string ): 'basic' | 'premium' | 'enterprise' {
   const normalized = planName.trim().toLowerCase();
-  if ( normalized.includes( 'enterprise' ) ) return 'enterprise';
-  if ( normalized.includes( 'basic' ) || normalized.includes( 'starter' ) ) return 'basic';
+  if ( normalized.includes( 'enterprise' ) ) {return 'enterprise';}
+  if ( normalized.includes( 'basic' ) || normalized.includes( 'starter' ) ) {return 'basic';}
   return 'premium';
 }
 
 export function toIsoFromUnix ( value: unknown ): string | null {
   const seconds = Number( value );
-  if ( !Number.isFinite( seconds ) || seconds <= 0 ) return null;
+  if ( !Number.isFinite( seconds ) || seconds <= 0 ) {return null;}
   return new Date( seconds * 1000 ).toISOString();
 }
 
 export function isPhoneNumberUniqueViolation ( error: unknown ): boolean {
-  if ( !error || typeof error !== 'object' ) return false;
+  if ( !error || typeof error !== 'object' ) {return false;}
 
   const record = error as { code?: unknown; message?: unknown; details?: unknown };
   const message = String( record.message ?? record.details ?? '' );
@@ -1247,7 +1228,7 @@ export function generateOtpCode (): string {
 export function getTwilioAuthPair (): { user: string; password: string } | null {
   const sid = deliveryEnv.twilioApiKeySid ?? deliveryEnv.twilioAccountSid ?? '';
   const secret = deliveryEnv.twilioApiKeySecret ?? deliveryEnv.twilioAuthToken ?? '';
-  if ( !sid || !secret ) return null;
+  if ( !sid || !secret ) {return null;}
   return { user: sid, password: secret };
 }
 
@@ -1331,16 +1312,16 @@ export async function hashOtpCode ( code: string ): Promise<string> {
 }
 
 export function isExpired ( isoValue?: string | null ): boolean {
-  if ( !isoValue ) return false;
+  if ( !isoValue ) {return false;}
   const expiresAt = new Date( isoValue ).getTime();
-  if ( Number.isNaN( expiresAt ) ) return false;
+  if ( Number.isNaN( expiresAt ) ) {return false;}
   return expiresAt <= Date.now();
 }
 
 export function isOlderThanHours ( isoValue: string | null | undefined, hours: number ): boolean {
-  if ( !isoValue ) return false;
+  if ( !isoValue ) {return false;}
   const timestamp = new Date( isoValue ).getTime();
-  if ( Number.isNaN( timestamp ) ) return false;
+  if ( Number.isNaN( timestamp ) ) {return false;}
   return Date.now() - timestamp >= hours * 60 * 60 * 1000;
 }
 
@@ -1400,10 +1381,10 @@ export async function buildTrustStatus (
       .maybeSingle(),
   ] );
 
-  if ( verificationResult.error ) throw new Error( verificationResult.error.message );
-  if ( driverResult.error ) throw new Error( driverResult.error.message );
-  if ( walletResult.error ) throw new Error( walletResult.error.message );
-  if ( otpResult.error ) throw new Error( otpResult.error.message );
+  if ( verificationResult.error ) {throw new Error( verificationResult.error.message );}
+  if ( driverResult.error ) {throw new Error( driverResult.error.message );}
+  if ( walletResult.error ) {throw new Error( walletResult.error.message );}
+  if ( otpResult.error ) {throw new Error( otpResult.error.message );}
 
   const verification = verificationResult.data;
   const driver = driverResult.data;
@@ -1703,7 +1684,7 @@ export async function stripeApiRequest (
     params?: URLSearchParams;
   },
 ): Promise<Record<string, unknown>> {
-  if ( !STRIPE_SECRET_KEY ) throw new Error( 'STRIPE_SECRET_KEY is not configured' );
+  if ( !STRIPE_SECRET_KEY ) {throw new Error( 'STRIPE_SECRET_KEY is not configured' );}
   const method = init?.method ?? 'GET';
   const url = `https://api.stripe.com${ path }${ method === 'GET' && init?.params ? `?${ init.params.toString() }` : '' }`;
   const response = await fetch( url, {
@@ -1716,7 +1697,7 @@ export async function stripeApiRequest (
     body: method === 'POST' && init?.params ? init.params.toString() : undefined,
   } );
   const data = await response.json().catch( () => ( {} ) );
-  if ( !response.ok ) throw new Error( String( data?.error?.message ?? `Stripe API error ${ response.status }` ) );
+  if ( !response.ok ) {throw new Error( String( data?.error?.message ?? `Stripe API error ${ response.status }` ) );}
   return data as Record<string, unknown>;
 }
 
@@ -1744,10 +1725,10 @@ export async function ensureStripeCustomer ( input: {
   canonicalUser: { id: string; email?: string | null; full_name?: string | null; phone_number?: string | null };
 } ): Promise<string> {
   const existing = await getExistingStripeCustomerId( input.admin, input.canonicalUser.id );
-  if ( existing ) return existing;
+  if ( existing ) {return existing;}
   const params = new URLSearchParams();
-  if ( input.canonicalUser.email ) params.append( 'email', input.canonicalUser.email );
-  if ( input.canonicalUser.full_name ) params.append( 'name', input.canonicalUser.full_name );
+  if ( input.canonicalUser.email ) {params.append( 'email', input.canonicalUser.email );}
+  if ( input.canonicalUser.full_name ) {params.append( 'name', input.canonicalUser.full_name );}
   params.append( 'metadata[user_id]', input.canonicalUser.id );
   const customer = await stripeApiRequest( '/v1/customers', { method: 'POST', params } );
   return String( customer.id );
@@ -1814,7 +1795,7 @@ export async function getCanonicalUserIdForSubscription (
   }
 
   const subscriptionId = String( subscription.id ?? '' );
-  if ( !subscriptionId ) return null;
+  if ( !subscriptionId ) {return null;}
 
   const { data, error } = await admin
     .from( 'subscriptions' )
@@ -1835,10 +1816,10 @@ export async function syncStripeSubscriptionRecord ( input: {
   planOverride?: string | null;
 } ) {
   const userId = await getCanonicalUserIdForSubscription( input.admin, input.subscription );
-  if ( !userId ) return null;
+  if ( !userId ) {return null;}
   const record = buildSubscriptionRecord( userId, input.subscription, input.planOverride );
   const { error } = await input.admin.from( 'subscriptions' ).upsert( record, { onConflict: 'stripe_subscription_id' } );
-  if ( error ) throw new Error( error.message );
+  if ( error ) {throw new Error( error.message );}
   return record;
 }
 
@@ -1865,7 +1846,7 @@ export async function getWalletSubscription (
     throw new Error( error.message );
   }
 
-  if ( !data ) return null;
+  if ( !data ) {return null;}
 
   return {
     id: String( data.stripe_subscription_id ?? data.id ?? '' ),
@@ -1886,7 +1867,7 @@ export async function getWalletSubscription (
 export function describeWalletTransaction ( row: WalletTransactionRow ): string {
   const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
   const metadataDescription = metadata.description ?? metadata.note;
-  if ( metadataDescription ) return String( metadataDescription );
+  if ( metadataDescription ) {return String( metadataDescription );}
 
   switch ( row.transaction_type ) {
     case 'add_funds':
@@ -1941,11 +1922,11 @@ export function buildWalletInsights ( transactions: ReturnType<typeof toWalletTr
   const monthlyBuckets = new Map<string, { spent: number; earned: number }>();
   for ( const tx of transactions ) {
     const date = new Date( tx.createdAt );
-    if ( Number.isNaN( date.getTime() ) ) continue;
+    if ( Number.isNaN( date.getTime() ) ) {continue;}
     const month = date.toLocaleDateString( 'en-US', { month: 'short', timeZone: 'UTC' } );
     const bucket = monthlyBuckets.get( month ) ?? { spent: 0, earned: 0 };
-    if ( tx.amount < 0 ) bucket.spent += Math.abs( tx.amount );
-    if ( tx.amount > 0 ) bucket.earned += tx.amount;
+    if ( tx.amount < 0 ) {bucket.spent += Math.abs( tx.amount );}
+    if ( tx.amount > 0 ) {bucket.earned += tx.amount;}
     monthlyBuckets.set( month, bucket );
   }
 
@@ -2076,8 +2057,8 @@ export async function loadWalletDetails ( admin: ReturnType<typeof getAdminClien
     getWalletSubscription( admin, userId ),
   ] );
 
-  if ( transactionsError ) throw new Error( transactionsError.message );
-  if ( paymentMethodsError ) throw new Error( paymentMethodsError.message );
+  if ( transactionsError ) {throw new Error( transactionsError.message );}
+  if ( paymentMethodsError ) {throw new Error( paymentMethodsError.message );}
 
   return {
     wallet,
@@ -2099,7 +2080,7 @@ export async function loadWalletPayload ( admin: ReturnType<typeof getAdminClien
 
 export async function authenticateWalletRequest ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth;
+  if ( 'error' in auth ) {return auth;}
   if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
     return { error: json( { error: 'Wallet route is not authorized for this user.' }, 403 ) };
   }
@@ -2127,7 +2108,7 @@ export function fromHex ( value: string ): Uint8Array {
 }
 
 export function timingSafeEqual ( left: Uint8Array, right: Uint8Array ): boolean {
-  if ( left.length !== right.length ) return false;
+  if ( left.length !== right.length ) {return false;}
   let diff = 0;
   for ( let index = 0; index < left.length; index += 1 ) {
     diff |= left[ index ] ^ right[ index ];
@@ -2160,7 +2141,7 @@ export async function hashWalletPin ( pin: string ): Promise<string> {
 }
 
 export async function verifyWalletPinHash ( pin: string, storedHash?: string | null ): Promise<boolean> {
-  if ( !storedHash ) return false;
+  if ( !storedHash ) {return false;}
   const parts = storedHash.split( '$' );
   if ( parts.length !== 4 || parts[ 0 ] !== 'pbkdf2_sha256' ) {
     const legacyHash = await hashLegacyWalletPin( pin );
@@ -2191,7 +2172,7 @@ export async function verifyWalletPinHash ( pin: string, storedHash?: string | n
 
 export async function resolveWalletRecipient ( admin: ReturnType<typeof getAdminClient>, recipientId: string ) {
   const recipient = recipientId.trim();
-  if ( !recipient ) return null;
+  if ( !recipient ) {return null;}
 
   // Validate recipient is either a UUID, a valid email, or a valid E.164 phone.
   // Reject anything that doesn't match to prevent injection via the filter value.
@@ -2205,21 +2186,21 @@ export async function resolveWalletRecipient ( admin: ReturnType<typeof getAdmin
 
   if ( isUuid ) {
     const byId = await admin.from( 'users' ).select( 'id' ).eq( 'id', recipient ).maybeSingle();
-    if ( byId.data?.id ) return String( byId.data.id );
+    if ( byId.data?.id ) {return String( byId.data.id );}
     const byAuthId = await admin.from( 'users' ).select( 'id' ).eq( 'auth_user_id', recipient ).maybeSingle();
-    if ( byAuthId.error ) throw new Error( byAuthId.error.message );
-    if ( byAuthId.data?.id ) return String( byAuthId.data.id );
+    if ( byAuthId.error ) {throw new Error( byAuthId.error.message );}
+    if ( byAuthId.data?.id ) {return String( byAuthId.data.id );}
   }
 
   if ( isEmail ) {
     const byEmail = await admin.from( 'users' ).select( 'id' ).eq( 'email', recipient ).maybeSingle();
-    if ( byEmail.data?.id ) return String( byEmail.data.id );
+    if ( byEmail.data?.id ) {return String( byEmail.data.id );}
   }
 
   if ( isPhone ) {
     const byPhone = await admin.from( 'users' ).select( 'id' ).eq( 'phone_number', recipient ).maybeSingle();
-    if ( byPhone.error ) throw new Error( byPhone.error.message );
-    if ( byPhone.data?.id ) return String( byPhone.data.id );
+    if ( byPhone.error ) {throw new Error( byPhone.error.message );}
+    if ( byPhone.data?.id ) {return String( byPhone.data.id );}
   }
 
   return null;
@@ -2446,7 +2427,7 @@ export async function createStripeSubscriptionCheckoutSession ( input: {
   request: Request;
 } ): Promise<CheckoutSession> {
   const priceId = STRIPE_WASEL_PLUS_PRICE_ID;
-  if ( !priceId ) throw new Error( 'STRIPE_WASEL_PLUS_PRICE_ID is not configured' );
+  if ( !priceId ) {throw new Error( 'STRIPE_WASEL_PLUS_PRICE_ID is not configured' );}
   const customerId = await ensureStripeCustomer( input );
   const appUrl = getAppBaseUrl( input.request );
   const params = new URLSearchParams();
@@ -2494,7 +2475,7 @@ export async function createCliqCheckoutSession ( input: {
 }
 
 export function constantTimeEquals ( left: string, right: string ): boolean {
-  if ( left.length !== right.length ) return false;
+  if ( left.length !== right.length ) {return false;}
   let mismatch = 0;
   for ( let index = 0; index < left.length; index += 1 ) {
     mismatch |= left.charCodeAt( index ) ^ right.charCodeAt( index );
@@ -2547,7 +2528,7 @@ export async function verifyStripeWebhookSignature ( payload: string, signatureH
 }
 
 export function normalizeSignatureHeader ( value: string | null ): string {
-  if ( !value ) return '';
+  if ( !value ) {return '';}
   const trimmed = value.trim();
   if ( trimmed.includes( '=' ) ) {
     return trimmed.split( /[,\s]+/ )
@@ -2565,7 +2546,7 @@ export async function verifyProviderWebhookSignature ( args: {
   timestamp?: string | null;
 } ): Promise<boolean> {
   const normalized = normalizeSignatureHeader( args.signature );
-  if ( !normalized ) return false;
+  if ( !normalized ) {return false;}
   const payload = args.timestamp ? `${ args.timestamp }.${ args.payload }` : args.payload;
   const expected = await computeHmacHex( args.secret, payload );
   return constantTimeEquals( normalized, expected );
@@ -2693,8 +2674,8 @@ export async function processQueuedDeliveries (
   let failed = 0;
   for ( const delivery of dueDeliveries ) {
     const result = await sendDelivery( admin, delivery, functionBaseUrl );
-    if ( result.ok ) sent += 1;
-    else failed += 1;
+    if ( result.ok ) {sent += 1;}
+    else {failed += 1;}
   }
 
   return {
@@ -2706,9 +2687,9 @@ export async function processQueuedDeliveries (
 }
 
 export function normalizePaymentAmount ( value: unknown ): number | null {
-  if ( typeof value !== 'number' || !Number.isFinite( value ) ) return null;
+  if ( typeof value !== 'number' || !Number.isFinite( value ) ) {return null;}
   const amount = Math.round( value );
-  if ( amount < 50 || amount > MAX_PAYMENT_AMOUNT_MINOR ) return null;
+  if ( amount < 50 || amount > MAX_PAYMENT_AMOUNT_MINOR ) {return null;}
   return amount;
 }
 
@@ -2780,8 +2761,8 @@ export async function assertTripParticipant ( admin: ReturnType<typeof getAdminC
       .maybeSingle(),
   ] );
 
-  if ( tripError ) throw tripError;
-  if ( bookingError ) throw bookingError;
+  if ( tripError ) {throw tripError;}
+  if ( bookingError ) {throw bookingError;}
   return Boolean( ( trip && trip.driver_id === userId ) || booking );
 }
 

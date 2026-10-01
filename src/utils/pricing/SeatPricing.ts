@@ -92,7 +92,10 @@ export class SmartPricingEngine {
     const baseFee = 50; // Fixed monthly operational fee
 
     let monthlyCost = baseFee + distanceKm * baseRatePerKm * daysPerWeek * 4; // 4 weeks
-    if (isRoundTrip) {monthlyCost *= 1.8;} // 10% discount on return leg
+    // A round trip is two legs at full price less a 10% discount on the return
+    // leg: (1 + 0.9) = 1.9x. This was 1.8x, which does not match the discount
+    // the comment claims and under-charged school subscriptions by 5%.
+    if (isRoundTrip) {monthlyCost *= 1.9;}
 
     return {
       standard: Math.ceil(monthlyCost),

@@ -69,7 +69,7 @@ function mapActiveTripRow ( row: Record<string, unknown> ): Record<string, unkno
 
 export async function handleGetActiveTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const { data, error } = await auth.admin
     .from( 'active_trips' )
@@ -77,17 +77,17 @@ export async function handleGetActiveTrip ( request: Request ) {
     .eq( 'user_id', auth.canonicalUser.id )
     .maybeSingle();
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   return json( { activeTrip: data ? mapActiveTripRow( data ) : null } );
 }
 
 export async function handleSetActiveTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
-  if ( !isPlainObject( body ) ) return json( { error: 'Invalid request body' }, 400 );
+  if ( !isPlainObject( body ) ) {return json( { error: 'Invalid request body' }, 400 );}
 
   const status = String( body.status ?? 'en_route_to_pickup' );
   if ( !( ACTIVE_TRIP_STATUSES as readonly string[] ).includes( status ) ) {
@@ -150,17 +150,17 @@ export async function handleSetActiveTrip ( request: Request ) {
     .select( '*' )
     .single();
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   return json( { activeTrip: mapActiveTripRow( data ) }, 200 );
 }
 
 export async function handlePatchActiveTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
-  if ( !isPlainObject( body ) ) return json( { error: 'Invalid request body' }, 400 );
+  if ( !isPlainObject( body ) ) {return json( { error: 'Invalid request body' }, 400 );}
 
   const { data: current, error: readError } = await auth.admin
     .from( 'active_trips' )
@@ -168,8 +168,8 @@ export async function handlePatchActiveTrip ( request: Request ) {
     .eq( 'user_id', auth.canonicalUser.id )
     .maybeSingle();
 
-  if ( readError ) return json( { error: readError.message }, 500 );
-  if ( !current ) return json( { activeTrip: null } );
+  if ( readError ) {return json( { error: readError.message }, 500 );}
+  if ( !current ) {return json( { activeTrip: null } );}
 
   const patch: Record<string, unknown> = {};
   const payloadPatch: Record<string, unknown> = {};
@@ -206,21 +206,21 @@ export async function handlePatchActiveTrip ( request: Request ) {
     .select( '*' )
     .single();
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   return json( { activeTrip: mapActiveTripRow( data ) } );
 }
 
 export async function handleClearActiveTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const { error } = await auth.admin
     .from( 'active_trips' )
     .delete()
     .eq( 'user_id', auth.canonicalUser.id );
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   return json( { ok: true, activeTrip: null } );
 }

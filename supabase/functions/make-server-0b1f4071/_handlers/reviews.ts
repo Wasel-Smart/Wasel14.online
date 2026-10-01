@@ -47,7 +47,7 @@ async function resolveBookingForReview (
     .order( 'created_at', { ascending: false } )
     .limit( 25 );
 
-  if ( error ) throw error;
+  if ( error ) {throw error;}
 
   const candidates = ( Array.isArray( data ) ? data : [] ).filter( ( booking: Record<string, unknown> ) => {
     const status = String( booking.booking_status ?? booking.status ?? '' );
@@ -58,7 +58,7 @@ async function resolveBookingForReview (
     const byTrip = candidates.find( ( booking: Record<string, unknown> ) => (
       String( booking.trip_id ?? '' ) === tripReference
     ) );
-    if ( byTrip ) return byTrip;
+    if ( byTrip ) {return byTrip;}
   }
 
   if ( tripReference && !UUID_PATTERN.test( tripReference ) ) {
@@ -66,7 +66,7 @@ async function resolveBookingForReview (
     const byShareCode = candidates.find( ( booking: Record<string, unknown> ) => (
       String( booking.id ?? booking.booking_id ?? '' ).slice( 0, 8 ).toUpperCase() === shareCode
     ) );
-    if ( byShareCode ) return byShareCode;
+    if ( byShareCode ) {return byShareCode;}
   }
 
   return candidates[ 0 ] ?? null;
@@ -89,8 +89,8 @@ async function isReviewableDriver (
     .maybeSingle();
 
   const driverId = String( ( trip as Record<string, unknown> | null )?.driver_id ?? '' );
-  if ( !driverId ) return true;
-  if ( driverId === revieweeId ) return true;
+  if ( !driverId ) {return true;}
+  if ( driverId === revieweeId ) {return true;}
 
   const { data: driver } = await admin
     .from( 'drivers' )
@@ -103,10 +103,10 @@ async function isReviewableDriver (
 
 export async function handleSubmitReview ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
-  if ( !isPlainObject( body ) ) return json( { error: 'Invalid request body' }, 400 );
+  if ( !isPlainObject( body ) ) {return json( { error: 'Invalid request body' }, 400 );}
 
   const overallRating = Number( body.overall_rating );
   if ( !Number.isFinite( overallRating ) || overallRating < 1 || overallRating > 5 ) {
@@ -114,7 +114,7 @@ export async function handleSubmitReview ( request: Request ) {
   }
 
   const revieweeId = String( body.reviewee_id ?? '' ).trim();
-  if ( !revieweeId ) return json( { error: 'reviewee_id is required' }, 400 );
+  if ( !revieweeId ) {return json( { error: 'reviewee_id is required' }, 400 );}
 
   const { admin, canonicalUser } = auth;
 
@@ -178,7 +178,7 @@ export async function handleSubmitReview ( request: Request ) {
     .select( '*' )
     .single();
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   // Best-effort: a failed notification must not fail the review.
   await admin.from( 'notifications' ).insert( {

@@ -49,20 +49,50 @@ const fns = readdirSync(ROOT)
   .filter((p) => statSync(p).isDirectory() && p !== join(ROOT, '_shared') && existsSync(join(p, 'index.ts')));
 
 let total = 0;
+let broken = 0;
 console.log(`deno ${DENO.version} (${DENO.bin})`);
 for (const fn of fns) {
   const res = spawnSync(DENO.bin, ['check', '--no-lock', join(fn, 'index.ts')], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   const text = `${res.stdout || ''}${res.stderr || ''}`.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+
+  // The regex below only matches diagnostics carrying a
+  // `at file:///.../supabase/functions/...:line:col` frame. Module-resolution
+  // failures (TS2307 and friends) are reported WITHOUT that frame, so counting
+  // framed errors alone reported "TOTAL: 0" and exited 0 for a function that
+  // cannot link at all — which ships as an active 503 BOOT_ERROR. The exit
+  // status is therefore authoritative: anything non-zero is a failure, and the
+  // output is printed so the cause is visible.
+  const exitCode = res.status ?? 1;
+  const spawnFailed = Boolean(res.error) || exitCode !== 0;
+
   const re = /TS(\d+) \[ERROR\]: (.*?)\n([\s\S]*?)\n\s*at file:\/\/\/.*?supabase[/\\]functions[/\\](.+?):(\d+):(\d+)/g;
   const sites = [];
   for (const m of text.matchAll(re)) {
     sites.push(`${m[4]}:${m[5]}:${m[6]} TS${m[1]} ${m[2].trim()}`);
   }
-  total += sites.length;
-  if (sites.length) {
+
+  // Any TS#### code anywhere in the output counts, framed or not.
+  const unframed = [...text.matchAll(/TS(\d+) \[ERROR\]/g)]
+    .filter(() => sites.length === 0)
+    .map((m) => `unframed TS${m[1]}`);
+
+  total += sites.length + unframed.length;
+
+  if (spawnFailed) {
+    broken += 1;
     console.log(`\n${fn}`);
+    if (res.error) {
+      console.log(`  failed to run deno check: ${res.error.message}`);
+    }
     for (const s of sites) console.log(`  ${s}`);
+    if (sites.length === 0) {
+      const raw = text.trim().split('\n').filter(Boolean);
+      for (const line of raw.slice(0, 20)) console.log(`  ${line}`);
+    }
   }
 }
 console.log(`\nTOTAL: ${total}`);
-process.exitCode = total ? 1 : 0;
+if (broken) {
+  console.error(`\n${broken} edge function(s) failed \`deno check\` (exit != 0).`);
+}
+process.exitCode = total || broken ? 1 : 0;

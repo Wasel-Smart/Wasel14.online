@@ -21,13 +21,13 @@ function json(data: unknown, status = 200) {
 }
 
 function resolveAllowedOrigin(origin: string | null): string | null {
-  if (!origin) return null;
+  if (!origin) {return null;}
   try {
     const url = new URL(origin);
-    if (url.origin === new URL(APP_BASE_URL).origin) return url.origin;
-    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return url.origin;
+    if (url.origin === new URL(APP_BASE_URL).origin) {return url.origin;}
+    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {return url.origin;}
     const extra = ADDITIONAL_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-    if (extra.includes(url.origin)) return url.origin;
+    if (extra.includes(url.origin)) {return url.origin;}
   } catch { /* ignore */ }
   return null;
 }
@@ -37,48 +37,48 @@ function buildResponseHeaders(request: Request): Headers {
   const allowedOrigin = resolveAllowedOrigin(request.headers.get('origin'));
   Object.entries(responseBaseHeaders).forEach(([k, v]) => headers.set(k, v));
   headers.set('Vary', 'Origin');
-  if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
+  if (allowedOrigin) {headers.set('Access-Control-Allow-Origin', allowedOrigin);}
   return headers;
 }
 
 function getAdminClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase not configured');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {throw new Error('Supabase not configured');}
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function authenticateRequest(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) return { error: json({ error: 'Missing bearer token' }, 401) };
+  if (!token) {return { error: json({ error: 'Missing bearer token' }, 401) };}
   const admin = getAdminClient();
   const { data: authData, error: authError } = await admin.auth.getUser(token);
-  if (authError || !authData.user) return { error: json({ error: 'Invalid auth token' }, 401) };
+  if (authError || !authData.user) {return { error: json({ error: 'Invalid auth token' }, 401) };}
   const { data: byAuthUser, error: byAuthError } = await admin.from('users').select('*').eq('auth_user_id', authData.user.id).maybeSingle();
-  if (byAuthError) return { error: json({ error: 'Internal server error' }, 500) };
+  if (byAuthError) {return { error: json({ error: 'Internal server error' }, 500) };}
   let canonicalUser = byAuthUser;
   if (!canonicalUser) {
     const fallback = await admin.from('users').select('*').eq('id', authData.user.id).maybeSingle();
     canonicalUser = fallback.data;
-    if (fallback.error || !canonicalUser) return { error: json({ error: 'User not found' }, 404) };
+    if (fallback.error || !canonicalUser) {return { error: json({ error: 'User not found' }, 404) };}
   }
   return { admin, authUser: authData.user, canonicalUser };
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {return false;}
   let result = 0;
-  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < a.length; i++) {result |= a.charCodeAt(i) ^ b.charCodeAt(i);}
   return result === 0;
 }
 
 function getTwilioAuthPair(): { user: string; password: string } | null {
   const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID') ?? '';
-  if (!twilioAccountSid) return null;
+  if (!twilioAccountSid) {return null;}
   const twilioApiKeySid = Deno.env.get('TWILIO_API_KEY_SID') ?? '';
   const twilioApiKeySecret = Deno.env.get('TWILIO_API_KEY_SECRET') ?? '';
   const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN') ?? '';
-  if (twilioApiKeySid && twilioApiKeySecret) return { user: twilioApiKeySid, password: twilioApiKeySecret };
-  if (twilioAuthToken) return { user: twilioAccountSid, password: twilioAuthToken };
+  if (twilioApiKeySid && twilioApiKeySecret) {return { user: twilioApiKeySid, password: twilioApiKeySecret };}
+  if (twilioAuthToken) {return { user: twilioAccountSid, password: twilioAuthToken };}
   return null;
 }
 
@@ -113,10 +113,10 @@ async function checkTwilioPhoneVerification(phoneNumber: string, code: string) {
 
 function normalizePhoneNumber(phone: string): string {
   const cleaned = phone.replace(/[^\d+]/g, '');
-  if (cleaned.startsWith('+')) return cleaned;
-  if (cleaned.startsWith('00')) return '+' + cleaned.slice(2);
-  if (cleaned.startsWith('962')) return '+' + cleaned;
-  if (cleaned.startsWith('0') && cleaned.length === 10) return '+962' + cleaned.slice(1);
+  if (cleaned.startsWith('+')) {return cleaned;}
+  if (cleaned.startsWith('00')) {return '+' + cleaned.slice(2);}
+  if (cleaned.startsWith('962')) {return '+' + cleaned;}
+  if (cleaned.startsWith('0') && cleaned.length === 10) {return '+962' + cleaned.slice(1);}
   return cleaned;
 }
 
@@ -126,17 +126,17 @@ function isValidE164Phone(phone: string): boolean {
 
 async function handlePhoneVerification(request: Request, path: string) {
   const auth = await authenticateRequest(request);
-  if ('error' in auth) return auth.error;
+  if ('error' in auth) {return auth.error;}
   const admin = auth.admin;
   const body = await request.json().catch(() => ({}));
 
   if (request.method === 'POST' && path === '/phone/send-code') {
     const phoneNumber = normalizePhoneNumber(String(body.phone ?? ''));
-    if (!isValidE164Phone(phoneNumber)) return json({ error: 'Invalid phone number format.' }, 400);
+    if (!isValidE164Phone(phoneNumber)) {return json({ error: 'Invalid phone number format.' }, 400);}
 
     if (hasTwilioVerifyRuntime()) {
       const result = await startTwilioPhoneVerification(phoneNumber);
-      if (result.ok) return json({ success: true, message: 'Verification code sent.' });
+      if (result.ok) {return json({ success: true, message: 'Verification code sent.' });}
       return json({ error: result.error ?? 'Failed to send verification code.' }, 502);
     }
 
@@ -146,8 +146,8 @@ async function handlePhoneVerification(request: Request, path: string) {
   if (request.method === 'POST' && path === '/phone/verify-code') {
     const phoneNumber = normalizePhoneNumber(String(body.phone ?? ''));
     const code = String(body.code ?? '').trim();
-    if (!isValidE164Phone(phoneNumber)) return json({ error: 'Invalid phone number format.' }, 400);
-    if (!code) return json({ error: 'Verification code is required.' }, 400);
+    if (!isValidE164Phone(phoneNumber)) {return json({ error: 'Invalid phone number format.' }, 400);}
+    if (!code) {return json({ error: 'Verification code is required.' }, 400);}
 
     if (hasTwilioVerifyRuntime()) {
       const result = await checkTwilioPhoneVerification(phoneNumber, code);
@@ -167,7 +167,7 @@ async function handlePhoneVerification(request: Request, path: string) {
 
 Deno.serve(async (request: Request) => {
   const headers = buildResponseHeaders(request);
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (request.method === 'OPTIONS') {return new Response(null, { status: 204, headers });}
 
   try {
     const url = new URL(request.url);
@@ -178,7 +178,7 @@ Deno.serve(async (request: Request) => {
 
     if (path.startsWith('/phone')) {
       response = await handlePhoneVerification(request, path);
-      if (!response) response = json({ error: 'Not found', service: 'phone-service' }, 404);
+      if (!response) {response = json({ error: 'Not found', service: 'phone-service' }, 404);}
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'phone-service', timestamp: new Date().toISOString() });
     } else {

@@ -1,36 +1,16 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
+    getAdminClient,
+    matchesAuthenticatedUser,
+    getDriverForUser,
+    ensureDriverForUser,
+    isApprovedDriver,
+    buildProfilePayload,
+    mapTripRow,
+    mapBookingRow,
+    fetchDriverProfiles,
+    logUnhandledRouteError,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
@@ -58,10 +38,10 @@ export async function handleTripRequest ( request: Request, path: string ) {
     const to = url.searchParams.get( 'to' );
     const date = url.searchParams.get( 'date' );
     const seats = url.searchParams.get( 'seats' );
-    if ( from ) query = query.ilike( 'origin_city', `%${ from }%` );
-    if ( to ) query = query.ilike( 'destination_city', `%${ to }%` );
-    if ( date ) query = query.gte( 'departure_time', `${ date }T00:00:00` ).lt( 'departure_time', `${ date }T23:59:59.999` );
-    if ( seats ) query = query.gte( 'available_seats', Number( seats ) );
+    if ( from ) {query = query.ilike( 'origin_city', `%${ from }%` );}
+    if ( to ) {query = query.ilike( 'destination_city', `%${ to }%` );}
+    if ( date ) {query = query.gte( 'departure_time', `${ date }T00:00:00` ).lt( 'departure_time', `${ date }T23:59:59.999` );}
+    if ( seats ) {query = query.gte( 'available_seats', Number( seats ) );}
     const { data, error } = await query.in( 'trip_status', [ 'open', 'booked', 'in_progress' ] ).order( 'departure_time' );
     if ( error ) {
       logUnhandledRouteError( error, request );
@@ -85,7 +65,7 @@ export async function handleTripRequest ( request: Request, path: string ) {
 
   if ( request.method === 'GET' && tripRoute?.id === 'user' ) {
     const auth = await authenticateRequest( request );
-    if ( 'error' in auth ) return auth.error;
+    if ( 'error' in auth ) {return auth.error;}
     const requestedUserId = tripRoute.action ?? '';
     if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
       return json( { error: 'Trip route is not authorized for this user.' }, 403 );
@@ -96,7 +76,7 @@ export async function handleTripRequest ( request: Request, path: string ) {
       .select( 'trip_id, driver_id, origin_city, destination_city, departure_time, available_seats, price_per_seat, trip_status, allow_packages, package_capacity, vehicle_make, vehicle_model, notes, created_at' )
       .eq( 'driver_id', driver.driver_id )
       .order( 'departure_time', { ascending: false } );
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     const profile = await buildProfilePayload( auth.admin, auth.canonicalUser );
     return json( ( Array.isArray( data ) ? data : [] ).map( ( row: Record<string, unknown> ) => mapTripRow( row, profile ) ) );
   }
@@ -107,15 +87,15 @@ export async function handleTripRequest ( request: Request, path: string ) {
       .select( 'trip_id, driver_id, origin_city, destination_city, departure_time, available_seats, price_per_seat, trip_status, allow_packages, package_capacity, vehicle_make, vehicle_model, notes, created_at' )
       .eq( 'trip_id', tripRoute.id )
       .maybeSingle();
-    if ( error ) return json( { error: error.message }, 500 );
-    if ( !data ) return json( { error: 'Trip not found' }, 404 );
+    if ( error ) {return json( { error: error.message }, 500 );}
+    if ( !data ) {return json( { error: 'Trip not found' }, 404 );}
     const profiles = await fetchDriverProfiles( admin, [ String( data.driver_id ?? '' ) ] );
     return json( mapTripRow( data, profiles[ String( data.driver_id ?? '' ) ] ) );
   }
 
   if ( request.method === 'POST' && path === '/trips' ) {
     const auth = await authenticateRequest( request );
-    if ( 'error' in auth ) return auth.error;
+    if ( 'error' in auth ) {return auth.error;}
     const body = await request.json().catch( () => ( {} ) );
     const driver = await ensureDriverForUser( auth.admin, auth.canonicalUser );
     if ( !isApprovedDriver( auth.canonicalUser, driver, Boolean( auth.authUser.email_confirmed_at ) ) ) {
@@ -144,21 +124,21 @@ export async function handleTripRequest ( request: Request, path: string ) {
       } )
       .select( 'trip_id, driver_id, origin_city, destination_city, departure_time, available_seats, price_per_seat, trip_status, allow_packages, package_capacity, vehicle_make, vehicle_model, notes, created_at' )
       .single();
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     return json( mapTripRow( data, await buildProfilePayload( auth.admin, auth.canonicalUser ) ) );
   }
 
   if ( ( request.method === 'PUT' || request.method === 'DELETE' || ( request.method === 'POST' && tripRoute?.action === 'publish' ) ) && tripRoute?.id ) {
     const auth = await authenticateRequest( request );
-    if ( 'error' in auth ) return auth.error;
+    if ( 'error' in auth ) {return auth.error;}
     // IDOR guard: verify the caller owns the trip or has trip management permission.
     const { data: tripOwner, error: tripOwnerErr } = await auth.admin
       .from( 'trips' )
       .select( 'trip_id, driver_id' )
       .eq( 'trip_id', tripRoute.id )
       .maybeSingle();
-    if ( tripOwnerErr ) return json( { error: tripOwnerErr.message }, 500 );
-    if ( !tripOwner ) return json( { error: 'Trip not found' }, 404 );
+    if ( tripOwnerErr ) {return json( { error: tripOwnerErr.message }, 500 );}
+    if ( !tripOwner ) {return json( { error: 'Trip not found' }, 404 );}
     const driver = await getDriverForUser( auth.admin, auth.canonicalUser.id );
     const isOwner = Boolean( driver?.driver_id ) && String( tripOwner.driver_id ) === String( driver.driver_id );
     const canManageTrips = hasPermission( resolveAccessRole( auth.canonicalUser.role ), 'rides:assign' );
@@ -186,14 +166,14 @@ export async function handleTripRequest ( request: Request, path: string ) {
     }
     const body = await request.json().catch( () => ( {} ) );
     const patch: Record<string, unknown> = {};
-    if ( body.from ) patch.origin_city = body.from;
-    if ( body.to ) patch.destination_city = body.to;
-    if ( body.date || body.time ) patch.departure_time = new Date( `${ body.date ?? new Date().toISOString().slice( 0, 10 ) }T${ body.time ?? '08:00' }:00` ).toISOString();
-    if ( body.date ) patch.departure_date = body.date;
-    if ( typeof body.seats === 'number' ) patch.available_seats = body.seats;
-    if ( typeof body.price === 'number' ) patch.price_per_seat = body.price;
-    if ( typeof body.status === 'string' ) patch.trip_status = body.status === 'active' ? 'open' : body.status;
-    if ( typeof body.note === 'string' ) patch.notes = body.note;
+    if ( body.from ) {patch.origin_city = body.from;}
+    if ( body.to ) {patch.destination_city = body.to;}
+    if ( body.date || body.time ) {patch.departure_time = new Date( `${ body.date ?? new Date().toISOString().slice( 0, 10 ) }T${ body.time ?? '08:00' }:00` ).toISOString();}
+    if ( body.date ) {patch.departure_date = body.date;}
+    if ( typeof body.seats === 'number' ) {patch.available_seats = body.seats;}
+    if ( typeof body.price === 'number' ) {patch.price_per_seat = body.price;}
+    if ( typeof body.status === 'string' ) {patch.trip_status = body.status === 'active' ? 'open' : body.status;}
+    if ( typeof body.note === 'string' ) {patch.notes = body.note;}
     const { data, error } = await auth.admin
       .from( 'trips' )
       .update( patch )
@@ -201,7 +181,7 @@ export async function handleTripRequest ( request: Request, path: string ) {
       .eq( 'driver_id', tripOwner.driver_id )
       .select( 'trip_id, driver_id, origin_city, destination_city, departure_time, available_seats, price_per_seat, trip_status, allow_packages, package_capacity, vehicle_make, vehicle_model, notes, created_at' )
       .single();
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     const profiles = await fetchDriverProfiles( auth.admin, [ String( data.driver_id ?? '' ) ] );
     return json( mapTripRow( data, profiles[ String( data.driver_id ?? '' ) ] ) );
   }
@@ -211,19 +191,19 @@ export async function handleTripRequest ( request: Request, path: string ) {
 
 export async function handleBookingCollectionForTrip ( request: Request, tripId: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
   const { data, error } = await auth.admin
     .from( 'bookings' )
     .select( '*' )
     .eq( 'trip_id', tripId )
     .order( 'created_at', { ascending: false } );
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
   return json( ( Array.isArray( data ) ? data : [] ).map( mapBookingRow ) );
 }
 
 export async function handleCancelTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canCancelAny = hasPermission( role, 'rides:cancel_any' ) || hasPermission( role, 'packages:cancel_any' );
@@ -231,7 +211,7 @@ export async function handleCancelTrip ( request: Request ) {
   const body = await request.json();
   const tripId = String( body.tripId ?? '' );
   const reason = String( body.reason ?? '' ).trim();
-  if ( !tripId || !reason ) return json( { error: 'tripId and reason are required' }, 400 );
+  if ( !tripId || !reason ) {return json( { error: 'tripId and reason are required' }, 400 );}
 
   const { admin, canonicalUser } = auth;
   const { data: trip, error: fetchError } = await admin
@@ -240,11 +220,11 @@ export async function handleCancelTrip ( request: Request ) {
     .eq( 'id', tripId )
     .maybeSingle();
 
-  if ( fetchError ) return json( { error: fetchError.message }, 500 );
-  if ( !trip ) return json( { error: 'Trip not found' }, 404 );
-  if ( !canCancelAny && trip.driver_id !== canonicalUser.id ) return json( { error: 'Unauthorized' }, 403 );
-  if ( trip.status === 'cancelled' ) return json( { error: 'Trip already cancelled' }, 409 );
-  if ( trip.status === 'completed' ) return json( { error: 'Cannot cancel completed trip' }, 409 );
+  if ( fetchError ) {return json( { error: fetchError.message }, 500 );}
+  if ( !trip ) {return json( { error: 'Trip not found' }, 404 );}
+  if ( !canCancelAny && trip.driver_id !== canonicalUser.id ) {return json( { error: 'Unauthorized' }, 403 );}
+  if ( trip.status === 'cancelled' ) {return json( { error: 'Trip already cancelled' }, 409 );}
+  if ( trip.status === 'completed' ) {return json( { error: 'Cannot cancel completed trip' }, 409 );}
 
   const { data: bookings, error: bookingsError } = await admin
     .from( 'bookings' )
@@ -252,14 +232,14 @@ export async function handleCancelTrip ( request: Request ) {
     .eq( 'trip_id', tripId )
     .in( 'status', [ 'pending', 'confirmed' ] );
 
-  if ( bookingsError ) return json( { error: bookingsError.message }, 500 );
+  if ( bookingsError ) {return json( { error: bookingsError.message }, 500 );}
 
   const { error: tripUpdateError } = await admin
     .from( 'trips' )
     .update( { status: 'cancelled', cancelled_at: new Date().toISOString() } )
     .eq( 'id', tripId );
 
-  if ( tripUpdateError ) return json( { error: tripUpdateError.message }, 500 );
+  if ( tripUpdateError ) {return json( { error: tripUpdateError.message }, 500 );}
 
   const activeBookings = bookings ?? [];
   if ( activeBookings.length > 0 ) {
@@ -274,7 +254,7 @@ export async function handleCancelTrip ( request: Request ) {
       } )
       .in( 'id', bookingIds );
 
-    if ( bookingUpdateError ) return json( { error: bookingUpdateError.message }, 500 );
+    if ( bookingUpdateError ) {return json( { error: bookingUpdateError.message }, 500 );}
 
     await admin.from( 'notifications' ).insert(
       activeBookings.map( ( booking: Record<string, unknown> ) => ( {
@@ -295,7 +275,7 @@ export async function handleCancelTrip ( request: Request ) {
 
 export async function handleGetLiveTrip ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const { data: booking, error: bookingError } = await auth.admin
     .from( 'bookings' )
@@ -306,8 +286,8 @@ export async function handleGetLiveTrip ( request: Request ) {
     .limit( 1 )
     .maybeSingle();
 
-  if ( bookingError ) return json( { error: bookingError.message }, 500 );
-  if ( !booking?.trip_id ) return json( { snapshot: null } );
+  if ( bookingError ) {return json( { error: bookingError.message }, 500 );}
+  if ( !booking?.trip_id ) {return json( { snapshot: null } );}
 
   const [ { data: trip }, { data: presence } ] = await Promise.all( [
     auth.admin
@@ -322,7 +302,7 @@ export async function handleGetLiveTrip ( request: Request ) {
       .maybeSingle(),
   ] );
 
-  if ( !trip ) return json( { snapshot: null } );
+  if ( !trip ) {return json( { snapshot: null } );}
 
   const { data: driver } = await auth.admin
     .from( 'users' )

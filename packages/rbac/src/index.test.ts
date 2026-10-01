@@ -44,7 +44,11 @@ describe('RBAC — role coverage', () => {
 
   it('getAllPermissions returns all unique permissions', () => {
     const perms = getAllPermissions();
-    expect(perms.length).toBeGreaterThan(50);
+    // Pinned to the declared union rather than a loose floor. `> 50` no longer
+    // matched the 46 permissions the AccessPermission union actually defines,
+    // so this test could only ever fail — it had simply never been executed,
+    // because packages/** was outside the Vitest include glob.
+    expect(perms.length).toBe(46);
     // No duplicates
     expect(new Set(perms).size).toBe(perms.length);
   });

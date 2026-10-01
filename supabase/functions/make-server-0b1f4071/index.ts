@@ -1,36 +1,11 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    noContent,
+    finalizeResponse,
+    isOriginAllowed,
+    enforceRequestSecurity,
+    logUnhandledRouteError,
+    sanitizedUnhandledErrorResponse,
 } from './_handlers/shared.ts';
 
 import {
@@ -583,11 +558,11 @@ async function resolveRoute ( request: Request ): Promise<Response> {
   }
 
   for ( const route of ROUTES ) {
-    if ( route.methods && !route.methods.includes( request.method ) ) continue;
-    if ( !route.test( path, request.method ) ) continue;
+    if ( route.methods && !route.methods.includes( request.method ) ) {continue;}
+    if ( !route.test( path, request.method ) ) {continue;}
 
     const result = await route.handle( request, path );
-    if ( result ) return result;
+    if ( result ) {return result;}
   }
 
   return json( { error: 'Route not found', path }, 404 );

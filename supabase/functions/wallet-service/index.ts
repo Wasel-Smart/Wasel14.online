@@ -21,13 +21,13 @@ function json(data: unknown, status = 200) {
 }
 
 function resolveAllowedOrigin(origin: string | null): string | null {
-  if (!origin) return null;
+  if (!origin) {return null;}
   try {
     const url = new URL(origin);
-    if (url.origin === new URL(APP_BASE_URL).origin) return url.origin;
-    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return url.origin;
+    if (url.origin === new URL(APP_BASE_URL).origin) {return url.origin;}
+    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {return url.origin;}
     const extra = ADDITIONAL_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-    if (extra.includes(url.origin)) return url.origin;
+    if (extra.includes(url.origin)) {return url.origin;}
   } catch { /* ignore */ }
   return null;
 }
@@ -37,29 +37,29 @@ function buildResponseHeaders(request: Request): Headers {
   const allowedOrigin = resolveAllowedOrigin(request.headers.get('origin'));
   Object.entries(responseBaseHeaders).forEach(([k, v]) => headers.set(k, v));
   headers.set('Vary', 'Origin');
-  if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
+  if (allowedOrigin) {headers.set('Access-Control-Allow-Origin', allowedOrigin);}
   return headers;
 }
 
 function getAdminClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase not configured');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {throw new Error('Supabase not configured');}
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function authenticateRequest(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) return { error: json({ error: 'Missing bearer token' }, 401) };
+  if (!token) {return { error: json({ error: 'Missing bearer token' }, 401) };}
   const admin = getAdminClient();
   const { data: authData, error: authError } = await admin.auth.getUser(token);
-  if (authError || !authData.user) return { error: json({ error: 'Invalid auth token' }, 401) };
+  if (authError || !authData.user) {return { error: json({ error: 'Invalid auth token' }, 401) };}
   const { data: byAuthUser, error: byAuthError } = await admin.from('users').select('*').eq('auth_user_id', authData.user.id).maybeSingle();
-  if (byAuthError) return { error: json({ error: 'Internal server error' }, 500) };
+  if (byAuthError) {return { error: json({ error: 'Internal server error' }, 500) };}
   let canonicalUser = byAuthUser;
   if (!canonicalUser) {
     const fallback = await admin.from('users').select('*').eq('id', authData.user.id).maybeSingle();
     canonicalUser = fallback.data;
-    if (fallback.error || !canonicalUser) return { error: json({ error: 'User not found' }, 404) };
+    if (fallback.error || !canonicalUser) {return { error: json({ error: 'User not found' }, 404) };}
   }
   return { admin, authUser: authData.user, canonicalUser };
 }
@@ -84,10 +84,10 @@ type WalletRow = {
 
 async function ensureWalletForUser(admin: ReturnType<typeof getAdminClient>, userId: string): Promise<WalletRow> {
   const { data: existing, error: existingError } = await admin.from('wallets').select('*').eq('user_id', userId).maybeSingle();
-  if (existingError) throw new Error('Wallet lookup failed');
-  if (existing?.wallet_id) return existing as WalletRow;
+  if (existingError) {throw new Error('Wallet lookup failed');}
+  if (existing?.wallet_id) {return existing as WalletRow;}
   const { data: created, error: createError } = await admin.from('wallets').insert({ user_id: userId }).select('*').single();
-  if (createError) throw new Error('Wallet creation failed');
+  if (createError) {throw new Error('Wallet creation failed');}
   return created as WalletRow;
 }
 
@@ -97,7 +97,7 @@ function toHex(bytes: Uint8Array): string {
 
 function fromHex(value: string): Uint8Array {
   const normalized = value.trim();
-  if (!/^[0-9a-f]+$/i.test(normalized) || normalized.length % 2 !== 0) return new Uint8Array();
+  if (!/^[0-9a-f]+$/i.test(normalized) || normalized.length % 2 !== 0) {return new Uint8Array();}
   const bytes = new Uint8Array(normalized.length / 2);
   for (let index = 0; index < normalized.length; index += 2) {
     bytes[index / 2] = Number.parseInt(normalized.slice(index, index + 2), 16);
@@ -106,9 +106,9 @@ function fromHex(value: string): Uint8Array {
 }
 
 function timingSafeEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.length !== right.length) return false;
+  if (left.length !== right.length) {return false;}
   let diff = 0;
-  for (let index = 0; index < left.length; index += 1) diff |= left[index] ^ right[index];
+  for (let index = 0; index < left.length; index += 1) {diff |= left[index] ^ right[index];}
   return diff === 0;
 }
 
@@ -121,13 +121,13 @@ async function hashWalletPin(pin: string): Promise<string> {
 }
 
 async function verifyWalletPinHash(pin: string, storedHash?: string | null): Promise<boolean> {
-  if (!storedHash) return false;
+  if (!storedHash) {return false;}
   const parts = storedHash.split('$');
-  if (parts.length !== 4 || parts[0] !== 'pbkdf2_sha256') return false;
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2_sha256') {return false;}
   const iterations = Number.parseInt(parts[1] ?? '', 10);
   const salt = fromHex(parts[2] ?? '');
   const expected = fromHex(parts[3] ?? '');
-  if (!Number.isFinite(iterations) || iterations < 100_000 || salt.length < 16 || expected.length !== 32) return false;
+  if (!Number.isFinite(iterations) || iterations < 100_000 || salt.length < 16 || expected.length !== 32) {return false;}
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(`wasel-wallet-pin:${pin}`), 'PBKDF2', false, ['deriveBits']);
   const derivedBits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: salt.buffer as ArrayBuffer, iterations }, key, expected.length * 8);
   return timingSafeEqual(new Uint8Array(derivedBits), expected);
@@ -135,17 +135,17 @@ async function verifyWalletPinHash(pin: string, storedHash?: string | null): Pro
 
 function parseWalletRoute(path: string) {
   const match = /^\/wallet\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path);
-  if (!match) return null;
+  if (!match) {return null;}
   return { userId: decodeURIComponent(match[1]), action: match[2] ? decodeURIComponent(match[2]) : '', resourceId: match[3] ? decodeURIComponent(match[3]) : null };
 }
 
 async function handleWalletRequest(request: Request, path: string) {
   const walletRoute = parseWalletRoute(path);
-  if (!walletRoute) return json({ error: 'Invalid wallet route' }, 400);
+  if (!walletRoute) {return json({ error: 'Invalid wallet route' }, 400);}
   const { userId, action } = walletRoute;
 
   const auth = await authenticateRequest(request);
-  if ('error' in auth) return auth.error;
+  if ('error' in auth) {return auth.error;}
   if (userId !== auth.canonicalUser.id && userId !== auth.authUser.id) {
     return json({ error: 'Wallet route is not authorized for this user.' }, 403);
   }
@@ -182,11 +182,11 @@ async function handleWalletRequest(request: Request, path: string) {
   if (action === 'set-pin' && request.method === 'POST') {
     const body = await request.json().catch(() => ({}));
     const pin = String(body.pin ?? '').trim();
-    if (!/^\d{4}$/.test(pin)) return json({ error: 'Wallet PIN must be four digits.' }, 400);
+    if (!/^\d{4}$/.test(pin)) {return json({ error: 'Wallet PIN must be four digits.' }, 400);}
     try {
       const pinHash = await hashWalletPin(pin);
       const { error } = await admin.from('wallets').update({ pin_hash: pinHash, updated_at: new Date().toISOString() }).eq('user_id', auth.canonicalUser.id);
-      if (error) throw new Error('PIN update failed');
+      if (error) {throw new Error('PIN update failed');}
       return json({ success: true });
     } catch (error) {
       console.error('Set PIN error:', error instanceof Error ? error.message : String(error));
@@ -216,7 +216,7 @@ async function handleWalletRequest(request: Request, path: string) {
         auto_top_up_enabled: Boolean(body.enabled), auto_top_up_amount: amount > 0 ? amount : 20,
         auto_top_up_threshold: threshold >= 0 ? threshold : 5, updated_at: new Date().toISOString(),
       }).eq('user_id', auth.canonicalUser.id);
-      if (error) throw new Error('Auto top-up update failed');
+      if (error) {throw new Error('Auto top-up update failed');}
       return json({ success: true });
     } catch (error) {
       console.error('Auto top-up error:', error instanceof Error ? error.message : String(error));
@@ -228,19 +228,19 @@ async function handleWalletRequest(request: Request, path: string) {
     const body = await request.json().catch(() => ({}));
     const amountJod = toMoneyNumber(body.amount);
     const bankAccount = String(body.bankAccount ?? '').trim();
-    if (amountJod <= 0) return json({ error: 'Amount must be greater than zero.' }, 400);
-    if (!bankAccount) return json({ error: 'Bank account is required.' }, 400);
+    if (amountJod <= 0) {return json({ error: 'Amount must be greater than zero.' }, 400);}
+    if (!bankAccount) {return json({ error: 'Bank account is required.' }, 400);}
     const rl = await checkDbRateLimit(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, auth.canonicalUser.id, 'wallet_withdraw', { maxAttempts: 3, windowMinutes: 60 });
-    if (!rl.allowed) return json({ error: 'Too many withdrawal attempts. Try again later.' }, 429);
+    if (!rl.allowed) {return json({ error: 'Too many withdrawal attempts. Try again later.' }, 429);}
     try {
       const wallet = await ensureWalletForUser(admin, auth.canonicalUser.id);
-      if (toNumber(wallet.balance, 0) < amountJod) return json({ error: 'Insufficient wallet balance.' }, 400);
+      if (toNumber(wallet.balance, 0) < amountJod) {return json({ error: 'Insufficient wallet balance.' }, 400);}
       const { error } = await admin.rpc('wallet_post_transaction', {
         p_wallet_id: wallet.wallet_id, p_amount: amountJod, p_transaction_type: 'withdraw_funds',
         p_payment_method: 'local_gateway', p_direction: 'debit', p_reference_type: 'bank_account',
         p_reference_id: null, p_metadata: { bank_account: bankAccount, description: 'Wallet withdrawal' },
       });
-      if (error) throw new Error('Withdrawal failed');
+      if (error) {throw new Error('Withdrawal failed');}
       return json({ success: true });
     } catch (error) {
       console.error('Withdraw error:', error instanceof Error ? error.message : String(error));
@@ -253,10 +253,10 @@ async function handleWalletRequest(request: Request, path: string) {
     const amountJod = toMoneyNumber(body.amount);
     const recipientId = String(body.recipientId ?? '').trim();
     const note = String(body.note ?? '').trim();
-    if (amountJod <= 0) return json({ error: 'Amount must be greater than zero.' }, 400);
-    if (!recipientId) return json({ error: 'recipientId is required.' }, 400);
+    if (amountJod <= 0) {return json({ error: 'Amount must be greater than zero.' }, 400);}
+    if (!recipientId) {return json({ error: 'recipientId is required.' }, 400);}
     const rl = await checkDbRateLimit(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, auth.canonicalUser.id, 'wallet_send', { maxAttempts: 10, windowMinutes: 60 });
-    if (!rl.allowed) return json({ error: 'Too many send attempts. Try again later.' }, 429);
+    if (!rl.allowed) {return json({ error: 'Too many send attempts. Try again later.' }, 429);}
     try {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recipientId);
       let recipientUserId: string | null = null;
@@ -280,10 +280,10 @@ async function handleWalletRequest(request: Request, path: string) {
           recipientUserId = byPhone.data?.id ? String(byPhone.data.id) : null;
         }
       }
-      if (!recipientUserId) return json({ error: 'Recipient wallet was not found.' }, 404);
-      if (recipientUserId === auth.canonicalUser.id) return json({ error: 'Cannot send wallet funds to the same account.' }, 400);
+      if (!recipientUserId) {return json({ error: 'Recipient wallet was not found.' }, 404);}
+      if (recipientUserId === auth.canonicalUser.id) {return json({ error: 'Cannot send wallet funds to the same account.' }, 400);}
       const { error } = await admin.rpc('app_transfer_wallet_funds', { p_from_user_id: auth.canonicalUser.id, p_to_user_id: recipientUserId, p_amount: amountJod, p_payment_method: 'wallet_balance' });
-      if (error) throw new Error('Transfer failed');
+      if (error) {throw new Error('Transfer failed');}
       return json({ success: true, note: note.slice(0, 200).replace(/[<>"']/g, '') });
     } catch (error) {
       console.error('Send error:', error instanceof Error ? error.message : String(error));
@@ -297,7 +297,7 @@ async function handleWalletRequest(request: Request, path: string) {
 Deno.serve(async (request: Request) => {
   const headers = buildResponseHeaders(request);
   headers.set('X-Api-Version', 'v1');
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (request.method === 'OPTIONS') {return new Response(null, { status: 204, headers });}
 
   try {
     const url = new URL(request.url);
@@ -308,7 +308,7 @@ Deno.serve(async (request: Request) => {
 
     if (path.startsWith('/wallet')) {
       response = await handleWalletRequest(request, path);
-      if (!response) response = json({ error: 'Not found', service: 'wallet-service' }, 404);
+      if (!response) {response = json({ error: 'Not found', service: 'wallet-service' }, 404);}
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'wallet-service', timestamp: new Date().toISOString() });
     } else {

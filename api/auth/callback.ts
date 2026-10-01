@@ -156,7 +156,9 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const isRecovery = url.searchParams.get('type') === 'recovery';
 
   if (oauthError) {
-    response.writeHead(302, { Location: `${SIGN_IN_PATH}?error=${encodeURIComponent(friendlyAuthError(oauthErrorCode))}` });
+    const errorParams = new URLSearchParams({ error: friendlyAuthError(oauthErrorCode) });
+    if (returnTo !== DEFAULT_RETURN_TO) { errorParams.set('returnTo', returnTo); }
+    response.writeHead(302, { Location: `${SIGN_IN_PATH}?${errorParams.toString()}` });
     response.end();
     return;
   }
@@ -207,8 +209,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
     ? `${CLIENT_CALLBACK_PATH}?type=recovery&returnTo=${encodeURIComponent(returnTo)}`
     : returnTo;
 
+  let failLocation = `${SIGN_IN_PATH}?error=${encodeURIComponent(friendlyAuthError(null))}`;
+  if (returnTo !== DEFAULT_RETURN_TO) { failLocation += `&returnTo=${encodeURIComponent(returnTo)}`; }
   const headers: Record<string, string | string[]> = {
-    Location: error ? `${SIGN_IN_PATH}?error=${encodeURIComponent(friendlyAuthError(null))}` : successLocation,
+    Location: error ? failLocation : successLocation,
   };
   if (outgoingCookies.length > 0) {
     headers['Set-Cookie'] = outgoingCookies;

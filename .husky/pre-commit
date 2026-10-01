@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Running lint..."
-npm run lint
-
-echo "Running typecheck..."
-npm run type-check
-
-echo "Running tests..."
-npm run test:unit -- --run
+# Run lint-staged: only lints and type-checks files staged for this commit.
+# Full test suite runs in CI (on push/PR), not on every local commit.
+npx lint-staged

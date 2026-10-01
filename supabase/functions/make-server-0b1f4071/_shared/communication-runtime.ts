@@ -31,7 +31,7 @@ export type DeliveryProcessorEnv = {
 };
 
 function resolveProviderWebhookBaseUrl(functionBaseUrl?: string): string | undefined {
-  if (!functionBaseUrl) return undefined;
+  if (!functionBaseUrl) {return undefined;}
   const normalized = functionBaseUrl.replace(/\/$/, '');
   return normalized.includes('/functions/v1/make-server-0b1f4071')
     // The status-callback handlers live in this same function at
@@ -43,18 +43,18 @@ function resolveProviderWebhookBaseUrl(functionBaseUrl?: string): string | undef
 }
 
 export function determineProviderName(channel: string): string {
-  if (channel === 'email') return 'email_provider';
-  if (channel === 'sms' || channel === 'whatsapp') return 'twilio';
-  if (channel === 'push') return 'push_runtime';
+  if (channel === 'email') {return 'email_provider';}
+  if (channel === 'sms' || channel === 'whatsapp') {return 'twilio';}
+  if (channel === 'push') {return 'push_runtime';}
   return 'app_queue';
 }
 
 export function normalizePhoneDestination(input: string): string {
   const trimmed = input.trim();
-  if (!trimmed) return '';
-  if (trimmed.startsWith('whatsapp:')) return trimmed;
+  if (!trimmed) {return '';}
+  if (trimmed.startsWith('whatsapp:')) {return trimmed;}
   const normalized = trimmed.replace(/[^\d+]/g, '');
-  if (!normalized) return '';
+  if (!normalized) {return '';}
   return normalized.startsWith('+') ? normalized : `+${normalized}`;
 }
 
@@ -130,9 +130,9 @@ export function buildResendPayload(
   env: DeliveryProcessorEnv,
 ) {
   const to = delivery.destination?.trim();
-  if (!env.resendApiKey) throw new Error('RESEND_API_KEY is not configured');
-  if (!env.resendFromEmail) throw new Error('RESEND_FROM_EMAIL is not configured');
-  if (!to) throw new Error('Delivery destination is missing');
+  if (!env.resendApiKey) {throw new Error('RESEND_API_KEY is not configured');}
+  if (!env.resendFromEmail) {throw new Error('RESEND_FROM_EMAIL is not configured');}
+  if (!to) {throw new Error('Delivery destination is missing');}
 
   const body = String(delivery.payload?.body ?? '');
   const subject = delivery.subject?.trim() || 'Wasel notification';
@@ -167,9 +167,9 @@ export function buildSendgridPayload(
   env: DeliveryProcessorEnv,
 ) {
   const to = delivery.destination?.trim();
-  if (!env.sendgridApiKey) throw new Error('SENDGRID_API_KEY is not configured');
-  if (!env.sendgridFromEmail) throw new Error('SENDGRID_FROM_EMAIL is not configured');
-  if (!to) throw new Error('Delivery destination is missing');
+  if (!env.sendgridApiKey) {throw new Error('SENDGRID_API_KEY is not configured');}
+  if (!env.sendgridFromEmail) {throw new Error('SENDGRID_FROM_EMAIL is not configured');}
+  if (!to) {throw new Error('Delivery destination is missing');}
 
   const body = String(delivery.payload?.body ?? '');
   const subject = delivery.subject?.trim() || 'Wasel notification';
@@ -212,7 +212,7 @@ export function buildTwilioRequest(
   }
 
   const destination = normalizePhoneDestination(delivery.destination ?? '');
-  if (!destination) throw new Error('Delivery destination is missing');
+  if (!destination) {throw new Error('Delivery destination is missing');}
 
   const body = String(delivery.payload?.body ?? '');
   const params = new URLSearchParams({
@@ -221,7 +221,7 @@ export function buildTwilioRequest(
   });
 
   if (delivery.channel === 'whatsapp') {
-    if (!env.twilioWhatsappFrom) throw new Error('TWILIO_WHATSAPP_FROM is not configured');
+    if (!env.twilioWhatsappFrom) {throw new Error('TWILIO_WHATSAPP_FROM is not configured');}
     params.set('From', env.twilioWhatsappFrom.startsWith('whatsapp:')
       ? env.twilioWhatsappFrom
       : `whatsapp:${env.twilioWhatsappFrom}`);
@@ -257,22 +257,22 @@ export function buildTwilioRequest(
 
 export function mapResendEventToStatus(eventType: string): DeliveryLifecycleStatus {
   const normalized = eventType.toLowerCase();
-  if (normalized.includes('delivered') || normalized.includes('opened') || normalized.includes('clicked')) return 'delivered';
-  if (normalized.includes('sent') || normalized.includes('queued') || normalized.includes('processed')) return 'sent';
-  if (normalized.includes('bounced') || normalized.includes('complained') || normalized.includes('failed')) return 'failed';
+  if (normalized.includes('delivered') || normalized.includes('opened') || normalized.includes('clicked')) {return 'delivered';}
+  if (normalized.includes('sent') || normalized.includes('queued') || normalized.includes('processed')) {return 'sent';}
+  if (normalized.includes('bounced') || normalized.includes('complained') || normalized.includes('failed')) {return 'failed';}
   return 'sent';
 }
 
 export function mapTwilioStatusToLifecycle(status: string): DeliveryLifecycleStatus {
   const normalized = status.toLowerCase();
-  if (normalized === 'delivered' || normalized === 'read') return 'delivered';
-  if (normalized === 'sent' || normalized === 'queued' || normalized === 'accepted' || normalized === 'scheduled') return 'sent';
-  if (normalized === 'failed' || normalized === 'undelivered' || normalized === 'canceled') return 'failed';
+  if (normalized === 'delivered' || normalized === 'read') {return 'delivered';}
+  if (normalized === 'sent' || normalized === 'queued' || normalized === 'accepted' || normalized === 'scheduled') {return 'sent';}
+  if (normalized === 'failed' || normalized === 'undelivered' || normalized === 'canceled') {return 'failed';}
   return 'processing';
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {return false;}
   let result = 0;
   for (let i = 0; i < a.length; i++) {
     result |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -281,6 +281,6 @@ function constantTimeEqual(a: string, b: string): boolean {
 }
 
 export function hasValidWebhookToken(url: URL, expectedToken?: string): boolean {
-  if (!expectedToken) return false;
+  if (!expectedToken) {return false;}
   return constantTimeEqual(url.searchParams.get('token') ?? '', expectedToken);
 }

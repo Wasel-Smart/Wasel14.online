@@ -20,13 +20,13 @@ function json(data: unknown, status = 200) {
 }
 
 function resolveAllowedOrigin(origin: string | null): string | null {
-  if (!origin) return null;
+  if (!origin) {return null;}
   try {
     const url = new URL(origin);
-    if (url.origin === new URL(APP_BASE_URL).origin) return url.origin;
-    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return url.origin;
+    if (url.origin === new URL(APP_BASE_URL).origin) {return url.origin;}
+    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {return url.origin;}
     const extra = ADDITIONAL_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-    if (extra.includes(url.origin)) return url.origin;
+    if (extra.includes(url.origin)) {return url.origin;}
   } catch { /* ignore */ }
   return null;
 }
@@ -36,29 +36,29 @@ function buildResponseHeaders(request: Request): Headers {
   const allowedOrigin = resolveAllowedOrigin(request.headers.get('origin'));
   Object.entries(responseBaseHeaders).forEach(([k, v]) => headers.set(k, v));
   headers.set('Vary', 'Origin');
-  if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
+  if (allowedOrigin) {headers.set('Access-Control-Allow-Origin', allowedOrigin);}
   return headers;
 }
 
 function getAdminClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase not configured');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {throw new Error('Supabase not configured');}
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function authenticateRequest(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) return { error: json({ error: 'Missing bearer token' }, 401) };
+  if (!token) {return { error: json({ error: 'Missing bearer token' }, 401) };}
   const admin = getAdminClient();
   const { data: authData, error: authError } = await admin.auth.getUser(token);
-  if (authError || !authData.user) return { error: json({ error: 'Invalid auth token' }, 401) };
+  if (authError || !authData.user) {return { error: json({ error: 'Invalid auth token' }, 401) };}
   const { data: byAuthUser, error: byAuthError } = await admin.from('users').select('*').eq('auth_user_id', authData.user.id).maybeSingle();
-  if (byAuthError) return { error: json({ error: 'Internal server error' }, 500) };
+  if (byAuthError) {return { error: json({ error: 'Internal server error' }, 500) };}
   let canonicalUser = byAuthUser;
   if (!canonicalUser) {
     const fallback = await admin.from('users').select('*').eq('id', authData.user.id).maybeSingle();
     canonicalUser = fallback.data;
-    if (fallback.error || !canonicalUser) return { error: json({ error: 'User not found' }, 404) };
+    if (fallback.error || !canonicalUser) {return { error: json({ error: 'User not found' }, 404) };}
   }
   return { admin, authUser: authData.user, canonicalUser };
 }
@@ -86,30 +86,30 @@ function mapBookingRow(row: Record<string, unknown>) {
 function parseEntityRoute(path: string, prefix: string) {
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = new RegExp(`^/${escapedPrefix}/([^/]+)(?:/([^/]+))?$`).exec(path);
-  if (!match) return null;
+  if (!match) {return null;}
   return { id: decodeURIComponent(match[1]), action: match[2] ? decodeURIComponent(match[2]) : null };
 }
 
 async function handleBookingCollectionForTrip(request: Request, tripId: string) {
   const auth = await authenticateRequest(request);
-  if ('error' in auth) return auth.error;
+  if ('error' in auth) {return auth.error;}
   const { data, error } = await auth.admin.from('bookings').select('*').eq('trip_id', tripId).order('created_at', { ascending: false });
-  if (error) return json({ error: 'Internal server error' }, 500);
+  if (error) {return json({ error: 'Internal server error' }, 500);}
   return json((Array.isArray(data) ? data : []).map(mapBookingRow));
 }
 
 async function handleBookingRequest(request: Request, path: string) {
   const auth = await authenticateRequest(request);
-  if ('error' in auth) return auth.error;
+  if ('error' in auth) {return auth.error;}
 
   if (request.method === 'POST' && path === '/bookings') {
     const body = await request.json().catch(() => ({}));
     const tripId = String(body.trip_id ?? '');
     const seatsRequested = Math.max(1, toNumber(body.seats_requested, 1));
     const { data: trip, error: tripError } = await auth.admin.from('trips').select('trip_id, available_seats, price_per_seat, trip_status').eq('trip_id', tripId).single();
-    if (tripError) return json({ error: 'Internal server error' }, 500);
+    if (tripError) {return json({ error: 'Internal server error' }, 500);}
     const availableSeats = toNumber(trip.available_seats, 0);
-    if (availableSeats < seatsRequested) return json({ error: 'Not enough seats available' }, 409);
+    if (availableSeats < seatsRequested) {return json({ error: 'Not enough seats available' }, 409);}
 
     const totalPrice = toNumber(body.total_price, toNumber(trip.price_per_seat, 0) * seatsRequested);
     const status = String(body.status ?? body.booking_status ?? 'confirmed');
@@ -121,7 +121,7 @@ async function handleBookingRequest(request: Request, path: string) {
       booking_status: status, status, confirmed_by_driver: status !== 'pending_driver',
       amount: totalPrice, price_per_seat: toNumber(trip.price_per_seat, 0), total_price: totalPrice,
     }).select('*').single();
-    if (error) return json({ error: 'Internal server error' }, 500);
+    if (error) {return json({ error: 'Internal server error' }, 500);}
     if (status !== 'pending_driver') {
       await auth.admin.from('trips').update({
         available_seats: Math.max(availableSeats - seatsRequested, 0),
@@ -134,7 +134,7 @@ async function handleBookingRequest(request: Request, path: string) {
   const bookingRoute = parseEntityRoute(path, 'bookings');
   if (request.method === 'GET' && bookingRoute?.id === 'user') {
     const { data, error } = await auth.admin.from('bookings').select('*').eq('passenger_id', auth.canonicalUser.id).order('created_at', { ascending: false });
-    if (error) return json({ error: 'Internal server error' }, 500);
+    if (error) {return json({ error: 'Internal server error' }, 500);}
     return json((Array.isArray(data) ? data : []).map(mapBookingRow));
   }
 
@@ -148,7 +148,7 @@ async function handleBookingRequest(request: Request, path: string) {
     const { data, error } = await auth.admin.from('bookings').update({
       booking_status: status, status, confirmed_by_driver: status === 'confirmed',
     }).eq('booking_id', bookingRoute.id).select('*').single();
-    if (error) return json({ error: 'Internal server error' }, 500);
+    if (error) {return json({ error: 'Internal server error' }, 500);}
     return json(mapBookingRow(data));
   }
 
@@ -157,7 +157,7 @@ async function handleBookingRequest(request: Request, path: string) {
 
 Deno.serve(async (request: Request) => {
   const headers = buildResponseHeaders(request);
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (request.method === 'OPTIONS') {return new Response(null, { status: 204, headers });}
 
   try {
     const url = new URL(request.url);
@@ -168,7 +168,7 @@ Deno.serve(async (request: Request) => {
 
     if (path.startsWith('/bookings')) {
       response = await handleBookingRequest(request, path);
-      if (!response) response = json({ error: 'Not found' }, 404);
+      if (!response) {response = json({ error: 'Not found' }, 404);}
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'booking-service', timestamp: new Date().toISOString() });
     } else {

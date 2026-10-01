@@ -303,9 +303,9 @@ export function scheduleIdleTask(
   callback: () => void,
   options?: { timeout?: number },
 ): () => void {
-  if (typeof requestIdleCallback !== 'undefined') {
-    const id = requestIdleCallback(callback, options);
-    return () => cancelIdleCallback(id);
+  if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+    const id = window.requestIdleCallback(callback, options);
+    return () => window.cancelIdleCallback?.(id);
   }
   const id = setTimeout(callback, options?.timeout ?? 1);
   return () => clearTimeout(id);

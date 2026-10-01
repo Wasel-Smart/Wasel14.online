@@ -30,19 +30,19 @@ function json(data: unknown, status = 200) {
 }
 
 function resolveRateLimitTier(path: string, method: string): keyof typeof RATE_LIMITS {
-  if (path.startsWith('/auth')) return 'auth';
-  if (method === 'GET' && path.includes('search')) return 'search';
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return 'write';
+  if (path.startsWith('/auth')) {return 'auth';}
+  if (method === 'GET' && path.includes('search')) {return 'search';}
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {return 'write';}
   return 'default';
 }
 
 async function authenticateToken(token: string): Promise<{ userId: string } | null> {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {return null;}
   const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const { data, error } = await admin.auth.getUser(token);
-  if (error || !data.user) return null;
+  if (error || !data.user) {return null;}
   return { userId: data.user.id };
 }
 
@@ -68,10 +68,10 @@ Deno.serve(async (request: Request) => {
   // Authenticate
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) return json({ error: 'Missing bearer token' }, 401);
+  if (!token) {return json({ error: 'Missing bearer token' }, 401);}
 
   const authResult = await authenticateToken(token);
-  if (!authResult) return json({ error: 'Invalid auth token' }, 401);
+  if (!authResult) {return json({ error: 'Invalid auth token' }, 401);}
 
   // Rate limit per user + tier
   const tier = resolveRateLimitTier(path, request.method);

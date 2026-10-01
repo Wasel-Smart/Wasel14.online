@@ -15,7 +15,6 @@ export default tseslint.config(
       'tests/load',
       'mobile',
       'mobile/**',
-      'supabase/functions',
        'e2e',
        'service.ts',
        'docs',
@@ -27,7 +26,12 @@ export default tseslint.config(
        '.kilo/**',
        '**/dist/**',
        'packages/rbac/deno/**',
-     ]
+      // Generated edge bundles: scripts/prepare-edge-bundles.mjs vendors these
+      // copies of packages/ and src/ into each function directory. They carry a
+      // "GENERATED FILE - DO NOT EDIT" banner and are verified by `npm run
+      // edge:sync:check`, so linting them would only report on the sources.
+      '**/_vendor/**',
+    ]
   },
   {
     extends: [ js.configs.recommended, ...tseslint.configs.recommended ],
@@ -35,7 +39,7 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2020,
       parserOptions: {
-        project: [ './tsconfig.json', './tsconfig.api.json', './tsconfig.tests.json', './packages/rbac/tsconfig.json' ],
+        project: [ './tsconfig.json', './tsconfig.api.json', './tsconfig.tests.json', './supabase/functions/tsconfig.json', './packages/rbac/tsconfig.json' ],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {

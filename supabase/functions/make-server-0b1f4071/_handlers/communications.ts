@@ -1,40 +1,15 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    ensureRuntimeAdminAccess,
+    authenticateRequest,
+    getAdminClient,
+    getFunctionBaseUrl,
+    executeSqlStatements,
 } from './shared.ts';
 
+import type {
+  CommunicationDeliveryRecord} from '../_shared/communication-runtime.ts';
 import {
-  CommunicationDeliveryRecord,
   buildIdempotencyKey,
   buildResendPayload,
   buildSendgridPayload,
@@ -54,7 +29,7 @@ import {
 
 export async function handleGetCommunicationPreferences ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const { data, error } = await auth.admin
     .from( 'communication_preferences' )
@@ -71,7 +46,7 @@ export async function handleGetCommunicationPreferences ( request: Request ) {
 
 export async function handlePatchCommunicationPreferences ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const patch = {
@@ -106,7 +81,7 @@ export async function handlePatchCommunicationPreferences ( request: Request ) {
 
 export async function handleQueueCommunicationDeliveries ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const deliveries = Array.isArray( body.deliveries ) ? body.deliveries : [];
@@ -172,7 +147,7 @@ export async function handleProcessCommunicationQueue ( request: Request ) {
 
 export async function handleSendTestCommunication ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
-  if ( accessError ) return accessError;
+  if ( accessError ) {return accessError;}
 
   const body = await request.json().catch( () => ( {} ) );
   const channel = String( body.channel ?? 'email' );
@@ -252,7 +227,7 @@ export async function handleSendTestCommunication ( request: Request ) {
 
 export async function handleProviderDiagnostics ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
-  if ( accessError ) return accessError;
+  if ( accessError ) {return accessError;}
 
   const diagnostics: Record<string, unknown> = {
     resend: {
@@ -346,7 +321,7 @@ export async function handleProviderDiagnostics ( request: Request ) {
 
 export async function handleApplyCommunicationMigrations ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
-  if ( accessError ) return accessError;
+  if ( accessError ) {return accessError;}
 
   await executeSqlStatements( COMMUNICATIONS_RUNTIME_SQL );
   await executeSqlStatements( COMMUNICATIONS_OPERATIONS_SQL );

@@ -83,7 +83,7 @@ describe('SmartPricingEngine.calculateSchoolSubscription()', () => {
     expect(result.premium).toBe(770);
   });
 
-  it('round trip applies the 1.8x multiplier documented in the source', () => {
+  it('round trip applies the 1.9x multiplier documented in the source', () => {
     const oneWay = SmartPricingEngine.calculateSchoolSubscription(10, 5, false);
     const roundTrip = SmartPricingEngine.calculateSchoolSubscription(10, 5, true);
     // A round trip should be the one-way cost plus the return leg with a 10% discount,

@@ -171,7 +171,7 @@ export function parseOrReject<T>(
   data: unknown,
 ): T | Response {
   const result = (schema as { safeParse: (data: unknown) => { success: boolean; data?: T; error?: { errors: Array<{ path: Array<string | number>; message: string; code: string }> } } }).safeParse(data);
-  if (result.success) return result.data as T;
+  if (result.success) {return result.data as T;}
 
   const errors = (result.error ?? { errors: [] }).errors.map((e: { path: Array<string | number>; message: string; code: string }) => ({
     field:   e.path.join('.'),

@@ -162,21 +162,21 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
   };
 }
 
-// Request idle callback polyfill
-export const requestIdleCallback: (cb: IdleRequestCallback) => number =
-  window.requestIdleCallback ||
-  function (cb: IdleRequestCallback): number {
-    const start = Date.now();
-    return setTimeout(() => {
-      cb({
-        didTimeout: false,
-        timeRemaining: () => Math.max(0, 50 - (Date.now() - start)),
-      });
-    }, 1) as unknown as number;
-  };
+// Request idle callback polyfill — safe on Safari/iOS, Chrome, Firefox, and SSR.
+export const requestIdleCallback: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number =
+  typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function'
+    ? (cb, opts) => window.requestIdleCallback(cb, opts)
+    : function (cb: IdleRequestCallback): number {
+        const start = Date.now();
+        return setTimeout(() => {
+          cb({
+            didTimeout: false,
+            timeRemaining: () => Math.max(0, 50 - (Date.now() - start)),
+          });
+        }, 1) as unknown as number;
+      };
 
-export const cancelIdleCallback =
-  window.cancelIdleCallback ||
-  function (id: number) {
-    clearTimeout(id);
-  };
+export const cancelIdleCallback: (id: number) => void =
+  typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function'
+    ? (id) => window.cancelIdleCallback(id)
+    : (id) => clearTimeout(id);

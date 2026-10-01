@@ -1,39 +1,9 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
-  SUPABASE_AUTH_HOOK_SEND_SMS_SECRET,
-  deliveryEnv,
-  constantTimeEquals,
+    json,
+    getAdminClient,
+    SUPABASE_AUTH_HOOK_SEND_SMS_SECRET,
+    deliveryEnv,
+    constantTimeEquals,
 } from './shared.ts';
 
 import {
@@ -356,7 +326,7 @@ export async function handleResendWebhook ( request: Request ) {
     .eq( 'external_reference', externalReference )
     .eq( 'provider_name', 'resend' );
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
   return json( { received: true, status } );
 }
 
@@ -390,7 +360,7 @@ export async function handleTwilioWebhook ( request: Request ) {
     .eq( 'external_reference', externalReference )
     .eq( 'provider_name', 'twilio' );
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
   return json( { received: true, status } );
 }
 
@@ -405,10 +375,10 @@ async function verifyStandardWebhookSignature ( headers: Headers, rawBody: strin
   const id = headers.get( 'webhook-id' ) ?? '';
   const timestamp = headers.get( 'webhook-timestamp' ) ?? '';
   const signatures = headers.get( 'webhook-signature' ) ?? '';
-  if ( !id || !timestamp || !signatures || !secret ) return false;
+  if ( !id || !timestamp || !signatures || !secret ) {return false;}
 
   const issuedAt = Number( timestamp );
-  if ( !Number.isFinite( issuedAt ) || Math.abs( Date.now() / 1000 - issuedAt ) > 300 ) return false;
+  if ( !Number.isFinite( issuedAt ) || Math.abs( Date.now() / 1000 - issuedAt ) > 300 ) {return false;}
 
   const base64Secret = secret.replace( /^v1,/, '' ).replace( /^whsec_/, '' );
   let key: CryptoKey;

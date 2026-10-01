@@ -60,9 +60,9 @@ export default function WaselAuthCallback() {
 
   useEffect(() => {
     let active = true;
-    // `type=recovery` is added to the reset-email redirect URL by
-    // AuthContext.resetPassword, so this is known up-front for new links.
     let isRecoveryFlow = callbackType === 'recovery';
+    let unsubscribe: (() => void) | undefined;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
     const showRecovery = () => {
       if (!active) {return;}
@@ -71,83 +71,117 @@ export default function WaselAuthCallback() {
       setFormError('');
     };
 
-    const finishAuth = async () => {
-      if (!supabase) {
-        if (!active) {return;}
-        setState('error');
-        setMessage(tx('waselAuthCallback.backend_not_configured_social'));
-        return;
-      }
+    if (!supabase) {
+      setState('error');
+      setMessage(tx('waselAuthCallback.backend_not_configured_social'));
+      return () => { active = false; };
+    }
 
-      if (callbackError) {
-        if (!active) {return;}
-        setState('error');
-        setMessage(callbackError);
-        return;
-      }
+    if (callbackError) {
+      setState('error');
+      setMessage(callbackError);
+      return () => { active = false; };
+    }
 
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
+    if (isRecoveryFlow) {
+      showRecovery();
+      return () => { active = false; };
+    }
+
+    // With PKCE + detectSessionInUrl:true the browser client exchanges the
+    // code automatically and fires onAuthStateChange. We wait for that event
+    // rather than calling getSession() immediately (which may return null
+    // before the exchange completes and produce a spurious "session failed").
+    //
+    // The one case where waiting cannot help is a redirect with no credential
+    // to exchange: a cancelled or rejected provider sign-in returns here with
+    // no `code` and no hash token, so no auth event will ever fire. Waiting the
+    // full fallback window only strands the user on a spinner, so check the
+    // session immediately and report the failure instead.
+    const hasCredentialToExchange =
+      new URLSearchParams(window.location.search).has('code') ||
+      window.location.hash.includes('access_token') ||
+      window.location.hash.includes('refresh_token');
+
+    if ( !hasCredentialToExchange ) {
+      supabase.auth.getSession().then(
+        ({ data: { session }, error }) => {
+          if ( !active ) {return;}
+          if ( error || !session ) {
+            setState('error');
+            setMessage(tx('waselAuthCallback.session_failed'));
+          }
+        },
+        () => {
+          if ( !active ) {return;}
+          setState('error');
+          setMessage(tx('waselAuthCallback.session_failed'));
+        },
+      );
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: AuthChangeEvent, eventSession) => {
         if (!active) {return;}
 
         if (event === 'PASSWORD_RECOVERY') {
           isRecoveryFlow = true;
-          showRecovery();
-        }
-      });
-
-      try {
-        if (isRecoveryFlow) {
+          clearTimeout(fallbackTimer);
+          subscription.unsubscribe();
           showRecovery();
           return;
         }
 
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession();
-        if (error) {
-          throw error;
-        }
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          clearTimeout(fallbackTimer);
+          subscription.unsubscribe();
 
-        // With PKCE, getSession() waits for the code exchange, and
-        // PASSWORD_RECOVERY fires during that wait. A recovery session must
-        // never be redirected into the app without asking for a new password.
-        if (isRecoveryFlow) {
-          showRecovery();
-          return;
-        }
+          if (isRecoveryFlow) { showRecovery(); return; }
 
-        if (!session) {
-          throw new Error(tx('waselAuthCallback.session_failed'));
-        }
+          if (!eventSession) {
+            setState('error');
+            setMessage(tx('waselAuthCallback.session_failed'));
+            return;
+          }
 
-        if (window.opener && !window.opener.closed) {
-          setState('closing');
-          setMessage(tx('waselAuthCallback.sign_in_complete_return'));
-          const nonce = sessionStorage.getItem('wasel_oauth_nonce') ?? '';
-          window.opener.postMessage({ type: 'wasel-auth-complete', nonce }, window.location.origin);
-          window.close();
-          return;
-        }
+          if (window.opener && !window.opener.closed) {
+            setState('closing');
+            setMessage(tx('waselAuthCallback.sign_in_complete_return'));
+            const nonce = sessionStorage.getItem('wasel_oauth_nonce') ?? '';
+            window.opener.postMessage({ type: 'wasel-auth-complete', nonce }, window.location.origin);
+            window.close();
+            return;
+          }
 
+          setState('redirecting');
+          setMessage(tx('waselAuthCallback.sign_in_complete_redirecting'));
+          navigate(returnTo, { replace: true });
+        }
+      },
+    );
+    unsubscribe = () => subscription.unsubscribe();
+
+    // Fallback: if no auth event fires within 10s (e.g. direct navigation
+    // with no code in the URL), check for an existing session or surface an error.
+    fallbackTimer = setTimeout(async () => {
+      if (!active) {return;}
+      subscription.unsubscribe();
+      const { data: { session }, error } = await supabase!.auth.getSession();
+      if (!active) {return;}
+      if (error || !session) {
+        setState('error');
+        setMessage(tx('waselAuthCallback.session_failed'));
+      } else {
         setState('redirecting');
         setMessage(tx('waselAuthCallback.sign_in_complete_redirecting'));
         navigate(returnTo, { replace: true });
-      } catch (error) {
-        if (!active) {return;}
-        setState('error');
-        setMessage(error instanceof Error ? error.message : tx('waselAuthCallback.unable_to_complete'));
-      } finally {
-        subscription.unsubscribe();
       }
-    };
-
-    void finishAuth();
+    }, 10_000);
 
     return () => {
       active = false;
+      clearTimeout(fallbackTimer);
+      unsubscribe?.();
     };
   }, [callbackError, callbackType, navigate, returnTo]);
 

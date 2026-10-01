@@ -1,6 +1,14 @@
 
-import Stripe from "npm:stripe@12.12.0";
-import { createClient } from "npm:@supabase/supabase-js@2.36.0";
+// Same convention as every other edge function here: esm.sh, no exact-version
+// pin. `npm:stripe@12.12.0` could not resolve against the local node_modules
+// tree (stripe is not a root dependency), leaving this entry point unlinkable.
+import Stripe from "https://esm.sh/stripe@12.12.0";
+// Matches every other edge function. The previous `npm:@supabase/supabase-js@2.36.0`
+// pinned an exact version that resolves against neither the local node_modules
+// tree nor the deno.json import map, so `deno check` failed to link this entry
+// point. The broken import was invisible because check-edge-types.mjs counted
+// only framed diagnostics and reported success on a non-zero exit.
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { createRateLimitMiddleware } from "./_shared/rate-limiter.ts";
 
 const STRIPE_SECRET = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
@@ -13,7 +21,7 @@ const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "https://wasel14.onl
   .map((s) => s.trim())
   .filter(Boolean);
 
-if (!STRIPE_SECRET) throw new Error("Missing STRIPE_SECRET_KEY");
+if (!STRIPE_SECRET) {throw new Error("Missing STRIPE_SECRET_KEY");}
 // Supabase persistence is optional; payments are still processed without it.
 
 const stripe = new Stripe(STRIPE_SECRET, { apiVersion: "2024-11-20" });
@@ -60,14 +68,14 @@ function jsonResponse(
 }
 
 function isAllowedRedirectUrl(value: unknown): value is string {
-  if (typeof value !== "string" || !value.trim()) return false;
+  if (typeof value !== "string" || !value.trim()) {return false;}
 
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:") return false;
+    if (url.protocol !== "https:") {return false;}
     // Redirect URLs are a security boundary. Missing configuration must never
     // widen the policy to every HTTPS site.
-    if (!APP_ORIGIN) return false;
+    if (!APP_ORIGIN) {return false;}
     return url.origin === new URL(APP_ORIGIN).origin;
   } catch {
     return false;
@@ -75,9 +83,9 @@ function isAllowedRedirectUrl(value: unknown): value is string {
 }
 
 function normalizeAmount(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {return null;}
   const amount = Math.round(value);
-  if (amount < 50 || amount > MAX_PAYMENT_AMOUNT_MINOR) return null;
+  if (amount < 50 || amount > MAX_PAYMENT_AMOUNT_MINOR) {return null;}
   return amount;
 }
 
@@ -91,7 +99,7 @@ async function requireAuthenticatedUser(
     ? authHeader.slice(7).trim()
     : "";
 
-  if (!token) return jsonResponse({ error: "Unauthorized" }, { status: 401 });
+  if (!token) {return jsonResponse({ error: "Unauthorized" }, { status: 401 });}
 
   if (!supabase) {
     return jsonResponse(
@@ -169,7 +177,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const rateLimitResponse = paymentRateLimit(req);
-  if (rateLimitResponse) return rateLimitResponse;
+  if (rateLimitResponse) {return rateLimitResponse;}
 
   try {
     const url = new URL(req.url);
@@ -177,7 +185,7 @@ Deno.serve(async (req: Request) => {
 
     if ((pathname.endsWith("/create-payment-intent") || pathname.endsWith("/stripe-payments-v2")) && req.method === "POST") {
       const auth = await requireAuthenticatedUser(req);
-      if (auth instanceof Response) return auth;
+      if (auth instanceof Response) {return auth;}
 
       const body = await req.json();
       const {
@@ -252,7 +260,7 @@ Deno.serve(async (req: Request) => {
       pathname.endsWith("/create-checkout-session") && req.method === "POST"
     ) {
       const auth = await requireAuthenticatedUser(req);
-      if (auth instanceof Response) return auth;
+      if (auth instanceof Response) {return auth;}
 
       const body = await req.json() as {
         price_id?: unknown;
@@ -327,7 +335,7 @@ Deno.serve(async (req: Request) => {
               .eq("id", pi.id)
               .neq("status", "succeeded")
               .select("id");
-            if (transitionError) throw transitionError;
+            if (transitionError) {throw transitionError;}
 
             const metadata = pi.metadata ?? {};
             if (
@@ -341,7 +349,7 @@ Deno.serve(async (req: Request) => {
                 p_payment_method: "card_payment",
                 p_external_reference: pi.id,
               });
-              if (creditError) throw creditError;
+              if (creditError) {throw creditError;}
             }
           }
           const admin = getAdminClient();

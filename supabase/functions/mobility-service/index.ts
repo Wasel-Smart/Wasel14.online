@@ -20,13 +20,13 @@ function json(data: unknown, status = 200) {
 }
 
 function resolveAllowedOrigin(origin: string | null): string | null {
-  if (!origin) return null;
+  if (!origin) {return null;}
   try {
     const url = new URL(origin);
-    if (url.origin === new URL(APP_BASE_URL).origin) return url.origin;
-    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return url.origin;
+    if (url.origin === new URL(APP_BASE_URL).origin) {return url.origin;}
+    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {return url.origin;}
     const extra = ADDITIONAL_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-    if (extra.includes(url.origin)) return url.origin;
+    if (extra.includes(url.origin)) {return url.origin;}
   } catch { /* ignore */ }
   return null;
 }
@@ -36,29 +36,29 @@ function buildResponseHeaders(request: Request): Headers {
   const allowedOrigin = resolveAllowedOrigin(request.headers.get('origin'));
   Object.entries(responseBaseHeaders).forEach(([k, v]) => headers.set(k, v));
   headers.set('Vary', 'Origin');
-  if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
+  if (allowedOrigin) {headers.set('Access-Control-Allow-Origin', allowedOrigin);}
   return headers;
 }
 
 function getAdminClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase not configured');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {throw new Error('Supabase not configured');}
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function authenticateRequest(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) return { error: json({ error: 'Missing bearer token' }, 401) };
+  if (!token) {return { error: json({ error: 'Missing bearer token' }, 401) };}
   const admin = getAdminClient();
   const { data: authData, error: authError } = await admin.auth.getUser(token);
-  if (authError || !authData.user) return { error: json({ error: 'Invalid auth token' }, 401) };
+  if (authError || !authData.user) {return { error: json({ error: 'Invalid auth token' }, 401) };}
   const { data: byAuthUser, error: byAuthError } = await admin.from('users').select('*').eq('auth_user_id', authData.user.id).maybeSingle();
-  if (byAuthError) return { error: json({ error: byAuthError.message }, 500) };
+  if (byAuthError) {return { error: json({ error: byAuthError.message }, 500) };}
   let canonicalUser = byAuthUser;
   if (!canonicalUser) {
     const fallback = await admin.from('users').select('*').eq('id', authData.user.id).maybeSingle();
     canonicalUser = fallback.data;
-    if (fallback.error || !canonicalUser) return { error: json({ error: 'User not found' }, 404) };
+    if (fallback.error || !canonicalUser) {return { error: json({ error: 'User not found' }, 404) };}
   }
   return { admin, authUser: authData.user, canonicalUser };
 }
@@ -99,7 +99,7 @@ function advanceCorridorAfterBooking(corridor: MobilityCorridorRow, type: 'seat'
 
 async function ensureMobilitySeed(admin: ReturnType<typeof getAdminClient>) {
   const { data } = await admin.from('mobility_corridors').select('id').limit(1);
-  if (Array.isArray(data) && data.length > 0) return;
+  if (Array.isArray(data) && data.length > 0) {return;}
   const seedCorridors = [
     { origin_city: 'Amman', destination_city: 'Irbid', base_price_seat: 3.50, seats_total: 100, seats_booked: 0, cargo_capacity_kg: 500, cargo_booked_kg: 0 },
     { origin_city: 'Amman', destination_city: 'Zarqa', base_price_seat: 2.00, seats_total: 80, seats_booked: 0, cargo_capacity_kg: 400, cargo_booked_kg: 0 },
@@ -116,7 +116,7 @@ async function handleMobilityRequest(request: Request, path: string) {
     try {
       await ensureMobilitySeed(admin);
       const { data, error } = await admin.from('mobility_corridors').select('*').order('demand_index', { ascending: false }).limit(12);
-      if (error) return json({ error: error.message }, 500);
+      if (error) {return json({ error: error.message }, 500);}
       const corridors = (Array.isArray(data) ? data : []) as MobilityCorridorRow[];
       return json({ corridors: buildMobilitySnapshot(corridors).corridors, generatedAt: new Date().toISOString() });
     } catch (err) {
@@ -125,13 +125,13 @@ async function handleMobilityRequest(request: Request, path: string) {
   }
 
   const auth = await authenticateRequest(request);
-  if ('error' in auth) return auth.error;
+  if ('error' in auth) {return auth.error;}
 
   await ensureMobilitySeed(auth.admin);
 
   if (request.method === 'GET' && path === '/mobility-os/snapshot') {
     const { data, error } = await auth.admin.from('mobility_corridors').select('*').order('demand_index', { ascending: false });
-    if (error) return json({ error: error.message }, 500);
+    if (error) {return json({ error: error.message }, 500);}
     return json(buildMobilitySnapshot((Array.isArray(data) ? data : []) as MobilityCorridorRow[]));
   }
 
@@ -140,15 +140,15 @@ async function handleMobilityRequest(request: Request, path: string) {
     const corridorId = String(body.corridor_id ?? '');
     const type: 'seat' | 'cargo' = body.type === 'cargo' ? 'cargo' : 'seat';
     const quantity = Math.max(0, toNumber(body.quantity, 0));
-    if (!corridorId || quantity <= 0) return json({ error: 'Invalid booking request.' }, 400);
+    if (!corridorId || quantity <= 0) {return json({ error: 'Invalid booking request.' }, 400);}
 
     const { data: corridor, error } = await auth.admin.from('mobility_corridors').select('*').eq('id', corridorId).single();
-    if (error) return json({ error: error.message }, 500);
+    if (error) {return json({ error: error.message }, 500);}
 
     const snapshot = buildMobilitySnapshot([corridor as MobilityCorridorRow]);
     const projection = snapshot.corridors[0];
     const remaining = type === 'seat' ? projection?.seats_available : projection?.cargo_available_kg;
-    if (!projection || quantity > remaining) return json({ error: 'Not enough corridor capacity remains.' }, 409);
+    if (!projection || quantity > remaining) {return json({ error: 'Not enough corridor capacity remains.' }, 409);}
 
     const timestamp = String(body.timestamp ?? new Date().toISOString());
     const traceId = `trace-${crypto.randomUUID()}`;
@@ -160,7 +160,7 @@ async function handleMobilityRequest(request: Request, path: string) {
       unit_price: unitPrice, total_price: Number((unitPrice * quantity).toFixed(2)),
       booking_timestamp: timestamp, trace_id: traceId,
     }).select('booking_id').single();
-    if (bookingError) return json({ error: bookingError.message }, 500);
+    if (bookingError) {return json({ error: bookingError.message }, 500);}
 
     await auth.admin.from('mobility_corridors').update({
       seats_booked: nextCorridor.seats_booked, cargo_booked_kg: nextCorridor.cargo_booked_kg,
@@ -182,7 +182,7 @@ async function handleMobilityRequest(request: Request, path: string) {
 
 Deno.serve(async (request: Request) => {
   const headers = buildResponseHeaders(request);
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (request.method === 'OPTIONS') {return new Response(null, { status: 204, headers });}
 
   try {
     const url = new URL(request.url);
@@ -193,7 +193,7 @@ Deno.serve(async (request: Request) => {
 
     if (path.startsWith('/mobility-os')) {
       response = await handleMobilityRequest(request, path);
-      if (!response) response = json({ error: 'Not found', service: 'mobility-service' }, 404);
+      if (!response) {response = json({ error: 'Not found', service: 'mobility-service' }, 404);}
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'mobility-service', timestamp: new Date().toISOString() });
     } else {

@@ -1,36 +1,8 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
+    matchesAuthenticatedUser,
+    mapBookingRow,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
@@ -45,7 +17,7 @@ import {
 
 export async function handleBookingRequest ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   if ( request.method === 'POST' && path === '/bookings' ) {
     const body = await request.json().catch( () => ( {} ) );
@@ -73,7 +45,7 @@ export async function handleBookingRequest ( request: Request, path: string ) {
     }
 
     const data = ( Array.isArray( created ) ? created[ 0 ] : created );
-    if ( !data ) return json( { error: 'Booking could not be created' }, 500 );
+    if ( !data ) {return json( { error: 'Booking could not be created' }, 500 );}
 
     const { data: driver } = await auth.admin
       .from( 'drivers' )
@@ -108,7 +80,7 @@ export async function handleBookingRequest ( request: Request, path: string ) {
       .select( '*' )
       .eq( 'passenger_id', auth.canonicalUser.id )
       .order( 'created_at', { ascending: false } );
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     return json( ( Array.isArray( data ) ? data : [] ).map( mapBookingRow ) );
   }
 
@@ -120,8 +92,8 @@ export async function handleBookingRequest ( request: Request, path: string ) {
       .select( 'booking_id, passenger_id, trip_id' )
       .eq( 'booking_id', bookingRoute.id )
       .maybeSingle();
-    if ( bookingErr ) return json( { error: bookingErr.message }, 500 );
-    if ( !bookingRow ) return json( { error: 'Booking not found' }, 404 );
+    if ( bookingErr ) {return json( { error: bookingErr.message }, 500 );}
+    if ( !bookingRow ) {return json( { error: 'Booking not found' }, 404 );}
     const isPassenger = bookingRow.passenger_id === auth.canonicalUser.id;
     let isDriver = false;
     if ( bookingRow.trip_id ) {
@@ -147,7 +119,7 @@ export async function handleBookingRequest ( request: Request, path: string ) {
       .eq( 'booking_id', bookingRoute.id )
       .select( '*' )
       .single();
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     return json( mapBookingRow( data ) );
   }
 
@@ -156,7 +128,7 @@ export async function handleBookingRequest ( request: Request, path: string ) {
 
 export async function handleSubmitRating ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canModerateRatings = hasPermission( role, 'trust:moderate' );
@@ -178,10 +150,10 @@ export async function handleSubmitRating ( request: Request ) {
     .eq( 'id', bookingId )
     .maybeSingle();
 
-  if ( bookingError ) return json( { error: bookingError.message }, 500 );
-  if ( !booking ) return json( { error: 'Booking not found' }, 404 );
-  if ( !canModerateRatings && booking.user_id !== canonicalUser.id ) return json( { error: 'Unauthorized' }, 403 );
-  if ( booking.status !== 'completed' ) return json( { error: 'Can only rate completed trips' }, 409 );
+  if ( bookingError ) {return json( { error: bookingError.message }, 500 );}
+  if ( !booking ) {return json( { error: 'Booking not found' }, 404 );}
+  if ( !canModerateRatings && booking.user_id !== canonicalUser.id ) {return json( { error: 'Unauthorized' }, 403 );}
+  if ( booking.status !== 'completed' ) {return json( { error: 'Can only rate completed trips' }, 409 );}
 
   const { data: existingRating, error: existingError } = await admin
     .from( 'ratings' )
@@ -190,8 +162,8 @@ export async function handleSubmitRating ( request: Request ) {
     .eq( 'rider_id', canonicalUser.id )
     .maybeSingle();
 
-  if ( existingError ) return json( { error: existingError.message }, 500 );
-  if ( existingRating ) return json( { error: 'You have already rated this trip' }, 409 );
+  if ( existingError ) {return json( { error: existingError.message }, 500 );}
+  if ( existingRating ) {return json( { error: 'You have already rated this trip' }, 409 );}
 
   const { error: insertError } = await admin
     .from( 'ratings' )
@@ -205,7 +177,7 @@ export async function handleSubmitRating ( request: Request ) {
       tags: Array.isArray( body.tags ) ? body.tags : [],
     } );
 
-  if ( insertError ) return json( { error: insertError.message }, 500 );
+  if ( insertError ) {return json( { error: insertError.message }, 500 );}
 
   await admin.from( 'notifications' ).insert( {
     user_id: driverId,
@@ -220,7 +192,7 @@ export async function handleSubmitRating ( request: Request ) {
 
 export async function handleGetDriverRating ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const driverId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   const { admin } = auth;
@@ -231,7 +203,7 @@ export async function handleGetDriverRating ( request: Request, path: string ) {
     .eq( 'id', driverId )
     .maybeSingle();
 
-  if ( profileError ) return json( { error: profileError.message }, 500 );
+  if ( profileError ) {return json( { error: profileError.message }, 500 );}
 
   const { data: recentReviews, error: reviewsError } = await admin
     .from( 'ratings' )
@@ -241,7 +213,7 @@ export async function handleGetDriverRating ( request: Request, path: string ) {
     .order( 'created_at', { ascending: false } )
     .limit( 10 );
 
-  if ( reviewsError ) return json( { error: reviewsError.message }, 500 );
+  if ( reviewsError ) {return json( { error: reviewsError.message }, 500 );}
 
   return json( {
     averageRating: Number( profile?.average_rating ?? 0 ),
@@ -257,7 +229,7 @@ export async function handleGetDriverRating ( request: Request, path: string ) {
 
 export async function handleCanRateBooking ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const bookingId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   const { admin, canonicalUser } = auth;
@@ -268,10 +240,10 @@ export async function handleCanRateBooking ( request: Request, path: string ) {
     .eq( 'id', bookingId )
     .maybeSingle();
 
-  if ( error ) return json( { error: error.message }, 500 );
-  if ( !booking ) return json( { canRate: false, reason: 'Booking not found' } );
-  if ( booking.user_id !== canonicalUser.id ) return json( { canRate: false, reason: 'Not your booking' } );
-  if ( booking.status !== 'completed' ) return json( { canRate: false, reason: 'Trip not completed' } );
+  if ( error ) {return json( { error: error.message }, 500 );}
+  if ( !booking ) {return json( { canRate: false, reason: 'Booking not found' } );}
+  if ( booking.user_id !== canonicalUser.id ) {return json( { canRate: false, reason: 'Not your booking' } );}
+  if ( booking.status !== 'completed' ) {return json( { canRate: false, reason: 'Trip not completed' } );}
 
   const { data: existingRating, error: ratingError } = await admin
     .from( 'ratings' )
@@ -280,15 +252,15 @@ export async function handleCanRateBooking ( request: Request, path: string ) {
     .eq( 'rider_id', canonicalUser.id )
     .maybeSingle();
 
-  if ( ratingError ) return json( { error: ratingError.message }, 500 );
-  if ( existingRating ) return json( { canRate: false, reason: 'Already rated' } );
+  if ( ratingError ) {return json( { error: ratingError.message }, 500 );}
+  if ( existingRating ) {return json( { canRate: false, reason: 'Already rated' } );}
 
   return json( { canRate: true } );
 }
 
 export async function handleCancelBooking ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canCancelAny = hasPermission( role, 'rides:cancel_any' ) || hasPermission( role, 'packages:cancel_any' );
@@ -296,7 +268,7 @@ export async function handleCancelBooking ( request: Request ) {
   const body = await request.json();
   const bookingId = String( body.bookingId ?? '' );
   const reason = String( body.reason ?? '' ).trim();
-  if ( !bookingId || !reason ) return json( { error: 'bookingId and reason are required' }, 400 );
+  if ( !bookingId || !reason ) {return json( { error: 'bookingId and reason are required' }, 400 );}
 
   const { admin, canonicalUser } = auth;
   const { data: bookingRow, error: fetchError } = await admin
@@ -305,8 +277,8 @@ export async function handleCancelBooking ( request: Request ) {
     .eq( 'id', bookingId )
     .maybeSingle();
 
-  if ( fetchError ) return json( { error: fetchError.message }, 500 );
-  if ( !bookingRow ) return json( { error: 'Booking not found' }, 404 );
+  if ( fetchError ) {return json( { error: fetchError.message }, 500 );}
+  if ( !bookingRow ) {return json( { error: 'Booking not found' }, 404 );}
   const booking = bookingRow as unknown as {
     id: string;
     user_id: string;
@@ -318,9 +290,9 @@ export async function handleCancelBooking ( request: Request ) {
     // both shapes have to be handled.
     trips: { driver_id: string | null } | { driver_id: string | null }[] | null;
   };
-  if ( !canCancelAny && booking.user_id !== canonicalUser.id ) return json( { error: 'Unauthorized' }, 403 );
-  if ( booking.status === 'cancelled' ) return json( { error: 'Booking already cancelled' }, 409 );
-  if ( booking.status === 'completed' ) return json( { error: 'Cannot cancel completed booking' }, 409 );
+  if ( !canCancelAny && booking.user_id !== canonicalUser.id ) {return json( { error: 'Unauthorized' }, 403 );}
+  if ( booking.status === 'cancelled' ) {return json( { error: 'Booking already cancelled' }, 409 );}
+  if ( booking.status === 'completed' ) {return json( { error: 'Cannot cancel completed booking' }, 409 );}
 
   const { error: updateError } = await admin
     .from( 'bookings' )
@@ -332,7 +304,7 @@ export async function handleCancelBooking ( request: Request ) {
     } )
     .eq( 'id', bookingId );
 
-  if ( updateError ) return json( { error: updateError.message }, 500 );
+  if ( updateError ) {return json( { error: updateError.message }, 500 );}
 
   const driverId = Array.isArray( booking.trips )
     ? booking.trips[ 0 ]?.driver_id
@@ -355,7 +327,7 @@ export async function handleCancelBooking ( request: Request ) {
 
 export async function handleCanCancelBooking ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const role = resolveAccessRole( auth.canonicalUser.role );
   const canCancelAny = hasPermission( role, 'rides:cancel_any' ) || hasPermission( role, 'packages:cancel_any' );
@@ -368,11 +340,11 @@ export async function handleCanCancelBooking ( request: Request, path: string ) 
     .eq( 'id', bookingId )
     .maybeSingle();
 
-  if ( error ) return json( { error: error.message }, 500 );
-  if ( !booking ) return json( { canCancel: false, reason: 'Booking not found' } );
-  if ( !canCancelAny && booking.user_id !== canonicalUser.id ) return json( { canCancel: false, reason: 'Not your booking' } );
-  if ( booking.status === 'cancelled' ) return json( { canCancel: false, reason: 'Already cancelled' } );
-  if ( booking.status === 'completed' ) return json( { canCancel: false, reason: 'Trip completed' } );
+  if ( error ) {return json( { error: error.message }, 500 );}
+  if ( !booking ) {return json( { canCancel: false, reason: 'Booking not found' } );}
+  if ( !canCancelAny && booking.user_id !== canonicalUser.id ) {return json( { canCancel: false, reason: 'Not your booking' } );}
+  if ( booking.status === 'cancelled' ) {return json( { canCancel: false, reason: 'Already cancelled' } );}
+  if ( booking.status === 'completed' ) {return json( { canCancel: false, reason: 'Trip completed' } );}
 
   const trip = Array.isArray( booking.trips ) ? booking.trips[ 0 ] : booking.trips;
   const departureTime = new Date( trip?.departure_time ?? 0 );

@@ -47,12 +47,12 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 async function redisGet(key: string): Promise<string | null> {
   const redisUrl = Deno.env.get('REDIS_URL');
-  if (!redisUrl) return null;
+  if (!redisUrl) {return null;}
   try {
     const res = await fetch(`${redisUrl}/get/${encodeURIComponent(key)}`, {
       headers: { Authorization: `Bearer ${Deno.env.get('REDIS_TOKEN') ?? ''}` },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {return null;}
     const data = await res.json() as { result?: string | null };
     return data.result ?? null;
   } catch { return null; }
@@ -60,7 +60,7 @@ async function redisGet(key: string): Promise<string | null> {
 
 async function redisSet(key: string, value: string, ttlSeconds: number): Promise<void> {
   const redisUrl = Deno.env.get('REDIS_URL');
-  if (!redisUrl) return;
+  if (!redisUrl) {return;}
   try {
     await fetch(`${redisUrl}/set/${encodeURIComponent(key)}`, {
       method: 'POST',
@@ -91,10 +91,10 @@ export const idempotencyMiddleware = {
    * Returns a 409 Response if the same key is currently in-flight.
    */
   async check(request: Request, userId: string | null): Promise<Response | null> {
-    if (!isMutatingMethod(request.method)) return null;
+    if (!isMutatingMethod(request.method)) {return null;}
 
     const key = request.headers.get('X-Idempotency-Key');
-    if (!key || !userId) return null;
+    if (!key || !userId) {return null;}
 
     // Validate key format: must be a non-empty string ≤ 128 chars, alphanumeric + hyphens
     if (!/^[a-zA-Z0-9_\-]{1,128}$/.test(key)) {
@@ -145,10 +145,10 @@ export const idempotencyMiddleware = {
    * Pass response.clone() so the original can still be returned to the caller.
    */
   async store(request: Request, userId: string | null, response: Response): Promise<void> {
-    if (!isMutatingMethod(request.method)) return;
+    if (!isMutatingMethod(request.method)) {return;}
 
     const key = request.headers.get('X-Idempotency-Key');
-    if (!key || !userId) return;
+    if (!key || !userId) {return;}
 
     // Only cache successful responses (2xx)
     if (response.status < 200 || response.status >= 300) {
@@ -184,7 +184,7 @@ export const idempotencyMiddleware = {
    */
   release(request: Request, userId: string | null): void {
     const key = request.headers.get('X-Idempotency-Key');
-    if (!key || !userId) return;
+    if (!key || !userId) {return;}
     const cacheKey = buildCacheKey(userId, key);
     if (IN_PROCESS_CACHE.get(cacheKey) === 'in_flight') {
       IN_PROCESS_CACHE.delete(cacheKey);

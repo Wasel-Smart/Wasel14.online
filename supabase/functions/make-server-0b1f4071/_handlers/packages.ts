@@ -1,36 +1,8 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
+    matchesAuthenticatedUser,
+    mapPackageRow,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
@@ -46,7 +18,7 @@ import {
 
 export async function handlePackageRequest ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   if ( request.method === 'POST' && path === '/packages' ) {
     const body = await request.json().catch( () => ( {} ) );
@@ -73,7 +45,7 @@ export async function handlePackageRequest ( request: Request, path: string ) {
       } )
       .select( '*' )
       .single();
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
 
     const packageId = String( data.package_id ?? data.id ?? '' );
     const { data: trip } = await auth.admin
@@ -120,8 +92,8 @@ export async function handlePackageRequest ( request: Request, path: string ) {
       .select( '*' )
       .eq( 'package_id', packageRoute.id )
       .maybeSingle();
-    if ( error ) return json( { error: error.message }, 500 );
-    if ( !data ) return json( { error: 'Package not found' }, 404 );
+    if ( error ) {return json( { error: error.message }, 500 );}
+    if ( !data ) {return json( { error: 'Package not found' }, 404 );}
     const isOwner = data.sender_id === auth.canonicalUser.id || data.carrier_id === auth.canonicalUser.id;
     const isStaff = hasPermission( resolveAccessRole( auth.canonicalUser.role ), 'packages:read' );
     if ( !isOwner && !isStaff ) {
@@ -132,7 +104,7 @@ export async function handlePackageRequest ( request: Request, path: string ) {
 
   if ( request.method === 'GET' && path.startsWith( '/packages/sender/' ) ) {
     const userId = path.split( '/packages/sender/' )[ 1 ]?.split( '/' )[ 0 ];
-    if ( !userId ) return json( { error: 'User ID required' }, 400 );
+    if ( !userId ) {return json( { error: 'User ID required' }, 400 );}
     // IDOR guard: only the sender themselves (or admin) may list their packages.
     if ( !matchesAuthenticatedUser( auth, userId ) && !hasPermission( resolveAccessRole( auth.canonicalUser.role ), 'packages:assign' ) ) {
       return json( { error: 'Not authorized to view these packages.' }, 403 );
@@ -142,7 +114,7 @@ export async function handlePackageRequest ( request: Request, path: string ) {
       .select( '*' )
       .eq( 'sender_id', userId )
       .order( 'created_at', { ascending: false } );
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     return json( ( Array.isArray( data ) ? data : [] ).map( mapPackageRow ) );
   }
 
@@ -152,8 +124,8 @@ export async function handlePackageRequest ( request: Request, path: string ) {
       .select( 'package_id, sender_id, carrier_id' )
       .eq( 'package_id', packageRoute.id )
       .maybeSingle();
-    if ( pkgErr ) return json( { error: pkgErr.message }, 500 );
-    if ( !pkg ) return json( { error: 'Package not found' }, 404 );
+    if ( pkgErr ) {return json( { error: pkgErr.message }, 500 );}
+    if ( !pkg ) {return json( { error: 'Package not found' }, 404 );}
     const isCarrier = pkg.carrier_id === auth.canonicalUser.id;
     const isSender = pkg.sender_id === auth.canonicalUser.id;
     const isStaff = hasPermission( resolveAccessRole( auth.canonicalUser.role ), 'packages:write' );
@@ -166,7 +138,7 @@ export async function handlePackageRequest ( request: Request, path: string ) {
       .eq( 'package_id', packageRoute.id )
       .select( '*' )
       .single();
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     return json( mapPackageRow( data ) );
   }
 

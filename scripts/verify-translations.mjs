@@ -83,8 +83,7 @@ function main() {
     missingEn.slice(0, 20).forEach(k => console.error(`    - ${k}`));
     if (missingEn.length > 20) console.error(`    ... and ${missingEn.length - 20} more`);
   }
-  console.error('\nTranslation drift is a known content debt item. Failing CI for content drift is disabled.');
-  return 0;
+  return 1;
 }
 
 const code = main();

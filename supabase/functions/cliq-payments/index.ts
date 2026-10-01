@@ -67,7 +67,7 @@ async function generateSignature(
 }
 
 function signaturesMatch(actual: string, expected: string): boolean {
-  if (actual.length !== expected.length) return false;
+  if (actual.length !== expected.length) {return false;}
   let mismatch = 0;
   for (let index = 0; index < actual.length; index += 1) {
     mismatch |= actual.charCodeAt(index) ^ expected.charCodeAt(index);
@@ -108,14 +108,14 @@ async function requireAuthenticatedUser(
 
 Deno.serve(async (req: Request) => {
   const rateLimitResponse = cliqRateLimit(req);
-  if (rateLimitResponse) return rateLimitResponse;
+  if (rateLimitResponse) {return rateLimitResponse;}
 
   const url = new URL(req.url);
   const pathname = url.pathname.replace(/\/+$/, "");
 
   if (pathname.endsWith("/create-checkout") && req.method === "POST") {
     const authError = await requireAuthenticatedUser(req);
-    if (authError) return authError;
+    if (authError) {return authError;}
 
     const body = await req.json();
     const { amount, merchantReference } = body;

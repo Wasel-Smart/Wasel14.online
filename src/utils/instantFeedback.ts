@@ -22,12 +22,11 @@ class InstantFeedbackEngine {
     // DEFER INITIALIZATION to avoid blocking FID
     if (typeof window !== 'undefined') {
       // Use requestIdleCallback to initialize non-critical features
-      requestIdleCallback(
-        () => {
-          this.lazyInit();
-        },
-        { timeout: 2000 },
-      );
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(() => { this.lazyInit(); }, { timeout: 2000 });
+      } else {
+        setTimeout(() => { this.lazyInit(); }, 0);
+      }
     }
   }
 

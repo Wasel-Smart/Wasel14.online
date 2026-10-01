@@ -1,41 +1,15 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
+    getAdminClient,
+    ensureMobilitySeed,
+    logUnhandledRouteError,
 } from './shared.ts';
 
-import {
+import type {
   MobilityBookingType,
-  MobilityCorridorRow,
+  MobilityCorridorRow} from '../_shared/mobility-os-runtime.ts';
+import {
   advanceCorridorAfterBooking,
   buildMobilitySnapshot,
 } from '../_shared/mobility-os-runtime.ts';
@@ -93,13 +67,13 @@ export async function handlePublicMobilitySnapshot ( _request: Request ) {
 
 export async function handleMobilityOSRequest ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   await ensureMobilitySeed( auth.admin );
 
   if ( request.method === 'GET' && path === '/mobility-os/snapshot' ) {
     const { data, error } = await auth.admin.from( 'mobility_corridors' ).select( '*' ).order( 'demand_index', { ascending: false } );
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
     return json( buildMobilitySnapshot( ( Array.isArray( data ) ? data : [] ) as MobilityCorridorRow[] ) );
   }
 
@@ -108,19 +82,19 @@ export async function handleMobilityOSRequest ( request: Request, path: string )
     const corridorId = String( body.corridor_id ?? '' );
     const type: MobilityBookingType = body.type === 'cargo' ? 'cargo' : 'seat';
     const quantity = Math.max( 0, toNumber( body.quantity, 0 ) );
-    if ( !corridorId || quantity <= 0 ) return json( { error: 'Invalid booking request.' }, 400 );
+    if ( !corridorId || quantity <= 0 ) {return json( { error: 'Invalid booking request.' }, 400 );}
 
     const { data: corridor, error } = await auth.admin
       .from( 'mobility_corridors' )
       .select( '*' )
       .eq( 'id', corridorId )
       .single();
-    if ( error ) return json( { error: error.message }, 500 );
+    if ( error ) {return json( { error: error.message }, 500 );}
 
     const snapshot = buildMobilitySnapshot( [ corridor as MobilityCorridorRow ] );
     const projection = snapshot.corridors[ 0 ];
     const remaining = type === 'seat' ? projection?.seats_available : projection?.cargo_available_kg;
-    if ( !projection || quantity > remaining ) return json( { error: 'Not enough corridor capacity remains.' }, 409 );
+    if ( !projection || quantity > remaining ) {return json( { error: 'Not enough corridor capacity remains.' }, 409 );}
 
     const timestamp = String( body.timestamp ?? new Date().toISOString() );
     const traceId = `trace-${ crypto.randomUUID() }`;
@@ -145,7 +119,7 @@ export async function handleMobilityOSRequest ( request: Request, path: string )
       } )
       .select( 'booking_id' )
       .single();
-    if ( bookingError ) return json( { error: bookingError.message }, 500 );
+    if ( bookingError ) {return json( { error: bookingError.message }, 500 );}
 
     await auth.admin
       .from( 'mobility_corridors' )
@@ -179,7 +153,7 @@ export async function handleMobilityOSRequest ( request: Request, path: string )
 
 export async function handleGetMobilityLiveRows ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const [ { data: trips }, { data: bookings }, { data: packages }, { data: tripPresence } ] =
     await Promise.all( [

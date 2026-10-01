@@ -12,13 +12,13 @@ Wasel uses a three-layer testing strategy:
 ## Coverage Requirements
 
 ```
-Branches:  70%
-Functions: 75%
-Lines:     80%
-Statements: 80%
+Branches:   75%
+Functions:  80%
+Lines:      85%
+Statements: 85%
 ```
 
-Run with coverage: `npm run test:coverage`
+Run with coverage: `npm run test:unit -- --coverage`
 
 ## Writing Tests
 

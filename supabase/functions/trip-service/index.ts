@@ -20,13 +20,13 @@ function json ( data: unknown, status = 200 ) {
 }
 
 function resolveAllowedOrigin ( origin: string | null ): string | null {
-  if ( !origin ) return null;
+  if ( !origin ) {return null;}
   try {
     const url = new URL( origin );
-    if ( url.origin === new URL( APP_BASE_URL ).origin ) return url.origin;
-    if ( ALLOW_LOCAL_ORIGINS && ( url.hostname === 'localhost' || url.hostname === '127.0.0.1' ) ) return url.origin;
+    if ( url.origin === new URL( APP_BASE_URL ).origin ) {return url.origin;}
+    if ( ALLOW_LOCAL_ORIGINS && ( url.hostname === 'localhost' || url.hostname === '127.0.0.1' ) ) {return url.origin;}
     const extra = ADDITIONAL_ALLOWED_ORIGINS.split( ',' ).map( s => s.trim() ).filter( Boolean );
-    if ( extra.includes( url.origin ) ) return url.origin;
+    if ( extra.includes( url.origin ) ) {return url.origin;}
   } catch { /* ignore */ }
   return null;
 }
@@ -36,29 +36,29 @@ function buildResponseHeaders ( request: Request ): Headers {
   const allowedOrigin = resolveAllowedOrigin( request.headers.get( 'origin' ) );
   Object.entries( responseBaseHeaders ).forEach( ( [ k, v ] ) => headers.set( k, v ) );
   headers.set( 'Vary', 'Origin' );
-  if ( allowedOrigin ) headers.set( 'Access-Control-Allow-Origin', allowedOrigin );
+  if ( allowedOrigin ) {headers.set( 'Access-Control-Allow-Origin', allowedOrigin );}
   return headers;
 }
 
 function getAdminClient () {
-  if ( !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY ) throw new Error( 'Supabase not configured' );
+  if ( !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY ) {throw new Error( 'Supabase not configured' );}
   return createClient( SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } } );
 }
 
 async function authenticateRequest ( request: Request ) {
   const authorization = request.headers.get( 'Authorization' ) ?? '';
   const token = authorization.startsWith( 'Bearer ' ) ? authorization.slice( 7 ) : '';
-  if ( !token ) return { error: json( { error: 'Missing bearer token' }, 401 ) };
+  if ( !token ) {return { error: json( { error: 'Missing bearer token' }, 401 ) };}
   const admin = getAdminClient();
   const { data: authData, error: authError } = await admin.auth.getUser( token );
-  if ( authError || !authData.user ) return { error: json( { error: 'Invalid auth token' }, 401 ) };
+  if ( authError || !authData.user ) {return { error: json( { error: 'Invalid auth token' }, 401 ) };}
   const { data: byAuthUser, error: byAuthError } = await admin.from( 'users' ).select( '*' ).eq( 'auth_user_id', authData.user.id ).maybeSingle();
-  if ( byAuthError ) return { error: json( { error: 'Internal server error' }, 500 ) };
+  if ( byAuthError ) {return { error: json( { error: 'Internal server error' }, 500 ) };}
   let canonicalUser = byAuthUser;
   if ( !canonicalUser ) {
     const fallback = await admin.from( 'users' ).select( '*' ).eq( 'id', authData.user.id ).maybeSingle();
     canonicalUser = fallback.data;
-    if ( fallback.error || !canonicalUser ) return { error: json( { error: 'User not found' }, 404 ) };
+    if ( fallback.error || !canonicalUser ) {return { error: json( { error: 'User not found' }, 404 ) };}
   }
   return { admin, authUser: authData.user, canonicalUser };
 }
@@ -70,13 +70,13 @@ function toNumber ( value: unknown, fallback = 0 ): number {
 
 function formatDate ( value: unknown, fallback = new Date().toISOString().slice( 0, 10 ) ): string {
   const date = new Date( String( value ?? '' ) );
-  if ( Number.isNaN( date.getTime() ) ) return fallback;
+  if ( Number.isNaN( date.getTime() ) ) {return fallback;}
   return date.toISOString().slice( 0, 10 );
 }
 
 function formatTime ( value: unknown ): string {
   const date = new Date( String( value ?? '' ) );
-  if ( Number.isNaN( date.getTime() ) ) return String( value ?? '' ).slice( 0, 5 ) || '08:00';
+  if ( Number.isNaN( date.getTime() ) ) {return String( value ?? '' ).slice( 0, 5 ) || '08:00';}
   return date.toISOString().slice( 11, 16 );
 }
 
@@ -101,11 +101,11 @@ function mapTripRow ( row: Record<string, unknown>, driverProfile?: Record<strin
 
 async function fetchDriverProfiles ( admin: ReturnType<typeof getAdminClient>, driverIds: string[] ): Promise<Record<string, Record<string, unknown>>> {
   const uniqueIds = Array.from( new Set( driverIds.filter( Boolean ) ) );
-  if ( uniqueIds.length === 0 ) return {};
+  if ( uniqueIds.length === 0 ) {return {};}
   const { data: drivers } = await admin.from( 'drivers' ).select( 'driver_id, user_id, rating, sanad_identity_linked' ).in( 'driver_id', uniqueIds );
   const driverRows = Array.isArray( drivers ) ? drivers : [];
   const userIds = driverRows.map( ( d: Record<string, unknown> ) => String( d.user_id ?? '' ) );
-  if ( userIds.length === 0 ) return {};
+  if ( userIds.length === 0 ) {return {};}
   const { data: users } = await admin.from( 'users' ).select( 'id, auth_user_id, full_name, email, rating, sanad_verified_status' ).in( 'id', userIds );
   const usersById = new Map<string, Record<string, unknown>>();
   ( Array.isArray( users ) ? users : [] ).forEach( ( u: Record<string, unknown> ) => usersById.set( String( u.id ), u ) );
@@ -128,20 +128,20 @@ async function fetchDriverProfiles ( admin: ReturnType<typeof getAdminClient>, d
 function parseEntityRoute ( path: string, prefix: string ) {
   const escapedPrefix = prefix.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' );
   const match = new RegExp( `^/${ escapedPrefix }/([^/]+)(?:/([^/]+))?$` ).exec( path );
-  if ( !match ) return null;
+  if ( !match ) {return null;}
   return { id: decodeURIComponent( match[ 1 ] ), action: match[ 2 ] ? decodeURIComponent( match[ 2 ] ) : null };
 }
 
 async function ensureDriverForUser ( admin: ReturnType<typeof getAdminClient>, user: Record<string, unknown> ) {
   const { data: existing } = await admin.from( 'drivers' ).select( '*' ).eq( 'user_id', String( user.id ) ).maybeSingle();
-  if ( existing ) return existing;
+  if ( existing ) {return existing;}
   const { data, error } = await admin.from( 'drivers' ).insert( {
     user_id: user.id,
     driver_status: 'pending_approval',
     verification_level: user.verification_level ?? 'level_0',
     sanad_identity_linked: false,
   } ).select( '*' ).single();
-  if ( error ) throw error;
+  if ( error ) {throw error;}
   return data;
 }
 
@@ -169,22 +169,22 @@ async function authorizeTripOwner (
   auth: Awaited<ReturnType<typeof authenticateRequest>>,
   tripId: string,
 ) {
-  if ( 'error' in auth ) return { error: auth.error };
+  if ( 'error' in auth ) {return { error: auth.error };}
 
   const { data: driver, error } = await auth.admin
     .from( 'drivers' )
     .select( 'driver_id, user_id, driver_status, background_check_status, verification_level' )
     .eq( 'user_id', auth.canonicalUser.id )
     .maybeSingle();
-  if ( error ) return { error: json( { error: 'Internal server error' }, 500 ) };
+  if ( error ) {return { error: json( { error: 'Internal server error' }, 500 ) };}
 
   const { data: trip, error: tripError } = await auth.admin
     .from( 'trips' )
     .select( 'trip_id, driver_id' )
     .eq( 'trip_id', tripId )
     .maybeSingle();
-  if ( tripError ) return { error: json( { error: 'Internal server error' }, 500 ) };
-  if ( !trip ) return { error: json( { error: 'Trip not found' }, 404 ) };
+  if ( tripError ) {return { error: json( { error: 'Internal server error' }, 500 ) };}
+  if ( !trip ) {return { error: json( { error: 'Trip not found' }, 404 ) };}
   if ( !driver || String( trip.driver_id ) !== String( driver.driver_id ) ) {
     return { error: json( { error: 'You do not own this trip' }, 403 ) };
   }
@@ -214,12 +214,12 @@ async function handleTripRequest ( request: Request, path: string ) {
     const to = url.searchParams.get( 'to' );
     const date = url.searchParams.get( 'date' );
     const seats = url.searchParams.get( 'seats' );
-    if ( from ) query = query.ilike( 'origin_city', `%${ from }%` );
-    if ( to ) query = query.ilike( 'destination_city', `%${ to }%` );
-    if ( date ) query = query.gte( 'departure_time', `${ date }T00:00:00` ).lt( 'departure_time', `${ date }T23:59:59.999` );
-    if ( seats ) query = query.gte( 'available_seats', Number( seats ) );
+    if ( from ) {query = query.ilike( 'origin_city', `%${ from }%` );}
+    if ( to ) {query = query.ilike( 'destination_city', `%${ to }%` );}
+    if ( date ) {query = query.gte( 'departure_time', `${ date }T00:00:00` ).lt( 'departure_time', `${ date }T23:59:59.999` );}
+    if ( seats ) {query = query.gte( 'available_seats', Number( seats ) );}
     const { data, error } = await query.in( 'trip_status', [ 'open', 'booked', 'in_progress' ] ).order( 'departure_time' );
-    if ( error ) return json( { error: 'Internal server error' }, 500 );
+    if ( error ) {return json( { error: 'Internal server error' }, 500 );}
     const rows = Array.isArray( data ) ? data : [];
     const profiles = await fetchDriverProfiles( admin, rows.map( ( r: Record<string, unknown> ) => String( r.driver_id ?? '' ) ) );
     return json( rows.map( ( r: Record<string, unknown> ) => mapTripRow( r, profiles[ String( r.driver_id ?? '' ) ] ) ) );
@@ -234,24 +234,24 @@ async function handleTripRequest ( request: Request, path: string ) {
   const tripRoute = parseEntityRoute( path, 'trips' );
   if ( request.method === 'GET' && tripRoute?.id === 'user' ) {
     const auth = await authenticateRequest( request );
-    if ( 'error' in auth ) return auth.error;
+    if ( 'error' in auth ) {return auth.error;}
     const driver = await ensureDriverForUser( auth.admin, auth.canonicalUser );
     const { data, error } = await auth.admin.from( 'trips' ).select( '*' ).eq( 'driver_id', driver.driver_id ).order( 'departure_time', { ascending: false } );
-    if ( error ) return json( { error: 'Internal server error' }, 500 );
+    if ( error ) {return json( { error: 'Internal server error' }, 500 );}
     return json( ( Array.isArray( data ) ? data : [] ).map( ( r: Record<string, unknown> ) => mapTripRow( r, null ) ) );
   }
 
   if ( request.method === 'GET' && tripRoute?.id ) {
     const { data, error } = await admin.from( 'trips' ).select( '*' ).eq( 'trip_id', tripRoute.id ).maybeSingle();
-    if ( error ) return json( { error: 'Internal server error' }, 500 );
-    if ( !data ) return json( { error: 'Trip not found' }, 404 );
+    if ( error ) {return json( { error: 'Internal server error' }, 500 );}
+    if ( !data ) {return json( { error: 'Trip not found' }, 404 );}
     const profiles = await fetchDriverProfiles( admin, [ String( data.driver_id ?? '' ) ] );
     return json( mapTripRow( data, profiles[ String( data.driver_id ?? '' ) ] ) );
   }
 
   if ( request.method === 'POST' && path === '/trips' ) {
     const auth = await authenticateRequest( request );
-    if ( 'error' in auth ) return auth.error;
+    if ( 'error' in auth ) {return auth.error;}
     const body = await request.json().catch( () => ( {} ) );
     const driver = await ensureDriverForUser( auth.admin, auth.canonicalUser );
     if ( !isApprovedDriver( auth.canonicalUser, driver, Boolean( auth.authUser.email_confirmed_at ) ) ) {
@@ -270,7 +270,7 @@ async function handleTripRequest ( request: Request, path: string ) {
       vehicle_make: vehicleMake, vehicle_model: vehicleRest.length > 0 ? vehicleRest.join( ' ' ) : body.carModel ?? null,
       notes: body.note ?? null,
     } ).select( '*' ).single();
-    if ( error ) return json( { error: 'Internal server error' }, 500 );
+    if ( error ) {return json( { error: 'Internal server error' }, 500 );}
     return json( mapTripRow( data, await ( async () => {
       const p = await fetchDriverProfiles( auth.admin, [ String( data.driver_id ?? '' ) ] );
       return p[ String( data.driver_id ?? '' ) ];
@@ -279,9 +279,9 @@ async function handleTripRequest ( request: Request, path: string ) {
 
   if ( ( request.method === 'PUT' || request.method === 'DELETE' || ( request.method === 'POST' && tripRoute?.action === 'publish' ) ) && tripRoute?.id ) {
     const auth = await authenticateRequest( request );
-    if ( 'error' in auth ) return auth.error;
+    if ( 'error' in auth ) {return auth.error;}
     const ownership = await authorizeTripOwner( auth, tripRoute.id );
-    if ( 'error' in ownership ) return ownership.error;
+    if ( 'error' in ownership ) {return ownership.error;}
     if ( request.method === 'DELETE' ) {
       const { error } = await auth.admin.from( 'trips' ).update( { trip_status: 'cancelled', deleted_at: new Date().toISOString() } ).eq( 'trip_id', tripRoute.id ).eq( 'driver_id', ownership.driver.driver_id );
       return error ? json( { error: 'Internal server error' }, 500 ) : json( { success: true } );
@@ -292,16 +292,16 @@ async function handleTripRequest ( request: Request, path: string ) {
     }
     const body = await request.json().catch( () => ( {} ) );
     const patch: Record<string, unknown> = {};
-    if ( body.from ) patch.origin_city = body.from;
-    if ( body.to ) patch.destination_city = body.to;
-    if ( body.date || body.time ) patch.departure_time = new Date( `${ body.date ?? new Date().toISOString().slice( 0, 10 ) }T${ body.time ?? '08:00' }:00` ).toISOString();
-    if ( body.date ) patch.departure_date = body.date;
-    if ( typeof body.seats === 'number' ) patch.available_seats = body.seats;
-    if ( typeof body.price === 'number' ) patch.price_per_seat = body.price;
-    if ( typeof body.status === 'string' ) patch.trip_status = body.status === 'active' ? 'open' : body.status;
-    if ( typeof body.note === 'string' ) patch.notes = body.note;
+    if ( body.from ) {patch.origin_city = body.from;}
+    if ( body.to ) {patch.destination_city = body.to;}
+    if ( body.date || body.time ) {patch.departure_time = new Date( `${ body.date ?? new Date().toISOString().slice( 0, 10 ) }T${ body.time ?? '08:00' }:00` ).toISOString();}
+    if ( body.date ) {patch.departure_date = body.date;}
+    if ( typeof body.seats === 'number' ) {patch.available_seats = body.seats;}
+    if ( typeof body.price === 'number' ) {patch.price_per_seat = body.price;}
+    if ( typeof body.status === 'string' ) {patch.trip_status = body.status === 'active' ? 'open' : body.status;}
+    if ( typeof body.note === 'string' ) {patch.notes = body.note;}
     const { data, error } = await auth.admin.from( 'trips' ).update( patch ).eq( 'trip_id', tripRoute.id ).eq( 'driver_id', ownership.driver.driver_id ).select( '*' ).single();
-    if ( error ) return json( { error: 'Internal server error' }, 500 );
+    if ( error ) {return json( { error: 'Internal server error' }, 500 );}
     const profiles = await fetchDriverProfiles( auth.admin, [ String( data.driver_id ?? '' ) ] );
     return json( mapTripRow( data, profiles[ String( data.driver_id ?? '' ) ] ) );
   }
@@ -312,7 +312,7 @@ async function handleTripRequest ( request: Request, path: string ) {
 Deno.serve( async ( request: Request ) => {
   const headers = buildResponseHeaders( request );
   headers.set( 'X-Api-Version', 'v1' );
-  if ( request.method === 'OPTIONS' ) return new Response( null, { status: 204, headers } );
+  if ( request.method === 'OPTIONS' ) {return new Response( null, { status: 204, headers } );}
 
   try {
     const url = new URL( request.url );

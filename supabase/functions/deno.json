@@ -7,5 +7,19 @@
   "imports": {
     "https://esm.sh/@supabase/supabase-js@2": "npm:@supabase/supabase-js@2",
     "https://deno.land/x/postgres@v0.19.3/mod.ts": "npm:postgres"
+  },
+  "lint": {
+    "include": ["./"],
+    "exclude": ["tests/"],
+    "rules": {
+      "tags": ["recommended"],
+      "include": ["no-explicit-any", "no-unused-vars", "eqeqeq"]
+    }
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 120,
+    "indentWidth": 2,
+    "singleQuote": true
   }
 }

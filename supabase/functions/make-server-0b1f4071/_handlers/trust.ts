@@ -1,36 +1,8 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
+    getFunctionBaseUrl,
+    buildTrustStatus,
 } from './shared.ts';
 
 import {
@@ -61,7 +33,7 @@ import {
 
 export async function handleGetTrustStatus ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const status = await buildTrustStatus( auth );
   return json( { status } );
@@ -69,7 +41,7 @@ export async function handleGetTrustStatus ( request: Request ) {
 
 export async function handleStartPhoneVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const phoneNumber = normalizePhoneNumber( body.phoneNumber );
@@ -225,7 +197,7 @@ export async function handleStartPhoneVerification ( request: Request ) {
 
 export async function handleConfirmPhoneVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const code = String( body.code ?? '' ).trim();

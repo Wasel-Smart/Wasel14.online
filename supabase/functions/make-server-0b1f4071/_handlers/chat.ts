@@ -1,36 +1,6 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
 } from './shared.ts';
 
 import {
@@ -40,7 +10,7 @@ import {
 
 export async function handleGetChatMessages ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const tripId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   if ( !( await assertTripParticipant( auth.admin, tripId, auth.canonicalUser.id ) ) ) {
@@ -55,13 +25,13 @@ export async function handleGetChatMessages ( request: Request, path: string ) {
     .order( 'created_at', { ascending: false } )
     .limit( limit );
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
   return json( { messages: ( data ?? [] ).reverse() } );
 }
 
 export async function handleSendChatMessage ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const tripId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   if ( !( await assertTripParticipant( auth.admin, tripId, auth.canonicalUser.id ) ) ) {
@@ -70,7 +40,7 @@ export async function handleSendChatMessage ( request: Request, path: string ) {
 
   const body = await request.json();
   const content = String( body.content ?? '' ).trim();
-  if ( !content ) return json( { error: 'Message content is required' }, 400 );
+  if ( !content ) {return json( { error: 'Message content is required' }, 400 );}
 
   const { data, error } = await auth.admin
     .from( 'messages' )
@@ -85,33 +55,33 @@ export async function handleSendChatMessage ( request: Request, path: string ) {
     .select( 'id, trip_id, sender_id, content, type, metadata, read_by, created_at, sender:profiles(id, full_name, avatar_url)' )
     .single();
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
   return json( { message: data }, 201 );
 }
 
 export async function handleMarkChatMessagesRead ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json();
   const messageIds = Array.isArray( body.messageIds ) ? body.messageIds.map( String ).filter( Boolean ) : [];
-  if ( messageIds.length === 0 ) return json( { ok: true } );
+  if ( messageIds.length === 0 ) {return json( { ok: true } );}
 
   const { data: messages, error } = await auth.admin
     .from( 'messages' )
     .select( 'id, read_by' )
     .in( 'id', messageIds );
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   for ( const message of messages ?? [] ) {
     const readBy = Array.isArray( message.read_by ) ? message.read_by : [];
-    if ( readBy.includes( auth.canonicalUser.id ) ) continue;
+    if ( readBy.includes( auth.canonicalUser.id ) ) {continue;}
     const { error: updateError } = await auth.admin
       .from( 'messages' )
       .update( { read_by: [ ...readBy, auth.canonicalUser.id ] } )
       .eq( 'id', message.id );
-    if ( updateError ) return json( { error: updateError.message }, 500 );
+    if ( updateError ) {return json( { error: updateError.message }, 500 );}
   }
 
   return json( { ok: true } );
@@ -119,7 +89,7 @@ export async function handleMarkChatMessagesRead ( request: Request ) {
 
 export async function handleGetChatUnreadCount ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const tripId = decodeURIComponent( path.split( '/' )[ 3 ] ?? '' );
   if ( !( await assertTripParticipant( auth.admin, tripId, auth.canonicalUser.id ) ) ) {
@@ -131,7 +101,7 @@ export async function handleGetChatUnreadCount ( request: Request, path: string 
     .select( 'id, read_by' )
     .eq( 'trip_id', tripId );
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   const count = ( data ?? [] ).filter( ( message: Record<string, unknown> ) => {
     const readBy = Array.isArray( message.read_by ) ? message.read_by : [];

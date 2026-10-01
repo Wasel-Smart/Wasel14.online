@@ -284,8 +284,8 @@ if (environmentIsValid) {
   void resetLocalDevelopmentArtifacts();
 
   const scheduleIdle = (callback: () => void, delay = 0) =>
-    typeof requestIdleCallback !== 'undefined'
-      ? requestIdleCallback(callback, { timeout: delay + 1000 })
+    typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback(callback, { timeout: delay + 1000 })
       : setTimeout(callback, delay);
 
   // Defer non-critical initializations to reduce initial bundle impact.

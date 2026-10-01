@@ -1,36 +1,10 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
+    authenticateAuthUser,
+    ensureCanonicalUserForAuth,
+    buildProfilePayload,
+    buildTrustStatus,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
@@ -51,7 +25,7 @@ import {
 
 export async function handleProfileRequest ( request: Request, path: string ) {
   const auth = await authenticateAuthUser( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const profileRoute = parseEntityRoute( path, 'profile' );
   const body = request.method === 'GET' ? {} : await request.json().catch( () => ( {} ) );
@@ -79,11 +53,11 @@ export async function handleProfileRequest ( request: Request, path: string ) {
     const canWriteUsers = hasPermission( resolvedRole, 'users:write' );
 
     const patch: Record<string, unknown> = {};
-    if ( typeof body.email === 'string' ) patch.email = body.email.trim();
-    if ( typeof body.full_name === 'string' ) patch.full_name = body.full_name.trim();
-    if ( typeof body.phone_number === 'string' ) patch.phone_number = body.phone_number.trim();
-    if ( typeof body.phone === 'string' ) patch.phone_number = body.phone.trim();
-    if ( typeof body.avatar_url === 'string' ) patch.avatar_url = body.avatar_url;
+    if ( typeof body.email === 'string' ) {patch.email = body.email.trim();}
+    if ( typeof body.full_name === 'string' ) {patch.full_name = body.full_name.trim();}
+    if ( typeof body.phone_number === 'string' ) {patch.phone_number = body.phone_number.trim();}
+    if ( typeof body.phone === 'string' ) {patch.phone_number = body.phone.trim();}
+    if ( typeof body.avatar_url === 'string' ) {patch.avatar_url = body.avatar_url;}
 
     // Changing a number must never retain verification from the old number.
     // The verification workflow is the only route that can set this timestamp.
@@ -108,7 +82,7 @@ export async function handleProfileRequest ( request: Request, path: string ) {
 
     if ( Object.keys( patch ).length > 0 ) {
       const { error } = await auth.admin.from( 'users' ).update( patch ).eq( 'id', user.id );
-      if ( error ) return json( { error: error.message }, 500 );
+      if ( error ) {return json( { error: error.message }, 500 );}
     }
 
     // Wallet balance is NEVER mutated through this endpoint. Balance changes
@@ -121,13 +95,13 @@ export async function handleProfileRequest ( request: Request, path: string ) {
   }
 
   const { data: nextUser, error } = await auth.admin.from( 'users' ).select( '*' ).eq( 'id', user.id ).single();
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
   return json( await buildProfilePayload( auth.admin, nextUser ) );
 }
 
 export async function handleTwoFactorSetup ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const label = auth.canonicalUser.email || auth.authUser.email || auth.canonicalUser.id;
   const secret = generateTOTPSecret();
@@ -159,7 +133,7 @@ export async function handleTwoFactorSetup ( request: Request ) {
 
 export async function handleTwoFactorVerify ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const code = typeof body.code === 'string' ? body.code : '';
@@ -214,7 +188,7 @@ export async function handleTwoFactorVerify ( request: Request ) {
 
 export async function handleTwoFactorDisable ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const code = typeof body.code === 'string' ? body.code : '';
@@ -261,7 +235,7 @@ export async function handleTwoFactorDisable ( request: Request ) {
 
 export async function handleSubmitIdentityVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const providerReference = String( body.providerReference ?? '' ).trim();
@@ -307,7 +281,7 @@ export async function handleSubmitIdentityVerification ( request: Request ) {
 
 export async function handleEnableDriverMode ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const { error } = await auth.admin
     .from( 'users' )
@@ -327,7 +301,7 @@ export async function handleEnableDriverMode ( request: Request ) {
 
 export async function handleSubmitDriverDocuments ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   if ( String( auth.canonicalUser.role ?? 'passenger' ) !== 'driver' ) {
     return json( { error: 'Enable Driver mode before submitting driver documents.' }, 400 );

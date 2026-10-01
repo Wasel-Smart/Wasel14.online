@@ -34,11 +34,9 @@ jobs:
           cache: 'npm'
 
       - run: npm ci --legacy-peer-deps
-      # Blocking for runtime dependencies (what actually ships). Dev-only
-      # advisories are reported but do not fail the build.
+      # Blocking for all dependencies at high severity.
       - run: npm audit --omit=dev --audit-level=high
       - run: npm audit --audit-level=high
-        continue-on-error: true
 
   # ── CodeQL Analysis ──────────────────────────────────────────────────────────
   codeql:

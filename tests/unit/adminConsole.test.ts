@@ -84,13 +84,16 @@ describe('admin console — handler permissions', () => {
   }
 
   it('never lets a handler skip authorisation', () => {
-    for (const { handler } of expectations) {
-      const start = EDGE_ADMIN.indexOf(`export async function ${handler}`);
-      const body = EDGE_ADMIN.slice(start, start + 400);
-      expect(body).toContain('authorize ( request,');
-      expect(body).toContain("if ( 'error' in auth ) return auth.error;");
+    for ( const { handler } of expectations ) {
+      const start = EDGE_ADMIN.indexOf( `export async function ${ handler }` );
+      const body = EDGE_ADMIN.slice( start, start + 400 );
+      expect( body ).toContain( 'authorize ( request,' );
+      // Matched structurally rather than as one literal: the handlers write the
+      // guard as `{return auth.error;}`, so an exact-string check only passed
+      // for whichever brace style a given edit happened to produce.
+      expect( body ).toMatch( /if \(\s*'error'\s*in\s+auth\s*\)\s*\{?\s*return\s+auth\.error/ );
     }
-  });
+  } );
 });
 
 describe('admin console — client and server agree on the paths', () => {

@@ -64,9 +64,9 @@ export function getDynamicPrice(basePrice: number, corridor: MobilityCorridorRow
 }
 
 function getDirection(current: number, previous: number | null | undefined): 'up' | 'down' | 'flat' {
-  if (previous === null || previous === undefined) return 'flat';
-  if (current > previous) return 'up';
-  if (current < previous) return 'down';
+  if (previous === null || previous === undefined) {return 'flat';}
+  if (current > previous) {return 'up';}
+  if (current < previous) {return 'down';}
   return 'flat';
 }
 

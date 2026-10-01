@@ -39,7 +39,10 @@ export default defineConfig( {
     // the same process, avoiding the worker spawn entirely.
     pool: 'vmForks',
     environmentOptions: { url: 'http://localhost/' },
-    passWithNoTests: true,
+    // A filter that matches nothing exits 0, which let an entire suite silently
+    // disappear from CI without anyone noticing. Tests that are deliberately
+    // not run belong in the exclude list below, not behind a pass-by-default.
+    passWithNoTests: false,
     testTimeout: 20000,
     hookTimeout: 20000,
     setupFiles: './tests/setup.ts',
@@ -47,6 +50,10 @@ export default defineConfig( {
       'tests/**/*.test.{ts,tsx}',
       'src/**/*.test.{ts,tsx}',
       'src/**/__tests__/**/*.{ts,tsx}',
+      // The RBAC package holds the permission map every authz decision reads.
+      // Its test was previously unreachable from every runner, so a regression in
+      // role permissions would have gone unseen.
+      'packages/**/*.test.{ts,tsx}',
     ],
     exclude: [
       '**/node_modules/**',
@@ -56,9 +63,10 @@ export default defineConfig( {
       '**/tests/e2e/**',
       '**/mobile/**',
       '**/*.spec.ts',
-      'tests/database/**',
-      'tests/utils/pricing/**',
-      'src/services/Button.test.tsx',
+      // Shared test helpers that live in __tests__ directories. These contain no
+      // tests, so Vitest reports them as failing suites ("no tests found").
+      '**/__tests__/**/setup*.ts',
+      '**/__tests__/**/*[!.t]est.{ts,tsx}',
     ],
     env: {
       VITE_EVENT_BROKER: 'memory',

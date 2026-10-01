@@ -45,7 +45,7 @@ function json(data: unknown, status = 200): Response {
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {return false;}
   let result = 0;
   for (let i = 0; i < a.length; i++) {
     result |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -112,7 +112,7 @@ async function runMatchingCycle(): Promise<MatchResult> {
     .order('created_at')
     .limit(BATCH_LIMIT);
 
-  if (alertsError) throw new Error(`Failed to fetch alerts: ${alertsError.message}`);
+  if (alertsError) {throw new Error(`Failed to fetch alerts: ${alertsError.message}`);}
 
   const alerts = (rawAlerts ?? []) as unknown as DemandAlertRow[];
 
@@ -124,7 +124,7 @@ async function runMatchingCycle(): Promise<MatchResult> {
     errors: [],
   };
 
-  if (!alerts || alerts.length === 0) return result;
+  if (!alerts || alerts.length === 0) {return result;}
 
   /**
    * Step 2: For each alert, call the atomic PostgreSQL RPC that:
@@ -189,7 +189,7 @@ Deno.serve(async (request) => {
     `matching-worker:${request.headers.get('x-forwarded-for') ?? 'unknown'}`,
     { windowMs: 60_000, maxRequests: 30 },
   );
-  if (!rl.allowed) return json({ error: 'Rate limit exceeded' }, 429);
+  if (!rl.allowed) {return json({ error: 'Rate limit exceeded' }, 429);}
 
   const url = new URL(request.url);
   const path = url.pathname.replace(/^.*matching-worker/, '') || '/';
@@ -206,7 +206,7 @@ Deno.serve(async (request) => {
     // Idempotency: if this exact worker invocation was already processed
     // (e.g. the scheduler retried after a timeout), return the cached result.
     const cached = await idempotencyMiddleware.check(request, 'worker');
-    if (cached) return cached;
+    if (cached) {return cached;}
 
     let response: Response;
     try {

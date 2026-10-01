@@ -22,13 +22,13 @@ function json(data: unknown, status = 200) {
 }
 
 function resolveAllowedOrigin(origin: string | null): string | null {
-  if (!origin) return null;
+  if (!origin) {return null;}
   try {
     const url = new URL(origin);
-    if (url.origin === new URL(APP_BASE_URL).origin) return url.origin;
-    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return url.origin;
+    if (url.origin === new URL(APP_BASE_URL).origin) {return url.origin;}
+    if (ALLOW_LOCAL_ORIGINS && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {return url.origin;}
     const extra = ADDITIONAL_ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
-    if (extra.includes(url.origin)) return url.origin;
+    if (extra.includes(url.origin)) {return url.origin;}
   } catch { /* ignore */ }
   return null;
 }
@@ -38,44 +38,44 @@ function buildResponseHeaders(request: Request): Headers {
   const allowedOrigin = resolveAllowedOrigin(request.headers.get('origin'));
   Object.entries(responseBaseHeaders).forEach(([k, v]) => headers.set(k, v));
   headers.set('Vary', 'Origin');
-  if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
+  if (allowedOrigin) {headers.set('Access-Control-Allow-Origin', allowedOrigin);}
   return headers;
 }
 
 function getAdminClient() {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error('Supabase not configured');
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {throw new Error('Supabase not configured');}
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 async function authenticateRequest(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-  if (!token) return { error: json({ error: 'Missing bearer token' }, 401) };
+  if (!token) {return { error: json({ error: 'Missing bearer token' }, 401) };}
   const admin = getAdminClient();
   const { data: authData, error: authError } = await admin.auth.getUser(token);
-  if (authError || !authData.user) return { error: json({ error: 'Invalid auth token' }, 401) };
+  if (authError || !authData.user) {return { error: json({ error: 'Invalid auth token' }, 401) };}
   const { data: byAuthUser, error: byAuthError } = await admin.from('users').select('*').eq('auth_user_id', authData.user.id).maybeSingle();
-  if (byAuthError) return { error: json({ error: 'Internal server error' }, 500) };
+  if (byAuthError) {return { error: json({ error: 'Internal server error' }, 500) };}
   let canonicalUser = byAuthUser;
   if (!canonicalUser) {
     const fallback = await admin.from('users').select('*').eq('id', authData.user.id).maybeSingle();
     canonicalUser = fallback.data;
-    if (fallback.error || !canonicalUser) return { error: json({ error: 'User not found' }, 404) };
+    if (fallback.error || !canonicalUser) {return { error: json({ error: 'User not found' }, 404) };}
   }
   return { admin, authUser: authData.user, canonicalUser };
 }
 
 function isExpired(isoValue?: string | null): boolean {
-  if (!isoValue) return false;
+  if (!isoValue) {return false;}
   const expiresAt = new Date(isoValue).getTime();
-  if (Number.isNaN(expiresAt)) return false;
+  if (Number.isNaN(expiresAt)) {return false;}
   return expiresAt <= Date.now();
 }
 
 function isOlderThanHours(isoValue: string | null | undefined, hours: number): boolean {
-  if (!isoValue) return false;
+  if (!isoValue) {return false;}
   const timestamp = new Date(isoValue).getTime();
-  if (Number.isNaN(timestamp)) return false;
+  if (Number.isNaN(timestamp)) {return false;}
   return Date.now() - timestamp >= hours * 60 * 60 * 1000;
 }
 
@@ -90,7 +90,7 @@ function computeTrustStepSummary(steps: Record<string, { id: string; state: stri
 }
 
 async function buildReviewHistory(auth: Awaited<ReturnType<typeof authenticateRequest>>) {
-  if ('error' in auth) return [];
+  if ('error' in auth) {return [];}
 
   const { data, error } = await auth.admin
     .from('verification_records')
@@ -99,7 +99,7 @@ async function buildReviewHistory(auth: Awaited<ReturnType<typeof authenticateRe
     .order('verification_timestamp', { ascending: false })
     .limit(20);
 
-  if (error) throw new Error('Review history lookup failed');
+  if (error) {throw new Error('Review history lookup failed');}
 
   const items = (data ?? []).map((row: Record<string, unknown>) => {
     const status = row.sanad_status === 'verified' || row.document_status === 'verified'
@@ -128,7 +128,7 @@ function buildTrustStep(id: string, state: string, detail: string, meta: Record<
 }
 
 async function buildTrustStatus(auth: Awaited<ReturnType<typeof authenticateRequest>>) {
-  if ('error' in auth) return null;
+  if ('error' in auth) {return null;}
 
   const [verificationResult, driverResult, walletResult, otpResult] = await Promise.all([
     auth.admin.from('verification_records').select('verification_id, sanad_status, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at').eq('user_id', auth.canonicalUser.id).order('verification_timestamp', { ascending: false }).limit(1).maybeSingle(),
@@ -137,10 +137,10 @@ async function buildTrustStatus(auth: Awaited<ReturnType<typeof authenticateRequ
     auth.admin.from('otp_sessions').select('otp_session_id, phone_number, attempts, max_attempts, expires_at, consumed_at, created_at').eq('user_id', auth.canonicalUser.id).eq('purpose', 'driver_action').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
 
-  if (verificationResult.error) throw new Error('Verification lookup failed');
-  if (driverResult.error) throw new Error('Driver lookup failed');
-  if (walletResult.error) throw new Error('Wallet lookup failed');
-  if (otpResult.error) throw new Error('OTP lookup failed');
+  if (verificationResult.error) {throw new Error('Verification lookup failed');}
+  if (driverResult.error) {throw new Error('Driver lookup failed');}
+  if (walletResult.error) {throw new Error('Wallet lookup failed');}
+  if (otpResult.error) {throw new Error('OTP lookup failed');}
 
   const verification = verificationResult.data;
   const driver = driverResult.data;
@@ -203,12 +203,12 @@ async function buildTrustStatus(auth: Awaited<ReturnType<typeof authenticateRequ
 
 async function handleTrustRequest(request: Request, path: string) {
   const auth = await authenticateRequest(request);
-  if ('error' in auth) return auth.error;
+  if ('error' in auth) {return auth.error;}
 
   if (request.method === 'GET' && (path === '/trust/status' || path === '/trust' || path === '/v1/trust/status' || path === '/v1/trust')) {
     try {
       const status = await buildTrustStatus(auth);
-      if (!status) return json({ error: 'Unable to load trust status' }, 500);
+      if (!status) {return json({ error: 'Unable to load trust status' }, 500);}
       return json(status);
     } catch (error) {
       console.error('Trust status error:', error instanceof Error ? error.message : String(error));
@@ -232,7 +232,7 @@ async function handleTrustRequest(request: Request, path: string) {
 Deno.serve(async (request: Request) => {
   const headers = buildResponseHeaders(request);
   headers.set('X-Api-Version', 'v1');
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+  if (request.method === 'OPTIONS') {return new Response(null, { status: 204, headers });}
 
   try {
     const url = new URL(request.url);
@@ -243,7 +243,7 @@ Deno.serve(async (request: Request) => {
 
     if (path.startsWith('/trust') || path.startsWith('/v1/trust')) {
       response = await handleTrustRequest(request, path);
-      if (!response) response = json({ error: 'Not found', service: 'trust-service' }, 404);
+      if (!response) {response = json({ error: 'Not found', service: 'trust-service' }, 404);}
     } else if (path === '/health') {
       response = json({ status: 'ok', service: 'trust-service', timestamp: new Date().toISOString() });
     } else {

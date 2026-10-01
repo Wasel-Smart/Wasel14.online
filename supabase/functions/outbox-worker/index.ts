@@ -36,9 +36,9 @@ function getAdminClient () {
 }
 
 function constantTimeEqual ( a: string, b: string ): boolean {
-  if ( a.length !== b.length ) return false;
+  if ( a.length !== b.length ) {return false;}
   let result = 0;
-  for ( let i = 0; i < a.length; i++ ) result |= a.charCodeAt( i ) ^ b.charCodeAt( i );
+  for ( let i = 0; i < a.length; i++ ) {result |= a.charCodeAt( i ) ^ b.charCodeAt( i );}
   return result === 0;
 }
 
@@ -92,7 +92,7 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
     .order( 'created_at', { ascending: true } )
     .limit( BATCH_SIZE );
 
-  if ( error ) throw new Error( `outbox fetch failed: ${ error.message }` );
+  if ( error ) {throw new Error( `outbox fetch failed: ${ error.message }` );}
 
   const rows = ( Array.isArray( data ) ? data : [] ) as OutboxRow[];
   let succeeded = 0;

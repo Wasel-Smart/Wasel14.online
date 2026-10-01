@@ -1,7 +1,5 @@
 import { getAuthDetails } from './core';
 import {
-  BackendRequestError,
-  getSecureBackendFallbackError,
   hasConfiguredEdgeTransport,
   requestEdgeJson,
   runBackendWorkflow,
@@ -11,12 +9,8 @@ import {
   getDirectVerificationRecord,
   updateDirectProfile,
 } from './directSupabase';
-import { getAuthCallbackUrl, getConfig, resolveAuthRedirectOrigin } from '../utils/env';
+import { getAuthCallbackUrl, resolveAuthRedirectOrigin } from '../utils/env';
 import { supabase } from '../utils/supabase/client';
-
-function getDirectFallbackError(operation: string): Error {
-  return getSecureBackendFallbackError(operation);
-}
 
 const ERROR_RULES: Array<{
   test: (lower: string, code: string | undefined) => boolean;
@@ -260,11 +254,10 @@ export const authAPI = {
     const directUpdates: Record<string, unknown> = { email, full_name: fullName };
     if (phone) {directUpdates.phone_number = phone;}
 
+    // Profile creation is idempotent and non-sensitive — always allow the
+    // direct-Supabase path as a fallback so new sign-ups never get a null
+    // profile regardless of edge function availability.
     if (!hasConfiguredEdgeTransport('required')) {
-      if (!getConfig().allowDirectSupabaseFallback) {
-        throw getDirectFallbackError('Profile creation');
-      }
-
       return updateDirectProfile(userId, directUpdates);
     }
 
@@ -284,15 +277,10 @@ export const authAPI = {
         operation: 'Failed to create profile',
       });
       return data;
-    } catch (error) {
-      if (
-        error instanceof BackendRequestError &&
-        error.status === 404 &&
-        getConfig().allowDirectSupabaseFallback
-      ) {
-        return updateDirectProfile(userId, directUpdates);
-      }
-      throw error instanceof Error ? error : new Error('Failed to create profile');
+    } catch {
+      // Edge function unavailable or returned an error — fall back to direct
+      // Supabase unconditionally so sign-up always produces a valid profile.
+      return updateDirectProfile(userId, directUpdates);
     }
   },
 
@@ -302,7 +290,7 @@ export const authAPI = {
 
     if (error) {
       if (import.meta.env?.DEV) { // nosec CWE-117
-        console.error('[auth.signIn]', error.status, error.code, error.message);
+        console.error('[auth.signIn]', error.status, error.code, String(error.message).replace(/[\r\n]/g, ' '));
       }
       throw new Error(normalizeAuthError(error.message, error.code, 'signin'));
     }
@@ -339,11 +327,10 @@ export const authAPI = {
         });
         const enrichedProfile = await enrichProfileWithVerification(context.userId, data);
         return { profile: enrichedProfile };
-      } catch (edgeError) {
-        if (getConfig().allowDirectSupabaseFallback) {
-          return loadProfileViaFallback(context.userId);
-        }
-        throw edgeError;
+      } catch {
+        // Edge function unavailable — always fall back to direct Supabase
+        // so signed-in users always get their profile loaded.
+        return loadProfileViaFallback(context.userId);
       }
     } catch (error) {
       // Only swallow not-found states; log real errors in DEV
@@ -364,7 +351,7 @@ export const authAPI = {
       const profile = await runBackendWorkflow({
         operation: 'Profile update',
         authMode: 'required',
-        fallbackPolicy: 'writes-if-enabled',
+        fallbackPolicy: 'always',
         fallback: ({ userId }) => updateDirectProfile(userId ?? '', updates),
         edge: context =>
           requestEdgeJson<Record<string, unknown>>({
@@ -380,8 +367,7 @@ export const authAPI = {
     } catch (error) {
       return {
         success: false,
-        error:
-          error instanceof Error ? error.message : getDirectFallbackError('Profile update').message,
+        error: error instanceof Error ? error.message : 'Profile update failed.',
       };
     }
   },

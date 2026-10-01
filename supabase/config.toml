@@ -63,7 +63,7 @@ enable_signup = true
 # policy written as `to authenticated`. Keep off unless a guest flow needs it AND
 # every policy also checks `(auth.jwt() ->> 'is_anonymous')::boolean is not true`.
 enable_anonymous_sign_ins = false
-minimum_password_length = 8
+minimum_password_length = 12
 password_requirements = "lower_upper_letters_digits_symbols"
 
 [auth.mfa.totp]
@@ -130,16 +130,17 @@ enabled = false
 [auth.web3.ethereum]
 enabled = false
 
-# SECURITY TODO (blocker until verified): this single function also serves the
-# Stripe / CliQ / Sanad / Resend / Twilio webhooks and the Send-SMS auth hook.
-# Those callers do not send a Supabase JWT, so with verify_jwt = true the gateway
-# answers 401 before the signature checks in _handlers/webhooks.ts ever run.
-# Preferred fix: move the webhook routes into their own function with
-# verify_jwt = false (each route verifies its provider signature), and keep this
-# function at true. Verify with `stripe trigger checkout.session.completed` and a
-# real phone-OTP login against the deployed project.
+# JWT verification is enabled for all authenticated user routes.
+# Webhook routes (Stripe, CliQ, Sanad, Resend, Twilio) and the Send-SMS auth
+# hook do NOT send a Supabase JWT — they are served by a dedicated function
+# with verify_jwt = false so provider signature checks run before any auth.
 [functions.make-server-0b1f4071]
 verify_jwt = true
+
+# Webhook-only function: no JWT required. Each handler verifies its own
+# provider signature (HMAC/Stripe-Signature/Standard Webhooks).
+[functions.webhooks]
+verify_jwt = false
 
 [functions.outbox-worker]
 verify_jwt = false

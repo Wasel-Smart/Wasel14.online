@@ -30,7 +30,7 @@ function isVercelPreviewUrl ( hostname: string ): boolean {
 }
 
 function normalizeOrigin(origin: string | null | undefined): string | null {
-  if (!origin) return null;
+  if (!origin) {return null;}
 
   try {
     const parsed = new URL(origin);

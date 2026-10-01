@@ -1,28 +1,8 @@
 import {
-  json,
-  authenticateRequest,
-  enforcePermission,
-  consumeRateLimit,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    authenticateRequest,
+    enforcePermission,
+    consumeRateLimit,
 } from './shared.ts';
 
 import {
@@ -51,13 +31,13 @@ const REFUND_REASONS = new Set( [ 'requested_by_customer', 'duplicate', 'fraudul
 
 function sanitizeClientMetadata ( input: unknown ): Record<string, string> {
   const out: Record<string, string> = {};
-  if ( !input || typeof input !== 'object' || Array.isArray( input ) ) return out;
+  if ( !input || typeof input !== 'object' || Array.isArray( input ) ) {return out;}
 
   for ( const [ rawKey, rawValue ] of Object.entries( input as Record<string, unknown> ) ) {
-    if ( Object.keys( out ).length >= MAX_METADATA_ENTRIES ) break;
+    if ( Object.keys( out ).length >= MAX_METADATA_ENTRIES ) {break;}
     const key = rawKey.trim().slice( 0, 40 );
-    if ( !key || RESERVED_METADATA_KEYS.has( key.toLowerCase() ) ) continue;
-    if ( typeof rawValue !== 'string' && typeof rawValue !== 'number' && typeof rawValue !== 'boolean' ) continue;
+    if ( !key || RESERVED_METADATA_KEYS.has( key.toLowerCase() ) ) {continue;}
+    if ( typeof rawValue !== 'string' && typeof rawValue !== 'number' && typeof rawValue !== 'boolean' ) {continue;}
     out[ key ] = String( rawValue ).slice( 0, MAX_METADATA_VALUE_LENGTH );
   }
   return out;
@@ -69,7 +49,7 @@ export async function handlePaymentIntentCreate ( request: Request ): Promise<Re
   }
 
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const {
@@ -89,7 +69,7 @@ export async function handlePaymentIntentCreate ( request: Request ): Promise<Re
   // the platform's Stripe account. Fail closed - a money path must not run
   // unthrottled just because the limiter is down.
   const limited = await consumeRateLimit( auth.admin, `payment-intent:${ auth.authUser.id }`, 10, 3600, { failClosed: true } );
-  if ( limited ) return limited;
+  if ( limited ) {return limited;}
 
   // NOTE: a client-supplied `customer_id` is intentionally ignored. Accepting
   // one lets a caller attach a PaymentIntent to another user's Stripe customer.
@@ -144,13 +124,13 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
   }
 
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   // Refunds move money out of the platform. Only roles holding the canonical
   // `payments:refund` permission (admin, finance) may issue them. Passenger
   // refunds must go through the cancellation flow, which applies policy.
   const denied = enforcePermission( auth, 'payments:refund' );
-  if ( denied ) return denied;
+  if ( denied ) {return denied;}
 
   const body = await request.json().catch( () => ( {} ) );
   const { payment_intent_id, booking_id, amount, reason } = body as {
@@ -243,7 +223,7 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
 
 export async function handleGetPaymentStatus ( request: Request, bookingId: string ): Promise<Response> {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const admin = auth.admin;
   const { data, error } = await admin

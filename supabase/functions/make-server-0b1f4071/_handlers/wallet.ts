@@ -1,38 +1,12 @@
+import type {
+  getAdminClient} from './shared.ts';
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
-  consumeRateLimit,
-  resetRateLimit,
+    json,
+    authenticateRequest,
+    getAppBaseUrl,
+    matchesAuthenticatedUser,
+    consumeRateLimit,
+    resetRateLimit,
 } from './shared.ts';
 
 import {
@@ -71,7 +45,7 @@ import {
 
 export async function handleGetWallet ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   try {
     return json( await loadWalletPayload( auth.admin, auth.canonicalUser.id ) );
@@ -82,7 +56,7 @@ export async function handleGetWallet ( request: Request, requestedUserId: strin
 
 export async function handleGetWalletTransactions ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   try {
     const url = new URL( request.url );
@@ -106,7 +80,7 @@ export async function handleGetWalletTransactions ( request: Request, requestedU
 
 export async function handleGetWalletInsights ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   try {
     const details = await loadWalletDetails( auth.admin, auth.canonicalUser.id );
@@ -151,7 +125,7 @@ async function enforceWalletPin (
   wallet: { pin_hash?: string | null },
   rawPin: unknown,
 ): Promise<Response | null> {
-  if ( !wallet.pin_hash ) return null;
+  if ( !wallet.pin_hash ) {return null;}
 
   const pin = typeof rawPin === 'string' ? rawPin.trim() : '';
   if ( !/^\d{4}$/.test( pin ) ) {
@@ -165,7 +139,7 @@ async function enforceWalletPin (
     PIN_LOCKOUT_SECONDS,
     { failClosed: true },
   );
-  if ( limited ) return limited;
+  if ( limited ) {return limited;}
 
   const verified = await verifyWalletPinHash( pin, wallet.pin_hash );
   if ( !verified ) {
@@ -178,20 +152,20 @@ async function enforceWalletPin (
 
 export async function handleWalletWithdraw ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const throttled = await consumeRateLimit( auth.admin, `wallet-withdraw:${ auth.canonicalUser.id }`, 5, 3600, { failClosed: true } );
-  if ( throttled ) return throttled;
+  if ( throttled ) {return throttled;}
 
   const body = await request.json().catch( () => ( {} ) );
   const amountJod = toMoneyNumber( body.amount );
   const bankAccount = String( body.bankAccount ?? '' ).trim();
   const method = String( body.method ?? 'bank_transfer' ).trim() || 'bank_transfer';
-  if ( amountJod <= 0 ) return json( { error: 'Amount must be greater than zero.' }, 400 );
+  if ( amountJod <= 0 ) {return json( { error: 'Amount must be greater than zero.' }, 400 );}
   if ( amountJod > MAX_WALLET_WITHDRAW_JOD ) {
     return json( { error: `Withdrawals are limited to JOD ${ MAX_WALLET_WITHDRAW_JOD } per request.` }, 400 );
   }
-  if ( !bankAccount ) return json( { error: 'Bank account is required.' }, 400 );
+  if ( !bankAccount ) {return json( { error: 'Bank account is required.' }, 400 );}
   if ( !/^[A-Za-z0-9 -]{6,64}$/.test( bankAccount ) ) {
     return json( { error: 'Bank account format is invalid.' }, 400 );
   }
@@ -202,7 +176,7 @@ export async function handleWalletWithdraw ( request: Request, requestedUserId: 
   try {
     const wallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
     const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, wallet, body.pin );
-    if ( pinDenied ) return pinDenied;
+    if ( pinDenied ) {return pinDenied;}
     if ( toNumber( wallet.balance, 0 ) < amountJod ) {
       return json( { error: 'Insufficient wallet balance.' }, 400 );
     }
@@ -220,7 +194,7 @@ export async function handleWalletWithdraw ( request: Request, requestedUserId: 
         description: 'Wallet withdrawal',
       },
     } );
-    if ( error ) throw new Error( error.message );
+    if ( error ) {throw new Error( error.message );}
     return json( await loadWalletPayload( auth.admin, auth.canonicalUser.id ) );
   } catch ( error ) {
     return walletOperationFailed( 'withdraw', error );
@@ -229,27 +203,27 @@ export async function handleWalletWithdraw ( request: Request, requestedUserId: 
 
 export async function handleWalletSend ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const amountJod = toMoneyNumber( body.amount );
   const recipientId = String( body.recipientId ?? '' ).trim();
   const note = String( body.note ?? '' ).trim().slice( 0, 200 );
-  if ( amountJod <= 0 ) return json( { error: 'Amount must be greater than zero.' }, 400 );
+  if ( amountJod <= 0 ) {return json( { error: 'Amount must be greater than zero.' }, 400 );}
   if ( amountJod > MAX_WALLET_SEND_JOD ) {
     return json( { error: `Transfers are limited to JOD ${ MAX_WALLET_SEND_JOD } per request.` }, 400 );
   }
 
   const throttled = await consumeRateLimit( auth.admin, `wallet-send:${ auth.canonicalUser.id }`, 20, 3600, { failClosed: true } );
-  if ( throttled ) return throttled;
+  if ( throttled ) {return throttled;}
 
   try {
     const senderWallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
     const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, senderWallet, body.pin );
-    if ( pinDenied ) return pinDenied;
+    if ( pinDenied ) {return pinDenied;}
 
     const recipientUserId = await resolveWalletRecipient( auth.admin, recipientId );
-    if ( !recipientUserId ) return json( { error: 'Recipient wallet was not found.' }, 404 );
+    if ( !recipientUserId ) {return json( { error: 'Recipient wallet was not found.' }, 404 );}
     if ( recipientUserId === auth.canonicalUser.id ) {
       return json( { error: 'Cannot send wallet funds to the same account.' }, 400 );
     }
@@ -260,7 +234,7 @@ export async function handleWalletSend ( request: Request, requestedUserId: stri
       p_amount: amountJod,
       p_payment_method: 'wallet_balance',
     } );
-    if ( error ) throw new Error( error.message );
+    if ( error ) {throw new Error( error.message );}
 
     return json( { success: true, note, wallet: await loadWalletPayload( auth.admin, auth.canonicalUser.id ) } );
   } catch ( error ) {
@@ -270,11 +244,11 @@ export async function handleWalletSend ( request: Request, requestedUserId: stri
 
 export async function handleSetWalletPin ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const pin = String( body.pin ?? '' ).trim();
-  if ( !/^\d{4}$/.test( pin ) ) return json( { error: 'Wallet PIN must be four digits.' }, 400 );
+  if ( !/^\d{4}$/.test( pin ) ) {return json( { error: 'Wallet PIN must be four digits.' }, 400 );}
 
   try {
     const pinHash = await hashWalletPin( pin );
@@ -282,7 +256,7 @@ export async function handleSetWalletPin ( request: Request, requestedUserId: st
       .from( 'wallets' )
       .update( { pin_hash: pinHash, updated_at: new Date().toISOString() } )
       .eq( 'user_id', auth.canonicalUser.id );
-    if ( error ) throw new Error( error.message );
+    if ( error ) {throw new Error( error.message );}
     return json( { success: true, wallet: await loadWalletPayload( auth.admin, auth.canonicalUser.id ) } );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
@@ -291,13 +265,13 @@ export async function handleSetWalletPin ( request: Request, requestedUserId: st
 
 export async function handleVerifyWalletPin ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const pin = String( body.pin ?? '' ).trim();
   try {
     const wallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
-    if ( !wallet.pin_hash ) return json( { verified: false } );
+    if ( !wallet.pin_hash ) {return json( { verified: false } );}
 
     // Same lockout bucket as withdraw/send, so /pin/verify cannot be used as an
     // unthrottled oracle to brute-force the 4-digit space.
@@ -308,10 +282,10 @@ export async function handleVerifyWalletPin ( request: Request, requestedUserId:
       PIN_LOCKOUT_SECONDS,
       { failClosed: true },
     );
-    if ( limited ) return limited;
+    if ( limited ) {return limited;}
 
     const verified = await verifyWalletPinHash( pin, wallet.pin_hash );
-    if ( verified ) await resetRateLimit( auth.admin, pinAttemptKey( auth.canonicalUser.id ) );
+    if ( verified ) {await resetRateLimit( auth.admin, pinAttemptKey( auth.canonicalUser.id ) );}
     return json( { verified } );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
@@ -320,7 +294,7 @@ export async function handleVerifyWalletPin ( request: Request, requestedUserId:
 
 export async function handleSetWalletAutoTopUp ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const amount = toMoneyNumber( body.amount );
@@ -335,7 +309,7 @@ export async function handleSetWalletAutoTopUp ( request: Request, requestedUser
         updated_at: new Date().toISOString(),
       } )
       .eq( 'user_id', auth.canonicalUser.id );
-    if ( error ) throw new Error( error.message );
+    if ( error ) {throw new Error( error.message );}
     return json( await loadWalletPayload( auth.admin, auth.canonicalUser.id ) );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
@@ -344,7 +318,7 @@ export async function handleSetWalletAutoTopUp ( request: Request, requestedUser
 
 export async function handleGetWalletPaymentMethods ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   try {
     const details = await loadWalletDetails( auth.admin, auth.canonicalUser.id );
@@ -356,7 +330,7 @@ export async function handleGetWalletPaymentMethods ( request: Request, requeste
 
 export async function handleAddWalletPaymentMethod ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const provider = String( body.provider ?? 'manual' ).trim() || 'manual';
@@ -373,7 +347,7 @@ export async function handleAddWalletPaymentMethod ( request: Request, requested
       } )
       .select( '*' )
       .single();
-    if ( error ) throw new Error( error.message );
+    if ( error ) {throw new Error( error.message );}
     return json( data, 201 );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
@@ -382,8 +356,8 @@ export async function handleAddWalletPaymentMethod ( request: Request, requested
 
 export async function handleDeleteWalletPaymentMethod ( request: Request, requestedUserId: string, methodId: string | null ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
-  if ( !methodId ) return json( { error: 'Payment method id is required.' }, 400 );
+  if ( 'error' in auth ) {return auth.error;}
+  if ( !methodId ) {return json( { error: 'Payment method id is required.' }, 400 );}
 
   try {
     const { error } = await auth.admin
@@ -391,7 +365,7 @@ export async function handleDeleteWalletPaymentMethod ( request: Request, reques
       .delete()
       .eq( 'payment_method_id', methodId )
       .eq( 'user_id', auth.canonicalUser.id );
-    if ( error ) throw new Error( error.message );
+    if ( error ) {throw new Error( error.message );}
     return json( { success: true } );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
@@ -400,7 +374,7 @@ export async function handleDeleteWalletPaymentMethod ( request: Request, reques
 
 export async function handleGetWalletTrustScore ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   try {
     const [ { data: wallet }, { data: driver }, { data: user, error: userError } ] = await Promise.all( [
@@ -408,7 +382,7 @@ export async function handleGetWalletTrustScore ( request: Request, requestedUse
       auth.admin.from( 'drivers' ).select( 'driver_id' ).eq( 'user_id', auth.canonicalUser.id ).maybeSingle(),
       auth.admin.from( 'users' ).select( 'verification_level' ).eq( 'id', auth.canonicalUser.id ).maybeSingle(),
     ] );
-    if ( userError ) throw new Error( userError.message );
+    if ( userError ) {throw new Error( userError.message );}
     let tripCount = 0;
     if ( driver?.driver_id ) {
       const { count } = await auth.admin
@@ -430,22 +404,22 @@ export async function handleGetWalletTrustScore ( request: Request, requestedUse
 
 export async function handleGetWalletRewards ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
   return json( { rewards: [] } );
 }
 
 export async function handleClaimWalletReward ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
   const body = await request.json().catch( () => ( {} ) );
   const rewardId = String( body.rewardId ?? '' ).trim();
-  if ( !rewardId ) return json( { error: 'Reward id is required.' }, 400 );
+  if ( !rewardId ) {return json( { error: 'Reward id is required.' }, 400 );}
   return json( { error: 'Reward is not available.' }, 404 );
 }
 
 export async function handleGetWalletSubscription ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
   if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
     return json( { error: 'Wallet route is not authorized for this user.' }, 403 );
   }
@@ -460,7 +434,7 @@ export async function handleGetWalletSubscription ( request: Request, requestedU
 
 export async function handleWalletTopUp ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
   if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
     return json( { error: 'Wallet route is not authorized for this user.' }, 403 );
   }
@@ -478,7 +452,7 @@ export async function handleWalletTopUp ( request: Request, requestedUserId: str
 
   // Each call creates a pending transaction row and a provider checkout session.
   const throttled = await consumeRateLimit( auth.admin, `wallet-topup:${ auth.canonicalUser.id }`, 10, 3600 );
-  if ( throttled ) return throttled;
+  if ( throttled ) {return throttled;}
 
   const { data: wallet, error: walletError } = await auth.admin
     .from( 'wallets' )
@@ -596,7 +570,7 @@ export async function handleWalletTopUp ( request: Request, requestedUserId: str
 
 export async function handleWalletSubscribe ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
   if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
     return json( { error: 'Wallet route is not authorized for this user.' }, 403 );
   }
@@ -668,8 +642,8 @@ async function resolvePayableAmount (
       .eq( 'id', referenceId )
       .maybeSingle();
 
-    if ( error ) return { error: walletOperationFailed( 'pay', error ) };
-    if ( !data ) return { error: json( { error: 'Booking not found.' }, 404 ) };
+    if ( error ) {return { error: walletOperationFailed( 'pay', error ) };}
+    if ( !data ) {return { error: json( { error: 'Booking not found.' }, 404 ) };}
     if ( !isOwnedByCaller( data, callerUserId ) ) {
       return { error: json( { error: 'This booking does not belong to you.' }, 403 ) };
     }
@@ -697,8 +671,8 @@ async function resolvePayableAmount (
       .eq( 'id', referenceId )
       .maybeSingle();
 
-    if ( error ) return { error: walletOperationFailed( 'pay', error ) };
-    if ( !data ) return { error: json( { error: 'Package not found.' }, 404 ) };
+    if ( error ) {return { error: walletOperationFailed( 'pay', error ) };}
+    if ( !data ) {return { error: json( { error: 'Package not found.' }, 404 ) };}
     if ( data.sender_id !== callerUserId ) {
       return { error: json( { error: 'This package does not belong to you.' }, 403 ) };
     }
@@ -718,8 +692,8 @@ async function resolvePayableAmount (
       .eq( 'id', referenceId )
       .maybeSingle();
 
-    if ( error ) return { error: walletOperationFailed( 'pay', error ) };
-    if ( !data ) return { error: json( { error: 'Bus booking not found.' }, 404 ) };
+    if ( error ) {return { error: walletOperationFailed( 'pay', error ) };}
+    if ( !data ) {return { error: json( { error: 'Bus booking not found.' }, 404 ) };}
     if ( data.user_id !== callerUserId ) {
       return { error: json( { error: 'This booking does not belong to you.' }, 403 ) };
     }
@@ -749,7 +723,7 @@ function isOwnedByCaller ( row: Record<string, unknown>, callerUserId: string ):
 
 export async function handleWalletPay ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
   const referenceType = String( body.referenceType ?? body.reference_type ?? 'ride_booking' ).trim();
@@ -769,7 +743,7 @@ export async function handleWalletPay ( request: Request, requestedUserId: strin
     // amount is never trusted: the browser computes the quote, so accepting it
     // would let a caller settle any booking for an arbitrary sum.
     const authoritativeAmountJod = await resolvePayableAmount( auth.admin, referenceType, referenceId, auth.canonicalUser.id );
-    if ( 'error' in authoritativeAmountJod ) return authoritativeAmountJod.error;
+    if ( 'error' in authoritativeAmountJod ) {return authoritativeAmountJod.error;}
 
     const { amountJod, metadata } = authoritativeAmountJod;
     if ( amountJod <= 0 ) {
@@ -805,28 +779,28 @@ export async function handleWalletPay ( request: Request, requestedUserId: strin
 
 export async function handleWalletDispatch ( request: Request, path: string ): Promise<Response | undefined> {
   const walletRoute = parseWalletRoute( path );
-  if ( !walletRoute ) return undefined;
+  if ( !walletRoute ) {return undefined;}
 
   const method = request.method;
   const { userId, action, resourceId } = walletRoute;
 
-  if ( method === 'GET' && action === '' ) return handleGetWallet( request, userId );
-  if ( method === 'GET' && action === 'transactions' ) return handleGetWalletTransactions( request, userId );
-  if ( method === 'GET' && action === 'insights' ) return handleGetWalletInsights( request, userId );
-  if ( method === 'POST' && action === 'withdraw' ) return handleWalletWithdraw( request, userId );
-  if ( method === 'POST' && action === 'send' ) return handleWalletSend( request, userId );
-  if ( method === 'POST' && action === 'pin' && resourceId === 'set' ) return handleSetWalletPin( request, userId );
-  if ( method === 'POST' && action === 'pin' && resourceId === 'verify' ) return handleVerifyWalletPin( request, userId );
-  if ( method === 'POST' && action === 'auto-topup' ) return handleSetWalletAutoTopUp( request, userId );
-  if ( method === 'GET' && action === 'payment-methods' ) return handleGetWalletPaymentMethods( request, userId );
-  if ( method === 'POST' && action === 'payment-methods' ) return handleAddWalletPaymentMethod( request, userId );
-  if ( method === 'DELETE' && action === 'payment-methods' ) return handleDeleteWalletPaymentMethod( request, userId, resourceId );
-  if ( method === 'GET' && action === 'trust-score' ) return handleGetWalletTrustScore( request, userId );
-  if ( method === 'GET' && action === 'rewards' ) return handleGetWalletRewards( request, userId );
-  if ( method === 'POST' && action === 'rewards' && resourceId === 'claim' ) return handleClaimWalletReward( request, userId );
-  if ( method === 'GET' && action === 'subscription' ) return handleGetWalletSubscription( request, userId );
-  if ( method === 'POST' && action === 'top-up' ) return handleWalletTopUp( request, userId );
-  if ( method === 'POST' && action === 'subscribe' ) return handleWalletSubscribe( request, userId );
-  if ( method === 'POST' && action === 'pay' ) return handleWalletPay( request, userId );
+  if ( method === 'GET' && action === '' ) {return handleGetWallet( request, userId );}
+  if ( method === 'GET' && action === 'transactions' ) {return handleGetWalletTransactions( request, userId );}
+  if ( method === 'GET' && action === 'insights' ) {return handleGetWalletInsights( request, userId );}
+  if ( method === 'POST' && action === 'withdraw' ) {return handleWalletWithdraw( request, userId );}
+  if ( method === 'POST' && action === 'send' ) {return handleWalletSend( request, userId );}
+  if ( method === 'POST' && action === 'pin' && resourceId === 'set' ) {return handleSetWalletPin( request, userId );}
+  if ( method === 'POST' && action === 'pin' && resourceId === 'verify' ) {return handleVerifyWalletPin( request, userId );}
+  if ( method === 'POST' && action === 'auto-topup' ) {return handleSetWalletAutoTopUp( request, userId );}
+  if ( method === 'GET' && action === 'payment-methods' ) {return handleGetWalletPaymentMethods( request, userId );}
+  if ( method === 'POST' && action === 'payment-methods' ) {return handleAddWalletPaymentMethod( request, userId );}
+  if ( method === 'DELETE' && action === 'payment-methods' ) {return handleDeleteWalletPaymentMethod( request, userId, resourceId );}
+  if ( method === 'GET' && action === 'trust-score' ) {return handleGetWalletTrustScore( request, userId );}
+  if ( method === 'GET' && action === 'rewards' ) {return handleGetWalletRewards( request, userId );}
+  if ( method === 'POST' && action === 'rewards' && resourceId === 'claim' ) {return handleClaimWalletReward( request, userId );}
+  if ( method === 'GET' && action === 'subscription' ) {return handleGetWalletSubscription( request, userId );}
+  if ( method === 'POST' && action === 'top-up' ) {return handleWalletTopUp( request, userId );}
+  if ( method === 'POST' && action === 'subscribe' ) {return handleWalletSubscribe( request, userId );}
+  if ( method === 'POST' && action === 'pay' ) {return handleWalletPay( request, userId );}
   return undefined;
 }

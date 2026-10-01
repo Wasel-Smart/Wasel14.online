@@ -61,7 +61,7 @@ function mapNotificationRow ( row: Record<string, unknown> ) {
 
 export async function handleGetNotifications ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const requestedLimit = Number( new URL( request.url ).searchParams.get( 'limit' ) );
   const limit = Number.isFinite( requestedLimit ) && requestedLimit > 0
@@ -75,7 +75,7 @@ export async function handleGetNotifications ( request: Request ) {
     .order( 'created_at', { ascending: false } )
     .limit( limit );
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   const notifications = ( Array.isArray( data ) ? data : [] ).map(
     ( row: Record<string, unknown> ) => mapNotificationRow( row ),
@@ -86,9 +86,9 @@ export async function handleGetNotifications ( request: Request ) {
 
 export async function handleMarkNotificationRead ( request: Request, notificationId: string ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
-  if ( !notificationId ) return json( { error: 'Notification id is required' }, 400 );
+  if ( !notificationId ) {return json( { error: 'Notification id is required' }, 400 );}
 
   // The user_id predicate is what prevents one user from reading another's
   // notification — an update without it would mark arbitrary ids as read.
@@ -105,21 +105,21 @@ export async function handleMarkNotificationRead ( request: Request, notificatio
     .select( '*' )
     .maybeSingle();
 
-  if ( error ) return json( { error: error.message }, 500 );
-  if ( !data ) return json( { error: 'Notification not found' }, 404 );
+  if ( error ) {return json( { error: error.message }, 500 );}
+  if ( !data ) {return json( { error: 'Notification not found' }, 404 );}
 
   return json( { success: true, notification: mapNotificationRow( data ) } );
 }
 
 export async function handleSendPushNotification ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
-  if ( !isPlainObject( body ) ) return json( { error: 'Invalid request body' }, 400 );
+  if ( !isPlainObject( body ) ) {return json( { error: 'Invalid request body' }, 400 );}
 
   const recipientId = String( body.userId ?? auth.canonicalUser.id ).trim();
-  if ( !recipientId ) return json( { error: 'A recipient userId is required' }, 400 );
+  if ( !recipientId ) {return json( { error: 'A recipient userId is required' }, 400 );}
 
   // Without this guard any authenticated user could post notifications into
   // somebody else's feed, so targeting yourself is allowed but targeting anyone
@@ -161,7 +161,7 @@ export async function handleSendPushNotification ( request: Request ) {
     .select( '*' )
     .single();
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   return json( {
     ok: true,
@@ -171,10 +171,10 @@ export async function handleSendPushNotification ( request: Request ) {
 
 export async function handleSetPushPreference ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
-  if ( !isPlainObject( body ) ) return json( { error: 'Invalid request body' }, 400 );
+  if ( !isPlainObject( body ) ) {return json( { error: 'Invalid request body' }, 400 );}
 
   // The browser permission and the server opt-in are two separate facts: the
   // user can grant the browser permission and still not want push delivered.
@@ -193,7 +193,7 @@ export async function handleSetPushPreference ( request: Request ) {
     .select( 'user_id, push_enabled, updated_at' )
     .single();
 
-  if ( error ) return json( { error: error.message }, 500 );
+  if ( error ) {return json( { error: error.message }, 500 );}
 
   return json( { ok: true, pushEnabled: enabled, preferences: data ?? null } );
 }

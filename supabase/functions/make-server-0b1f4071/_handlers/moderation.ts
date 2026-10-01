@@ -1,36 +1,8 @@
 import {
-  json,
-  noContent,
-  buildResponseHeaders,
-  finalizeResponse,
-  isOriginAllowed,
-  isWebhookRoute,
-  enforceRequestSecurity,
-  ensureRuntimeAdminAccess,
-  authenticateRequest,
-  getAdminClient,
-  authenticateAuthUser,
-  enforcePermission,
-  hasAnyPermission,
-  getFunctionBaseUrl,
-  executeSqlStatements,
-  getAppBaseUrl,
-  matchesAuthenticatedUser,
-  ensureCanonicalUserForAuth,
-  getWalletForUser,
-  getVerificationForUser,
-  getDriverForUser,
-  ensureDriverForUser,
-  isApprovedDriver,
-  buildProfilePayload,
-  mapTripRow,
-  mapBookingRow,
-  mapPackageRow,
-  fetchDriverProfiles,
-  buildTrustStatus,
-  ensureMobilitySeed,
-  logUnhandledRouteError,
-  sanitizedUnhandledErrorResponse,
+    json,
+    ensureRuntimeAdminAccess,
+    authenticateRequest,
+    executeSqlStatements,
 } from './shared.ts';
 
 import {
@@ -40,7 +12,7 @@ import {
 
 export async function handleApplyModerationMigrations ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
-  if ( accessError ) return accessError;
+  if ( accessError ) {return accessError;}
 
   await executeSqlStatements( CONTENT_MODERATION_SQL );
 
@@ -53,14 +25,14 @@ export async function handleApplyModerationMigrations ( request: Request ) {
 
 export async function handleSubmitReport ( request: Request ) {
   const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) return auth.error;
+  if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json();
   const bookingId = String( body.bookingId ?? '' ).trim();
   const issueType = String( body.issueType ?? '' ).trim();
   const description = typeof body.description === 'string' ? body.description.trim() : '';
 
-  if ( !issueType ) return json( { error: 'issueType is required' }, 400 );
+  if ( !issueType ) {return json( { error: 'issueType is required' }, 400 );}
 
   const { admin, canonicalUser } = auth;
 
@@ -71,7 +43,7 @@ export async function handleSubmitReport ( request: Request ) {
       .select( 'id' )
       .eq( 'id', bookingId )
       .maybeSingle();
-    if ( bookingError ) return json( { error: bookingError.message }, 500 );
+    if ( bookingError ) {return json( { error: bookingError.message }, 500 );}
     bookingIdResolved = booking?.id ?? null;
   }
 
@@ -83,7 +55,7 @@ export async function handleSubmitReport ( request: Request ) {
     status: 'open',
   } );
 
-  if ( insertError ) return json( { error: insertError.message }, 500 );
+  if ( insertError ) {return json( { error: insertError.message }, 500 );}
 
   return json( { ok: true }, 201 );
 }

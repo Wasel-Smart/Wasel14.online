@@ -8,9 +8,9 @@ const supabaseAdmin = createClient(
 );
 
 function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {return false;}
   let result = 0;
-  for (let i = 0; i < a.length; i++) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < a.length; i++) {result |= a.charCodeAt(i) ^ b.charCodeAt(i);}
   return result === 0;
 }
 
@@ -29,7 +29,7 @@ serve(async (req: Request) => {
       .eq('status', 'pending')
       .lte('scheduled_for', new Date().toISOString());
 
-    if (error) throw error;
+    if (error) {throw error;}
 
     if (!requests || requests.length === 0) {
       return new Response(JSON.stringify({ processed: 0 }), {

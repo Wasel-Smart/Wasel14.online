@@ -203,6 +203,43 @@ describe('Performance Utilities', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
       expect(fn).toHaveBeenCalled();
     });
+
+    it('falls back to setTimeout when requestIdleCallback is unavailable (Safari/iOS)', async () => {
+      vi.useFakeTimers();
+      const originalRic = window.requestIdleCallback;
+      // Simulate Safari/iOS: property does not exist
+      Object.defineProperty(window, 'requestIdleCallback', { value: undefined, configurable: true, writable: true });
+
+      try {
+        const { scheduleIdleTask } = await import('../../src/utils/performance');
+        const fn = vi.fn();
+        const cancel = scheduleIdleTask(fn);
+        expect(typeof cancel).toBe('function');
+        vi.runAllTimers();
+        expect(fn).toHaveBeenCalledTimes(1);
+      } finally {
+        Object.defineProperty(window, 'requestIdleCallback', { value: originalRic, configurable: true, writable: true });
+        vi.useRealTimers();
+      }
+    });
+
+    it('cancel function stops the scheduled task (Safari/iOS fallback path)', async () => {
+      vi.useFakeTimers();
+      const originalRic = window.requestIdleCallback;
+      Object.defineProperty(window, 'requestIdleCallback', { value: undefined, configurable: true, writable: true });
+
+      try {
+        const { scheduleIdleTask } = await import('../../src/utils/performance');
+        const fn = vi.fn();
+        const cancel = scheduleIdleTask(fn);
+        cancel();
+        vi.runAllTimers();
+        expect(fn).not.toHaveBeenCalled();
+      } finally {
+        Object.defineProperty(window, 'requestIdleCallback', { value: originalRic, configurable: true, writable: true });
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('batchTasks', () => {

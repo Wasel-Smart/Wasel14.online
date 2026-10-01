@@ -10,6 +10,15 @@
   "engines": {
     "node": ">=20"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0",
+      "bash -c 'npm run type-check:app'"
+    ],
+    "*.{js,mjs,cjs}": [
+      "eslint --fix --max-warnings 0"
+    ]
+  },
   "scripts": {
     "dev": "vite",
     "build": "npx tsc && vite build && node scripts/generate-pwa-manifest.mjs && node scripts/version-sw.mjs",
@@ -128,6 +137,7 @@
   "devDependencies": {
     "@axe-core/cli": "^4.13.0",
     "@eslint/js": "^10.0.1",
+    "@lhci/cli": "^0.14.0",
     "@playwright/test": "^1.44.1",
     "@tailwindcss/vite": "^4.1.4",
     "@testing-library/dom": "^10.4.1",
@@ -143,6 +153,7 @@
     "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.70.0",
     "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.4.19",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -150,6 +161,7 @@
     "globals": "^16.5.0",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "lint-staged": "^15.2.0",
     "playwright": "^1.63.0",
     "postcss": "^8.4.38",
     "prettier": "^3.9.8",
