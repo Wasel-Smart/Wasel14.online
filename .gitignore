@@ -39,6 +39,7 @@ yarn.lock
 !.env.example
 !.env.production.template
 !.env.production.staging.template
+!.env.edge.template
 .env.original
 .env.testcopy
 .env-LaithNassar.*
@@ -123,6 +124,7 @@ mobile/file.tmp
 *~
 
 # ---- Secrets / credentials (never commit) ----
+_git_hygiene_quarantine/
 _SECRETS_NEEDS_ROTATION_THEN_DELETE/
 client_secret_*.json
 wasel-planning-with-ai-*.json
@@ -284,6 +286,7 @@ vitest.config.mjs
 
 # ---- Local write-test / ephemeral output ----
 # (covered above under root-level scratch)
-
-.vercel
-.env*
+#
+# NOTE: do not add a trailing `.env*` or a second `.vercel` here. A later pattern overrides
+# the `!.env.example` / `!.env.*.template` negations above and would hide the committed
+# templates from git. `.vercel` is already ignored in the Vercel section.

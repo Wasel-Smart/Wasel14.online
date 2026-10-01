@@ -252,7 +252,11 @@ export const SANAD_CLIENT_SECRET = Deno.env.get( 'SANAD_CLIENT_SECRET' ) ?? '';
 export const SANAD_WEBHOOK_SECRET = Deno.env.get( 'SANAD_WEBHOOK_SECRET' ) ?? '';
 export const SANAD_VERIFICATION_ENDPOINT = Deno.env.get( 'SANAD_VERIFICATION_ENDPOINT' ) ?? '/identity/verifications';
 export const STRIPE_WASEL_PLUS_PRICE_ID = Deno.env.get( 'STRIPE_WASEL_PLUS_PRICE_ID' ) ?? '';
-export const SUPABASE_AUTH_HOOK_SEND_SMS_SECRET = Deno.env.get( 'SUPABASE_AUTH_HOOK_SEND_SMS_SECRET' ) ?? '';
+// The Supabase CLI and dashboard refuse secret names that start with SUPABASE_, so the
+// hook secret is read from SEND_SMS_HOOK_SECRET first. The old name is kept as a fallback
+// for any environment that already provides it.
+export const SUPABASE_AUTH_HOOK_SEND_SMS_SECRET =
+  Deno.env.get( 'SEND_SMS_HOOK_SECRET' ) ?? Deno.env.get( 'SUPABASE_AUTH_HOOK_SEND_SMS_SECRET' ) ?? '';
 export const ADDITIONAL_ALLOWED_ORIGINS = Deno.env.get( 'ALLOWED_ORIGINS' ) ?? '';
 // Localhost origins are only permitted when explicitly enabled (local dev).
 // In production this MUST stay false so dev origins cannot call the API.
@@ -1165,12 +1169,14 @@ export function toMoneyNumber ( value: unknown ): number {
 }
 
 /**
- * JOD is a three-decimal currency, so a dinar amount converts to fils at
- * x1000. This must only ever be paired with a JOD Stripe price: charging it
- * against a two-decimal currency bills ten times the intended amount.
+ * JOD is a three-decimal currency (1 JOD = 1000 fils). Stripe requires amounts for
+ * three-decimal currencies to be a multiple of 10 (it rejects e.g. 5124), so the
+ * value is rounded to the nearest 10 fils (0.01 JOD) before conversion. This must
+ * only ever be paired with a JOD Stripe price: charging it against a two-decimal
+ * currency bills ten times the intended amount.
  */
 export function toStripeMinorAmount ( amountJod: number ): string {
-  return String( Math.round( amountJod * 1000 ) );
+  return String( Math.round( amountJod * 100 ) * 10 );
 }
 
 export function buildCliqCheckoutUrl ( template: string, values: Record<string, string> ): string {

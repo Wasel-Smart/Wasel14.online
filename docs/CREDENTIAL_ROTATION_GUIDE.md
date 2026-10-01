@@ -93,9 +93,11 @@ want to recreate the services.
 Settings, Database, **Reset database password**. Update `DATABASE_URL` everywhere it is used and
 restart anything holding connections.
 
-### 3.3 Send-SMS auth hook secret (`SUPABASE_AUTH_HOOK_SEND_SMS_SECRET`)
-Regenerate the hook secret in Authentication, Hooks, and update the same value in Supabase
-secrets so `handleSendSmsHook` accepts it.
+### 3.3 Send-SMS auth hook secret (`SEND_SMS_HOOK_SECRET`)
+Regenerate the hook secret in Authentication, Hooks, and set the same value as the
+`SEND_SMS_HOOK_SECRET` edge secret so `handleSendSmsHook` accepts it. (The code also still
+reads the old `SUPABASE_AUTH_HOOK_SEND_SMS_SECRET` name as a fallback, but Supabase will not
+let you set secrets with a `SUPABASE_` prefix.)
 
 ---
 
