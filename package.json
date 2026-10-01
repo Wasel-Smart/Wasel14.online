@@ -103,7 +103,7 @@
     "facebook-nodejs-business-sdk": "^24.0.1",
     "framer-motion": "^12.0.0",
     "input-otp": "^1.4.2",
-    "ioredis": "^5.11.1",
+    "ioredis": "^6.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.487.0",
     "motion": "^12.0.0",
