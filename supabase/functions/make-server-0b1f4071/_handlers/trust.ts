@@ -1,34 +1,25 @@
 import {
     json,
     authenticateRequest,
-    getFunctionBaseUrl,
     buildTrustStatus,
+    PHONE_NUMBER_IN_USE_MESSAGE,
+    PHONE_VERIFICATION_TTL_MINUTES,
+    TWILIO_VERIFY_SERVICE_SID,
+    checkTwilioPhoneVerification,
+    constantTimeEqual,
+    generateOtpCode,
+    hasTwilioVerifyRuntime,
+    hashOtpCode,
+    isExpired,
+    isPhoneNumberUniqueViolation,
+    sendTwilioOtpSms,
+    startTwilioPhoneVerification,
 } from './shared.ts';
 
 import {
   isValidE164Phone,
   normalizePhoneNumber,
 } from '../_shared/phone.ts';
-
-import {
-  PHONE_NUMBER_IN_USE_MESSAGE,
-  PHONE_VERIFICATION_TTL_MINUTES,
-  TWILIO_VERIFY_SERVICE_SID,
-  checkTwilioPhoneVerification,
-  constantTimeEqual,
-  generateOtpCode,
-  hasTwilioVerifyRuntime,
-  hashOtpCode,
-  isExpired,
-  isPhoneNumberUniqueViolation,
-  sendDelivery,
-  startTwilioPhoneVerification,
-} from './shared.ts';
-
-import {
-  buildIdempotencyKey,
-  determineProviderName,
-} from '../_shared/communication-runtime.ts';
 
 
 export async function handleGetTrustStatus ( request: Request ) {
@@ -137,47 +128,13 @@ export async function handleStartPhoneVerification ( request: Request ) {
     );
   }
 
-  const message = `Your Wasel verification code is ${ code }. It expires in ${ PHONE_VERIFICATION_TTL_MINUTES } minutes.`;
-  const deliveryRow = {
-    user_id: auth.canonicalUser.id,
-    channel: 'sms',
-    delivery_status: 'queued',
-    destination: phoneNumber,
-    subject: 'Wasel phone verification',
-    payload: {
-      body: message,
-      metadata: {
-        category: 'trust_phone_verification',
-      },
-    },
-    provider_name: determineProviderName( 'sms' ),
-    queued_at: now,
-    updated_at: now,
-    idempotency_key: buildIdempotencyKey( {
-      deliveryId: `phone-verification-${ otpSession.otp_session_id }`,
-      channel: 'sms',
-      destination: phoneNumber,
-      body: message,
-    } ),
-  };
-
-  const { data: delivery, error: deliveryError } = await auth.admin
-    .from( 'communication_deliveries' )
-    .insert( deliveryRow )
-    .select( '*' )
-    .single();
-  if ( deliveryError ) {
-    await auth.admin.from( 'otp_sessions' ).delete().eq( 'otp_session_id', otpSession.otp_session_id );
-    return json( { error: deliveryError.message }, 500 );
-  }
-
-  const deliveryResult = await sendDelivery( auth.admin, delivery, getFunctionBaseUrl( request ) );
-  if ( !deliveryResult.ok ) {
+  const smsResult = await sendTwilioOtpSms( phoneNumber, code ?? '' );
+  if ( !smsResult.ok ) {
     await auth.admin.from( 'otp_sessions' ).delete().eq( 'otp_session_id', otpSession.otp_session_id );
     return json(
       {
         error:
-          deliveryResult.error ??
+          smsResult.error ??
           'Phone verification could not be delivered. Check SMS provider configuration.',
       },
       502,

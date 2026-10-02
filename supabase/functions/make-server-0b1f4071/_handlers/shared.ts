@@ -20,11 +20,10 @@ import {
     MOBILITY_OS_RUNTIME_SQL,
 } from '../_shared/mobility-os-runtime.ts';
 import { toNumber } from '../_shared/pricing.ts';
-import type {
-  AccessPermission} from '../_shared/rbac.ts';
 import {
     hasPermission,
     resolveAccessRole,
+    type AccessPermission,
 } from '../_shared/rbac.ts';
 
 
@@ -1270,21 +1269,56 @@ export async function callTwilioVerify ( path: string, params: URLSearchParams )
   };
 }
 
-export async function startTwilioPhoneVerification ( phoneNumber: string ) {
-  const result = await callTwilioVerify(
-    '/Verifications',
-    new URLSearchParams( {
-      To: phoneNumber,
-      Channel: 'sms',
-      Locale: 'en',
-    } ),
+export async function sendTwilioOtpSms ( phoneNumber: string, code: string ): Promise<{ ok: boolean; retryable: boolean; error?: string }> {
+  const authPair = getTwilioAuthPair();
+  if ( !authPair || !deliveryEnv.twilioAccountSid ) {
+    return { ok: false, retryable: false, error: 'Twilio is not configured.' };
+  }
+
+  const body = `Wasel | واصل: Your verification code is ${ code }. It expires in 10 minutes. Never share this code with anyone.`;
+  const params = new URLSearchParams( { To: phoneNumber, Body: body } );
+
+  if ( deliveryEnv.twilioMessagingServiceSid ) {
+    params.set( 'MessagingServiceSid', deliveryEnv.twilioMessagingServiceSid );
+  } else if ( deliveryEnv.twilioSmsFrom ) {
+    params.set( 'From', deliveryEnv.twilioSmsFrom );
+  } else {
+    return { ok: false, retryable: false, error: 'TWILIO_MESSAGING_SERVICE_SID or TWILIO_SMS_FROM is required.' };
+  }
+
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${ deliveryEnv.twilioAccountSid }/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${ btoa( `${ authPair.user }:${ authPair.password }` ) }`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    },
   );
 
+  const payload = await response.json().catch( () => ( {} ) );
   return {
-    ok: result.ok,
-    retryable: result.retryable,
-    error: result.ok ? undefined : result.error,
+    ok: response.ok,
+    retryable: response.status >= 500,
+    error: response.ok ? undefined : String( payload?.message ?? `Twilio SMS error ${ response.status }` ),
   };
+}
+
+export async function startTwilioPhoneVerification ( phoneNumber: string ) {
+  // Use Twilio Verify when configured; fall back to direct SMS OTP.
+  if ( hasTwilioVerifyRuntime() ) {
+    const result = await callTwilioVerify(
+      '/Verifications',
+      new URLSearchParams( { To: phoneNumber, Channel: 'sms', Locale: 'en' } ),
+    );
+    return { ok: result.ok, retryable: result.retryable, error: result.ok ? undefined : result.error };
+  }
+
+  const code = generateOtpCode();
+  const result = await sendTwilioOtpSms( phoneNumber, code );
+  return { ok: result.ok, retryable: result.retryable, error: result.error, _code: result.ok ? code : undefined };
 }
 
 export async function checkTwilioPhoneVerification ( phoneNumber: string, code: string ) {
