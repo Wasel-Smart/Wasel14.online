@@ -288,20 +288,21 @@ if ( environmentIsValid ) {
     scheduleIdleTask( callback, { timeout: delay + 1000 } );
 
   // Defer non-critical initializations to reduce initial bundle impact.
-  void scheduleIdle( async () => {
-    try {
-      initializeAppInsights();
-      initializeCsrfProtection();
-      initializeSessionManagement();
+  void scheduleIdle( () => {
+    void ( async () => {
+      try {
+        initializeAppInsights();
+        initializeCsrfProtection();
+        initializeSessionManagement();
 
-      verifyBackendConnection()
-        .then( result => {
-          if ( result.connected ) {
-            if ( import.meta.env.DEV ) {
-              console.log( '[Wasel] ✓ Backend connected:', sanitizeLogMessage( result.message ) );
-            }
-            startHealthCheckMonitoring( 60_000 );
-          } else {
+        verifyBackendConnection()
+          .then( result => {
+            if ( result.connected ) {
+              if ( import.meta.env.DEV ) {
+                console.info( '[Wasel] ✓ Backend connected:', sanitizeLogMessage( result.message ) );
+              }
+              startHealthCheckMonitoring( 60_000 );
+            } else {
             if ( import.meta.env.DEV ) {
               console.warn( '[Wasel] ⚠ Backend connection issue:', sanitizeLogMessage( result.message ) );
             }
@@ -319,11 +320,12 @@ if ( environmentIsValid ) {
           clearMasterKey();
         }
       } );
-    } catch ( error ) {
-      if ( import.meta.env.DEV ) {
-        console.warn( '[Wasel] Deferred initialization failed:', error );
+      } catch ( error ) {
+        if ( import.meta.env.DEV ) {
+          console.warn( '[Wasel] Deferred initialization failed:', error );
+        }
       }
-    }
+    } )();
   } );
 
   // Expose circuit breaker utilities globally — DEV builds only.
@@ -351,43 +353,45 @@ if ( environmentIsValid ) {
   }
 
   if ( import.meta.env.PROD && import.meta.env.MODE !== 'test' && 'serviceWorker' in navigator && !window.location.hostname.includes( '127.0.0.1' ) && window.location.hostname !== 'localhost' ) {
-    window.addEventListener( 'load', async () => {
-      try {
-        const existing = await navigator.serviceWorker.getRegistrations();
-        await Promise.allSettled(
-          existing
-            .filter( r => !r.active?.scriptURL.endsWith( '/sw.js' ) )
-            .map( r => r.unregister() ),
-        );
-      } catch { /* non-fatal */ }
+    window.addEventListener( 'load', () => {
+      void ( async () => {
+        try {
+          const existing = await navigator.serviceWorker.getRegistrations();
+          await Promise.allSettled(
+            existing
+              .filter( r => !r.active?.scriptURL.endsWith( '/sw.js' ) )
+              .map( r => r.unregister() ),
+          );
+        } catch { /* non-fatal */ }
 
-      const onControllerChange = () => {
-        navigator.serviceWorker.removeEventListener( 'controllerchange', onControllerChange );
-        reloadAfterServiceWorkerUpdate();
-      };
+        const onControllerChange = () => {
+          navigator.serviceWorker.removeEventListener( 'controllerchange', onControllerChange );
+          reloadAfterServiceWorkerUpdate();
+        };
 
-      navigator.serviceWorker.register( '/sw.js', { updateViaCache: 'none' } ).then( ( registration ) => {
-        registration.update().catch( () => { } );
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then((registration) => {
+          registration.update().catch( () => { } );
 
-        navigator.serviceWorker.addEventListener( 'controllerchange', onControllerChange );
+          navigator.serviceWorker.addEventListener( 'controllerchange', onControllerChange );
 
-        if ( registration.waiting ) {
-          registration.waiting.postMessage( { type: 'SKIP_WAITING' } );
-        }
+          if ( registration.waiting ) {
+            registration.waiting.postMessage( { type: 'SKIP_WAITING' } );
+          }
 
-        registration.addEventListener( 'updatefound', () => {
-          const newWorker = registration.installing;
-          if ( !newWorker ) { return; }
+          registration.addEventListener( 'updatefound', () => {
+            const newWorker = registration.installing;
+            if ( !newWorker ) { return; }
 
-          newWorker.addEventListener( 'statechange', () => {
-            if ( newWorker.state === 'installed' ) {
-              newWorker.postMessage( { type: 'SKIP_WAITING' } );
-            }
+            newWorker.addEventListener( 'statechange', () => {
+              if ( newWorker.state === 'installed' ) {
+                newWorker.postMessage( { type: 'SKIP_WAITING' } );
+              }
+            } );
           } );
+        } ).catch( ( error ) => {
+          console.warn( '[Wasel] Service Worker registration failed:', sanitizeLogMessage( String( error ) ) );
         } );
-      } ).catch( ( error ) => {
-        console.warn( '[Wasel] Service Worker registration failed:', sanitizeLogMessage( String( error ) ) );
-      } );
+      } )();
     } );
   }
 
