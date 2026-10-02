@@ -4,6 +4,8 @@ import {
   enforcePermission,
   ensureRuntimeAdminAccess,
   getAdminClient,
+  type AdminClient,
+  type CanonicalUserRow,
 } from './shared.ts';
 import { hasPermission, resolveAccessRole, type AccessPermission } from '../_shared/rbac.ts';
 
@@ -40,8 +42,8 @@ function toCount ( value: number | null | undefined ): number {
 }
 
 interface AuthorizedContext {
-  admin: any;
-  canonicalUser: any;
+  admin: AdminClient;
+  canonicalUser: CanonicalUserRow;
 }
 
 /**

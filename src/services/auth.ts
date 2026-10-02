@@ -10,7 +10,42 @@ import {
   updateDirectProfile,
 } from './directSupabase';
 import { getAuthCallbackUrl, resolveAuthRedirectOrigin } from '../utils/env';
-import { supabase } from '../utils/supabase/client';
+import { isUsingLegacySupabaseKey, supabase } from '../utils/supabase/client';
+
+// Shapes that must never reach the UI, even when the upstream error text is
+// passed through verbatim instead of being replaced by a fixed message.
+const AUTH_ERROR_SECRET_PATTERNS: Array<[RegExp, string]> = [
+  [/\bsb_(?:publishable|secret)_[A-Za-z0-9_-]+/gi, '[redacted-key]'],
+  [/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]*/g, '[redacted-jwt]'],
+  [/\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9_-]+/gi, '[redacted-key]'],
+  [/\b[A-Za-z0-9._%+-]+:[^\s/@]+@[A-Za-z0-9.-]+\b/g, '[redacted-credential]'],
+  [/\bey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '[redacted-secret]'],
+];
+
+const AUTH_ERROR_MAX_LENGTH = 200;
+
+/**
+ * Make an upstream error string safe to render in the sign-in banner.
+ *
+ * Auth errors are the one place where the original text carries diagnostic
+ * value, so it is preserved — but only after anything that looks like a
+ * credential, key, or connection string has been stripped. Control characters
+ * and over-long text are dropped so the banner stays single-line and bounded.
+ */
+export function redactAuthErrorText(message: string | undefined): string {
+  if (!message) {return '';}
+
+  let out = String(message);
+  for (const [pattern, replacement] of AUTH_ERROR_SECRET_PATTERNS) {
+    out = out.replace(pattern, replacement);
+  }
+
+  return out
+    .replace(/[^\x20-\x7e]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, AUTH_ERROR_MAX_LENGTH);
+}
 
 const ERROR_RULES: Array<{
   test: (lower: string, code: string | undefined) => boolean;
@@ -85,25 +120,65 @@ const ERROR_RULES: Array<{
       lower.includes('network request failed'),
     message: 'Cannot reach the sign-in service. Check your connection and try again.',
   },
+  {
+    // Supabase disabled the legacy anon/service_role JWT keys project-wide. The
+    // API answers 401 with this text for every request made with one, so it is
+    // a deployment/configuration fault, not a bad password.
+    test: (lower, code) =>
+      lower.includes('legacy api keys are disabled') ||
+      lower.includes('legacy api key') ||
+      code === 'legacy_api_key_disabled',
+    message:
+      'Sign-in service is misconfigured (legacy API key rejected). Please contact support.',
+  },
+  {
+    test: (lower, code) =>
+      code === 'invalid_api_key' ||
+      code === 'bad_api_key' ||
+      lower.includes('invalid api key'),
+    message: 'Sign-in service is misconfigured (invalid API key). Please contact support.',
+  },
+  {
+    // CORS preflight rejection: Supabase only echoes the headers its edge
+    // function allows. An injected tracing header turns every call into a
+    // hard network failure, which the browser reports as "Failed to fetch".
+    test: (lower) =>
+      lower.includes('access-control-request-headers') ||
+      lower.includes('not allowed by access-control-allow-headers'),
+    message: 'Sign-in request was blocked by the network policy. Please contact support.',
+  },
 ];
 
+/**
+ * Map a raw Supabase/auth error onto a user-facing message.
+ *
+ * Deliberately does NOT collapse unmatched errors into a generic "Sign in
+ * failed" string: doing so destroyed the actual cause (e.g. "Legacy API keys
+ * are disabled") and made production misconfiguration undiagnosable. Unmatched
+ * errors now keep their own text, which Supabase phrases in user-safe terms.
+ * This message is rendered in the sign-in banner, so it must never carry a
+ * key, token, or URL — `redactAuthErrorText` strips those first.
+ */
 function normalizeAuthError(
   message: string,
   code: string | undefined,
-  context: 'signin' | 'signup' | 'generic',
+  _context: 'signin' | 'signup' | 'generic',
 ): string {
   const lower = message.toLowerCase();
 
   const match = ERROR_RULES.find(rule => rule.test(lower, code));
   if (match) {return match.message;}
 
-  if (context === 'signin') {return 'Sign in failed. Please try again.';}
-  if (context === 'signup') {return 'Sign up failed. Please try again.';}
-  return message || 'Request failed.';
+  return redactAuthErrorText(message) || 'Request failed. Please try again.';
 }
 
 async function requireSupabase() {
   if (!supabase) {
+    if (isUsingLegacySupabaseKey) {
+      throw new Error(
+        'Supabase sign-in service is misconfigured: the build is using a legacy API key that Supabase has disabled. Please contact support.',
+      );
+    }
     throw new Error(
       'Supabase auth is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.',
     );

@@ -8,10 +8,10 @@ Mark each as **Production** environment. Server-only vars must NOT have the `VIT
 | Variable | Value | Scope |
 |---|---|---|
 | `SUPABASE_URL` | `https://zexlxabdcsjefptmjhuq.supabase.co` | Server |
-| `SUPABASE_ANON_KEY` | `sb_publishable_JVm491I75epeoSqNOvN9EQ_sON38c3x` | Server |
+| `SUPABASE_ANON_KEY` | `sb_publishable_<your_publishable_key>` | Server |
 | `VITE_SUPABASE_URL` | `https://zexlxabdcsjefptmjhuq.supabase.co` | Client |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_JVm491I75epeoSqNOvN9EQ_sON38c3x` | Client |
-| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_JVm491I75epeoSqNOvN9EQ_sON38c3x` | Client |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_<your_publishable_key>` | Client |
+| `VITE_SUPABASE_ANON_KEY` | `sb_publishable_<your_publishable_key>` | Client |
 | `VITE_APP_URL` | `https://www.wasel14.online` | Client |
 | `VITE_AUTH_CALLBACK_PATH` | `/app/auth/callback` | Client |
 | `VITE_EDGE_FUNCTION_NAME` | `make-server-0b1f4071` | Client |

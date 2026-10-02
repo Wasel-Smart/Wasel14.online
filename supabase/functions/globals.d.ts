@@ -25,7 +25,6 @@ declare module 'https://esm.sh/@supabase/supabase-js@2.39.0' {
 declare module 'https://deno.land/x/zod@v3.23.8/mod.ts' {
   const z: any;
   namespace z {
-    export interface ZodSchema<T> {}
     export function infer<T>(schema: unknown): T;
     export function object<T>(shape: T): unknown;
     export function string(): unknown;
@@ -38,8 +37,8 @@ declare module 'https://deno.land/x/zod@v3.23.8/mod.ts' {
     export function min(limit: number, message?: string): unknown;
     export function max(limit: number, message?: string): unknown;
     export function uuid(message?: string): unknown;
-    export function optional<T>(schema: unknown): unknown;
-    export function nullable<T>(schema: unknown): unknown;
+    export function optional(schema: unknown): unknown;
+    export function nullable(schema: unknown): unknown;
     export function default_<T>(value: T): unknown;
     export function regex(regex: RegExp, message?: string): unknown;
     export function trim(): unknown;

@@ -92,6 +92,8 @@ export async function handleQueueCommunicationDeliveries ( request: Request ) {
   }
 
   const rows = deliveries.map( ( delivery: Record<string, unknown>, index: number ) => {
+    // Stripping control characters is the point of this sanitiser.
+    // eslint-disable-next-line no-control-regex
     const payloadBody = String( delivery.body ?? '' ).replace( /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '' );
     return {
       user_id: auth.canonicalUser.id,

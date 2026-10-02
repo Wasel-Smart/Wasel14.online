@@ -12,7 +12,12 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from './database.types';
-import { hasSupabasePublicConfig, publicAnonKey, publicSupabaseUrl } from './info';
+import {
+  hasSupabasePublicConfig,
+  isLegacyJwtPublicKey,
+  publicAnonKey,
+  publicSupabaseUrl,
+} from './info';
 
 // Cookie name shared with api/auth/callback.ts — the server-side callback
 // reads the PKCE code_verifier and writes the session under this same name.
@@ -50,6 +55,15 @@ export const isSupabaseConfigured =
   hasSupabasePublicConfig &&
   !isPlaceholderValue(supabaseUrl) &&
   !isPlaceholderValue(supabaseAnonKey);
+
+/**
+ * Supabase disabled legacy anon/service_role JWT keys in September 2026. A
+ * build still shipping one gets 401 "Legacy API keys are disabled" from every
+ * auth call. Surfaced as a named flag so the auth layer can report a
+ * configuration fault instead of the generic "wrong credentials" message.
+ */
+export const isUsingLegacySupabaseKey =
+  isSupabaseConfigured && isLegacyJwtPublicKey(supabaseAnonKey);
 
 // ── Retry config ──────────────────────────────────────────────────────────────
 const RETRY_CONFIG = {
@@ -144,6 +158,16 @@ const getSupabaseClient = () => {
         '[Supabase] Missing valid credentials. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your .env file.',
       );
     }
+    return null;
+  }
+
+  if (isUsingLegacySupabaseKey) {
+    // Never silently proceed: every request would 401 with
+    // "Legacy API keys are disabled", which looks like a credential problem
+    // and made production sign-in impossible to diagnose.
+    console.error(
+      '[Supabase] VITE_SUPABASE_PUBLISHABLE_KEY is a legacy anon JWT. Supabase disabled legacy API keys. Replace it with the sb_publishable_... key from Dashboard -> Project Settings -> API Keys.',
+    );
     return null;
   }
 

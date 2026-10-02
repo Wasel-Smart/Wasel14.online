@@ -44,7 +44,7 @@ Deno.test('handleStripeWebhook — 503 when secret not configured', async () => 
 });
 
 Deno.test('handleStripeWebhook — 401 on invalid signature', async () => {
-  Deno.env.set('STRIPE_WEBHOOK_SECRET', 'whsec_testsecret123456789012345678');
+  Deno.env.set('STRIPE_WEBHOOK_SECRET', 'whsec_placeholder_for_testing_only');
   const { handleStripeWebhook } = await import('../make-server-0b1f4071/_handlers/webhooks.ts');
   const res = await handleStripeWebhook(
     makeRequest('/payments/webhooks/stripe', '{"type":"test"}', {
@@ -55,7 +55,7 @@ Deno.test('handleStripeWebhook — 401 on invalid signature', async () => {
 });
 
 Deno.test('handleStripeWebhook — 200 on valid signature with unknown event', async () => {
-  const secret = 'whsec_testsecret123456789012345678';
+  const secret = 'whsec_placeholder_for_testing_only';
   Deno.env.set('STRIPE_WEBHOOK_SECRET', secret);
   const { handleStripeWebhook } = await import('../make-server-0b1f4071/_handlers/webhooks.ts');
   const payload = JSON.stringify({ type: 'unknown.event', data: { object: {} } });
@@ -111,7 +111,7 @@ Deno.test('handleSendSmsHook — 503 when secret not configured', async () => {
 });
 
 Deno.test('handleSendSmsHook — 401 on invalid Standard Webhooks signature', async () => {
-  Deno.env.set('SUPABASE_AUTH_HOOK_SEND_SMS_SECRET', 'v1,whsec_dGVzdHNlY3JldDEyMzQ1Njc4OTAxMjM0NTY=');
+  Deno.env.set('SUPABASE_AUTH_HOOK_SEND_SMS_SECRET', 'v1,whsec_placeholder_for_testing_only');
   const { handleSendSmsHook } = await import('../make-server-0b1f4071/_handlers/webhooks.ts');
   const req = new Request(
     'https://example.supabase.co/functions/v1/webhooks/auth/hooks/send-sms',

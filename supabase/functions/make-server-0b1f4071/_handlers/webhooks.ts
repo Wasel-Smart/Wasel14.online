@@ -411,7 +411,7 @@ export async function handleSendSmsHook ( request: Request ): Promise<Response> 
     return json( { error: 'Invalid webhook signature.' }, 401 );
   }
 
-  let body: unknown = null;
+  let body: unknown;
   try {
     body = JSON.parse( rawBody );
   } catch {

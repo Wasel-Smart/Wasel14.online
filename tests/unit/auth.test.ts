@@ -14,6 +14,7 @@ const createMockSupabase = () => ({
 vi.mock('../src/utils/supabase/client.ts', () => ({
   supabase: null,
   supabaseUrl: '',
+  isUsingLegacySupabaseKey: false,
 }));
 
 describe('auth.test.ts', () => {
@@ -25,6 +26,7 @@ describe('auth.test.ts', () => {
     vi.doMock('../../src/utils/supabase/client.ts', () => ({
       supabase: mockSupabase,
       supabaseUrl: '',
+      isUsingLegacySupabaseKey: false,
     }));
   });
 
@@ -167,6 +169,7 @@ describe('auth.test.ts', () => {
     vi.doMock('../../src/utils/supabase/client.ts', () => ({
       supabase: null,
       supabaseUrl: '',
+      isUsingLegacySupabaseKey: false,
     }));
 
     const { authAPI: api } = await import('../../src/services/auth');

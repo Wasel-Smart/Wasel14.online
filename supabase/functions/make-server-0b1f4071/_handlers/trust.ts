@@ -233,7 +233,7 @@ export async function handleConfirmPhoneVerification ( request: Request ) {
 
   const nextAttempts = attempts + 1;
   const usesTwilioVerify = String( otpSession.otp_hash ?? '' ).startsWith( 'twilio-verify:' );
-  let isCodeValid = false;
+  let isCodeValid: boolean;
   let verificationError = 'That verification code is incorrect.';
   let verificationErrorStatus = 400;
 

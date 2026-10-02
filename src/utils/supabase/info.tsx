@@ -132,6 +132,33 @@ function getProjectRefFromUrl(value: string): string {
     .replace(/\.supabase\.co$/, '');
 }
 
+/**
+ * True when the resolved public key is a legacy `anon`-role JWT rather than a
+ * `sb_publishable_...` key.
+ *
+ * Supabase permanently disabled legacy anon/service_role JWT keys in September
+ * 2026. A build still carrying one produces a 401 "Legacy API keys are
+ * disabled" on every auth call, which is indistinguishable from a wrong
+ * password at the sign-in form. Detecting it lets the app report a
+ * configuration fault instead of an opaque failure.
+ */
+export function isLegacyJwtPublicKey(value: string): boolean {
+  if (!value.startsWith('eyJ')) {return false;}
+
+  const parts = value.split('.');
+  if (parts.length < 2) {return false;}
+
+  const decoded = decodeBase64Url(parts[1] ?? '');
+  if (!decoded) {return false;}
+
+  try {
+    const payload = JSON.parse(decoded) as { role?: string };
+    return payload.role === 'anon' || payload.role === 'service_role';
+  } catch {
+    return false;
+  }
+}
+
 function pickConfiguredUrl(
   envCandidates: EnvCandidate[],
   fallbackCandidates: Array<string | undefined>,

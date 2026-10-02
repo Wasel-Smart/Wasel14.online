@@ -122,7 +122,7 @@ export async function handleSubmitReview ( request: Request ) {
   // the "this is my booking" check the same way /ratings does.
   const canModerateRatings = hasAnyPermission( auth, [ 'trust:moderate' ] );
 
-  let booking: Record<string, unknown> | null = null;
+  let booking: Record<string, unknown> | null;
   try {
     booking = await resolveBookingForReview(
       admin,
@@ -143,7 +143,7 @@ export async function handleSubmitReview ( request: Request ) {
   }
 
   if ( !canModerateRatings ) {
-    let reviewerIsPassenger = false;
+    let reviewerIsPassenger: boolean;
     try {
       reviewerIsPassenger = await isReviewableDriver( admin, tripId, revieweeId );
     } catch ( error ) {

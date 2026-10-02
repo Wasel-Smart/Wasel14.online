@@ -15,6 +15,11 @@ const AUTH_ERROR_MATCHES: AuthErrorMatch[] = [
   { patterns: ['user banned'], code: 'user_banned', message: 'Your account has been suspended. Please contact support.' },
   { patterns: ['signup disabled'], code: 'signup_disabled', message: 'Sign-up is currently disabled. Please contact support.' },
   { patterns: ['phone already exists'], code: 'phone_exists', message: 'This phone number is already registered.' },
+  { patterns: ['failed to fetch', 'load failed', 'networkerror', 'network request failed'], code: 'network_error', message: 'Cannot reach the sign-in service. Check your connection and try again.' },
+  { patterns: ['legacy api keys are disabled', 'legacy api key'], code: 'legacy_api_key_disabled', message: 'Sign-in service is misconfigured (legacy API key rejected). Please contact support.' },
+  { patterns: ['invalid api key'], code: 'invalid_api_key', message: 'Sign-in service is misconfigured (invalid API key). Please contact support.' },
+  { patterns: ['access-control-allow-headers', 'access-control-request-headers'], code: 'cors_rejected', message: 'Sign-in request was blocked by the network policy. Please contact support.' },
+  { patterns: ['fetch failed'], code: 'network_error', message: 'Cannot reach the sign-in service. Check your connection and try again.' },
 ];
 
 function matchAuthError(lower: string, normalizedCode: string | undefined): string | undefined {
