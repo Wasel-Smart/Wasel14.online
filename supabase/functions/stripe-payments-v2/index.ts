@@ -120,8 +120,8 @@ async function requireAuthenticatedUser(
   return { id: user.id };
 }
 
-async function publishEvent(
-  admin: ReturnType<typeof getAdminClient>,
+async function _publishEvent(
+  admin: ReturnType<typeof _getAdminClient>,
   event: Record<string, unknown>,
 ) {
   try {
@@ -140,11 +140,11 @@ async function publishEvent(
   }
 }
 
-function makeId(prefix: string): string {
+function _makeId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
-function getAdminClient() {
+function _getAdminClient() {
   return createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
