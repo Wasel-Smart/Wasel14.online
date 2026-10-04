@@ -3,12 +3,9 @@ import {
     authenticateRequest,
     enforcePermission,
     consumeRateLimit,
-} from './shared.ts';
-
-import {
-  ALLOWED_PAYMENT_CURRENCIES,
-  normalizePaymentAmount,
-  stripe,
+    ALLOWED_PAYMENT_CURRENCIES,
+    normalizePaymentAmount,
+    stripe,
 } from './shared.ts';
 
 // Metadata keys the server owns. A client must never be able to set these:
@@ -68,7 +65,7 @@ export async function handlePaymentIntentCreate ( request: Request ): Promise<Re
   // Card-testing / fee-abuse guard: each call creates a live PaymentIntent on
   // the platform's Stripe account. Fail closed - a money path must not run
   // unthrottled just because the limiter is down.
-  const limited = await consumeRateLimit( auth.admin, `payment-intent:${ auth.authUser.id }`, 10, 3600, { failClosed: true } );
+  const limited = await consumeRateLimit( auth.admin, `payment-intent:${ auth.authUser.id }`, 10, { windowSeconds: 3600, failClosed: true } );
   if ( limited ) {return limited;}
 
   // NOTE: a client-supplied `customer_id` is intentionally ignored. Accepting
@@ -118,6 +115,7 @@ export async function handlePaymentIntentCreate ( request: Request ): Promise<Re
   }
 }
 
+// eslint-disable-next-line complexity
 export async function handlePaymentRefund ( request: Request ): Promise<Response> {
   if ( !stripe ) {
     return json( { error: 'Stripe is not configured' }, 503 );

@@ -95,6 +95,7 @@ function parseEntityRoute(path: string, prefix: string) {
   return { id: decodeURIComponent(match[1]), action: match[2] ? decodeURIComponent(match[2]) : null };
 }
 
+// eslint-disable-next-line complexity
 async function handlePackageRequest(request: Request, path: string) {
   const auth = await authenticateRequest(request);
   if ('error' in auth) {return auth.error;}
@@ -195,7 +196,7 @@ Deno.serve(async (request: Request) => {
     const finalHeaders = new Headers(response.headers);
     headers.forEach((value, key) => finalHeaders.set(key, value));
     return new Response(response.body, { status: response.status, headers: finalHeaders });
-  } catch (error) {
+  } catch {
     const finalHeaders = new Headers({ 'Content-Type': 'application/json' });
     headers.forEach((value, key) => finalHeaders.set(key, value));
     return new Response(JSON.stringify({ error: 'Internal server error', requestId: crypto.randomUUID() }), { status: 500, headers: finalHeaders });

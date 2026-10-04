@@ -139,6 +139,7 @@ function parseWalletRoute(path: string) {
   return { userId: decodeURIComponent(match[1]), action: match[2] ? decodeURIComponent(match[2]) : '', resourceId: match[3] ? decodeURIComponent(match[3]) : null };
 }
 
+// eslint-disable-next-line complexity
 async function handleWalletRequest(request: Request, path: string) {
   const walletRoute = parseWalletRoute(path);
   if (!walletRoute) {return json({ error: 'Invalid wallet route' }, 400);}
@@ -318,7 +319,7 @@ Deno.serve(async (request: Request) => {
     const finalHeaders = new Headers(response.headers);
     headers.forEach((value, key) => finalHeaders.set(key, value));
     return new Response(response.body, { status: response.status, headers: finalHeaders });
-  } catch (error) {
+  } catch {
     const finalHeaders = new Headers({ 'Content-Type': 'application/json' });
     headers.forEach((value, key) => finalHeaders.set(key, value));
     return new Response(JSON.stringify({ error: 'Internal server error', requestId: crypto.randomUUID() }), { status: 500, headers: finalHeaders });

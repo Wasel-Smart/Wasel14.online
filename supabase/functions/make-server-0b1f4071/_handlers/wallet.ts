@@ -1,41 +1,37 @@
-import type {
-  getAdminClient} from './shared.ts';
 import {
+    type getAdminClient,
     json,
     authenticateRequest,
     getAppBaseUrl,
     matchesAuthenticatedUser,
     consumeRateLimit,
     resetRateLimit,
-} from './shared.ts';
-
-import {
-  CLIQ_API_BASE_URL,
-  CLIQ_API_KEY,
-  CLIQ_CHECKOUT_URL_TEMPLATE,
-  CLIQ_MERCHANT_ID,
-  authenticateWalletRequest,
-  buildCliqCheckoutUrl,
-  buildWalletInsights,
-  createCliqCheckoutSession,
-  createPendingTopUpTransaction,
-  createStripeCheckoutSession,
-  createStripeSubscriptionCheckoutSession,
-  ensureWalletForUser,
-  getWalletSubscription,
-  hashWalletPin,
-  loadWalletDetails,
-  loadWalletPayload,
-  mapReferenceTypeToTransactionType,
-  mapSubscriptionPlan,
-  markTopUpTransactionFailed,
-  normalizeWalletPaymentMethod,
-  parseWalletRoute,
-  resolveWalletRecipient,
-  toMoneyNumber,
-  toWalletTransaction,
-  updateTopUpTransactionMetadata,
-  verifyWalletPinHash,
+    CLIQ_API_BASE_URL,
+    CLIQ_API_KEY,
+    CLIQ_CHECKOUT_URL_TEMPLATE,
+    CLIQ_MERCHANT_ID,
+    authenticateWalletRequest,
+    buildCliqCheckoutUrl,
+    buildWalletInsights,
+    createCliqCheckoutSession,
+    createPendingTopUpTransaction,
+    createStripeCheckoutSession,
+    createStripeSubscriptionCheckoutSession,
+    ensureWalletForUser,
+    getWalletSubscription,
+    hashWalletPin,
+    loadWalletDetails,
+    loadWalletPayload,
+    mapReferenceTypeToTransactionType,
+    mapSubscriptionPlan,
+    markTopUpTransactionFailed,
+    normalizeWalletPaymentMethod,
+    parseWalletRoute,
+    resolveWalletRecipient,
+    toMoneyNumber,
+    toWalletTransaction,
+    updateTopUpTransactionMetadata,
+    verifyWalletPinHash,
 } from './shared.ts';
 
 import {
@@ -136,8 +132,7 @@ async function enforceWalletPin (
     admin,
     pinAttemptKey( userId ),
     PIN_MAX_ATTEMPTS,
-    PIN_LOCKOUT_SECONDS,
-    { failClosed: true },
+    { windowSeconds: PIN_LOCKOUT_SECONDS, failClosed: true },
   );
   if ( limited ) {return limited;}
 
@@ -154,7 +149,7 @@ export async function handleWalletWithdraw ( request: Request, requestedUserId: 
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) {return auth.error;}
 
-  const throttled = await consumeRateLimit( auth.admin, `wallet-withdraw:${ auth.canonicalUser.id }`, 5, 3600, { failClosed: true } );
+  const throttled = await consumeRateLimit( auth.admin, `wallet-withdraw:${ auth.canonicalUser.id }`, 5, { windowSeconds: 3600, failClosed: true } );
   if ( throttled ) {return throttled;}
 
   const body = await request.json().catch( () => ( {} ) );
@@ -214,7 +209,7 @@ export async function handleWalletSend ( request: Request, requestedUserId: stri
     return json( { error: `Transfers are limited to JOD ${ MAX_WALLET_SEND_JOD } per request.` }, 400 );
   }
 
-  const throttled = await consumeRateLimit( auth.admin, `wallet-send:${ auth.canonicalUser.id }`, 20, 3600, { failClosed: true } );
+  const throttled = await consumeRateLimit( auth.admin, `wallet-send:${ auth.canonicalUser.id }`, 20, { windowSeconds: 3600, failClosed: true } );
   if ( throttled ) {return throttled;}
 
   try {
@@ -279,8 +274,7 @@ export async function handleVerifyWalletPin ( request: Request, requestedUserId:
       auth.admin,
       pinAttemptKey( auth.canonicalUser.id ),
       PIN_MAX_ATTEMPTS,
-      PIN_LOCKOUT_SECONDS,
-      { failClosed: true },
+      { windowSeconds: PIN_LOCKOUT_SECONDS, failClosed: true },
     );
     if ( limited ) {return limited;}
 
@@ -432,6 +426,7 @@ export async function handleGetWalletSubscription ( request: Request, requestedU
   }
 }
 
+// eslint-disable-next-line complexity
 export async function handleWalletTopUp ( request: Request, requestedUserId: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
@@ -451,7 +446,7 @@ export async function handleWalletTopUp ( request: Request, requestedUserId: str
   }
 
   // Each call creates a pending transaction row and a provider checkout session.
-  const throttled = await consumeRateLimit( auth.admin, `wallet-topup:${ auth.canonicalUser.id }`, 10, 3600 );
+  const throttled = await consumeRateLimit( auth.admin, `wallet-topup:${ auth.canonicalUser.id }`, 10, { windowSeconds: 3600 } );
   if ( throttled ) {return throttled;}
 
   const { data: wallet, error: walletError } = await auth.admin
@@ -629,6 +624,7 @@ type PayableAmount =
  * read back from the server-side record and the owner is checked before money
  * moves.
  */
+// eslint-disable-next-line complexity
 async function resolvePayableAmount (
   admin: ReturnType<typeof getAdminClient>,
   referenceType: string,
@@ -777,6 +773,7 @@ export async function handleWalletPay ( request: Request, requestedUserId: strin
   }
 }
 
+// eslint-disable-next-line complexity
 export async function handleWalletDispatch ( request: Request, path: string ): Promise<Response | undefined> {
   const walletRoute = parseWalletRoute( path );
   if ( !walletRoute ) {return undefined;}

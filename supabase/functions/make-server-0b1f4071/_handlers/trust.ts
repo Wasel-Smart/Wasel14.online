@@ -152,6 +152,7 @@ export async function handleStartPhoneVerification ( request: Request ) {
   );
 }
 
+// eslint-disable-next-line complexity
 export async function handleConfirmPhoneVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}

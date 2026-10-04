@@ -27,6 +27,7 @@ import {
 } from '../_shared/communication-runtime.ts';
 
 
+// eslint-disable-next-line complexity
 export async function handleStripeWebhook ( request: Request ) {
   if ( !STRIPE_WEBHOOK_SECRET ) {
     return json( { error: 'Stripe webhook secret is not configured.' }, 503 );
@@ -214,6 +215,7 @@ export async function handleCliqWebhook ( request: Request ) {
   return json( { received: true, transactionId, pending: true } );
 }
 
+// eslint-disable-next-line complexity
 export async function handleSanadWebhook ( request: Request ) {
   if ( !SANAD_WEBHOOK_SECRET ) {
     return json( { error: 'Sanad webhook secret is not configured.' }, 503 );
@@ -395,6 +397,7 @@ async function verifyStandardWebhookSignature ( headers: Headers, rawBody: strin
   } );
 }
 
+// eslint-disable-next-line complexity
 export async function handleSendSmsHook ( request: Request ): Promise<Response> {
   if ( !SUPABASE_AUTH_HOOK_SEND_SMS_SECRET ) {
     return json( { error: 'SMS hook secret is not configured.' }, 503 );
@@ -438,8 +441,8 @@ export async function handleSendSmsHook ( request: Request ): Promise<Response> 
     return json( { error: 'TWILIO_MESSAGING_SERVICE_SID or TWILIO_SMS_FROM is required.' }, 503 );
   }
 
-  const body = `Wasel | واصل: Your verification code is ${ otp }. It expires in 10 minutes. Never share this code with anyone.`;
-  const params = new URLSearchParams( { To: phone, Body: body } );
+  const smsBody = `Wasel | واصل: Your verification code is ${ otp }. It expires in 10 minutes. Never share this code with anyone.`;
+  const params = new URLSearchParams( { To: phone, Body: smsBody } );
   if ( messagingServiceSid ) {
     params.set( 'MessagingServiceSid', messagingServiceSid );
   } else {

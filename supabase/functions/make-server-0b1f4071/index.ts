@@ -6,6 +6,7 @@ import {
     enforceRequestSecurity,
     logUnhandledRouteError,
     sanitizedUnhandledErrorResponse,
+    parseWalletRoute,
 } from './_handlers/shared.ts';
 
 import {
@@ -90,10 +91,6 @@ import {
   handleRequestDataExport,
   handleRequestDeletion,
 } from './_handlers/gdpr.ts';
-
-import {
-  parseWalletRoute,
-} from './_handlers/shared.ts';
 
 import {
   handleApplyCommunicationMigrations,

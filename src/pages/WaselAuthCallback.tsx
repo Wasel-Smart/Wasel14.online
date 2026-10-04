@@ -25,6 +25,7 @@ function readCallbackParam(key: string): string {
   return new URLSearchParams(hash).get(key) ?? '';
 }
 
+// eslint-disable-next-line max-lines-per-function -- auth callback state machine, one linear effect
 export default function WaselAuthCallback() {
   const navigate = useIframeSafeNavigate();
   const [state, setState] = useState<CallbackState>('loading');
@@ -61,8 +62,7 @@ export default function WaselAuthCallback() {
   useEffect(() => {
     let active = true;
     let isRecoveryFlow = callbackType === 'recovery';
-    let unsubscribe: (() => void) | undefined;
-    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = { unsubscribe: undefined as (() => void) | undefined, timer: undefined as ReturnType<typeof setTimeout> | undefined };
 
     const showRecovery = () => {
       if (!active) {return;}
@@ -72,6 +72,7 @@ export default function WaselAuthCallback() {
     };
 
     if (!supabase) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- missing backend is a terminal error surfaced on mount, not a derived value
       setState('error');
       setMessage(tx('waselAuthCallback.backend_not_configured_social'));
       return () => { active = false; };
@@ -87,6 +88,9 @@ export default function WaselAuthCallback() {
       showRecovery();
       return () => { active = false; };
     }
+
+    // Narrowed for the closures below, which otherwise widen back to | null.
+    const client = supabase;
 
     // With PKCE + detectSessionInUrl:true the browser client exchanges the
     // code automatically and fires onAuthStateChange. We wait for that event
@@ -126,14 +130,14 @@ export default function WaselAuthCallback() {
 
         if (event === 'PASSWORD_RECOVERY') {
           isRecoveryFlow = true;
-          clearTimeout(fallbackTimer);
+          clearTimeout(cleanup.timer);
           subscription.unsubscribe();
           showRecovery();
           return;
         }
 
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-          clearTimeout(fallbackTimer);
+          clearTimeout(cleanup.timer);
           subscription.unsubscribe();
 
           if (isRecoveryFlow) { showRecovery(); return; }
@@ -159,29 +163,35 @@ export default function WaselAuthCallback() {
         }
       },
     );
-    unsubscribe = () => subscription.unsubscribe();
+    cleanup.unsubscribe = () => subscription.unsubscribe();
 
-    // Fallback: if no auth event fires within 10s (e.g. direct navigation
-    // with no code in the URL), check for an existing session or surface an error.
-    fallbackTimer = setTimeout(async () => {
+    cleanup.timer = setTimeout(() => {
       if (!active) {return;}
       subscription.unsubscribe();
-      const { data: { session }, error } = await supabase!.auth.getSession();
-      if (!active) {return;}
-      if (error || !session) {
-        setState('error');
-        setMessage(tx('waselAuthCallback.session_failed'));
-      } else {
-        setState('redirecting');
-        setMessage(tx('waselAuthCallback.sign_in_complete_redirecting'));
-        navigate(returnTo, { replace: true });
-      }
+      void client.auth.getSession().then(
+        ({ data: { session }, error }) => {
+          if (!active) {return;}
+          if (error || !session) {
+            setState('error');
+            setMessage(tx('waselAuthCallback.session_failed'));
+          } else {
+            setState('redirecting');
+            setMessage(tx('waselAuthCallback.sign_in_complete_redirecting'));
+            navigate(returnTo, { replace: true });
+          }
+        },
+        () => {
+          if (!active) {return;}
+          setState('error');
+          setMessage(tx('waselAuthCallback.session_failed'));
+        },
+      );
     }, 10_000);
 
     return () => {
       active = false;
-      clearTimeout(fallbackTimer);
-      unsubscribe?.();
+      clearTimeout(cleanup.timer);
+      cleanup.unsubscribe?.();
     };
   }, [callbackError, callbackType, navigate, returnTo]);
 

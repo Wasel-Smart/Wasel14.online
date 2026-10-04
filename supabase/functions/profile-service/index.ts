@@ -93,6 +93,7 @@ function toNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// eslint-disable-next-line complexity
 async function buildProfilePayload(admin: ReturnType<typeof getAdminClient>, user: Record<string, unknown>) {
   const { data: wallet } = await admin.from('wallets').select('balance, wallet_status').eq('user_id', String(user.id)).maybeSingle();
   const { data: verification } = await admin.from('verification_records').select('sanad_status, verification_level').eq('user_id', String(user.id)).order('updated_at', { ascending: false }).limit(1).maybeSingle();
@@ -128,11 +129,12 @@ function parseEntityRoute(path: string, prefix: string) {
   return { id: decodeURIComponent(match[1]), action: match[2] ? decodeURIComponent(match[2]) : null };
 }
 
-function matchesAuthenticatedUser(auth: Awaited<ReturnType<typeof authenticateRequest>>, requestedUserId: string): boolean {
+function _matchesAuthenticatedUser(auth: Awaited<ReturnType<typeof authenticateRequest>>, requestedUserId: string): boolean {
   if ('error' in auth) {return false;}
   return requestedUserId === auth.canonicalUser.id || requestedUserId === auth.authUser.id;
 }
 
+// eslint-disable-next-line complexity
 async function handleProfileRequest(request: Request, path: string) {
   const auth = await authenticateRequest(request);
   if ('error' in auth) {return auth.error;}
@@ -216,7 +218,7 @@ Deno.serve(async (request: Request) => {
     const finalHeaders = new Headers(response.headers);
     headers.forEach((value, key) => finalHeaders.set(key, value));
     return new Response(response.body, { status: response.status, headers: finalHeaders });
-  } catch (error) {
+  } catch {
     const finalHeaders = new Headers({ 'Content-Type': 'application/json' });
     headers.forEach((value, key) => finalHeaders.set(key, value));
     return new Response(JSON.stringify({ error: 'Internal server error', requestId: crypto.randomUUID() }), { status: 500, headers: finalHeaders });

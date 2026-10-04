@@ -23,6 +23,13 @@ export const homeHeroSection = {
       phone_tag_wallet: 'Wallet ready',
       phone_tag_proof: 'Handoff proof',
       lang_toggle_title: 'Switch language',
+      hero_title: 'Shared Routes That Reduce Travel Cost',
+      hero_lead_guest: 'Wasel connects riders and drivers through shared routes to reduce cost. Book a ride, offer a route, or join the network across Jordan.',
+      hero_lead_user: 'Welcome back, {name}. Wasel connects riders and drivers through shared routes to reduce cost.',
+      timeline_seat_price_label: 'Seat price',
+      timeline_driver_trust_label: 'Driver trust',
+      timeline_parcel_option_label: 'Parcel slot',
+      timeline_bus_fallback_label: 'Bus fallback',
   },
   ar: {
       trip_mode: 'نمط الرحلة',
@@ -48,6 +55,13 @@ export const homeHeroSection = {
       phone_tag_wallet: 'المحفظة جاهزة',
       phone_tag_proof: 'إثبات التسليم',
       lang_toggle_title: 'تغيير اللغة',
+      hero_title: 'مسارات مشتركة تقلل تكلفة السفر',
+      hero_lead_guest: 'واصل يربط الركاب والسائقين عبر مسارات مشتركة لتقليل التكلفة. احجز رحلة، اعرض مساراً، أو انضم للشبكة في الأردن.',
+      hero_lead_user: 'أهلاً بعودتك، {name}. واصل يربط الركاب والسائقين عبر مسارات مشتركة لتقليل التكلفة.',
+      timeline_seat_price_label: 'سعر المقعد',
+      timeline_driver_trust_label: 'ثقة السائق',
+      timeline_parcel_option_label: 'مكان طرد',
+      timeline_bus_fallback_label: 'بديل الباص',
   }
 } as const;
 

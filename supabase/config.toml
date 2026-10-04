@@ -130,12 +130,16 @@ enabled = false
 [auth.web3.ethereum]
 enabled = false
 
-# JWT verification is enabled for all authenticated user routes.
-# Webhook routes (Stripe, CliQ, Sanad, Resend, Twilio) and the Send-SMS auth
-# hook do NOT send a Supabase JWT — they are served by a dedicated function
-# with verify_jwt = false so provider signature checks run before any auth.
+# make-server-0b1f4071 exposes one intentionally-public, unauthenticated
+# route: GET /health (liveness probe used by uptime monitors and the frontend
+# before any session exists). With verify_jwt = true the Edge gateway rejected
+# that request with 401 (publishable keys are not JWTs), and the 401 response
+# carried no CORS headers, so browsers blocked it. Setting verify_jwt = false
+# lets /health through; every protected route re-authenticates itself via
+# authenticateRequest() (bearer JWT validated through the admin client).
+# Webhook-only routes are served by the dedicated `webhooks` function below.
 [functions.make-server-0b1f4071]
-verify_jwt = true
+verify_jwt = false
 
 # Webhook-only function: no JWT required. Each handler verifies its own
 # provider signature (HMAC/Stripe-Signature/Standard Webhooks).

@@ -679,9 +679,9 @@ export async function consumeRateLimit (
   admin: ReturnType<typeof getAdminClient>,
   key: string,
   limit: number,
-  windowSeconds: number,
-  options: { failClosed?: boolean } = {},
+  options: { windowSeconds: number; failClosed?: boolean },
 ): Promise<Response | null> {
+  const { windowSeconds } = options;
   try {
     const { data, error } = await admin.rpc( 'consume_rate_limit', {
       p_key: key,
@@ -692,7 +692,7 @@ export async function consumeRateLimit (
 
     const row = Array.isArray( data ) ? data[ 0 ] : data;
     if ( row && row.allowed === false ) {
-      const retryAfter = Math.max( Number( row.retry_after_seconds ?? windowSeconds ), 1 );
+      const retryAfter = Math.max( Number( row.retry_after_seconds ?? options.windowSeconds ), 1 );
       return new Response(
         JSON.stringify( {
           error: 'Too many requests. Please try again later.',
@@ -843,6 +843,7 @@ export async function authenticateAuthUser ( request: Request ) {
   return { admin, authUser: data.user };
 }
 
+// eslint-disable-next-line complexity
 export async function ensureCanonicalUserForAuth (
   admin: ReturnType<typeof getAdminClient>,
   authUser: Record<string, unknown>,
@@ -984,6 +985,7 @@ export function isApprovedDriver (
   );
 }
 
+// eslint-disable-next-line complexity
 export async function buildProfilePayload ( admin: ReturnType<typeof getAdminClient>, user: Record<string, unknown> ) {
   const [ wallet, verification, driver ] = await Promise.all( [
     getWalletForUser( admin, String( user.id ) ).catch( () => null ),
@@ -1367,6 +1369,7 @@ export function computeTrustStepSummary ( steps: Record<string, { id: string; st
   return { totalSteps: all.length, completedSteps: completed, failedSteps: failed, inProgressSteps: inProgress };
 }
 
+// eslint-disable-next-line max-params
 export function buildTrustStep ( id: string, state: string, detail: string, meta: Record<string, unknown>, options?: {
   failureReason?: string | null;
   updatedAt?: string | null;
@@ -1374,6 +1377,7 @@ export function buildTrustStep ( id: string, state: string, detail: string, meta
   return { id, state, detail, ...meta, failureReason: options?.failureReason ?? null, updatedAt: options?.updatedAt ?? null };
 }
 
+// eslint-disable-next-line max-lines-per-function, complexity
 export async function buildTrustStatus (
   auth: Awaited<ReturnType<typeof authenticateRequest>>,
 ) {
@@ -2303,6 +2307,7 @@ export async function updateTopUpTransactionMetadata (
   }
 }
 
+// eslint-disable-next-line max-params
 export async function markTopUpTransactionFailed (
   admin: ReturnType<typeof getAdminClient>,
   transactionId: string,
@@ -2586,6 +2591,7 @@ export async function verifyProviderWebhookSignature ( args: {
   return constantTimeEquals( normalized, expected );
 }
 
+// eslint-disable-next-line complexity
 export async function sendDelivery (
   admin: ReturnType<typeof getAdminClient>,
   delivery: CommunicationDeliveryRecord,

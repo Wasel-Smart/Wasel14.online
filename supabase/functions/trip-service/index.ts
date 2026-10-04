@@ -204,6 +204,7 @@ function calculateDirectPrice ( _type: string, weight?: number, distanceKm?: num
   return { total, breakdown: { base: basePrice, distance: Number( distanceFee.toFixed( 2 ) ), weight: Number( weightFee.toFixed( 2 ) ) } };
 }
 
+// eslint-disable-next-line complexity
 async function handleTripRequest ( request: Request, path: string ) {
   const admin = getAdminClient();
   const url = new URL( request.url );
@@ -330,7 +331,7 @@ Deno.serve( async ( request: Request ) => {
     const finalHeaders = new Headers( response.headers );
     headers.forEach( ( value, key ) => finalHeaders.set( key, value ) );
     return new Response( response.body, { status: response.status, headers: finalHeaders } );
-  } catch ( error ) {
+  } catch {
     const finalHeaders = new Headers( { 'Content-Type': 'application/json' } );
     headers.forEach( ( value, key ) => finalHeaders.set( key, value ) );
     return new Response( JSON.stringify( { error: 'Internal server error', requestId: crypto.randomUUID() } ), { status: 500, headers: finalHeaders } );

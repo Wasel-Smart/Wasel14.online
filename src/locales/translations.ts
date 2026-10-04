@@ -94,6 +94,7 @@ import { worldClassAuthPage } from './chunks/worldClassAuthPage';
 import { liveGeoTracking } from './chunks/liveGeoTracking';
 import { protectedOutlet } from './chunks/protectedOutlet';
 import { routeFallback } from './chunks/routeFallback';
+import { corridorBetaFocusSection } from './chunks/corridorBetaFocusSection';
 
 export type Language = 'en' | 'ar';
 
@@ -197,6 +198,7 @@ export const translations: Record<Language, TranslationNode> = {
     ...liveGeoTracking.en,
     ...protectedOutlet.en,
     ...routeFallback.en,
+    ...corridorBetaFocusSection.en,
   },
   ar: {
     ...common.ar,
@@ -295,6 +297,7 @@ export const translations: Record<Language, TranslationNode> = {
     ...liveGeoTracking.ar,
     ...protectedOutlet.ar,
     ...routeFallback.ar,
+    ...corridorBetaFocusSection.ar,
   },
 };
 

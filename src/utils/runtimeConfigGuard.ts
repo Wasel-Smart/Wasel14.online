@@ -35,10 +35,14 @@ export function getStartupConfigurationError(environment: StartupEnvironment): s
     return 'Supabase URL must use HTTPS.';
   }
 
-  // Supabase publishable keys come in two valid formats: the current
-  // `sb_publishable_...` format, and the legacy JWT-style anon key
-  // (`eyJ...`) still issued for older projects.
-  if (!supabaseKey.startsWith('eyJ') && !supabaseKey.startsWith('sb_publishable_')) {
+  // Legacy JWT-style anon keys (`eyJ...`) were permanently disabled by
+  // Supabase for this project, so a publishable key is mandatory in
+  // production. Accepting the legacy form here would only allow a stale,
+  // non-functional key to silently ship to users.
+  if (supabaseKey.startsWith('eyJ')) {
+    return 'Supabase legacy JWT anon key is disabled; set VITE_SUPABASE_PUBLISHABLE_KEY.';
+  }
+  if (!supabaseKey.startsWith('sb_publishable_')) {
     return 'Supabase publishable key appears to be invalid.';
   }
 
