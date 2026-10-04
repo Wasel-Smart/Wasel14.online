@@ -292,6 +292,10 @@ if ( environmentIsValid ) {
     void ( async () => {
       try {
         initializeAppInsights();
+        // Sentry is loaded lazily inside initSentry() — only downloads the SDK
+        // when VITE_SENTRY_DSN is set, so this is safe to call unconditionally.
+        const { initSentry } = await import( './utils/monitoring' );
+        void initSentry();
         initializeCsrfProtection();
         initializeSessionManagement();
 

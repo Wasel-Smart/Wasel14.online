@@ -52,7 +52,83 @@ sensitive values were found in local environment files.
 
 ---
 
-## After rotating all credentials
+## Backend wiring — required before notifications and monitoring work
+
+All code is wired. These are the Vercel env var values that must be set.
+Go to: **Vercel Dashboard → Your Project → Settings → Environment Variables**
+
+### Gap 6 — Twilio / Resend (SMS, WhatsApp, Email notifications)
+
+| Variable | Where to get the value |
+|---|---|
+| `RESEND_API_KEY` | [resend.com/api-keys](https://resend.com/api-keys) → Create API key |
+| `RESEND_FROM_EMAIL` | e.g. `Wasel <notifications@wasel14.online>` — must be a verified sender domain in Resend |
+| `RESEND_REPLY_TO_EMAIL` | e.g. `support@wasel.jo` |
+| `TWILIO_ACCOUNT_SID` | [console.twilio.com](https://console.twilio.com) → Account Info |
+| `TWILIO_AUTH_TOKEN` | Twilio Console → Account Info → Auth Token |
+| `TWILIO_MESSAGING_SERVICE_SID` | Twilio Console → Messaging → Services → your service SID |
+| `TWILIO_WHATSAPP_FROM` | e.g. `whatsapp:+14155238886` (Twilio sandbox) or your approved number |
+| `COMMUNICATION_WORKER_SECRET` | Generate: `openssl rand -hex 32` |
+| `COMMUNICATION_WEBHOOK_TOKEN` | Generate: `openssl rand -hex 32` |
+
+Also set these in **Supabase Dashboard → Project → Edge Functions → Secrets**:
+`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+`TWILIO_MESSAGING_SERVICE_SID`, `TWILIO_WHATSAPP_FROM`, `COMMUNICATION_WORKER_SECRET`
+
+Verify: `GET /v1/health` with `x-communication-worker-secret` header → `communications.emailConfigured` and `communications.twilioConfigured` must be `true`.
+
+### Gap 7 — Sentry and Application Insights (error monitoring, Web Vitals)
+
+| Variable | Where to get the value |
+|---|---|
+| `VITE_SENTRY_DSN` | [sentry.io](https://sentry.io) → Your project → Settings → Client Keys (DSN) |
+| `VITE_APP_INSIGHTS_CONNECTION_STRING` | Azure Portal → Application Insights resource → Overview → Connection String |
+
+Both are `VITE_` prefixed — set them in Vercel as **Production** environment variables.
+After deploying, verify: Sentry → Issues → Production should receive events within minutes of first user session.
+
+### Gap 8 — Stripe 2FA backup codes (already overwritten, needs provider action)
+
+1. Go to [dashboard.stripe.com/settings/user](https://dashboard.stripe.com/settings/user)
+2. Under **Two-step authentication** → click **Manage** → **Regenerate backup codes**
+3. Store the new codes in a password manager, not in this repo
+4. The old codes in `stripe_backup_code.txt` are already overwritten with instructions — the file is safe
+
+### Gap 9 — Google and Facebook OAuth secrets (still live at providers)
+
+The secrets were redacted from `.env` and `.env.production` but are **still valid at the providers** until you rotate them.
+
+**Google OAuth:**
+1. Go to [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
+2. Click the OAuth 2.0 Client ID used by Wasel
+3. Click **Reset Secret** → copy the new secret
+4. Set `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET=<new_secret>` in Supabase Dashboard → Auth → Providers → Google
+5. Also set it in Vercel env vars if any server-side code reads it directly
+
+**Facebook OAuth:**
+1. Go to [developers.facebook.com](https://developers.facebook.com) → Your App → Settings → Basic
+2. Under **App Secret** → click **Reset**
+3. Set `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET=<new_secret>` in Supabase Dashboard → Auth → Providers → Facebook
+
+**After rotating both:**
+- Update the status column in the Credential rotation table above to ✅
+- Test sign-in with Google and Facebook to confirm the new secrets work
+
+### Gap 10 — Stripe webhook endpoint (dual handler consolidated)
+
+The `stripe-payments-v2/webhook` endpoint now returns **410 Gone**.
+Your Stripe webhook destination must point to the canonical handler:
+
+```
+https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/payments/webhooks/stripe
+```
+
+To verify:
+1. [dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks) → check the endpoint URL
+2. If it still points to `stripe-payments-v2/webhook`, update it to the URL above
+3. Stripe Dashboard → Webhooks → your endpoint → **Send test webhook** → `payment_intent.succeeded` → should return 200
+
+---
 
 1. Update `.env.example` with the new placeholder names (not real values).
 2. Update Vercel environment variables via the Vercel Dashboard or `vercel env pull`.

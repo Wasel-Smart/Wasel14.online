@@ -141,6 +141,12 @@ enabled = false
 [functions.make-server-0b1f4071]
 verify_jwt = false
 
+# stripe-payments-v2 validates its own bearer token via requireAuthenticatedUser().
+# verify_jwt = false is required so the function can serve OPTIONS preflight
+# requests and return 410 on the deprecated /webhook path without a JWT.
+[functions.stripe-payments-v2]
+verify_jwt = false
+
 # Webhook-only function: no JWT required. Each handler verifies its own
 # provider signature (HMAC/Stripe-Signature/Standard Webhooks).
 [functions.webhooks]

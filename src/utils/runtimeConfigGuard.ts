@@ -58,15 +58,28 @@ export function getStartupConfigurationError(environment: StartupEnvironment): s
  * Returns a list of non-fatal observability warnings for production.
  * These do not block startup but should be surfaced to operators.
  */
+const PLACEHOLDER_VALUES = [
+  'set_in_secret_manager',
+  'set_before_launch',
+  'paste_your',
+  '_here',
+];
+
+function isPlaceholder(value: string | undefined): boolean {
+  if (!value) { return true; }
+  const lower = value.toLowerCase();
+  return PLACEHOLDER_VALUES.some(p => lower.includes(p));
+}
+
 export function getObservabilityWarnings(environment: StartupEnvironment): string[] {
   if (environment.DEV || environment.MODE === 'test' || environment.VITE_E2E_LOCAL_AUTH === 'true') {
     return [];
   }
   const warnings: string[] = [];
-  if (!environment.VITE_SENTRY_DSN) {
+  if (isPlaceholder(environment.VITE_SENTRY_DSN)) {
     warnings.push('VITE_SENTRY_DSN is not set — runtime errors will not be captured in Sentry.');
   }
-  if (!environment.VITE_APP_INSIGHTS_CONNECTION_STRING && !environment.VITE_APP_INSIGHTS_KEY) {
+  if (isPlaceholder(environment.VITE_APP_INSIGHTS_CONNECTION_STRING) && isPlaceholder(environment.VITE_APP_INSIGHTS_KEY)) {
     warnings.push('VITE_APP_INSIGHTS_CONNECTION_STRING is not set — Web Vitals will not flow to Azure Application Insights.');
   }
   return warnings;

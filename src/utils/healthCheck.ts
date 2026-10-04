@@ -1,6 +1,6 @@
 import { getEnv } from './env';
 import { logger } from './monitoring';
-import { supabase, isSupabaseConfigured, supabaseAnonKey } from '@/utils/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/utils/supabase/client';
 import { getEdgeFunctionName } from './edgeFunctionConfig';
 
 export interface HealthCheckResult {
@@ -53,13 +53,9 @@ async function checkEdgeFunctionHealth(): Promise<boolean> {
   if (!supabaseUrl || !edgeFunctionName) {return false;}
 
   try {
-    const headers: Record<string, string> = {};
-    if (supabaseAnonKey && !supabaseAnonKey.toLowerCase().includes('your-anon-key')) {
-      headers['apikey'] = supabaseAnonKey;
-    }
     const response = await fetch(`${supabaseUrl}/functions/v1/${edgeFunctionName}/health`, {
       method: 'GET',
-      headers,
+      headers: {},
       signal: AbortSignal.timeout(5_000),
     });
     return response.ok;

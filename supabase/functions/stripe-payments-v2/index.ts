@@ -308,106 +308,16 @@ Deno.serve(async (req: Request) => {
     }
 
     if (pathname.endsWith("/webhook") && req.method === "POST") {
-      // Webhook handler: expects raw body and STRIPE_WEBHOOK_SECRET env var
-      const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-      const payload = await req.text();
-      if (!webhookSecret) {
-        return jsonResponse({ error: "Webhook unavailable" }, { status: 500 });
-      }
-      const sig = req.headers.get("stripe-signature") || "";
-      let event;
-      try {
-        event = stripe.webhooks.constructEvent(payload, sig, webhookSecret);
-      } catch {
-        return jsonResponse({ error: "Invalid signature" }, { status: 400 });
-      }
-
-      // Handle relevant events
-      switch (event.type) {
-        case "payment_intent.succeeded": {
-          const pi = event.data.object;
-          if (supabase) {
-            // Claim the transition once. Stripe can redeliver webhooks, so only
-            // the invocation that changes a non-succeeded row may credit a wallet.
-            const { data: transitioned, error: transitionError } = await supabase
-              .from("payments")
-              .update({ status: "succeeded" })
-              .eq("id", pi.id)
-              .neq("status", "succeeded")
-              .select("id");
-            if (transitionError) {throw transitionError;}
-
-            const metadata = pi.metadata ?? {};
-            if (
-              transitioned && transitioned.length > 0 &&
-              metadata.purpose === "wallet_top_up" && metadata.user_id
-            ) {
-              const divisor = pi.currency === "jod" ? 1000 : 100;
-              const { error: creditError } = await supabase.rpc("app_add_wallet_funds", {
-                p_user_id: metadata.user_id,
-                p_amount: pi.amount / divisor,
-                p_payment_method: "card_payment",
-                p_external_reference: pi.id,
-              });
-              if (creditError) {throw creditError;}
-            }
-          }
-          const admin = getAdminClient();
-          await publishEvent(admin, {
-            id: makeId("evt"),
-            topic: "payments.captured",
-            payload: {
-              entityId: pi.id,
-              entityType: "ride",
-              amount: pi.amount,
-            },
-            producer: "stripe-payments-v2",
-            trace_id: makeId("trace"),
-            occurred_at: new Date().toISOString(),
-          });
-          break;
-        }
-        case "payment_intent.payment_failed": {
-          const pi = event.data.object;
-          if (supabase) {
-            await supabase.from("payments").update({ status: "failed" }).eq(
-              "id",
-              pi.id,
-            );
-          }
-          break;
-        }
-        case "checkout.session.completed": {
-          const session = event.data.object;
-          if (supabase) {
-            await supabase.from("payments").insert(
-              [{
-                id: session.payment_intent,
-                status: "succeeded",
-                raw: session,
-              }],
-            );
-          }
-          const admin = getAdminClient();
-          await publishEvent(admin, {
-            id: makeId("evt"),
-            topic: "payments.captured",
-            payload: {
-              entityId: session.payment_intent as string,
-              entityType: "ride",
-              amount: session.amount_total ?? 0,
-            },
-            producer: "stripe-payments-v2",
-            trace_id: makeId("trace"),
-            occurred_at: new Date().toISOString(),
-          });
-          break;
-        }
-        default:
-          break;
-      }
-
-      return jsonResponse({ received: true }, { status: 200 });
+      // Stripe webhooks are handled exclusively by the canonical
+      // make-server-0b1f4071 function at /payments/webhooks/stripe.
+      // This endpoint is intentionally disabled to prevent split processing.
+      // Point your Stripe webhook destination to:
+      //   https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/payments/webhooks/stripe
+      return jsonResponse(
+        { error: "Webhook endpoint moved. Configure Stripe to call /payments/webhooks/stripe on make-server-0b1f4071." },
+        { status: 410 },
+        req,
+      );
     }
 
     return jsonResponse(
@@ -416,8 +326,8 @@ Deno.serve(async (req: Request) => {
         routes: [
           "/create-payment-intent",
           "/create-checkout-session",
-          "/webhook",
         ],
+        webhookNote: "Stripe webhooks must be sent to make-server-0b1f4071/payments/webhooks/stripe",
       },
     );
   } catch {
