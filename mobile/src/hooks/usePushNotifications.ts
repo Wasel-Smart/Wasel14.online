@@ -17,19 +17,55 @@ Notifications.setNotificationHandler({
 });
 
 type NotificationPreferences = {
-  rideUpdates: boolean;
+  inApp: boolean;
+  push: boolean;
+  email: boolean;
+  sms: boolean;
+  whatsapp: boolean;
+  tripUpdates: boolean;
+  bookingRequests: boolean;
+  messages: boolean;
   promotions: boolean;
-  chatMessages: boolean;
-  systemAlerts: boolean;
+  prayerReminders: boolean;
+  criticalAlerts: boolean;
+  preferredLanguage: 'en' | 'ar';
 };
 
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  inApp: true,
+  push: true,
+  email: false,
+  sms: false,
+  whatsapp: false,
+  tripUpdates: true,
+  bookingRequests: true,
+  messages: true,
+  promotions: false,
+  prayerReminders: true,
+  criticalAlerts: true,
+  preferredLanguage: 'en',
+};
+
+function normalizePreferences(row: Record<string, unknown> | null | undefined): NotificationPreferences {
+  if (!row) return { ...DEFAULT_PREFERENCES };
+  return {
+    inApp: row.in_app_enabled !== false,
+    push: row.push_enabled !== false,
+    email: row.email_enabled === true,
+    sms: row.sms_enabled === true,
+    whatsapp: row.whatsapp_enabled === true,
+    tripUpdates: row.trip_updates_enabled !== false,
+    bookingRequests: row.booking_requests_enabled !== false,
+    messages: row.messages_enabled !== false,
+    promotions: row.promotions_enabled === true,
+    prayerReminders: row.prayer_reminders_enabled !== false,
+    criticalAlerts: row.critical_alerts_enabled !== false,
+    preferredLanguage: row.preferred_language === 'ar' ? 'ar' : 'en',
+  };
+}
+
 export function usePushNotifications() {
-  const [preferences, setPreferences] = useState<NotificationPreferences>({
-    rideUpdates: true,
-    promotions: true,
-    chatMessages: true,
-    systemAlerts: true,
-  });
+  const [preferences, setPreferences] = useState<NotificationPreferences>({ ...DEFAULT_PREFERENCES });
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const [pushToken, setPushToken] = useState<string | null>(null);
@@ -76,10 +112,10 @@ export function usePushNotifications() {
 
       const user = mobileAuth.getUser();
       if (user) {
-        await apiClient.post('notifications/register', {
+        await apiClient.post('notifications/push-token', {
           token,
           userId: user.id,
-          platform: Platform.OS,
+          platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
           deviceId: Constants.installationId,
         });
       }

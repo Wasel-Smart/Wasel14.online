@@ -21,20 +21,56 @@ Notifications.setNotificationHandler({
 });
 
 interface NotificationPreferences {
-  rideUpdates: boolean;
+  inApp: boolean;
+  push: boolean;
+  email: boolean;
+  sms: boolean;
+  whatsapp: boolean;
+  tripUpdates: boolean;
+  bookingRequests: boolean;
+  messages: boolean;
   promotions: boolean;
-  chatMessages: boolean;
-  systemAlerts: boolean;
+  prayerReminders: boolean;
+  criticalAlerts: boolean;
+  preferredLanguage: 'en' | 'ar';
+}
+
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  inApp: true,
+  push: true,
+  email: false,
+  sms: false,
+  whatsapp: false,
+  tripUpdates: true,
+  bookingRequests: true,
+  messages: true,
+  promotions: false,
+  prayerReminders: true,
+  criticalAlerts: true,
+  preferredLanguage: 'en',
+};
+
+function normalizePreferences(row: Record<string, unknown> | null | undefined): NotificationPreferences {
+  if (!row) return { ...DEFAULT_PREFERENCES };
+  return {
+    inApp: row.in_app_enabled !== false,
+    push: row.push_enabled !== false,
+    email: row.email_enabled === true,
+    sms: row.sms_enabled === true,
+    whatsapp: row.whatsapp_enabled === true,
+    tripUpdates: row.trip_updates_enabled !== false,
+    bookingRequests: row.booking_requests_enabled !== false,
+    messages: row.messages_enabled !== false,
+    promotions: row.promotions_enabled === true,
+    prayerReminders: row.prayer_reminders_enabled !== false,
+    criticalAlerts: row.critical_alerts_enabled !== false,
+    preferredLanguage: row.preferred_language === 'ar' ? 'ar' : 'en',
+  };
 }
 
 class PushNotificationsService {
   private expoPushToken: string | null = null;
-  private preferences: NotificationPreferences = {
-    rideUpdates: true,
-    promotions: true,
-    chatMessages: true,
-    systemAlerts: true,
-  };
+  private preferences: NotificationPreferences = { ...DEFAULT_PREFERENCES };
 
   async initialize(): Promise<void> {
     if (!Device.isDevice) {
@@ -125,10 +161,10 @@ class PushNotificationsService {
     if (!user) return;
 
     try {
-      await apiClient.post('notifications/register', {
+      await apiClient.post('notifications/push-token', {
         token,
         userId: user.id,
-        platform: Platform.OS,
+        platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
         deviceId: Constants.installationId,
       });
     } catch (error) {
@@ -141,11 +177,9 @@ class PushNotificationsService {
     if (!user) return this.preferences;
 
     try {
-      const response = await apiClient.get<NotificationPreferences>(
-        `notifications/preferences/${user.id}`,
-      );
-      if (response.data) {
-        this.preferences = response.data;
+      const response = await apiClient.get<{ preferences: Record<string, unknown> | null }>('communications/preferences');
+      if (response.data?.preferences) {
+        this.preferences = normalizePreferences(response.data.preferences);
       }
     } catch (error) {
       console.error('[PushNotifications] Failed to load preferences:', error);
@@ -162,11 +196,11 @@ class PushNotificationsService {
 
     try {
       const response = await apiClient.patch(
-        `notifications/preferences/${user.id}`,
+        'communications/preferences',
         preferences,
       );
 
-      if (response.data) {
+      if (!response.error) {
         this.preferences = { ...this.preferences, ...preferences };
         return true;
       }
