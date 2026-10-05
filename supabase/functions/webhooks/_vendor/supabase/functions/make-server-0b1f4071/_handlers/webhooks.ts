@@ -8,23 +8,20 @@ import {
     SUPABASE_AUTH_HOOK_SEND_SMS_SECRET,
     deliveryEnv,
     constantTimeEquals,
-} from './shared.ts';
-
-import {
-  CLIQ_WEBHOOK_SECRET,
-  SANAD_WEBHOOK_SECRET,
-  STRIPE_WEBHOOK_SECRET,
-  fetchStripeSubscription,
-  finalizeTopUpTransaction,
-  firstStringValue,
-  isFailedProviderStatus,
-  isSuccessfulProviderStatus,
-  markTopUpTransactionFailed,
-  normalizeProviderStatus,
-  syncStripeSubscriptionRecord,
-  updateTopUpTransactionMetadata,
-  verifyProviderWebhookSignature,
-  verifyStripeWebhookSignature,
+    CLIQ_WEBHOOK_SECRET,
+    SANAD_WEBHOOK_SECRET,
+    STRIPE_WEBHOOK_SECRET,
+    fetchStripeSubscription,
+    finalizeTopUpTransaction,
+    firstStringValue,
+    isFailedProviderStatus,
+    isSuccessfulProviderStatus,
+    markTopUpTransactionFailed,
+    normalizeProviderStatus,
+    syncStripeSubscriptionRecord,
+    updateTopUpTransactionMetadata,
+    verifyProviderWebhookSignature,
+    verifyStripeWebhookSignature,
 } from './shared.ts';
 
 import {
@@ -34,6 +31,7 @@ import {
 } from '../_shared/communication-runtime.ts';
 
 
+// eslint-disable-next-line complexity
 export async function handleStripeWebhook ( request: Request ) {
   if ( !STRIPE_WEBHOOK_SECRET ) {
     return json( { error: 'Stripe webhook secret is not configured.' }, 503 );
@@ -221,6 +219,7 @@ export async function handleCliqWebhook ( request: Request ) {
   return json( { received: true, transactionId, pending: true } );
 }
 
+// eslint-disable-next-line complexity
 export async function handleSanadWebhook ( request: Request ) {
   if ( !SANAD_WEBHOOK_SECRET ) {
     return json( { error: 'Sanad webhook secret is not configured.' }, 503 );
@@ -402,6 +401,7 @@ async function verifyStandardWebhookSignature ( headers: Headers, rawBody: strin
   } );
 }
 
+// eslint-disable-next-line complexity
 export async function handleSendSmsHook ( request: Request ): Promise<Response> {
   if ( !SUPABASE_AUTH_HOOK_SEND_SMS_SECRET ) {
     return json( { error: 'SMS hook secret is not configured.' }, 503 );
@@ -415,7 +415,7 @@ export async function handleSendSmsHook ( request: Request ): Promise<Response> 
     return json( { error: 'Invalid webhook signature.' }, 401 );
   }
 
-  let body: unknown = null;
+  let body: unknown;
   try {
     body = JSON.parse( rawBody );
   } catch {
@@ -433,25 +433,32 @@ export async function handleSendSmsHook ( request: Request ): Promise<Response> 
   }
 
   const accountSid = deliveryEnv.twilioAccountSid ?? '';
-  const authToken = deliveryEnv.twilioAuthToken ?? '';
-  const from = deliveryEnv.twilioSmsFrom ?? '';
+  const authUser = deliveryEnv.twilioApiKeySid ?? accountSid;
+  const authPassword = deliveryEnv.twilioApiKeySecret ?? deliveryEnv.twilioAuthToken ?? '';
+  const messagingServiceSid = deliveryEnv.twilioMessagingServiceSid ?? '';
+  const smsFrom = deliveryEnv.twilioSmsFrom ?? '';
 
-  if ( !accountSid || !authToken || !from ) {
+  if ( !accountSid || !authPassword ) {
     return json( { error: 'Twilio is not configured.' }, 503 );
   }
+  if ( !messagingServiceSid && !smsFrom ) {
+    return json( { error: 'TWILIO_MESSAGING_SERVICE_SID or TWILIO_SMS_FROM is required.' }, 503 );
+  }
 
-  const params = new URLSearchParams( {
-    To: phone,
-    From: from,
-    Body: `Your Wasel verification code is: ${ otp }`,
-  } );
+  const smsBody = `Wasel | واصل: Your verification code is ${ otp }. It expires in 10 minutes. Never share this code with anyone.`;
+  const params = new URLSearchParams( { To: phone, Body: smsBody } );
+  if ( messagingServiceSid ) {
+    params.set( 'MessagingServiceSid', messagingServiceSid );
+  } else {
+    params.set( 'From', smsFrom );
+  }
 
   const response = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${ accountSid }/Messages.json`,
     {
       method: 'POST',
       headers: {
-        Authorization: `Basic ${ btoa( `${ accountSid }:${ authToken }` ) }`,
+        Authorization: `Basic ${ btoa( `${ authUser }:${ authPassword }` ) }`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: params.toString(),

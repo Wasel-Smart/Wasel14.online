@@ -105,6 +105,17 @@ function enforceOtpStartRateLimit ( userId: string ) {
   otpStartTimestamps.set( userId, now );
 }
 
+function isPhoneNumberUniqueViolation ( error: unknown ): boolean {
+  if ( !error || typeof error !== 'object' ) { return false; }
+  const record = error as { code?: unknown; message?: unknown; details?: unknown };
+  const message = String( record.message ?? record.details ?? '' );
+  return (
+    record.code === '23505' ||
+    message.includes( 'users_phone_number_key' ) ||
+    message.includes( 'duplicate key value violates unique constraint' )
+  );
+}
+
 export async function startDirectTrustPhoneVerification ( userId: string, phoneNumber: string ) {
   const context = await buildUserContext( userId );
   const db = getDb();
@@ -128,9 +139,14 @@ export async function startDirectTrustPhoneVerification ( userId: string, phoneN
 
   const { error: updateError } = await db
     .from( 'users' )
-    .update( { phone_number: normalized } )
+    .update( { phone_number: normalized, phone_verified_at: null } )
     .eq( 'id', context.user.id );
-  if ( updateError ) { throw updateError; }
+  if ( updateError ) {
+    if ( isPhoneNumberUniqueViolation( updateError ) ) {
+      throw new Error( 'This phone number is already linked to another account.' );
+    }
+    throw updateError;
+  }
 
   const now = new Date().toISOString();
   const expiresAt = new Date( Date.now() + 10 * 60 * 1000 ).toISOString();

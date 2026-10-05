@@ -118,6 +118,16 @@ import {
   handleHealth,
 } from './_handlers/infrastructure.ts';
 
+import {
+  handleCreateOrganization,
+  handleGetOrganization,
+  handleListOrganizations,
+  handleAddMember,
+  handleAddCredits,
+  handleGenerateInvoice,
+  handleGetInvoices,
+} from './_handlers/corporate.ts';
+
 
 interface RouteDescriptor {
   id: string;
@@ -543,6 +553,48 @@ const ROUTES: RouteDescriptor[] = [
       const parts = path.split( '/' );
       return handleGetPaymentStatus( request, decodeURIComponent( parts[ 2 ] ) );
     },
+  },
+  {
+    id: 'corporate-create-org',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/corporate/organizations',
+    handle: ( request ) => handleCreateOrganization( request ),
+  },
+  {
+    id: 'corporate-list-orgs',
+    methods: [ 'GET' ],
+    test: ( path ) => path === '/corporate/organizations',
+    handle: ( request ) => handleListOrganizations( request ),
+  },
+  {
+    id: 'corporate-get-org',
+    methods: [ 'GET' ],
+    test: ( path ) => /^\/corporate\/organizations\/[^/]+$/.test( path ),
+    handle: ( request, path ) => handleGetOrganization( request, path ),
+  },
+  {
+    id: 'corporate-add-member',
+    methods: [ 'POST' ],
+    test: ( path ) => /^\/corporate\/organizations\/[^/]+\/members$/.test( path ),
+    handle: ( request, path ) => handleAddMember( request, path ),
+  },
+  {
+    id: 'corporate-add-credits',
+    methods: [ 'POST' ],
+    test: ( path ) => /^\/corporate\/organizations\/[^/]+\/credits$/.test( path ),
+    handle: ( request, path ) => handleAddCredits( request, path ),
+  },
+  {
+    id: 'corporate-generate-invoice',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/corporate/invoices/generate',
+    handle: ( request ) => handleGenerateInvoice( request ),
+  },
+  {
+    id: 'corporate-get-invoices',
+    methods: [ 'GET' ],
+    test: ( path ) => /^\/corporate\/organizations\/[^/]+\/invoices$/.test( path ),
+    handle: ( request, path ) => handleGetInvoices( request, path ),
   },
 ];
 

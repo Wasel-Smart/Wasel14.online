@@ -24,11 +24,10 @@ import {
     MOBILITY_OS_RUNTIME_SQL,
 } from '../_shared/mobility-os-runtime.ts';
 import { toNumber } from '../_shared/pricing.ts';
-import type {
-  AccessPermission} from '../_shared/rbac.ts';
 import {
     hasPermission,
     resolveAccessRole,
+    type AccessPermission,
 } from '../_shared/rbac.ts';
 
 
@@ -684,9 +683,9 @@ export async function consumeRateLimit (
   admin: ReturnType<typeof getAdminClient>,
   key: string,
   limit: number,
-  windowSeconds: number,
-  options: { failClosed?: boolean } = {},
+  options: { windowSeconds: number; failClosed?: boolean },
 ): Promise<Response | null> {
+  const { windowSeconds } = options;
   try {
     const { data, error } = await admin.rpc( 'consume_rate_limit', {
       p_key: key,
@@ -697,7 +696,7 @@ export async function consumeRateLimit (
 
     const row = Array.isArray( data ) ? data[ 0 ] : data;
     if ( row && row.allowed === false ) {
-      const retryAfter = Math.max( Number( row.retry_after_seconds ?? windowSeconds ), 1 );
+      const retryAfter = Math.max( Number( row.retry_after_seconds ?? options.windowSeconds ), 1 );
       return new Response(
         JSON.stringify( {
           error: 'Too many requests. Please try again later.',
@@ -848,6 +847,7 @@ export async function authenticateAuthUser ( request: Request ) {
   return { admin, authUser: data.user };
 }
 
+// eslint-disable-next-line complexity
 export async function ensureCanonicalUserForAuth (
   admin: ReturnType<typeof getAdminClient>,
   authUser: Record<string, unknown>,
@@ -989,6 +989,7 @@ export function isApprovedDriver (
   );
 }
 
+// eslint-disable-next-line complexity
 export async function buildProfilePayload ( admin: ReturnType<typeof getAdminClient>, user: Record<string, unknown> ) {
   const [ wallet, verification, driver ] = await Promise.all( [
     getWalletForUser( admin, String( user.id ) ).catch( () => null ),
@@ -1229,6 +1230,65 @@ export function generateOtpCode (): string {
   return String( random + 100000 ).padStart( 6, '0' );
 }
 
+const TWILIO_REQUEST_TIMEOUT_MS = 10_000;
+
+interface TwilioJsonResult {
+  ok: boolean;
+  status: number;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Every Twilio call leaves the function over the public internet, so DNS, TLS
+ * and connection failures surface as a thrown TypeError instead of a response.
+ * Left unhandled that exception escapes the request handler and the top-level
+ * catch in index.ts replaces it with a generic 500 "Internal server error",
+ * which is indistinguishable from an application bug and hides the real cause.
+ * Routing the call through here keeps transport failures structured and typed.
+ */
+async function requestTwilioJson (
+  url: string,
+  authPair: { user: string; password: string },
+  params: URLSearchParams,
+): Promise<TwilioJsonResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout( () => controller.abort(), TWILIO_REQUEST_TIMEOUT_MS );
+
+  try {
+    const response = await fetch( url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${ btoa( `${ authPair.user }:${ authPair.password }` ) }`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+      signal: controller.signal,
+    } );
+    const payload = ( await response.json().catch( () => ( {} ) ) ) as Record<string, unknown>;
+
+    return { ok: response.ok, status: response.status, payload };
+  } catch ( error ) {
+    const timedOut = controller.signal.aborted;
+    console.error( '[Edge] Twilio request failed', {
+      url,
+      timedOut,
+      reason: error instanceof Error ? error.message : String( error ),
+    } );
+
+    return {
+      ok: false,
+      status: timedOut ? 408 : 0,
+      payload: {
+        message: timedOut
+          ? 'The SMS provider did not respond in time. Please try again.'
+          : 'The SMS provider could not be reached. Please try again.',
+      },
+    };
+  } finally {
+    clearTimeout( timeoutId );
+  }
+}
+
 export function getTwilioAuthPair (): { user: string; password: string } | null {
   const sid = deliveryEnv.twilioApiKeySid ?? deliveryEnv.twilioAccountSid ?? '';
   const secret = deliveryEnv.twilioApiKeySecret ?? deliveryEnv.twilioAuthToken ?? '';
@@ -1250,45 +1310,66 @@ export async function callTwilioVerify ( path: string, params: URLSearchParams )
     };
   }
 
-  const response = await fetch(
+  const result = await requestTwilioJson(
     `https://verify.twilio.com/v2/Services/${ TWILIO_VERIFY_SERVICE_SID }${ path }`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${ btoa( `${ authPair.user }:${ authPair.password }` ) }`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    },
-  );
-  const payload = await response.json().catch( () => ( {} ) );
-
-  return {
-    ok: response.ok,
-    retryable: response.status >= 400 && response.status < 500,
-    payload,
-    error:
-      typeof payload?.message === 'string'
-        ? payload.message
-        : `Twilio Verify request failed (${ response.status }).`,
-  };
-}
-
-export async function startTwilioPhoneVerification ( phoneNumber: string ) {
-  const result = await callTwilioVerify(
-    '/Verifications',
-    new URLSearchParams( {
-      To: phoneNumber,
-      Channel: 'sms',
-      Locale: 'en',
-    } ),
+    authPair,
+    params,
   );
 
   return {
     ok: result.ok,
-    retryable: result.retryable,
-    error: result.ok ? undefined : result.error,
+    retryable: result.status >= 400 && result.status < 500,
+    payload: result.payload,
+    error:
+      typeof result.payload?.message === 'string'
+        ? result.payload.message
+        : `Twilio Verify request failed (${ result.status }).`,
   };
+}
+
+export async function sendTwilioOtpSms ( phoneNumber: string, code: string ): Promise<{ ok: boolean; retryable: boolean; error?: string }> {
+  const authPair = getTwilioAuthPair();
+  if ( !authPair || !deliveryEnv.twilioAccountSid ) {
+    return { ok: false, retryable: false, error: 'Twilio is not configured.' };
+  }
+
+  const body = `Wasel | واصل: Your verification code is ${ code }. It expires in 10 minutes. Never share this code with anyone.`;
+  const params = new URLSearchParams( { To: phoneNumber, Body: body } );
+
+  if ( deliveryEnv.twilioMessagingServiceSid ) {
+    params.set( 'MessagingServiceSid', deliveryEnv.twilioMessagingServiceSid );
+  } else if ( deliveryEnv.twilioSmsFrom ) {
+    params.set( 'From', deliveryEnv.twilioSmsFrom );
+  } else {
+    return { ok: false, retryable: false, error: 'TWILIO_MESSAGING_SERVICE_SID or TWILIO_SMS_FROM is required.' };
+  }
+
+  const result = await requestTwilioJson(
+    `https://api.twilio.com/2010-04-01/Accounts/${ deliveryEnv.twilioAccountSid }/Messages.json`,
+    authPair,
+    params,
+  );
+
+  return {
+    ok: result.ok,
+    retryable: result.status === 0 || result.status >= 500,
+    error: result.ok ? undefined : String( result.payload?.message ?? `Twilio SMS error ${ result.status }` ),
+  };
+}
+
+export async function startTwilioPhoneVerification ( phoneNumber: string ) {
+  // Use Twilio Verify when configured; fall back to direct SMS OTP.
+  if ( hasTwilioVerifyRuntime() ) {
+    const result = await callTwilioVerify(
+      '/Verifications',
+      new URLSearchParams( { To: phoneNumber, Channel: 'sms', Locale: 'en' } ),
+    );
+    return { ok: result.ok, retryable: result.retryable, error: result.ok ? undefined : result.error };
+  }
+
+  const code = generateOtpCode();
+  const result = await sendTwilioOtpSms( phoneNumber, code );
+  return { ok: result.ok, retryable: result.retryable, error: result.error, _code: result.ok ? code : undefined };
 }
 
 export async function checkTwilioPhoneVerification ( phoneNumber: string, code: string ) {
@@ -1337,6 +1418,7 @@ export function computeTrustStepSummary ( steps: Record<string, { id: string; st
   return { totalSteps: all.length, completedSteps: completed, failedSteps: failed, inProgressSteps: inProgress };
 }
 
+// eslint-disable-next-line max-params
 export function buildTrustStep ( id: string, state: string, detail: string, meta: Record<string, unknown>, options?: {
   failureReason?: string | null;
   updatedAt?: string | null;
@@ -1344,6 +1426,7 @@ export function buildTrustStep ( id: string, state: string, detail: string, meta
   return { id, state, detail, ...meta, failureReason: options?.failureReason ?? null, updatedAt: options?.updatedAt ?? null };
 }
 
+// eslint-disable-next-line max-lines-per-function, complexity
 export async function buildTrustStatus (
   auth: Awaited<ReturnType<typeof authenticateRequest>>,
 ) {
@@ -2273,6 +2356,7 @@ export async function updateTopUpTransactionMetadata (
   }
 }
 
+// eslint-disable-next-line max-params
 export async function markTopUpTransactionFailed (
   admin: ReturnType<typeof getAdminClient>,
   transactionId: string,
@@ -2556,6 +2640,7 @@ export async function verifyProviderWebhookSignature ( args: {
   return constantTimeEquals( normalized, expected );
 }
 
+// eslint-disable-next-line complexity
 export async function sendDelivery (
   admin: ReturnType<typeof getAdminClient>,
   delivery: CommunicationDeliveryRecord,

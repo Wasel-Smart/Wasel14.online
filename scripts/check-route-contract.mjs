@@ -44,43 +44,80 @@ function walk(dir, out = []) {
   return out;
 }
 
+function extractStaticPrefix(path) {
+  // Extract the static prefix before any template expression
+  const idx = path.indexOf('${');
+  if (idx === -1) return path;
+  const prefix = path.slice(0, idx);
+  // Remove trailing slash if it ends with one before the template
+  return prefix.replace(/\/+$/, '') || '/';
+}
+
 // ---------------------------------------------------------------------------
 // 1. Paths the frontend asks for
 // ---------------------------------------------------------------------------
 const CALL_PATTERNS = [
-  // `prefix` is prepended to the capture, because the pattern itself consumes
-  // the slash that separates the base URL from the path.
-  { re: /\$\{\s*API_URL\s*\}\/([A-Za-z0-9_\-/{}]*)"/g, prefix: '/' },
-  { re: /\$\{\s*API_URL\s*\}\/([A-Za-z0-9_\-/{}]*)/g, prefix: '/' },
-  { re: /['"`]\/(v1\/)?[A-Za-z0-9_\-/{}]*/g, prefix: '' },
+  // API_URL template literals: `${API_URL}/path` or `${API_URL}/path/${var}`
+  { re: /\$\{\s*API_URL\s*\}\/([^'"`\s${}]*(?:\$\{[^}]+\}[^'"`\s${}]*)*)/g, prefix: '/', groups: [1] },
+  // String literals with optional v1 prefix: '/v1/path' or '/path' (including template expressions)
+  { re: /['"`]\/(v1\/)?([A-Za-z0-9_\-/{}]+(?:\$\{[^}]+\}[A-Za-z0-9_\-/{}]*)*)/g, prefix: '', groups: [2] },
+  // api.get/post/put/patch/delete calls with string endpoints
+  { re: /api\.(?:get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]/g, prefix: '', groups: [1] },
+  // API_ENDPOINTS references: API_ENDPOINTS.SOME_ENDPOINT or API_ENDPOINTS.SOME_ENDPOINT(id)
+  { re: /API_ENDPOINTS\.[A-Z_]+(?:\([^)]*\))?/g, prefix: '', groups: [] },
 ];
 
 const calls = new Map(); // path -> [{file, line}]
 
 for (const file of walk(SRC)) {
   if (file.includes('__tests__') || file.endsWith('.test.ts') || file.endsWith('.test.tsx')) continue;
-  const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+  const content = readFileSync(file, 'utf8');
+  const lines = content.split(/\r?\n/);
   lines.forEach((line, i) => {
     if (line.trimStart().startsWith('*') || line.trimStart().startsWith('//')) return;
-    for (const { re, prefix } of CALL_PATTERNS) {
+    for (const { re, prefix, groups } of CALL_PATTERNS) {
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(line)) !== null) {
-        // If the path continues into a template expression (`/notifications/${id}/read`)
-        // the static prefix alone is not verifiable, so skip it.
-        if (line.slice(re.lastIndex).startsWith('${')) continue;
-        let path = `${prefix}${m[1] ?? ''}`;
+        let path = '';
+        if (groups.length === 0) {
+          // API_ENDPOINTS pattern - skip, handled separately
+          continue;
+        } else if (groups.length === 1) {
+          // Single capture group
+          path = `${prefix}${m[groups[0]] || ''}`;
+        } else if (groups.length === 2) {
+          // Two capture groups (v1 prefix + path)
+          path = `${prefix}/${m[groups[0]] || ''}${m[groups[1]] || ''}`;
+        } else {
+          continue;
+        }
         path = path.replace(/^['"`]/, '').replace(/['"`]$/, '');
         if (!path || path === '/') continue;
         if (!path.startsWith('/')) continue;
         // Normalise the path prefix the edge strips at runtime.
         path = path.replace(/^\/v1(?=\/|$)/, '');
-        if (path.includes('${')) continue; // fully dynamic, cannot verify statically
-        if (!calls.has(path)) calls.set(path, []);
-        calls.get(path).push({ file: relative(ROOT, file), line: i + 1 });
+        // Extract static prefix for dynamic paths
+        const staticPath = extractStaticPrefix(path);
+        if (!calls.has(staticPath)) calls.set(staticPath, []);
+        calls.get(staticPath).push({ file: relative(ROOT, file), line: i + 1 });
       }
     }
   });
+}
+
+// Also scan for API_ENDPOINTS usage by reading the actual constant values
+// This is a simplified approach - we'll also check the api.ts file for endpoint definitions
+const apiTsContent = readFileSync(join(ROOT, 'src', 'utils', 'api.ts'), 'utf8');
+// Extract endpoint paths from API_ENDPOINTS object (both string literals and functions)
+const endpointPattern = /([A-Z_]+):\s*(?:['"`]([^'"`]+)['"`]|\([^)]*\)\s*=>\s*['"`]([^'"`]+)['"`])/g;
+for (const m of apiTsContent.matchAll(endpointPattern)) {
+  let path = m[2] || m[3];
+  if (!path) continue;
+  path = path.replace(/^\/v1(?=\/|$)/, '');
+  const staticPath = extractStaticPrefix(path);
+  if (!calls.has(staticPath)) calls.set(staticPath, []);
+  calls.get(staticPath).push({ file: 'src/utils/api.ts (API_ENDPOINTS)', line: 0 });
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +144,10 @@ for (const m of edgeSource.matchAll(/`(\/[A-Za-z0-9_\-/]*)\$\{/g)) declared.add(
 for (const m of edgeSource.matchAll(/'(\/[A-Za-z0-9_\-/]*\/)\$\{/g)) declared.add(m[1]);
 // Regex-literal route patterns, e.g. /^\/wallet\/([^/]+)/ used by parseWalletRoute.
 for (const m of edgeSource.matchAll(/\^\\\/([A-Za-z0-9_\-]+)/g)) declared.add(`/${m[1]}`);
+// parseEntityRoute prefixes
+for (const m of edgeSource.matchAll(/parseEntityRoute\(\s*path\s*,\s*'([^']+)'/g)) declared.add(`/${m[1]}`);
+// parseWalletRoute - the regex is /^\/wallet\/([^/]+)/
+// Already covered by regex-literal pattern above
 
 // ---------------------------------------------------------------------------
 // 3. Compare

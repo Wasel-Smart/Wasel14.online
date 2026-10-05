@@ -26,6 +26,7 @@
     "preview": "vite preview",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
+    "test:edge": "node scripts/run-edge-tests.mjs",
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --grep @smoke",
     "test:e2e:oauth": "playwright test --grep @oauth",

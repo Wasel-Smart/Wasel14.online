@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import api from '../utils/api';
+import { notificationsAPI } from '../services/notifications';
 
 interface Notification {
   id: string;
@@ -30,9 +30,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.get('/v1/notifications');
-      const data = response as { data: Notification[]; meta: { total: number } };
-      setNotifications(data.data);
+      const response = await notificationsAPI.getNotifications();
+      setNotifications(response.notifications.map(n => ({ ...n, read: !!n.read })));
     } catch {
       setNotifications([]);
     } finally {
@@ -42,7 +41,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const markAsRead = useCallback(async (id: string) => {
     try {
-      await api.patch(`/v1/notifications/${id}/read`, {});
+      await notificationsAPI.markAsRead(id);
       setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)));
     } catch {
       // Silently fail - notification read is non-critical
