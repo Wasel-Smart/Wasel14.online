@@ -14,11 +14,11 @@ describe('i18n', () => {
   });
 
   it('replaces placeholders', () => {
-    expect(t('trustCenter.remainingChecks', 'en', { remaining: '3' })).toBe('Complete 3 remaining checks and avoid any stuck state.');
+    expect(t('trustCenter.remainingChecksHelp', 'en', { remaining: '3' })).toBe('Complete 3 remaining checks and avoid any stuck state.');
   });
 
   it('returns Arabic placeholder replacement', () => {
-    expect(t('trustCenter.remainingChecks', 'ar', { remaining: '٣' })).toBe('أكمل ٣ خطوات متبقية وتجنب أي حالة معلقة.');
+    expect(t('trustCenter.remainingChecksHelp', 'ar', { remaining: '٣' })).toBe('أكمل ٣ خطوات متبقية وتجنب أي حالة معلقة.');
   });
 
   it('getTranslations returns full dictionary', () => {

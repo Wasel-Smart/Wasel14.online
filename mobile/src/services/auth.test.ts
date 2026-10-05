@@ -6,36 +6,29 @@ jest.mock('react-native', () => ({
   },
 }));
 
-const mockSupabaseAuth = {
-  signInWithPassword: jest.fn(),
-  signUp: jest.fn(),
-  signInWithOtp: jest.fn(),
-  signInWithOAuth: jest.fn(),
-  setSession: jest.fn(),
-  getSession: jest.fn().mockResolvedValue({ data: { session: null } }),
-  onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }),
-  verifyOtp: jest.fn(),
-  signOut: jest.fn(),
-  refreshSession: jest.fn(),
-  updateUser: jest.fn(),
-  resetPasswordForEmail: jest.fn(),
-};
-
-const mockFunctionsInvoke = jest.fn().mockResolvedValue({ data: null, error: null });
-
-jest.mock('../lib/config', () => {
-  console.error('MOCK_FACTORY_CONFIG:', typeof mockSupabaseAuth, typeof mockSupabaseAuth?.signInWithPassword);
-  return ({
+jest.mock('../lib/config', () => ({
   waselMobileConfig: {
     hasSupabase: true,
     authRedirectUrl: 'wasel://auth/callback',
   },
   supabase: {
-    auth: mockSupabaseAuth,
-    functions: { invoke: mockFunctionsInvoke },
+    auth: {
+      signInWithPassword: jest.fn(),
+      signUp: jest.fn(),
+      signInWithOtp: jest.fn(),
+      signInWithOAuth: jest.fn(),
+      setSession: jest.fn(),
+      getSession: jest.fn().mockResolvedValue({ data: { session: null } }),
+      onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }),
+      verifyOtp: jest.fn(),
+      signOut: jest.fn(),
+      refreshSession: jest.fn(),
+      updateUser: jest.fn(),
+      resetPasswordForEmail: jest.fn(),
+    },
+    functions: { invoke: jest.fn().mockResolvedValue({ data: null, error: null }) },
   },
-  });
-});
+}));
 
 jest.mock('./biometricAuth', () => ({
   biometricAuth: {
@@ -47,6 +40,23 @@ import { Linking } from 'react-native';
 import { supabase, waselMobileConfig } from '../lib/config';
 import { biometricAuth } from './biometricAuth';
 import { mobileAuth } from './auth';
+
+const mockSupabaseAuth = supabase.auth as unknown as {
+  signInWithPassword: jest.Mock;
+  signUp: jest.Mock;
+  signInWithOtp: jest.Mock;
+  signInWithOAuth: jest.Mock;
+  setSession: jest.Mock;
+  getSession: jest.Mock;
+  onAuthStateChange: jest.Mock;
+  verifyOtp: jest.Mock;
+  signOut: jest.Mock;
+  refreshSession: jest.Mock;
+  updateUser: jest.Mock;
+  resetPasswordForEmail: jest.Mock;
+};
+
+const mockFunctionsInvoke = supabase.functions.invoke as jest.Mock;
 
 async function flushMicrotasks() {
   await new Promise(resolve => setTimeout(resolve, 0));
