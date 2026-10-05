@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { useStripe } from '@stripe/stripe-react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, View, AppState } from 'react-native';
 
 import {
   InfoCard,
@@ -13,13 +12,12 @@ import {
   StatusPill,
 } from '../components/MobilePrimitives';
 import { waselMobileConfig } from '../lib/config';
-import { createMobilePaymentSheet, paymentService } from '../services/payments';
+import { paymentService, createTopUpSession } from '../services/payments';
 import { mobileAuth } from '../services/auth';
 import { useLanguage } from '../contexts/LanguageContext';
-import { colors, radii, spacing } from '../theme';
+import { colors, spacing } from '../theme';
 
 const WalletScreen = React.memo(function WalletScreen() {
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const { t, language } = useLanguage();
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,9 +25,9 @@ const WalletScreen = React.memo(function WalletScreen() {
 
   const userId = mobileAuth.getUser()?.id ?? '';
   const numericAmount = Number(amount);
-  const paymentReady = waselMobileConfig.hasStripe && waselMobileConfig.hasFunctions;
+  const paymentReady = waselMobileConfig.hasFunctions;
   const validPayment = useMemo(
-    () => Number.isFinite(numericAmount) && numericAmount > 0,
+    () => Number.isFinite(numericAmount) && numericAmount >= 10,
     [numericAmount],
   );
 
@@ -41,13 +39,25 @@ const WalletScreen = React.memo(function WalletScreen() {
     setBalance(result.available);
   }, [userId]);
 
+  const refreshOnForeground = useCallback(async () => {
+    if (!userId) return;
+    const result = await paymentService.getWalletBalance(userId);
+    setBalance(result.available);
+  }, [userId]);
+
   useEffect(() => {
     void loadBalance();
-  }, [loadBalance]);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void refreshOnForeground();
+      }
+    });
+    return () => sub.remove();
+  }, [loadBalance, refreshOnForeground]);
 
   const startPayment = useCallback(async () => {
     if (!validPayment) {
-      Alert.alert(t('wallet.validAmount'), t('wallet.validAmount'));
+      Alert.alert(t('wallet.validAmount'), t('wallet.validAmountMsg'));
       return;
     }
 
@@ -59,36 +69,15 @@ const WalletScreen = React.memo(function WalletScreen() {
     try {
       setLoading(true);
       setStatus(null);
-      const sheet = await createMobilePaymentSheet({
-        userId,
-        amount: numericAmount,
-        currency: 'jod',
-        metadata: { source: 'wasel-mobile' },
-      });
 
-      const initResult = await initPaymentSheet({
-        merchantDisplayName: 'Wasel',
-        paymentIntentClientSecret: sheet.clientSecret,
-        allowsDelayedPaymentMethods: false,
-        defaultBillingDetails: {
-          address: {
-            country: 'JO',
-          },
-        },
-      });
+      const session = await createTopUpSession({ userId, amount: numericAmount });
 
-      if (initResult.error) {
-        throw new Error(initResult.error.message);
+      if (!session.checkoutUrl) {
+        throw new Error('No checkout URL returned');
       }
 
-      const presentResult = await presentPaymentSheet();
-      if (presentResult.error) {
-        throw new Error(presentResult.error.message);
-      }
-
-      const message = t('wallet.paymentCompleted');
+      const message = t('wallet.openingCheckout');
       setStatus(message);
-      Alert.alert(t('wallet.paymentCompleted'), message);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setStatus(message);
@@ -96,20 +85,15 @@ const WalletScreen = React.memo(function WalletScreen() {
     } finally {
       setLoading(false);
     }
-  }, [initPaymentSheet, numericAmount, presentPaymentSheet, userId, validPayment, t]);
+  }, [numericAmount, userId, validPayment, t]);
 
   return (
     <ScreenShell testID="wallet-screen">
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <StatusPill
-            label={waselMobileConfig.hasStripe ? t('wallet.stripeReady') : t('wallet.stripeKeyMissing')}
-            tone={waselMobileConfig.hasStripe ? colors.green : colors.amber}
-            icon={waselMobileConfig.hasStripe ? 'card' : 'warning'}
-          />
-          <StatusPill
-            label={waselMobileConfig.hasFunctions ? t('wallet.apiReady') : t('wallet.apiUrlMissing')}
-            tone={waselMobileConfig.hasFunctions ? colors.green : colors.amber}
+            label={paymentReady ? t('wallet.apiReady') : t('wallet.apiUrlMissing')}
+            tone={paymentReady ? colors.green : colors.amber}
           />
         </View>
 
@@ -127,7 +111,6 @@ const WalletScreen = React.memo(function WalletScreen() {
             tone={colors.teal}
             testID="wallet-balance"
           />
-          <MetricTile label={t('wallet.mode')} value={paymentReady ? t('wallet.live') : t('wallet.setup')} tone={paymentReady ? colors.teal : colors.amber} />
         </View>
 
         <PremiumPanel>
@@ -159,7 +142,7 @@ const WalletScreen = React.memo(function WalletScreen() {
             icon={status.includes('completed') ? 'checkmark-circle' : 'warning'}
             title={t('wallet.paymentStatus')}
             body={status}
-            tone={status.includes('completed') ? colors.green : colors.red}
+            tone={status.includes('completed') || status.includes('checkout') ? colors.green : colors.red}
           />
         ) : null}
 
@@ -204,7 +187,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.surfaceAlt,
     borderColor: colors.line,
-    borderRadius: radii.lg,
+    borderRadius: 16,
     borderWidth: 1,
     color: colors.ink,
     fontSize: 16,
@@ -213,5 +196,3 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
 });
-
-export default WalletScreen;
