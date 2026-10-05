@@ -31,7 +31,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const response = await notificationsAPI.getNotifications();
-      setNotifications(response.notifications.map(n => ({ ...n, read: !!n.read })));
+      setNotifications(response.notifications.map(n => ({ ...n, read: Boolean(n.read) })));
     } catch {
       setNotifications([]);
     } finally {

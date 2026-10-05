@@ -1226,6 +1226,65 @@ export function generateOtpCode (): string {
   return String( random + 100000 ).padStart( 6, '0' );
 }
 
+const TWILIO_REQUEST_TIMEOUT_MS = 10_000;
+
+interface TwilioJsonResult {
+  ok: boolean;
+  status: number;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Every Twilio call leaves the function over the public internet, so DNS, TLS
+ * and connection failures surface as a thrown TypeError instead of a response.
+ * Left unhandled that exception escapes the request handler and the top-level
+ * catch in index.ts replaces it with a generic 500 "Internal server error",
+ * which is indistinguishable from an application bug and hides the real cause.
+ * Routing the call through here keeps transport failures structured and typed.
+ */
+async function requestTwilioJson (
+  url: string,
+  authPair: { user: string; password: string },
+  params: URLSearchParams,
+): Promise<TwilioJsonResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout( () => controller.abort(), TWILIO_REQUEST_TIMEOUT_MS );
+
+  try {
+    const response = await fetch( url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${ btoa( `${ authPair.user }:${ authPair.password }` ) }`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+      signal: controller.signal,
+    } );
+    const payload = ( await response.json().catch( () => ( {} ) ) ) as Record<string, unknown>;
+
+    return { ok: response.ok, status: response.status, payload };
+  } catch ( error ) {
+    const timedOut = controller.signal.aborted;
+    console.error( '[Edge] Twilio request failed', {
+      url,
+      timedOut,
+      reason: error instanceof Error ? error.message : String( error ),
+    } );
+
+    return {
+      ok: false,
+      status: timedOut ? 408 : 0,
+      payload: {
+        message: timedOut
+          ? 'The SMS provider did not respond in time. Please try again.'
+          : 'The SMS provider could not be reached. Please try again.',
+      },
+    };
+  } finally {
+    clearTimeout( timeoutId );
+  }
+}
+
 export function getTwilioAuthPair (): { user: string; password: string } | null {
   const sid = deliveryEnv.twilioApiKeySid ?? deliveryEnv.twilioAccountSid ?? '';
   const secret = deliveryEnv.twilioApiKeySecret ?? deliveryEnv.twilioAuthToken ?? '';
@@ -1247,27 +1306,20 @@ export async function callTwilioVerify ( path: string, params: URLSearchParams )
     };
   }
 
-  const response = await fetch(
+  const result = await requestTwilioJson(
     `https://verify.twilio.com/v2/Services/${ TWILIO_VERIFY_SERVICE_SID }${ path }`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${ btoa( `${ authPair.user }:${ authPair.password }` ) }`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    },
+    authPair,
+    params,
   );
-  const payload = await response.json().catch( () => ( {} ) );
 
   return {
-    ok: response.ok,
-    retryable: response.status >= 400 && response.status < 500,
-    payload,
+    ok: result.ok,
+    retryable: result.status >= 400 && result.status < 500,
+    payload: result.payload,
     error:
-      typeof payload?.message === 'string'
-        ? payload.message
-        : `Twilio Verify request failed (${ response.status }).`,
+      typeof result.payload?.message === 'string'
+        ? result.payload.message
+        : `Twilio Verify request failed (${ result.status }).`,
   };
 }
 
@@ -1288,23 +1340,16 @@ export async function sendTwilioOtpSms ( phoneNumber: string, code: string ): Pr
     return { ok: false, retryable: false, error: 'TWILIO_MESSAGING_SERVICE_SID or TWILIO_SMS_FROM is required.' };
   }
 
-  const response = await fetch(
+  const result = await requestTwilioJson(
     `https://api.twilio.com/2010-04-01/Accounts/${ deliveryEnv.twilioAccountSid }/Messages.json`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${ btoa( `${ authPair.user }:${ authPair.password }` ) }`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    },
+    authPair,
+    params,
   );
 
-  const payload = await response.json().catch( () => ( {} ) );
   return {
-    ok: response.ok,
-    retryable: response.status >= 500,
-    error: response.ok ? undefined : String( payload?.message ?? `Twilio SMS error ${ response.status }` ),
+    ok: result.ok,
+    retryable: result.status === 0 || result.status >= 500,
+    error: result.ok ? undefined : String( result.payload?.message ?? `Twilio SMS error ${ result.status }` ),
   };
 }
 

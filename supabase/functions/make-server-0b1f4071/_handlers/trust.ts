@@ -1,19 +1,20 @@
 import {
-    json,
-    authenticateRequest,
-    buildTrustStatus,
-    PHONE_NUMBER_IN_USE_MESSAGE,
-    PHONE_VERIFICATION_TTL_MINUTES,
-    TWILIO_VERIFY_SERVICE_SID,
-    checkTwilioPhoneVerification,
-    constantTimeEqual,
-    generateOtpCode,
-    hasTwilioVerifyRuntime,
-    hashOtpCode,
-    isExpired,
-    isPhoneNumberUniqueViolation,
-    sendTwilioOtpSms,
-    startTwilioPhoneVerification,
+  type AdminClient,
+  json,
+  authenticateRequest,
+  buildTrustStatus,
+  PHONE_NUMBER_IN_USE_MESSAGE,
+  PHONE_VERIFICATION_TTL_MINUTES,
+  TWILIO_VERIFY_SERVICE_SID,
+  checkTwilioPhoneVerification,
+  constantTimeEqual,
+  generateOtpCode,
+  hasTwilioVerifyRuntime,
+  hashOtpCode,
+  isExpired,
+  isPhoneNumberUniqueViolation,
+  sendTwilioOtpSms,
+  startTwilioPhoneVerification,
 } from './shared.ts';
 
 import {
@@ -21,16 +22,76 @@ import {
   normalizePhoneNumber,
 } from '../_shared/phone.ts';
 
+const PHONE_ACTION_UNAVAILABLE_MESSAGE =
+  'Phone verification is temporarily unavailable. Please try again.';
+
+/**
+ * A provider outage, a DNS failure or any other escaped exception must not reach
+ * the top-level handler in index.ts: that catch rewrites everything into a 500
+ * "Internal server error" with no diagnostic detail, which is what surfaced to
+ * the user. Logging the real cause and answering with a typed 502 keeps phone
+ * verification failures actionable and keeps the retry semantics correct.
+ */
+function logPhoneActionFailure ( route: string, error: unknown ): void {
+  console.error( '[Edge] phone verification action failed', {
+    route,
+    message: error instanceof Error ? error.message : String( error ),
+  } );
+}
+
+function phoneActionUnavailable ( route: string, error: unknown ): Response {
+  logPhoneActionFailure( route, error );
+
+  return json( { error: PHONE_ACTION_UNAVAILABLE_MESSAGE }, 502 );
+}
+
+/**
+ * The number is written to the profile before the code is delivered so the UI can
+ * show it. If delivery then fails the pending number must be rolled back,
+ * otherwise a failed attempt silently destroys a number the user had already
+ * verified.
+ */
+async function restorePhoneAfterFailedDelivery (
+  admin: AdminClient,
+  userId: string,
+  previousPhoneNumber: string | null,
+  previousPhoneVerifiedAt: string | null,
+): Promise<void> {
+  if ( !previousPhoneNumber ) {return;}
+
+  const { error } = await admin
+    .from( 'users' )
+    .update({ phone_number: previousPhoneNumber, phone_verified_at: previousPhoneVerifiedAt })
+    .eq( 'id', userId );
+  if ( error ) {
+    console.error( '[Edge] phone rollback after failed delivery', error.message );
+  }
+}
+
 
 export async function handleGetTrustStatus ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
 
-  const status = await buildTrustStatus( auth );
-  return json( { status } );
+  try {
+    const status = await buildTrustStatus( auth );
+    return json( { status } );
+  } catch ( error ) {
+    logPhoneActionFailure( 'trust/status', error );
+
+    return json( { error: 'Trust Center status is temporarily unavailable.' }, 502 );
+  }
 }
 
 export async function handleStartPhoneVerification ( request: Request ) {
+  try {
+    return await startPhoneVerification( request );
+  } catch ( error ) {
+    return phoneActionUnavailable( 'trust/phone/start', error );
+  }
+}
+
+async function startPhoneVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
 
@@ -71,6 +132,9 @@ export async function handleStartPhoneVerification ( request: Request ) {
     return json( { error: invalidateError.message }, 500 );
   }
 
+  const previousPhoneNumber = auth.canonicalUser.phone_number;
+  const previousPhoneVerifiedAt = auth.canonicalUser.phone_verified_at;
+
   const { error: userError } = await auth.admin
     .from( 'users' )
     .update( {
@@ -107,6 +171,13 @@ export async function handleStartPhoneVerification ( request: Request ) {
     const verifyResult = await startTwilioPhoneVerification( phoneNumber );
     if ( !verifyResult.ok ) {
       await auth.admin.from( 'otp_sessions' ).delete().eq( 'otp_session_id', otpSession.otp_session_id );
+      await restorePhoneAfterFailedDelivery(
+        auth.admin,
+        auth.canonicalUser.id,
+        previousPhoneNumber,
+        previousPhoneVerifiedAt,
+      );
+
       return json(
         {
           error:
