@@ -237,14 +237,46 @@ export class OfflineService {
     const base = apiUrl.replace(/\/$/, '');
 
     switch (action.type) {
-      case 'RIDE_REQUEST':
+      case 'RIDE_REQUEST': {
+        const src = action.payload as Record<string, unknown>;
+        const originAddress = String( src.origin_address ?? ( ( src.origin as Record<string, unknown> | undefined )?.address ) ?? '' );
+        const destAddress = String( src.dest_address ?? ( ( src.destination as Record<string, unknown> | undefined )?.address ) ?? '' );
+        const seats = Number( src.seats ?? 1 );
+        const today = src.scheduled_for
+          ? new Date( src.scheduled_for as string ).toISOString().slice( 0, 10 )
+          : new Date().toISOString().slice( 0, 10 );
+
+        const searchParams = new URLSearchParams( { from: originAddress, to: destAddress, seats: String( seats ), date: today } );
+        const searchUrl = `${ base }/v1/trips/search?${ searchParams.toString() }`;
+        const searchResp = await fetch( searchUrl, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ token }` },
+        } );
+        if ( !searchResp.ok ) {
+          throw new Error( `Trip search failed: ${ searchResp.status }` );
+        }
+        const trips = await searchResp.json().catch( () => [] ) as Array<{ id: string }>;
+        if ( !trips.length ) {
+          throw new Error( 'No available trips found for this route' );
+        }
+        const selectedTrip = trips[0];
+
         await this.idempotentFetch(
-          `${base}/trips`,
-          { method: 'POST', body: JSON.stringify(this.toTripPayload(action.payload)) },
+          `${ base }/v1/bookings`,
+          {
+            method: 'POST',
+            body: JSON.stringify( {
+              trip_id: selectedTrip.id,
+              seats_requested: seats,
+              pickup_stop: originAddress,
+              dropoff_stop: destAddress,
+            } ),
+          },
           token,
           action.id,
         );
         break;
+      }
 
       case 'RIDE_CANCEL': {
         const bookingId = this.requireString(action.payload, ['bookingId', 'rideId']);
@@ -491,36 +523,6 @@ export class OfflineService {
     const id = mobileAuth.getUser()?.id;
     if (!id) throw new Error('Queued profile update requires authenticated user');
     return id;
-  }
-
-  private toTripPayload(payload: unknown): Record<string, unknown> {
-    if (!payload || typeof payload !== 'object') return {};
-    const src = payload as Record<string, unknown>;
-    if ('from' in src || 'to' in src) return src;
-
-    const origin = (src.origin && typeof src.origin === 'object') ? src.origin as Record<string, unknown> : {};
-    const destination = (src.destination && typeof src.destination === 'object') ? src.destination as Record<string, unknown> : {};
-    const scheduledAt = typeof src.scheduled_for === 'string'
-      ? new Date(src.scheduled_for)
-      : new Date(Date.now() + 3_600_000);
-
-    return {
-      from: src.origin_address ?? origin.address,
-      to: src.dest_address ?? destination.address,
-      date: scheduledAt.toISOString().slice(0, 10),
-      time: scheduledAt.toISOString().slice(11, 16),
-      seats: src.seats,
-      notes: src.notes,
-      // Preserve coordinates through the offline→online conversion instead of
-      // dropping them (see the matching fix in ride.ts requestRide).
-      origin_lat: src.origin_lat ?? origin.latitude,
-      origin_lng: src.origin_lng ?? origin.longitude,
-      origin_address: src.origin_address ?? origin.address,
-      dest_lat: src.dest_lat ?? destination.latitude,
-      dest_lng: src.dest_lng ?? destination.longitude,
-      dest_address: src.dest_address ?? destination.address,
-      preferred_vehicle_type: src.preferred_vehicle_type,
-    };
   }
 
   private async notifyStats(): Promise<void> {

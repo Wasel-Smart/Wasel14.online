@@ -61,9 +61,9 @@ export default function NotificationsScreen() {
     queryKey: ['notifications', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await apiClient.get<AppNotification[]>('notifications');
-      if (response.error || !response.data) throw new Error(response.error || 'فشل التحميل');
-      return response.data;
+      const response = await apiClient.get<{ notifications: AppNotification[] }>('notifications');
+      if (response.error || !response.data) throw new Error(response.error || 'Failed to load');
+      return response.data.notifications ?? [];
     },
     enabled: Boolean(user?.id),
     staleTime: 30 * 1000,
@@ -74,7 +74,7 @@ export default function NotificationsScreen() {
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id) return;
-      await apiClient.post('notifications/mark-all-read', { userId: user.id });
+      await apiClient.post('notifications/mark-all-read', {});
     },
     onSuccess: () => {
       queryClient.setQueryData<AppNotification[]>(['notifications', user?.id], prev =>
@@ -86,7 +86,7 @@ export default function NotificationsScreen() {
 
   const markReadMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.post(`notifications/${id}/mark-read`, {});
+      await apiClient.patch(`notifications/${id}/read`, {});
     },
     onSuccess: (_, id) => {
       queryClient.setQueryData<AppNotification[]>(['notifications', user?.id], prev =>
