@@ -197,3 +197,51 @@ export async function handleSetPushPreference ( request: Request ) {
 
   return json( { ok: true, pushEnabled: enabled, preferences: data ?? null } );
 }
+
+export async function handleMarkAllNotificationsRead ( request: Request ) {
+  const auth = await authenticateRequest( request );
+  if ( 'error' in auth ) {return auth.error;}
+
+  const { data, error } = await auth.admin
+    .from( 'notifications' )
+    .update( { read: true, is_read: true, read_at: new Date().toISOString(), updated_at: new Date().toISOString() } )
+    .eq( 'user_id', auth.canonicalUser.id )
+    .eq( 'read', false )
+    .select( 'id' );
+
+  if ( error ) {return json( { error: error.message }, 500 );}
+
+  return json( { ok: true, updated: ( Array.isArray( data ) ? data.length : 0 ) } );
+}
+
+export async function handleRegisterPushToken ( request: Request ) {
+  const auth = await authenticateRequest( request );
+  if ( 'error' in auth ) {return auth.error;}
+
+  const body = await request.json().catch( () => ( {} ) );
+  if ( !isPlainObject( body ) ) {return json( { error: 'Invalid request body' }, 400 );}
+
+  const token = String( body.token ?? '' ).trim();
+  const platform = String( body.platform ?? '' ).trim();
+  const deviceId = String( body.deviceId ?? '' ).trim() || null;
+
+  if ( !token ) {return json( { error: 'Push token is required' }, 400 );}
+  if ( !['ios', 'android', 'web'].includes( platform ) ) {return json( { error: 'Valid platform is required' }, 400 );}
+
+  const { data, error } = await auth.admin
+    .from( 'push_tokens' )
+    .upsert( {
+      user_id: auth.canonicalUser.id,
+      token,
+      platform,
+      device_id: deviceId,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,token' } )
+    .select( 'id, user_id, token, platform, is_active, created_at, updated_at' )
+    .single();
+
+  if ( error ) {return json( { error: error.message }, 500 );}
+
+  return json( { ok: true, token: data }, 201 );
+}

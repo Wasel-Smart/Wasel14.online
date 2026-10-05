@@ -31,6 +31,8 @@ import {
 import {
   handleGetNotifications,
   handleMarkNotificationRead,
+  handleMarkAllNotificationsRead,
+  handleRegisterPushToken,
   handleSendPushNotification,
   handleSetPushPreference,
 } from './_handlers/notifications.ts';
@@ -296,6 +298,18 @@ const ROUTES: RouteDescriptor[] = [
     test: ( path ) => /^\/notifications\/[^/]+\/read$/.test( path ),
     handle: ( request, path ) =>
       handleMarkNotificationRead( request, decodeURIComponent( path.split( '/' )[ 2 ] ) ),
+  },
+  {
+    id: 'notifications-mark-all-read',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/notifications/mark-all-read',
+    handle: ( request ) => handleMarkAllNotificationsRead( request ),
+  },
+  {
+    id: 'notifications-push-token',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/notifications/push-token',
+    handle: ( request ) => handleRegisterPushToken( request ),
   },
   // ── Post-ride review ─────────────────────────────────────────────────────
   // Distinct from /ratings: see the contract note in _handlers/reviews.ts.

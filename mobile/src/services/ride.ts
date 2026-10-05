@@ -32,6 +32,22 @@ export interface RideRequest {
   notes?: string;
 }
 
+export interface AvailableTrip {
+  id: string;
+  from: string;
+  to: string;
+  date: string;
+  time: string;
+  seats: number;
+  price: number;
+  driver: {
+    id: string;
+    name: string;
+    rating: number;
+    verified: boolean;
+  };
+}
+
 export interface Ride {
   id: string;
   riderId: string;
@@ -109,70 +125,67 @@ export class RideLifecycleService {
   private activeRide: Ride | null = null;
   private listeners = new Set<(ride: Ride | null) => void>();
 
-  constructor() { }
+  constructor() {}
 
-  async requestRide(request: RideRequest): Promise<{ ride?: Ride; error?: Error }> {
+  async searchTrips(from: string, to: string, seats = 1, date?: string): Promise<AvailableTrip[]> {
+    const params = new URLSearchParams({ from, to, seats: String(seats) });
+    if (date) params.set('date', date);
+
+    const { data, error } = await apiClient.get<AvailableTrip[]>(`/v1/trips/search?${params.toString()}`);
+    if (error || !data) return [];
+    return data;
+  }
+
+  async requestRide(request: RideRequest): Promise<{ ride?: Ride; error?: Error; bookingId?: string }> {
     const user = mobileAuth.getUser();
     if (!user) {
       return { error: new Error('User not authenticated') };
     }
 
-    const payload = {
-      from: request.origin.address,
-      to: request.destination.address,
-      date: (() => {
-        const d = request.scheduledFor ? new Date(request.scheduledFor) : new Date(Date.now() + 60 * 60 * 1000);
-        return d.toISOString().slice(0, 10);
-      })(),
-      time: (() => {
-        const d = request.scheduledFor ? new Date(request.scheduledFor) : new Date(Date.now() + 60 * 60 * 1000);
-        return d.toISOString().slice(11, 16);
-      })(),
-      seats: request.seats,
-      notes: request.notes,
-      // Coordinates and vehicle preference were previously dropped from the
-      // online request path (they were only present in the offline-queue
-      // payload below), which meant a PostGIS-backed matching call never saw
-      // exact pickup/dropoff coordinates for online requests. Included here
-      // additively so nothing already read by the backend changes shape.
-      origin_lat: request.origin.latitude,
-      origin_lng: request.origin.longitude,
-      origin_address: request.origin.address,
-      dest_lat: request.destination.latitude,
-      dest_lng: request.destination.longitude,
-      dest_address: request.destination.address,
-      preferred_vehicle_type: request.preferredVehicleType,
-    };
-    const queuedPayload = {
-      rider_id: user.id,
-      origin_lat: request.origin.latitude,
-      origin_lng: request.origin.longitude,
-      origin_address: request.origin.address,
-      dest_lat: request.destination.latitude,
-      dest_lng: request.destination.longitude,
-      dest_address: request.destination.address,
-      seats: request.seats,
-      scheduled_for: request.scheduledFor,
-      preferred_vehicle_type: request.preferredVehicleType,
-      notes: request.notes,
-    };
-
-    // If offline, queue the action
     if (!offlineService.isDeviceOnline()) {
       await offlineService.queueOfflineAction({
         type: 'RIDE_REQUEST',
-        payload: queuedPayload,
+        payload: {
+          rider_id: user.id,
+          origin_address: request.origin.address,
+          dest_address: request.destination.address,
+          seats: request.seats,
+          scheduled_for: request.scheduledFor,
+          preferred_vehicle_type: request.preferredVehicleType,
+          notes: request.notes,
+        },
       });
       return { error: new Error('Ride request queued for sync when online') };
     }
 
     try {
-      const { data, error } = await apiClient.post<{ ride?: unknown } & Record<string, unknown>>('/trips', payload);
+      const today = request.scheduledFor
+        ? new Date(request.scheduledFor).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+
+      const trips = await this.searchTrips(request.origin.address, request.destination.address, request.seats, today);
+      if (trips.length === 0) {
+        return { error: new Error('No available rides on this route') };
+      }
+
+      const selectedTrip = trips[0];
+      const { data, error } = await apiClient.post<{ booking?: unknown } & Record<string, unknown>>(
+        '/v1/bookings',
+        {
+          trip_id: selectedTrip.id,
+          seats_requested: request.seats,
+          pickup_stop: request.origin.address,
+          dropoff_stop: request.destination.address,
+        },
+      );
+
       if (error || !data) throw new Error(error ?? 'Empty response');
-      const ride = this.mapDatabaseRide((data.ride ?? data) as RawRideRecord);
+
+      const booking = (data.booking ?? data) as Record<string, unknown>;
+      const ride = this.mapBookingToRide(booking, selectedTrip);
       this.setActiveRide(ride);
       await offlineService.cacheActiveRide(ride);
-      return { ride };
+      return { ride, bookingId: String(booking.booking_id ?? booking.id ?? '') };
     } catch (error) {
       return { error: error as Error };
     }
@@ -269,19 +282,20 @@ export class RideLifecycleService {
   }
 
   async getDriverInfo(driverId: string): Promise<Driver | null> {
-    // If offline, try to get cached driver info
     if (!offlineService.isDeviceOnline()) {
       return await offlineService.getCachedDriverInfo<Driver>(driverId);
     }
 
     try {
-      const { data, error } = await apiClient.get<{ driver: Driver | null }>(
-        `/v1/drivers/${encodeURIComponent(driverId)}`,
+      const { data, error } = await apiClient.get<DriverRatingResponse>(
+        `/ratings/drivers/${encodeURIComponent(driverId)}`,
       );
-      if (!error && data?.driver) {
-        await offlineService.cacheDriverInfo(driverId, data.driver);
+      if (!error && data) {
+        const driver = this.mapDriverRatingToDriver(data, driverId);
+        await offlineService.cacheDriverInfo(driverId, driver);
+        return driver;
       }
-      return data?.driver ?? null;
+      return null;
     } catch (error) {
       console.error('[RideLifecycle] Error fetching driver info:', error);
       return await offlineService.getCachedDriverInfo<Driver>(driverId);
@@ -292,18 +306,18 @@ export class RideLifecycleService {
     const user = mobileAuth.getUser();
     if (!user) return [];
 
-    // If offline, return cached history
     if (!offlineService.isDeviceOnline()) {
       const cached = await offlineService.getCachedRideHistory<Ride>();
       return cached || [];
     }
 
     try {
-      const { data, error } = await apiClient.get<{ rides: unknown[] }>(
-        `/v1/rides/history?limit=${encodeURIComponent(String(limit))}`,
-      );
+      const { data, error } = await apiClient.get(`/bookings/user/${encodeURIComponent(user.id)}?limit=${encodeURIComponent(String(limit))}`);
       if (error || !data) throw new Error(error ?? 'Empty response');
-      const rides = data.rides.map(ride => this.mapDatabaseRide(ride as RawRideRecord));
+      const bookings = Array.isArray(data) ? data : data?.bookings ?? [];
+      const rides = bookings.map((booking: Record<string, unknown>) =>
+        this.mapBookingToRide(booking),
+      );
       await offlineService.cacheRideHistory(rides);
       return rides;
     } catch (error) {
