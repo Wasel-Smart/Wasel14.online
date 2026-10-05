@@ -366,6 +366,37 @@ export async function handleDeleteWalletPaymentMethod ( request: Request, reques
   }
 }
 
+export async function handleSetDefaultPaymentMethod ( request: Request, requestedUserId: string, methodId: string | null ) {
+  const auth = await authenticateWalletRequest( request, requestedUserId );
+  if ( 'error' in auth ) {return auth.error;}
+  if ( !methodId ) {return json( { error: 'Payment method id is required.' }, 400 );}
+
+  try {
+    const { error: clearError } = await auth.admin
+      .from( 'payment_methods' )
+      .update( { is_default: false, updated_at: new Date().toISOString() } )
+      .eq( 'user_id', auth.canonicalUser.id )
+      .eq( 'is_default', true );
+
+    if ( clearError ) {throw new Error( clearError.message );}
+
+    const { data, error } = await auth.admin
+      .from( 'payment_methods' )
+      .update( { is_default: true, updated_at: new Date().toISOString() } )
+      .eq( 'user_id', auth.canonicalUser.id )
+      .eq( 'payment_method_id', methodId )
+      .select( '*' )
+      .maybeSingle();
+
+    if ( error ) {return json( { error: error.message }, 500 );}
+    if ( !data ) {return json( { error: 'Payment method not found' }, 404 );}
+
+    return json( { success: true, method: normalizeWalletPaymentMethod( data ) } );
+  } catch ( error ) {
+    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+  }
+}
+
 export async function handleGetWalletTrustScore ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) {return auth.error;}
@@ -794,7 +825,8 @@ export async function handleWalletDispatch ( request: Request, path: string ): P
   if ( method === 'POST' && action === 'auto-topup' ) {return handleSetWalletAutoTopUp( request, userId );}
   if ( method === 'GET' && action === 'payment-methods' ) {return handleGetWalletPaymentMethods( request, userId );}
   if ( method === 'POST' && action === 'payment-methods' ) {return handleAddWalletPaymentMethod( request, userId );}
-  if ( method === 'DELETE' && action === 'payment-methods' ) {return handleDeleteWalletPaymentMethod( request, userId, resourceId );}
+   if ( method === 'DELETE' && action === 'payment-methods' ) {return handleDeleteWalletPaymentMethod( request, userId, resourceId );}
+   if ( method === 'PATCH' && action === 'payment-methods' && resourceId ) {return handleSetDefaultPaymentMethod( request, userId, resourceId );}
   if ( method === 'GET' && action === 'trust-score' ) {return handleGetWalletTrustScore( request, userId );}
   if ( method === 'GET' && action === 'rewards' ) {return handleGetWalletRewards( request, userId );}
   if ( method === 'POST' && action === 'rewards' && resourceId === 'claim' ) {return handleClaimWalletReward( request, userId );}
