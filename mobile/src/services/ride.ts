@@ -89,6 +89,17 @@ export interface Driver {
   photo?: string;
 }
 
+export interface DriverRatingResponse {
+  averageRating: number;
+  totalRatings: number;
+  recentReviews: Array<{
+    rating: number;
+    review: string;
+    tags: string[];
+    createdAt: string;
+  }>;
+}
+
 export interface RawRideRecord {
   id?: string;
   trip_id?: string;
@@ -256,7 +267,6 @@ export class RideLifecycleService {
     const user = mobileAuth.getUser();
     if (!user) return null;
 
-    // If offline, try to get cached ride
     if (!offlineService.isDeviceOnline()) {
       const cached = await offlineService.getCachedActiveRide<Ride>();
       if (cached) {
@@ -267,9 +277,9 @@ export class RideLifecycleService {
     }
 
     try {
-      const { data, error } = await apiClient.get<{ ride: unknown | null }>('/v1/rides/active');
-      if (error || !data?.ride) return null;
-      const ride = this.mapDatabaseRide(data.ride as RawRideRecord);
+      const { data, error } = await apiClient.get<{ activeTrip: Record<string, unknown> | null }>('/active-trip');
+      if (error || !data?.activeTrip) return null;
+      const ride = this.mapActiveTripToRide(data.activeTrip);
       this.setActiveRide(ride);
       await offlineService.cacheActiveRide(ride);
       return ride;
@@ -385,6 +395,76 @@ export class RideLifecycleService {
       startedAt: data.started_at,
       completedAt: data.completed_at,
       cancelledAt: data.cancelled_at,
+    };
+  }
+
+  private mapBookingToRide(booking: Record<string, unknown>, trip?: AvailableTrip): Ride {
+    const raw = booking as Record<string, unknown>;
+    const originAddress = String(raw.pickup ?? raw.pickup_stop ?? raw.pickup_location ?? trip?.from ?? '');
+    const destAddress = String(raw.dropoff ?? raw.dropoff_stop ?? raw.dropoff_location ?? trip?.to ?? '');
+    const status = (String(raw.status ?? raw.booking_status ?? 'requested')) as RideStatus;
+    return {
+      id: String(raw.booking_id ?? raw.id ?? ''),
+      riderId: String(raw.passenger_id ?? raw.user_id ?? mobileAuth.getUser()?.id ?? ''),
+      tripId: String(raw.trip_id ?? ''),
+      driverId: String(raw.driver_id ?? ''),
+      driverName: trip?.driver?.name,
+      vehicleId: String(raw.vehicle_id ?? ''),
+      rating: trip?.driver?.rating,
+      origin: { latitude: 0, longitude: 0, address: originAddress },
+      destination: { latitude: 0, longitude: 0, address: destAddress },
+      status: status === 'confirmed' ? 'matched' : status === 'cancelled' ? 'cancelled' : status === 'completed' ? 'completed' : 'requested',
+      fare: Number(raw.fare ?? raw.price_per_seat ?? raw.total_price ?? 0),
+      distance: undefined,
+      duration: undefined,
+      seats: Number(raw.seats_requested ?? trip?.seats ?? 1),
+      requestedAt: String(raw.created_at ?? new Date().toISOString()),
+    };
+  }
+
+  private mapActiveTripToRide(activeTrip: Record<string, unknown>): Ride {
+    const payload = (activeTrip as Record<string, unknown>);
+    const driver = (payload.driver as Record<string, unknown>) ?? {};
+    const vehicle = (payload.vehicle as Record<string, unknown>) ?? {};
+    return {
+      id: String(payload.id ?? payload.trip_id ?? ''),
+      riderId: String(payload.userId ?? mobileAuth.getUser()?.id ?? ''),
+      tripId: String(payload.trip_id ?? ''),
+      driverId: String(driver.id ?? ''),
+      driverName: String(driver.name ?? ''),
+      vehicleId: String(vehicle.id ?? ''),
+      rating: undefined,
+      origin: { latitude: 0, longitude: 0, address: String(payload.from ?? '') },
+      destination: { latitude: 0, longitude: 0, address: String(payload.to ?? '') },
+      status: this.mapActiveTripStatus(String(payload.status ?? '')),
+      fare: Number(payload.price ?? 0),
+      distance: undefined,
+      duration: String(payload.duration ?? ''),
+      seats: Number(payload.passengers ?? 1),
+      requestedAt: String(payload.startedAt ?? payload.created_at ?? new Date().toISOString()),
+      matchedAt: payload.matchedAt,
+      startedAt: payload.startedAt,
+    };
+  }
+
+  private mapActiveTripStatus(status: string): RideStatus {
+    if (status === 'en_route' || status === 'en_route_to_pickup') return 'in_progress';
+    if (status === 'driver_arrived') return 'in_progress';
+    if (status === 'arriving') return 'in_progress';
+    if (status === 'completed') return 'completed';
+    return 'matched';
+  }
+
+  private mapDriverRatingToDriver(rating: DriverRatingResponse, driverId: string): Driver {
+    return {
+      id: driverId,
+      name: '',
+      phone: '',
+      rating: rating.averageRating,
+      totalRides: rating.totalRatings,
+      vehicleModel: '',
+      vehiclePlate: '',
+      photo: undefined,
     };
   }
 }
