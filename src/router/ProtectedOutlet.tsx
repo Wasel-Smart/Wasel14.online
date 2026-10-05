@@ -12,14 +12,27 @@ function LoadingState() {
       aria-label={tx('protectedOutlet.restoring_your_wasel_session')}
       style={{
         display: 'flex',
+        flexDirection: 'column',
         minHeight: '60vh',
         alignItems: 'center',
         justifyContent: 'center',
-        color: 'rgba(196,220,238,0.68)',
-        fontFamily: "-apple-system,'Inter',sans-serif",
+        gap: 16,
       }}
     >
-      {tx('protectedOutlet.restoring_your_wasel_session')}
+      <div
+        aria-hidden="true"
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          border: '3px solid rgba(0,229,255,0.18)',
+          borderTopColor: '#00E5FF',
+          animation: 'wasel-spin 0.8s linear infinite',
+        }}
+      />
+      <span style={{ color: 'rgba(196,220,238,0.68)', fontSize: '0.875rem', fontFamily: "-apple-system,'Inter',sans-serif" }}>
+        {tx('protectedOutlet.restoring_your_wasel_session')}
+      </span>
     </div>
   );
 }

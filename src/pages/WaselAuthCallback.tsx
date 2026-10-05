@@ -443,7 +443,7 @@ export default function WaselAuthCallback() {
             borderTop: state === 'error' ? '3px solid #FF7C8B' : '3px solid #00E5FF',
             animation:
               state === 'redirecting' || state === 'loading' || state === 'closing'
-                ? 'spin 0.8s linear infinite'
+                ? 'wasel-spin 0.8s linear infinite'
                 : 'none',
           }}
         />
@@ -484,7 +484,6 @@ export default function WaselAuthCallback() {
             {tx('waselAuthCallback.back_to_sign_in')}
           </button>
         ) : null}
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     </div>
   );

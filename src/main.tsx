@@ -270,7 +270,11 @@ if ( import.meta.env.PROD && import.meta.env.MODE !== 'test' ) {
 }
 
 if ( environmentIsValid ) {
-  rootElement.textContent = '';
+  // Remove the pre-hydration skeleton injected in index.html so React
+  // takes over a clean node. Using removeChild is faster than textContent=''
+  // because it avoids serialising the entire subtree.
+  const preHydration = document.getElementById( 'wasel-pre-hydration' );
+  if ( preHydration ) { preHydration.remove(); }
 
   const AppTree = import.meta.env.DEV ? React.StrictMode : React.Fragment;
 

@@ -388,6 +388,7 @@ export default function WaselAuth () {
 
   const { signIn, register, loading, isSubmitting, user } = useLocalAuth();
   const busy = loading || Boolean( isSubmitting );
+
   const { resetPassword, signInWithGoogle, signInWithFacebook } = useAuth();
   const nav = useIframeSafeNavigate();
   const mountedRef = useRef( true );
@@ -770,6 +771,37 @@ export default function WaselAuth () {
     },
   ];
 
+  // While the session is still resolving, show a spinner instead of the form
+  // so an already-authenticated user never sees a flash of the sign-in UI.
+  // Placed after every hook so the rules-of-hooks order stays stable.
+  if ( loading && !user ) {
+    return (
+      <div
+        style={ {
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: C.bg,
+          gap: 16,
+        } }
+      >
+        <div
+          aria-hidden="true"
+          style={ {
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            border: '3px solid rgba(0,229,255,0.18)',
+            borderTopColor: '#00E5FF',
+            animation: 'wasel-spin 0.8s linear infinite',
+          } }
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className="auth-grid"
@@ -789,7 +821,6 @@ export default function WaselAuth () {
           .auth-form-panel{padding:${ SPACE[ 7 ] } ${ SPACE[ 5 ] }!important;align-items:flex-start!important}
           .auth-mobile-header{display:flex!important}
         }
-        @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(0.85)}}
       `}</style>
 
@@ -1200,7 +1231,7 @@ export default function WaselAuth () {
                               borderRadius: '50%',
                               border: `2px solid ${ social.color }40`,
                               borderTopColor: social.color,
-                              animation: 'spin 0.8s linear infinite',
+                              animation: 'wasel-spin 0.8s linear infinite',
                               display: 'inline-block',
                             } }
                           />
