@@ -19,7 +19,7 @@ export interface LiveRide {
   driverName: string;
   driverRating: number;
   vehicleModel: string;
-  licensePlate: string;
+  vehiclePlate: string;
   status: 'matching' | 'driver_en_route' | 'driver_arrived' | 'in_progress';
   eta: string;
   distance: string;
@@ -27,15 +27,82 @@ export interface LiveRide {
   driverLocation?: DriverLocation;
 }
 
-export function useLiveRide(rideId: string, enabled = true, refetchInterval = 3000) {
+interface LiveTripSnapshot {
+  bookingId: string;
+  tripId: string;
+  status: string;
+  from: string;
+  to: string;
+  fromCoord: { lat: number; lng: number };
+  toCoord: { lat: number; lng: number };
+  driver: {
+    id: string;
+    name: string;
+    rating: number;
+    trips: number;
+    img: string;
+    phone: string;
+    initials: string;
+  };
+  vehicle: {
+    model: string;
+    color: string;
+    plate: string;
+    year: number;
+  };
+  price: number;
+  startedAt: string;
+  estimatedArrival: string;
+  totalDistanceKm: number;
+  passengers: number;
+  shareCode: string;
+  progress: number;
+  timeLeftMinutes: number;
+  driverPosition?: { lat: number; lng: number };
+  waypoints: Array<{ label: string; coord: { lat: number; lng: number } }>;
+  heartbeatAt: string | null;
+  telemetryFresh: boolean;
+}
+
+function mapSnapshotToLiveRide(snapshot: LiveTripSnapshot): LiveRide {
+  const driverPos = snapshot.driverPosition;
+  return {
+    id: snapshot.tripId ?? snapshot.bookingId,
+    driverId: snapshot.driver.id,
+    driverName: snapshot.driver.name,
+    driverRating: snapshot.driver.rating,
+    vehicleModel: snapshot.vehicle.model,
+    vehiclePlate: snapshot.vehicle.plate,
+    status: snapshot.status === 'en_route' || snapshot.status === 'en_route_to_pickup'
+      ? 'driver_en_route'
+      : snapshot.status === 'driver_arrived'
+        ? 'driver_arrived'
+        : snapshot.status === 'in_progress' || snapshot.status === 'arriving'
+          ? 'in_progress'
+          : 'matching',
+    eta: snapshot.estimatedArrival,
+    distance: `${snapshot.totalDistanceKm} km`,
+    fare: `${snapshot.price}`,
+    driverLocation: driverPos
+      ? {
+          latitude: driverPos.lat,
+          longitude: driverPos.lng,
+          timestamp: snapshot.heartbeatAt ?? new Date().toISOString(),
+        }
+      : undefined,
+  };
+}
+
+export function useLiveRide(rideId?: string, enabled = true, refetchInterval = 3000) {
   const queryClient = useQueryClient();
 
   const queryOptions: Parameters<typeof useQuery<LiveRide | null>>[0] = {
     queryKey: ['live-ride', rideId],
     queryFn: async () => {
-      const response = await apiClient.get<LiveRide>(`rides/${rideId}/live`);
+      const response = await apiClient.get<LiveTripSnapshot>('live-trip');
       if (response.error) throw new Error(response.error);
-      return response.data;
+      if (!response.data?.snapshot) return null;
+      return mapSnapshotToLiveRide(response.data.snapshot);
     },
     enabled,
     staleTime: 1000,

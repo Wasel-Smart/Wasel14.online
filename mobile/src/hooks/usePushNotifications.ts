@@ -142,7 +142,7 @@ export function usePushNotifications() {
       if (!user) return false;
 
       try {
-        await apiClient.patch(`notifications/preferences/${user.id}`, newPreferences);
+        await apiClient.patch('communications/preferences', newPreferences);
         setPreferences(prev => ({ ...prev, ...newPreferences }));
         return true;
       } catch {
