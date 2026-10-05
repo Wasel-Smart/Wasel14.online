@@ -101,7 +101,7 @@ export class MigrationManager {
     } catch (error) {
       console.error(`[MigrationManager] Failed during rollbackWithBackup for version ${sanitizeLogMessage(version)}:`, error);
       // Depending on the failure point, manual intervention might be needed.
-      throw new Error(`Rollback with backup failed. A backup may have been created with label: ${backupLabel}`);
+      throw new Error(`Rollback with backup failed. A backup may have been created with label: ${backupLabel}`, { cause: error });
     }
   }
 

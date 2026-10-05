@@ -117,7 +117,7 @@ function constantTimeCompare(a: string, b: string): boolean {
  * Add CSRF token to request headers
  */
 export function addCSRFHeader(headers: HeadersInit = {}): HeadersInit {
-  let token = '';
+  let token: string;
 
   try {
     token = getCSRFToken();

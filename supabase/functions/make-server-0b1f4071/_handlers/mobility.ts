@@ -6,10 +6,9 @@ import {
     logUnhandledRouteError,
 } from './shared.ts';
 
-import type {
-  MobilityBookingType,
-  MobilityCorridorRow} from '../_shared/mobility-os-runtime.ts';
 import {
+  type MobilityBookingType,
+  type MobilityCorridorRow,
   advanceCorridorAfterBooking,
   buildMobilitySnapshot,
 } from '../_shared/mobility-os-runtime.ts';

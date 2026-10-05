@@ -58,6 +58,19 @@ function authorized(request: Request): boolean {
   return Boolean(WORKER_SECRET && constantTimeEqual(secret ?? '', WORKER_SECRET));
 }
 
+/**
+ * outbox-worker authenticates with `Authorization: Bearer <service role key>`,
+ * not with the worker secret header used by the scheduler path, so the event
+ * sink needs its own check. The service role key is compared rather than
+ * merely decoded: a caller holding an ordinary user JWT must not reach it.
+ */
+function isServiceRoleRequest(request: Request): boolean {
+  const authorization = request.headers.get('authorization') ?? '';
+  if (!authorization.startsWith('Bearer ')) {return false;}
+  if (!SUPABASE_SERVICE_ROLE_KEY) {return false;}
+  return constantTimeEqual(authorization.slice(7), SUPABASE_SERVICE_ROLE_KEY);
+}
+
 function getAdminClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -178,6 +191,34 @@ async function runMatchingCycle(): Promise<MatchResult> {
   return result;
 }
 
+// outbox-worker fans `rides.requested` out to `<function>/events`. This path
+  // did not exist, so every ride-requested event was answered 404, retried five
+  // times and dead-lettered without a matching cycle ever running. The event
+  // body is deliberately unused beyond the topic check: matching is driven by
+  // the demand_alerts table, not by the event payload, so the cycle reads
+  // whatever is pending.
+async function handleEventRequest(request: Request): Promise<Response> {
+  if (!isServiceRoleRequest(request)) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  const topic = typeof body.topic === 'string' ? body.topic : '';
+  if (topic !== 'rides.requested') {
+    return json({ error: `Unsupported topic: ${ topic }` }, 400);
+  }
+
+  try {
+    const result = await runMatchingCycle();
+    return json({ ok: true, topic, ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[matching-worker] event cycle failed', JSON.stringify({ topic, message }));
+    // 500 makes outbox-worker increment attempts and retry.
+    return json({ error: 'Matching cycle failed' }, 500);
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 Deno.serve(async (request) => {
@@ -185,11 +226,17 @@ Deno.serve(async (request) => {
     return new Response(null, { status: 204 });
   }
 
-  const rl = checkRateLimit(
-    `matching-worker:${request.headers.get('x-forwarded-for') ?? 'unknown'}`,
-    { windowMs: 60_000, maxRequests: 30 },
-  );
-  if (!rl.allowed) {return json({ error: 'Rate limit exceeded' }, 429);}
+  // The per-IP throttle is for untrusted callers. outbox-worker drains up to
+  // 50 events per invocation from a single IP, so charging it against the same
+  // 30/minute bucket would reject legitimate fan-out; it is authenticated by
+  // the service role key below instead.
+  if (!isServiceRoleRequest(request)) {
+    const rl = checkRateLimit(
+      `matching-worker:${request.headers.get('x-forwarded-for') ?? 'unknown'}`,
+      { windowMs: 60_000, maxRequests: 30 },
+    );
+    if (!rl.allowed) {return json({ error: 'Rate limit exceeded' }, 429);}
+  }
 
   const url = new URL(request.url);
   const path = url.pathname.replace(/^.*matching-worker/, '') || '/';
@@ -221,6 +268,10 @@ Deno.serve(async (request) => {
       );
     }
     return response;
+  }
+
+  if (request.method === 'POST' && path === '/events') {
+    return await handleEventRequest(request);
   }
 
   return json({ error: 'Not found' }, 404);

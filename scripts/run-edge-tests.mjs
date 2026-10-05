@@ -64,8 +64,21 @@ if (suites.length === 0) {
 
 console.log(`deno ${DENO.version} (${DENO.bin}) — ${suites.length} suite(s)\n`);
 
-const result = spawnSync(DENO.bin, ['test', '--allow-env', '--allow-net', '--no-lock', ...suites], {
-  stdio: 'inherit',
-});
+// Each suite runs in its OWN process. `_handlers/shared.ts` reads every secret at
+// module scope, so the environment is frozen on first import and a suite needing
+// secrets absent is incompatible with a suite needing them present. Separate
+// processes give separate module graphs, which `--parallel` does not: its workers
+// share Deno's module evaluation cache.
+let failed = 0;
 
-process.exit(result.status ?? 1);
+for (const suite of suites) {
+  console.log(`\n── ${ suite } ${'─'.repeat(Math.max(0, 46 - suite.length))}`);
+  const result = spawnSync(
+    DENO.bin,
+    ['test', '--allow-env', '--allow-net', '--no-lock', suite],
+    { stdio: 'inherit' },
+  );
+  if (result.status !== 0) failed += 1;
+}
+
+process.exit(failed === 0 ? 0 : 1);

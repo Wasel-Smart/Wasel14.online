@@ -773,7 +773,10 @@ export async function handleWalletPay ( request: Request, requestedUserId: strin
   }
 }
 
-// eslint-disable-next-line complexity
+/* eslint-disable complexity */
+// Each branch delegates to a handler that returns its own promise, so the
+// dispatcher stays synchronous on paper while callers keep awaiting it.
+// deno-lint-ignore require-await
 export async function handleWalletDispatch ( request: Request, path: string ): Promise<Response | undefined> {
   const walletRoute = parseWalletRoute( path );
   if ( !walletRoute ) {return undefined;}
@@ -801,3 +804,4 @@ export async function handleWalletDispatch ( request: Request, path: string ): P
   if ( method === 'POST' && action === 'pay' ) {return handleWalletPay( request, userId );}
   return undefined;
 }
+/* eslint-enable complexity */

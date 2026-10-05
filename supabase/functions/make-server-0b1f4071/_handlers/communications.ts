@@ -5,26 +5,22 @@ import {
     getAdminClient,
     getFunctionBaseUrl,
     executeSqlStatements,
+    COMMUNICATIONS_OPERATIONS_SQL,
+    COMMUNICATIONS_RUNTIME_SQL,
+    deliveryEnv,
+    getTwilioAuthPair,
+    hasTwilioVerifyRuntime,
+    hasWorkerAccess,
+    processQueuedDeliveries,
 } from './shared.ts';
 
-import type {
-  CommunicationDeliveryRecord} from '../_shared/communication-runtime.ts';
 import {
+  type CommunicationDeliveryRecord,
   buildIdempotencyKey,
   buildResendPayload,
   buildSendgridPayload,
   determineProviderName,
 } from '../_shared/communication-runtime.ts';
-
-import {
-  COMMUNICATIONS_OPERATIONS_SQL,
-  COMMUNICATIONS_RUNTIME_SQL,
-  deliveryEnv,
-  getTwilioAuthPair,
-  hasTwilioVerifyRuntime,
-  hasWorkerAccess,
-  processQueuedDeliveries,
-} from './shared.ts';
 
 
 export async function handleGetCommunicationPreferences ( request: Request ) {
@@ -92,9 +88,9 @@ export async function handleQueueCommunicationDeliveries ( request: Request ) {
   }
 
   const rows = deliveries.map( ( delivery: Record<string, unknown>, index: number ) => {
-    // Stripping control characters is the point of this sanitiser.
-    // eslint-disable-next-line no-control-regex
-    const payloadBody = String( delivery.body ?? '' ).replace( /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '' );
+// Stripping control characters is the point of this sanitiser. \p{Cc} covers
+    // U+0000-U+001F and U+007F-U+009F; tab, newline and carriage return survive.
+    const payloadBody = String( delivery.body ?? '' ).replace( /[^\P{Cc}\t\n\r]/gu, '' );
     return {
       user_id: auth.canonicalUser.id,
       notification_id: typeof body.notificationId === 'string' ? body.notificationId : null,

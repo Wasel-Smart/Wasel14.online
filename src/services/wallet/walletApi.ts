@@ -194,7 +194,7 @@ export const walletApi = {
       try {
         return await requestWalletJson(userId, '/top-up', 'Create wallet top-up', { method: 'POST', body: { amount, paymentMethod } });
       } catch (error) {
-        if (isConnectivityError(error)) {throw new Error('Secure wallet top-up is unavailable because the checkout backend is not configured. Deploy the wallet edge function and configure Stripe server secrets before adding funds.');}
+        if (isConnectivityError(error)) {throw new Error('Secure wallet top-up is unavailable because the checkout backend is not configured. Deploy the wallet edge function and configure Stripe server secrets before adding funds.', { cause: error });}
         throw error;
       }
     }
@@ -239,7 +239,7 @@ export const walletApi = {
       try {
         return await requestWalletJson(userId, '/subscribe', 'Create wallet subscription checkout', { method: 'POST', body: { planName, price } });
       } catch (error) {
-        if (isConnectivityError(error)) {throw new Error('Secure subscription checkout is unavailable because the billing backend is not configured. Deploy the wallet edge function and configure Stripe Billing before subscribing.');}
+        if (isConnectivityError(error)) {throw new Error('Secure subscription checkout is unavailable because the billing backend is not configured. Deploy the wallet edge function and configure Stripe Billing before subscribing.', { cause: error });}
         throw error;
       }
     }

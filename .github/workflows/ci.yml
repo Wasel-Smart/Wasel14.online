@@ -246,10 +246,17 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
       - name: Lint edge functions
         run: deno lint supabase/functions/
+      # Runs every suite in supabase/functions/tests/, not just the webhook one.
+      # Each suite gets its own process because _handlers/shared.ts reads every
+      # secret at module scope, so suites needing secrets present and absent
+      # cannot share a module graph.
       - name: Test edge function handlers
-        run: deno test --allow-env supabase/functions/tests/webhooks.test.ts
+        run: npm run test:edge
 
   lighthouse:
     name: Lighthouse CI

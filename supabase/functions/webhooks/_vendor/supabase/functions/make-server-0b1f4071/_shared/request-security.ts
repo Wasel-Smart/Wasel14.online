@@ -28,7 +28,7 @@ function previewOriginsEnabled(): boolean {
 }
 
 function isVercelPreviewUrl ( hostname: string ): boolean {
-  return /^(?:wasel|wasel14|wasel-14|wasel14\.online)-[a-z0-9-]*--[^\.]+\.vercel\.app$/.test( hostname )
+  return /^(?:wasel|wasel14|wasel-14|wasel14\.online)-[a-z0-9-]*--[^.]+\.vercel\.app$/.test( hostname )
     || hostname.endsWith( '.vercel.app' )
     || hostname.endsWith( '.vercel-dev.com' );
 }

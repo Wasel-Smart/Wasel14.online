@@ -1,10 +1,7 @@
 import {
     json,
     authenticateRequest,
-} from './shared.ts';
-
-import {
-  assertTripParticipant,
+    assertTripParticipant,
 } from './shared.ts';
 
 

@@ -17,7 +17,7 @@ import {
 } from '../_shared/request-security.ts';
 
 
-export async function handleHealth ( request: Request ) {
+export function handleHealth ( request: Request ) {
   const publicPayload = buildPublicHealthPayload( SERVICE_NAME );
 
   const emailConfigured = Boolean( deliveryEnv.resendApiKey && deliveryEnv.resendFromEmail ) ||

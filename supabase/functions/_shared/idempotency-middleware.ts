@@ -97,7 +97,7 @@ export const idempotencyMiddleware = {
     if (!key || !userId) {return null;}
 
     // Validate key format: must be a non-empty string ≤ 128 chars, alphanumeric + hyphens
-    if (!/^[a-zA-Z0-9_\-]{1,128}$/.test(key)) {
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(key)) {
       return new Response(
         JSON.stringify({ error: 'Invalid X-Idempotency-Key format' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },

@@ -362,17 +362,15 @@ const opsWorker = createWorker<AnyRecord>(
         metadata: payload as AnyRecord,
       });
     } else if (topic === 'payments.captured') {
-      if (ensureBackend()) {
-        const client = supabase;
-        if (!client) {return;}
-        const metricDate = new Date().toISOString().slice(0, 10);
-        await client.rpc('increment_ops_aggregate' as any, {
-          p_metric_date: metricDate,
-          p_metric_name: 'revenue_captured',
-          p_dimension: (payload.entityType as string) ?? 'unknown',
-          p_amount: (payload.amount as number) ?? 0,
-        });
-      }
+      // The `revenue_captured` ops aggregate is written by the `payments.captured`
+      // handler on make-server-0b1f4071, reached through outbox-worker. It was
+      // previously incremented here through `increment_ops_aggregate`, but that
+      // function is revoked from `authenticated` (see
+      // 20260826000000_atomic_ops_aggregate_increment.sql), so the browser call
+      // could only ever fail. Publishing the topic is what moves the metric.
+      telemetry.recordMetric('ops.revenue_capture_forwarded', 1, 'count', {
+        dimension: (payload.entityType as string) ?? 'unknown',
+      });
     }
 
     telemetry.recordMetric('ops.analytics_updated', 1, 'count', { topic });

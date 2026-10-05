@@ -205,6 +205,7 @@ async function handleDeadLetter(request: Request): Promise<Response> {
   return json({ ok: true });
 }
 
+// deno-lint-ignore require-await
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') {
     return json({ ok: true }, 204, request);

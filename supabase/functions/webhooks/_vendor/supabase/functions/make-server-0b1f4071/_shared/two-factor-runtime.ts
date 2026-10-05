@@ -62,7 +62,7 @@ export async function hashBackupCode(code: string): Promise<string> {
   return bytesToHex(new Uint8Array(digest));
 }
 
-export async function hashBackupCodes(codes: string[]): Promise<string[]> {
+export function hashBackupCodes(codes: string[]): Promise<string[]> {
   return Promise.all(codes.map((code) => hashBackupCode(code)));
 }
 

@@ -273,6 +273,7 @@ export async function createRideBooking ( input: {
     if ( supabase && !isLocalOnlySession() ) {
       throw new Error(
         `Booking could not be created: ${ error instanceof Error ? error.message : String( error ) }`,
+        { cause: error },
       );
     }
     // No backend, or a local/E2E demo session with no real Supabase token —

@@ -4,8 +4,6 @@ import { createRateLimitMiddleware } from "./_shared/rate-limiter.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CLIQ_API_BASE_URL = Deno.env.get("CLIQ_API_BASE_URL") ??
-  Deno.env.get("JOPACC_API_BASE_URL") ?? "";
 const CLIQ_MERCHANT_ID = Deno.env.get("CLIQ_MERCHANT_ID") ??
   Deno.env.get("JOPACC_MERCHANT_ID") ?? "";
 const CLIQ_API_KEY = Deno.env.get("CLIQ_API_KEY") ??

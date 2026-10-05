@@ -222,8 +222,8 @@ function dispatchAsyncNotification(data: NotificationCreateInput, userId?: strin
 export const notificationsAPI = {
   async getNotifications() {
     const localNotifications = readLocalNotifications();
-    let token: string | null = null;
-    let userId: string | null = null;
+    let token: string | null;
+    let userId: string | null;
 
     try {
       const auth = await getAuthDetails();
@@ -297,8 +297,8 @@ export const notificationsAPI = {
   async markAsRead(notificationId: string) {
     markLocalNotificationAsRead(notificationId);
 
-    let token: string | null = null;
-    let userId: string | null = null;
+    let token: string | null;
+    let userId: string | null;
     try {
       const auth = await getAuthDetails();
       token = auth.token;
@@ -338,8 +338,8 @@ export const notificationsAPI = {
 
   async createNotification(data: NotificationCreateInput): Promise<NotificationCreateResult> {
     const localNotifications = readLocalNotifications();
-    let token: string | null = null;
-    let userId: string | null = null;
+    let token: string | null;
+    let userId: string | null;
 
     try {
       const auth = await getAuthDetails();
@@ -364,7 +364,8 @@ export const notificationsAPI = {
           ...localNotifications,
         ]),
       );
-      dispatchAsyncNotification(data, userId);
+      // Auth lookup failed, so there is no user to attribute the notification to.
+      dispatchAsyncNotification(data, null);
       return {
         success: true,
         source: 'local',

@@ -96,10 +96,8 @@ export function resetRateLimit(key: string): void {
 // Cap store size to prevent unbounded memory growth
 const MAX_RATE_LIMIT_ENTRIES = 10_000;
 
-let _rateLimitCleanupInterval: ReturnType<typeof setInterval> | undefined;
-
-if (typeof setInterval !== 'undefined' && !_rateLimitCleanupInterval) {
-  _rateLimitCleanupInterval = setInterval(
+if (typeof setInterval !== 'undefined') {
+  setInterval(
     () => {
       const now = Date.now();
       for (const [key, record] of rateLimitStore.entries()) {

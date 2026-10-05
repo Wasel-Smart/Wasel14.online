@@ -7,7 +7,7 @@
  */
 
 import { writeFileSync, unlinkSync } from 'fs';
-import { join, dirname, resolve } from 'path';
+import { join, dirname, resolve, relative } from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import { createRequire } from 'module';
@@ -24,11 +24,13 @@ function extractModuleExports(filePath) {
   if (!resolvedPath.startsWith(PROJECT_ROOT)) {
     throw new Error(`Path traversal detected: ${filePath} resolves outside project root`);
   }
+  const relativeEntry = './' + relative(PROJECT_ROOT, resolvedPath).replace(/\\/g, '/');
   const build = buildSync({
-    entryPoints: [resolvedPath],
+    entryPoints: [relativeEntry],
     bundle: true,
     format: 'cjs',
     platform: 'node',
+    absWorkingDir: PROJECT_ROOT,
     write: false,
   });
   const src = build.outputFiles[0]?.text;

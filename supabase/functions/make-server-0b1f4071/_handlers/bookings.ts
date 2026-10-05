@@ -3,16 +3,13 @@ import {
     authenticateRequest,
     matchesAuthenticatedUser,
     mapBookingRow,
+    parseEntityRoute,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
 import {
   toNumber,
 } from '../_shared/pricing.ts';
-
-import {
-  parseEntityRoute,
-} from './shared.ts';
 
 
 export async function handleBookingRequest ( request: Request, path: string ) {

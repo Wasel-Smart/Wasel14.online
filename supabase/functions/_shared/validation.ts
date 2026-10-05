@@ -153,7 +153,7 @@ export const RatingSchema = z.object({
 
 export const IdempotencyKeySchema = z
   .string()
-  .regex(/^[a-zA-Z0-9_\-]{1,128}$/, 'Invalid idempotency key format');
+  .regex(/^[a-zA-Z0-9_-]{1,128}$/, 'Invalid idempotency key format');
 
 // ── parseOrReject helper ──────────────────────────────────────────────────────
 

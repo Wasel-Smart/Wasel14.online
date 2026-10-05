@@ -11,6 +11,8 @@ import {
     mapBookingRow,
     fetchDriverProfiles,
     logUnhandledRouteError,
+    cityCoord,
+    parseEntityRoute,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
@@ -18,11 +20,6 @@ import {
   calculateDirectPrice,
   toNumber,
 } from '../_shared/pricing.ts';
-
-import {
-  cityCoord,
-  parseEntityRoute,
-} from './shared.ts';
 
 
 export async function handleTripRequest ( request: Request, path: string ) {

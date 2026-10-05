@@ -5,13 +5,11 @@ import {
     ensureCanonicalUserForAuth,
     buildProfilePayload,
     buildTrustStatus,
+    parseEntityRoute,
+    submitSanadVerificationRequest,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
-import {
-  parseEntityRoute,
-  submitSanadVerificationRequest,
-} from './shared.ts';
 
 import {
   generateBackupCodes,

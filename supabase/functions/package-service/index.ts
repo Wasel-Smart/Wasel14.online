@@ -45,6 +45,143 @@ function getAdminClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) {return false;}
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {result |= a.charCodeAt(i) ^ b.charCodeAt(i);}
+  return result === 0;
+}
+
+/**
+ * outbox-worker authenticates with `Authorization: Bearer <service role key>`.
+ * The key is compared rather than merely decoded so an ordinary user JWT cannot
+ * reach the event sink and mutate packages without a user session.
+ */
+function isServiceRoleRequest(request: Request): boolean {
+  const authorization = request.headers.get('authorization') ?? '';
+  if (!authorization.startsWith('Bearer ')) {return false;}
+  if (!SUPABASE_SERVICE_ROLE_KEY) {return false;}
+  return constantTimeEqual(authorization.slice(7), SUPABASE_SERVICE_ROLE_KEY);
+}
+
+/**
+ * `POST /events` — the fan-out target for `packages.created` and
+ * `packages.location-updated`.
+ *
+ * This path did not exist, so both topics were answered 404 by this function,
+ * retried five times and dead-lettered. Package assignment therefore only ever
+ * ran on the `POST /packages` request path.
+ *
+ * `packages.created` mirrors that assignment step: claim a package slot on an
+ * open trip that accepts packages. The slot update is conditional on the slot
+ * still being available, so two concurrent events cannot oversubscribe a trip.
+ */
+async function assignPackageToOpenTrip(admin: ReturnType<typeof getAdminClient>, packageId: string): Promise<Record<string, unknown>> {
+  const { data: existing, error: lookupError } = await admin
+    .from('packages')
+    .select('trip_id, carrier_id, status')
+    .eq('package_id', packageId)
+    .maybeSingle();
+  if (lookupError) {throw new Error(lookupError.message);}
+
+  // Idempotency: an already-assigned package must not consume a second slot.
+  if (existing?.trip_id || existing?.carrier_id) {
+    return { assigned: true, skipped: 'already_assigned' };
+  }
+
+  const { data: trip, error: tripError } = await admin
+    .from('trips')
+    .select('trip_id, driver_id, package_slots_remaining')
+    .eq('allow_packages', true)
+    .eq('trip_status', 'open')
+    .gt('package_slots_remaining', 0)
+    .limit(1)
+    .maybeSingle();
+  if (tripError) {throw new Error(tripError.message);}
+
+  if (!trip) {return { assigned: false, reason: 'no_open_trip' };}
+
+  // Conditional decrement: if another event took the last slot first, the
+  // update matches zero rows and the package is left unassigned rather than
+  // oversubscribing the vehicle.
+  const { data: claimed, error: claimError } = await admin
+    .from('trips')
+    .update({ package_slots_remaining: toNumber(trip.package_slots_remaining, 0) - 1 })
+    .eq('trip_id', trip.trip_id)
+    .gt('package_slots_remaining', 0)
+    .select('trip_id');
+  if (claimError) {throw new Error(claimError.message);}
+  if (!claimed || claimed.length === 0) {
+    return { assigned: false, reason: 'slot_taken' };
+  }
+
+  const { error: assignError } = await admin
+    .from('packages')
+    .update({ trip_id: trip.trip_id, carrier_id: trip.driver_id, status: 'assigned' })
+    .eq('package_id', packageId);
+  if (assignError) {throw new Error(assignError.message);}
+
+  await admin.from('package_events').insert({
+    package_id: packageId,
+    event_type: 'assignment',
+    event_status: 'assigned',
+    notes: JSON.stringify({ trip_id: trip.trip_id, driver_id: trip.driver_id, source: 'outbox' }),
+  });
+
+  return { assigned: true, tripId: trip.trip_id };
+}
+
+function parsePackageEvent(body: Record<string, unknown>): { eventId: string; topic: string; packageId: string } | { error: string } {
+  const eventId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (!eventId || eventId.length > 128) {return { error: 'Missing required field: id' };}
+
+  const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
+  if (!topic) {return { error: 'Missing required field: topic' };}
+  if (topic !== 'packages.created' && topic !== 'packages.location-updated') {
+    return { error: `Unsupported topic: ${ topic }` };
+  }
+
+  const payload = (body.payload && typeof body.payload === 'object' && !Array.isArray(body.payload))
+    ? body.payload as Record<string, unknown>
+    : null;
+  if (!payload) {return { error: 'Missing required field: payload' };}
+
+  const packageId = typeof payload.packageId === 'string' ? payload.packageId.trim() : '';
+  if (!packageId) {return { error: 'Missing required field: payload.packageId' };}
+
+  return { eventId, topic, packageId, payload };
+}
+
+async function handleEventRequest(request: Request): Promise<Response> {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {return json({ error: 'Server misconfigured' }, 500);}
+  if (!isServiceRoleRequest(request)) {return json({ error: 'Unauthorized' }, 401);}
+
+  const parsed = parsePackageEvent(await request.json().catch(() => ({})) as Record<string, unknown>);
+  if ('error' in parsed) {return json({ error: parsed.error }, 400);}
+
+  const { eventId, topic, packageId } = parsed;
+  const payload = parsed.payload as Record<string, unknown>;
+
+  const admin = getAdminClient();
+
+  try {
+    if (topic === 'packages.location-updated') {
+      const location = typeof payload.location === 'string' ? payload.location.slice(0, 500) : null;
+      const { error } = await admin.from('packages').update({ current_location: location, updated_at: new Date().toISOString() }).eq('package_id', packageId);
+      if (error) {throw new Error(error.message);}
+      return json({ ok: true, topic, packageId });
+    }
+
+    const result = await assignPackageToOpenTrip(admin, packageId);
+    return json({ ok: true, topic, packageId, ...result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(JSON.stringify({ level: 'error', service: 'package-service', message: 'event handler failed', eventId, topic, detail: message }));
+    // 500 makes outbox-worker increment attempts and retry.
+    return json({ error: 'Event handler failed' }, 500);
+  }
+}
+
 async function authenticateRequest(request: Request) {
   const authorization = request.headers.get('Authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
@@ -79,7 +216,7 @@ function mapPackageRow(row: Record<string, unknown>) {
   };
 }
 
-function calculateDirectPrice(type: string, weight?: number, distanceKm?: number, basePrice = 5): { total: number; breakdown: { base: number; distance: number; weight: number } } {
+function calculateDirectPrice(weight?: number, distanceKm?: number, basePrice = 5): { total: number; breakdown: { base: number; distance: number; weight: number } } {
   const distance = distanceKm ?? 0;
   const w = weight ?? 0;
   const distanceFee = Number((distance * 0.5).toFixed(2));
@@ -116,7 +253,7 @@ async function handlePackageRequest(request: Request, path: string) {
       description: String(body.description ?? ''),
       declared_value: toNumber(body.declared_value, 0),
       fragile: Boolean(body.fragile),
-      delivery_fee: calculateDirectPrice('package', toNumber(body.weight, 0), 0, toNumber(body.base_price, 5)).breakdown.base,
+      delivery_fee: calculateDirectPrice(toNumber(body.weight, 0), 0, toNumber(body.base_price, 5)).breakdown.base,
       status: 'posted',
     }).select('*').single();
     if (error) {return json({ error: error.message }, 500);}
@@ -184,7 +321,9 @@ Deno.serve(async (request: Request) => {
   // falls through to the 404 below.
   let response: Response | undefined;
 
-    if (path.startsWith('/packages')) {
+    if (path === '/events') {
+      response = await handleEventRequest(request);
+    } else if (path.startsWith('/packages')) {
       response = await handlePackageRequest(request, path);
       if (!response) {response = json({ error: 'Not found' }, 404);}
     } else if (path === '/health') {

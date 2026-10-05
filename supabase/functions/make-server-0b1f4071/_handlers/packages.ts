@@ -3,6 +3,7 @@ import {
     authenticateRequest,
     matchesAuthenticatedUser,
     mapPackageRow,
+    parseEntityRoute,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
@@ -10,10 +11,6 @@ import {
   calculateDirectPrice,
   toNumber,
 } from '../_shared/pricing.ts';
-
-import {
-  parseEntityRoute,
-} from './shared.ts';
 
 
 export async function handlePackageRequest ( request: Request, path: string ) {

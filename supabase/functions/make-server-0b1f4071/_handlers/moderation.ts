@@ -3,10 +3,7 @@ import {
     ensureRuntimeAdminAccess,
     authenticateRequest,
     executeSqlStatements,
-} from './shared.ts';
-
-import {
-  CONTENT_MODERATION_SQL,
+    CONTENT_MODERATION_SQL,
 } from './shared.ts';
 
 

@@ -119,6 +119,10 @@ import {
 } from './_handlers/infrastructure.ts';
 
 import {
+  handleEventRequest,
+} from './_handlers/events.ts';
+
+import {
   handleCreateOrganization,
   handleGetOrganization,
   handleListOrganizations,
@@ -553,6 +557,14 @@ const ROUTES: RouteDescriptor[] = [
       const parts = path.split( '/' );
       return handleGetPaymentStatus( request, decodeURIComponent( parts[ 2 ] ) );
     },
+  },
+  {
+    // Registered first so `/events` is matched before the generic entity routes
+    // can interpret the id segment.
+    id: 'events',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/events',
+    handle: ( request ) => handleEventRequest( request ),
   },
   {
     id: 'corporate-create-org',

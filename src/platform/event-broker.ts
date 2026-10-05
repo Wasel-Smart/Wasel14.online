@@ -135,13 +135,27 @@ function resolveProxyBaseUrl(): string | null {
 
 function resolveWorkerSecret(): string | null {
   try {
-    if (typeof window !== 'undefined' || typeof import.meta === 'undefined') {
-      return typeof process !== 'undefined' ? process.env.VITE_EVENT_BROKER_WORKER_SECRET ?? null : null;
+    // import.meta.env is the only source that exists in a browser bundle. The
+    // previous implementation read process.env whenever `window` was defined —
+    // which is always true in a browser — so it returned null there and every
+    // proxyFetch() call short-circuited to "not configured". The proxy path was
+    // unreachable in production and both publish and poll silently fell through
+    // to the direct path, which RLS denies on event_outbox. Read import.meta.env
+    // first and keep process.env as the SSR/test fallback.
+    const fromVite =
+      typeof import.meta !== 'undefined' && typeof import.meta.env !== 'undefined'
+        ? (import.meta.env.VITE_EVENT_BROKER_WORKER_SECRET as string | undefined)
+        : undefined;
+    if (fromVite && fromVite.trim()) {return fromVite.trim();}
+
+    if (typeof process !== 'undefined') {
+      const fromProcess = process.env.VITE_EVENT_BROKER_WORKER_SECRET;
+      if (fromProcess && fromProcess.trim()) {return fromProcess.trim();}
     }
-    return null;
   } catch {
     return null;
   }
+  return null;
 }
 
 async function proxyFetch(

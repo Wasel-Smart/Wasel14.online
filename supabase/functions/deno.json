@@ -10,7 +10,7 @@
   },
   "lint": {
     "include": ["./"],
-    "exclude": ["tests/"],
+    "exclude": ["tests/", "globals.d.ts", "_vendor/"],
     "rules": {
       "tags": ["recommended"],
       "include": ["no-explicit-any", "no-unused-vars", "eqeqeq"]

@@ -544,6 +544,10 @@ export const WEBHOOK_PATH_PREFIXES = [
   '/trust/webhooks/',
   '/webhooks/',
   '/auth/hooks/',
+  // Machine-to-machine event sink drained by outbox-worker. It carries no user
+  // session and no browser CSRF token; it is authenticated by a constant-time
+  // comparison against SUPABASE_SERVICE_ROLE_KEY inside handleEventRequest().
+  '/events',
 ];
 
 export function isWebhookRoute ( path: string ): boolean {
@@ -824,8 +828,7 @@ export function sanitizePlainText ( value: unknown, maxLength = 500 ): string {
   return String( value ?? '' )
     .replace( /<[^>]*>/g, '' )
     .replace( /(javascript:|data:|vbscript:)/gi, '' )
-    // eslint-disable-next-line no-control-regex
-    .replace( /[\u0000-\u001F\u007F]/g, ' ' )
+    .replace( /\p{Cc}/gu, ' ' )
     .replace( /\s+/g, ' ' )
     .trim()
     .slice( 0, maxLength );
@@ -1821,7 +1824,7 @@ export async function ensureStripeCustomer ( input: {
   return String( customer.id );
 }
 
-export async function fetchStripeSubscription ( subscriptionId: string ) {
+export function fetchStripeSubscription ( subscriptionId: string ) {
   const params = new URLSearchParams();
   params.append( 'expand[]', 'items.data.price.product' );
   return stripeApiRequest( `/v1/subscriptions/${ encodeURIComponent( subscriptionId ) }`, {
@@ -2536,14 +2539,14 @@ export async function createStripeSubscriptionCheckoutSession ( input: {
   };
 }
 
-export async function createCliqCheckoutSession ( input: {
+export function createCliqCheckoutSession ( input: {
   transactionId: string;
   amountJod: number;
   currency: string;
   request: Request;
 } ): Promise<CheckoutSession & { providerReference: string | null }> {
   if ( !CLIQ_CHECKOUT_URL_TEMPLATE || !CLIQ_MERCHANT_ID ) {
-    throw new Error( 'CliQ checkout is not configured' );
+    return Promise.reject( new Error( 'CliQ checkout is not configured' ) );
   }
   const appUrl = getAppBaseUrl( input.request );
   const checkoutUrl = buildCliqCheckoutUrl( CLIQ_CHECKOUT_URL_TEMPLATE, {
@@ -2553,13 +2556,13 @@ export async function createCliqCheckoutSession ( input: {
     returnUrl: `${ appUrl }/app/wallet?topup=success&tx=${ input.transactionId }`,
     merchantId: CLIQ_MERCHANT_ID,
   } );
-  return {
+  return Promise.resolve( {
     id: input.transactionId,
     url: checkoutUrl,
     sessionId: input.transactionId,
     checkoutUrl,
     providerReference: input.transactionId,
-  };
+  } );
 }
 
 export function constantTimeEquals ( left: string, right: string ): boolean {
@@ -2571,7 +2574,7 @@ export function constantTimeEquals ( left: string, right: string ): boolean {
   return mismatch === 0;
 }
 
-export async function computeStripeSignature ( secret: string, payload: string, timestamp: string ): Promise<string> {
+export function computeStripeSignature ( secret: string, payload: string, timestamp: string ): Promise<string> {
   return computeHmacHex( secret, `${ timestamp }.${ payload }` );
 }
 
