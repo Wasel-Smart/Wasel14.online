@@ -99,7 +99,7 @@ export function useLiveRide(rideId?: string, enabled = true, refetchInterval = 3
   const queryOptions: Parameters<typeof useQuery<LiveRide | null>>[0] = {
     queryKey: ['live-ride', rideId],
     queryFn: async () => {
-      const response = await apiClient.get<LiveTripSnapshot>('live-trip');
+      const response = await apiClient.get<{ snapshot: LiveTripSnapshot | null }>('live-trip');
       if (response.error) throw new Error(response.error);
       if (!response.data?.snapshot) return null;
       return mapSnapshotToLiveRide(response.data.snapshot);

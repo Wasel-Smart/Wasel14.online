@@ -335,7 +335,7 @@ export class OfflineService {
 
       case 'SCHEDULED_RIDE_CREATE':
         await this.idempotentFetch(
-          `${base}/trips/scheduled`,
+          `${base}/v1/bookings`,
           { method: 'POST', body: JSON.stringify(action.payload) },
           token,
           action.id,

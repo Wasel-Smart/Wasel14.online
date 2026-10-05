@@ -39,8 +39,6 @@ export function initPerformanceMonitoring() {
       enableWatchdogTerminationTracking: true,
       enableAppHangTracking: true,
       appHangTimeoutInterval: 5,
-      enableAppStartTracking: true,
-      enableNativeFramesTracking: true,
       enableCaptureFailedRequests: true,
     });
 

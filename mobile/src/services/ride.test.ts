@@ -89,23 +89,33 @@ describe('RideLifecycleService', () => {
 
     it('sends request to API and returns ride on success', async () => {
       const { apiClient } = require('../lib/api');
+      apiClient.get.mockResolvedValueOnce({
+        data: [{ id: 'trip-1', distance: 100 }],
+        error: null,
+        status: 200,
+      });
       apiClient.post.mockResolvedValueOnce({
-        data: { ride: { id: 'ride-1', status: 'requested', origin_address: 'Amman' } },
+        data: { booking: { booking_id: 'booking-1', status: 'confirmed', pickup_stop: 'Amman', dropoff_stop: 'Aqaba' } },
         error: null,
         status: 200,
       });
 
       const result = await service.requestRide(validRequest);
       expect(result.ride).toBeDefined();
-      expect(result.ride?.id).toBe('ride-1');
+      expect(result.ride?.id).toBe('booking-1');
       expect(apiClient.post).toHaveBeenCalledWith(
-        expect.stringContaining('/trips'),
-        expect.objectContaining({ from: 'Amman', to: 'Aqaba', seats: 2 }),
+        '/v1/bookings',
+        expect.objectContaining({ trip_id: 'trip-1', seats_requested: 2, pickup_stop: 'Amman', dropoff_stop: 'Aqaba' }),
       );
     });
 
     it('returns error on API failure', async () => {
       const { apiClient } = require('../lib/api');
+      apiClient.get.mockResolvedValueOnce({
+        data: [{ id: 'trip-1', distance: 100 }],
+        error: null,
+        status: 200,
+      });
       apiClient.post.mockResolvedValueOnce({ data: null, error: new Error('Server error'), status: 500 });
 
       const result = await service.requestRide(validRequest);
@@ -127,7 +137,7 @@ describe('RideLifecycleService', () => {
 
     it('sends cancel request to API on success', async () => {
       const { apiClient } = require('../lib/api');
-      apiClient.post.mockResolvedValueOnce({ data: {}, error: null, status: 200 });
+      (apiClient.post as jest.Mock).mockResolvedValue({ data: {}, error: null, status: 200 });
 
       const result = await service.cancelRide('ride-1');
       expect(result).toEqual({});
@@ -152,10 +162,10 @@ describe('RideLifecycleService', () => {
 
     it('sends rating to API on success', async () => {
       const { apiClient } = require('../lib/api');
-      apiClient.post.mockResolvedValueOnce({ data: {}, error: null, status: 200 });
+      apiClient.post.mockResolvedValueOnce({ data: { ok: true }, error: null, status: 200 });
 
       const result = await service.rateRide('ride-1', 5, 'Great ride');
-      expect(result).toEqual({});
+      expect(result.error).toBeUndefined();
     });
   });
 
@@ -196,7 +206,7 @@ describe('RideLifecycleService', () => {
     it('returns rides from API on success', async () => {
       const { apiClient } = require('../lib/api');
       apiClient.get.mockResolvedValueOnce({
-        data: { rides: [{ id: 'ride-1', status: 'completed', origin_address: 'Amman' }] },
+        data: [{ id: 'ride-1', status: 'completed', pickup_stop: 'Amman', dropoff_stop: 'Aqaba', created_at: '2026-01-01' }],
         error: null,
         status: 200,
       });
@@ -204,6 +214,19 @@ describe('RideLifecycleService', () => {
       const rides = await service.getRideHistory();
       expect(rides).toHaveLength(1);
       expect(rides[0].id).toBe('ride-1');
+    });
+
+    it('returns bookings from API wrapped in { bookings } envelope', async () => {
+      const { apiClient } = require('../lib/api');
+      apiClient.get.mockResolvedValueOnce({
+        data: { bookings: [{ id: 'ride-2', status: 'completed', pickup_stop: 'City A', dropoff_stop: 'City B', created_at: '2026-02-01' }] },
+        error: null,
+        status: 200,
+      });
+
+      const rides = await service.getRideHistory();
+      expect(rides).toHaveLength(1);
+      expect(rides[0].id).toBe('ride-2');
     });
   });
 

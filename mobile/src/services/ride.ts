@@ -277,9 +277,12 @@ export class RideLifecycleService {
     }
 
     try {
-      const { data, error } = await apiClient.get<{ activeTrip: Record<string, unknown> | null }>('/active-trip');
-      if (error || !data?.activeTrip) return null;
-      const ride = this.mapActiveTripToRide(data.activeTrip);
+      const { data, error } = await apiClient.get<{ activeTrip?: Record<string, unknown> | null; ride?: Record<string, unknown> | null }>('/active-trip');
+      const tripData = data?.activeTrip ?? data?.ride;
+      if (error || !tripData || !data) return null;
+      const ride = data.activeTrip
+        ? this.mapActiveTripToRide(data.activeTrip)
+        : this.mapBookingToRide((data.ride ?? {}) as Record<string, unknown>);
       this.setActiveRide(ride);
       await offlineService.cacheActiveRide(ride);
       return ride;
@@ -322,11 +325,20 @@ export class RideLifecycleService {
     }
 
     try {
-      const { data, error } = await apiClient.get(`/bookings/user/${encodeURIComponent(user.id)}?limit=${encodeURIComponent(String(limit))}`);
+      const { data, error } = await apiClient.get<unknown>(`/bookings/user/${encodeURIComponent(user.id)}?limit=${encodeURIComponent(String(limit))}`);
       if (error || !data) throw new Error(error ?? 'Empty response');
-      const bookings = Array.isArray(data) ? data : data?.bookings ?? [];
-      const rides = bookings.map((booking: Record<string, unknown>) =>
-        this.mapBookingToRide(booking),
+      const rawObj = data as Record<string, unknown>;
+      const bookings = Array.isArray(data)
+        ? data
+        : Array.isArray(rawObj.rides)
+        ? (rawObj.rides as unknown[])
+        : Array.isArray(rawObj.bookings)
+        ? (rawObj.bookings as unknown[])
+        : Array.isArray(rawObj.data)
+        ? (rawObj.data as unknown[])
+        : [];
+      const rides = bookings.map((booking: unknown) =>
+        this.mapBookingToRide(booking as Record<string, unknown>),
       );
       await offlineService.cacheRideHistory(rides);
       return rides;
@@ -400,50 +412,67 @@ export class RideLifecycleService {
 
   private mapBookingToRide(booking: Record<string, unknown>, trip?: AvailableTrip): Ride {
     const raw = booking as Record<string, unknown>;
-    const originAddress = String(raw.pickup ?? raw.pickup_stop ?? raw.pickup_location ?? trip?.from ?? '');
-    const destAddress = String(raw.dropoff ?? raw.dropoff_stop ?? raw.dropoff_location ?? trip?.to ?? '');
-    const status = (String(raw.status ?? raw.booking_status ?? 'requested')) as RideStatus;
+    const originAddress = String(raw.origin_address ?? raw.pickup ?? raw.pickup_stop ?? raw.pickup_location ?? trip?.from ?? '');
+    const destAddress = String(raw.dest_address ?? raw.dropoff ?? raw.dropoff_stop ?? raw.dropoff_location ?? trip?.to ?? '');
+    const rawStatus = String(raw.status ?? raw.booking_status ?? raw.trip_status ?? 'requested');
+    const status: RideStatus =
+      rawStatus === 'confirmed' || rawStatus === 'matched'
+        ? 'matched'
+        : rawStatus === 'cancelled'
+        ? 'cancelled'
+        : rawStatus === 'completed'
+        ? 'completed'
+        : rawStatus === 'in_progress'
+        ? 'in_progress'
+        : rawStatus === 'accepted'
+        ? 'accepted'
+        : 'requested';
+
     return {
-      id: String(raw.booking_id ?? raw.id ?? ''),
-      riderId: String(raw.passenger_id ?? raw.user_id ?? mobileAuth.getUser()?.id ?? ''),
-      tripId: String(raw.trip_id ?? ''),
-      driverId: String(raw.driver_id ?? ''),
-      driverName: trip?.driver?.name,
-      vehicleId: String(raw.vehicle_id ?? ''),
-      rating: trip?.driver?.rating,
-      origin: { latitude: 0, longitude: 0, address: originAddress },
-      destination: { latitude: 0, longitude: 0, address: destAddress },
-      status: status === 'confirmed' ? 'matched' : status === 'cancelled' ? 'cancelled' : status === 'completed' ? 'completed' : 'requested',
+      id: String(raw.id ?? raw.booking_id ?? raw.trip_id ?? ''),
+      riderId: String(raw.rider_id ?? raw.passenger_id ?? raw.user_id ?? mobileAuth.getUser()?.id ?? ''),
+      tripId: raw.trip_id ? String(raw.trip_id) : undefined,
+      driverId: raw.driver_id ? String(raw.driver_id) : undefined,
+      driverName: (raw.driver_name as string) ?? trip?.driver?.name,
+      vehicleId: raw.vehicle_id ? String(raw.vehicle_id) : undefined,
+      rating: typeof raw.rating === 'number' ? raw.rating : trip?.driver?.rating,
+      origin: { latitude: Number(raw.origin_lat ?? 0), longitude: Number(raw.origin_lng ?? 0), address: originAddress },
+      destination: { latitude: Number(raw.dest_lat ?? 0), longitude: Number(raw.dest_lng ?? 0), address: destAddress },
+      status,
       fare: Number(raw.fare ?? raw.price_per_seat ?? raw.total_price ?? 0),
-      distance: undefined,
-      duration: undefined,
-      seats: Number(raw.seats_requested ?? trip?.seats ?? 1),
-      requestedAt: String(raw.created_at ?? new Date().toISOString()),
+      distance: typeof raw.distance === 'number' ? raw.distance : undefined,
+      duration: typeof raw.duration === 'number' ? raw.duration : undefined,
+      seats: Number(raw.seats_requested ?? raw.seats ?? trip?.seats ?? 1),
+      requestedAt: String(raw.created_at ?? raw.departure_time ?? new Date().toISOString()),
+      matchedAt: raw.matched_at ? String(raw.matched_at) : undefined,
+      startedAt: raw.started_at ? String(raw.started_at) : undefined,
+      completedAt: raw.completed_at ? String(raw.completed_at) : undefined,
+      cancelledAt: raw.cancelled_at ? String(raw.cancelled_at) : undefined,
     };
   }
 
   private mapActiveTripToRide(activeTrip: Record<string, unknown>): Ride {
-    const payload = (activeTrip as Record<string, unknown>);
+    const payload = activeTrip as Record<string, unknown>;
     const driver = (payload.driver as Record<string, unknown>) ?? {};
     const vehicle = (payload.vehicle as Record<string, unknown>) ?? {};
     return {
       id: String(payload.id ?? payload.trip_id ?? ''),
       riderId: String(payload.userId ?? mobileAuth.getUser()?.id ?? ''),
-      tripId: String(payload.trip_id ?? ''),
-      driverId: String(driver.id ?? ''),
-      driverName: String(driver.name ?? ''),
-      vehicleId: String(vehicle.id ?? ''),
+      tripId: payload.trip_id ? String(payload.trip_id) : undefined,
+      driverId: driver.id ? String(driver.id) : undefined,
+      driverName: driver.name ? String(driver.name) : undefined,
+      vehicleId: vehicle.id ? String(vehicle.id) : undefined,
       rating: undefined,
       origin: { latitude: 0, longitude: 0, address: String(payload.from ?? '') },
       destination: { latitude: 0, longitude: 0, address: String(payload.to ?? '') },
       status: this.mapActiveTripStatus(String(payload.status ?? '')),
       fare: Number(payload.price ?? 0),
       distance: undefined,
-      duration: String(payload.duration ?? ''),
+      duration: typeof payload.duration === 'number' ? payload.duration : undefined,
       seats: Number(payload.passengers ?? 1),
       requestedAt: String(payload.startedAt ?? payload.created_at ?? new Date().toISOString()),
-      matchedAt: payload.matchedAt,
-      startedAt: payload.startedAt,
+      matchedAt: payload.matchedAt ? String(payload.matchedAt) : undefined,
+      startedAt: payload.startedAt ? String(payload.startedAt) : undefined,
     };
   }
 

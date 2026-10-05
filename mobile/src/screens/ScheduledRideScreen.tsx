@@ -73,7 +73,7 @@ const ScheduledRideScreen = React.memo(function ScheduledRideScreen() {
         return;
       }
 
-      const response = await apiClient.post<ScheduledRideRequest>('rides/schedule', payload);
+      const response = await apiClient.post<ScheduledRideRequest>('bookings', payload);
 
       if (response.error) {
         setError(response.error);

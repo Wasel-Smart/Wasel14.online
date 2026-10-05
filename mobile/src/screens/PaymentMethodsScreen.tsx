@@ -1,19 +1,12 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '../lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  PrimaryButton,
+} from '../components/MobilePrimitives';
+import { paymentService, type PaymentMethod } from '../services/payments';
 import { useAuth } from '../providers/AuthProvider';
 import { colors, spacing, typography } from '../theme';
-
-type PaymentMethodType = 'wallet' | 'card';
-
-interface LocalPaymentMethod {
-  id: string;
-  type: PaymentMethodType;
-  name: string;
-  balance?: number;
-  primary: boolean;
-}
 
 function PaymentMethodsSkeleton() {
   return (
@@ -37,43 +30,81 @@ function PaymentMethodsSkeleton() {
 
 export default function PaymentMethodsScreen() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [actionLoading, setActionLoading] = useState(false);
+  const userId = user?.id ?? '';
 
-  const { data: methods, isLoading, error } = useQuery({
-    queryKey: ['payment-methods', user?.id],
+  const { data: methods, isLoading, error, refetch } = useQuery({
+    queryKey: ['payment-methods', userId],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const response = await apiClient.get<LocalPaymentMethod[]>('payments/methods/');
-      if (response.error || !response.data) throw new Error(response.error || '??? ???????');
-      return response.data;
+      if (!userId) return [];
+      const result = await paymentService.getPaymentMethods(userId);
+      return result;
     },
-    enabled: Boolean(user?.id),
-    staleTime: 5 * 60 * 1000,
+    enabled: Boolean(userId),
+    staleTime: 5 * 60_000,
   });
+
+  const handleSetPrimary = useCallback(async (id: string) => {
+    if (!userId || !id) return;
+    setActionLoading(true);
+    try {
+      const success = await paymentService.setDefaultPaymentMethod(userId, id);
+      if (success) {
+        Alert.alert('تم التحدث', 'تم تعيين وسيلة الدفع كافتراضية.');
+        void queryClient.invalidateQueries({ queryKey: ['payment-methods', userId] });
+      } else {
+        Alert.alert(' خطأ', 'تعذر تحديد وسيلة الدفع الافتراضية.');
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  }, [userId, queryClient]);
+
+  const handleRemove = useCallback(async (id: string) => {
+    if (!userId || !id) return;
+    Alert.alert(
+      'حذف وسيلة الدفع',
+      'هل أنت مطمئن أنك تريد حذف بطاقة الدفع هذه؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              const success = await paymentService.removePaymentMethod(userId, id);
+              if (success) {
+                void queryClient.invalidateQueries({ queryKey: ['payment-methods', userId] });
+              } else {
+                Alert.alert(' خطأ', 'تعذر حذف وسيلة الدفع.');
+              }
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [userId, queryClient]);
 
   if (isLoading) return <PaymentMethodsSkeleton />;
 
-  const displayMethods: LocalPaymentMethod[] = methods ?? [];
-
-  const handleAddPayment = () => {
-    Alert.alert('????? ????? ???', '???? Stripe ?? ???? ??? ????');
-  };
-
-  const handleSetPrimary = (_id: string) => {
-    Alert.alert('?? ?????', '?? ????? ????? ????? ????????');
-  };
+  const displayMethods: PaymentMethod[] = methods ?? [];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
-        <Text style={styles.title}>????? ?????</Text>
-        <Text style={styles.subtitle}>????? ?????? ?????</Text>
+        <Text style={styles.title}>وسائل الدفع</Text>
+        <Text style={styles.subtitle}>إدارة بطاقاتك ومحافظك</Text>
       </View>
 
       {error && (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>??? ????? ????? ?????</Text>
-          <TouchableOpacity onPress={handleAddPayment}>
-            <Text style={styles.retryText}>????? ????????</Text>
+          <Text style={styles.errorText}>حدث خطأ في تحميل وسائل الدفع</Text>
+          <TouchableOpacity onPress={() => void refetch()}>
+            <Text style={styles.retryText}>إعادة المحاولة</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -82,35 +113,47 @@ export default function PaymentMethodsScreen() {
         <View key={method.id} style={styles.methodCard}>
           <View style={styles.methodInfo}>
             <View style={[styles.methodIcon, { backgroundColor: colors.teal + '18' }]}>
-              <Text style={styles.methodIconText}>{method.type === 'wallet' ? '??' : '??'}</Text>
+              <Text style={styles.methodIconText}>{method.type === 'card' ? '💳' : '👛'}</Text>
             </View>
             <View style={styles.methodDetails}>
-              <Text style={styles.methodName}>{method.name}</Text>
-              {method.type === 'wallet' && (
-                <Text style={styles.balance}>??????: JOD {(method.balance ?? 0).toFixed(2)}</Text>
+              <Text style={styles.methodName}>
+                {method.type === 'card' ? `**** ${method.token_reference?.slice(-4) ?? ''}` : 'محفظة'}
+              </Text>
+              {method.provider && (
+                <Text style={styles.methodProvider}>{method.provider}</Text>
               )}
-              {method.primary && (
+              {method.isDefault && (
                 <View style={[styles.primaryBadge, { backgroundColor: colors.teal + '18' }]}>
-                  <Text style={[styles.primaryBadgeText, { color: colors.teal }]}>??????</Text>
+                  <Text style={[styles.primaryBadgeText, { color: colors.teal }]}>افتراضي</Text>
                 </View>
               )}
             </View>
           </View>
 
-          {!method.primary && (
-            <TouchableOpacity onPress={() => handleSetPrimary(method.id)}>
-              <Text style={[styles.setPrimaryText, { color: colors.teal }]}>????? ???????</Text>
+          {!method.isDefault ? (
+            <TouchableOpacity
+              onPress={() => handleSetPrimary(method.id)}
+              disabled={actionLoading}
+            >
+              <Text style={[styles.setPrimaryText, { color: colors.teal }]}>تعيين كافتراضي</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={() => handleRemove(method.id)}
+              disabled={actionLoading}
+            >
+              <Text style={[styles.setPrimaryText, { color: colors.red }]}>حذف</Text>
             </TouchableOpacity>
           )}
         </View>
       ))}
 
-      <TouchableOpacity
-        style={[styles.addButton, { backgroundColor: colors.teal }]}
-        onPress={handleAddPayment}
-      >
-        <Text style={styles.addButtonText}>+ ????? ????? ???</Text>
-      </TouchableOpacity>
+      <PrimaryButton
+        label="إضافة وسيلة دفع جديدة"
+        icon="card"
+        onPress={() => Alert.alert('قريباً', 'ستتوفر إضافة بطاقات جديدة عبر Stripe Checkout في التحديث القادم.')}
+        testID="add-payment-method"
+      />
     </ScrollView>
   );
 }
@@ -153,7 +196,7 @@ const styles = StyleSheet.create({
   methodIconText: { fontSize: 20 },
   methodDetails: { flex: 1 },
   methodName: { ...typography.body, fontWeight: '800', color: colors.ink },
-  balance: { ...typography.caption, color: colors.green, marginTop: 2, fontWeight: '700' },
+  methodProvider: { ...typography.caption, color: colors.muted, marginTop: 2 },
   primaryBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
@@ -199,4 +242,3 @@ const styles = StyleSheet.create({
   },
   skeletonLineShort: { width: '40%' },
 });
-

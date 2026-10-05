@@ -18,8 +18,6 @@ import { colors, hitSlop, radii, shadows, spacing, typography } from '../theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-type Tone = 'light' | 'dark';
-
 function triggerLightHaptic() {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
 }
@@ -79,7 +77,6 @@ export const PremiumPanel = React.memo(function PremiumPanel({
   children,
   style,
   testID,
-  tone,
 }: {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -274,7 +271,7 @@ export function PrimaryButton({
       disabled={isDisabled}
       hitSlop={hitSlop}
       onPress={handlePress}
-      style={({ pressed }) => [
+      style={({ pressed }: { pressed: boolean }) => [
         styles.button,
         {
           backgroundColor: isDisabled ? colors.line : tone,
@@ -322,7 +319,7 @@ export function ActionRow({
       accessibilityRole="button"
       hitSlop={hitSlop}
       onPress={handlePress}
-      style={({ pressed }) => [styles.action, pressed ? styles.actionPressed : null]}
+      style={({ pressed }: { pressed: boolean }) => [styles.action, pressed ? styles.actionPressed : null]}
     >
       <Ionicons name={icon} size={18} color={tone} />
       <Text style={[styles.actionText, destructive ? styles.destructiveText : null]}>{label}</Text>

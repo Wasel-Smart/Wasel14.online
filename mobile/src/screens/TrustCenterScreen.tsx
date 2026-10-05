@@ -10,8 +10,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import {
-  InfoCard,
-  InlineStat,
   MetricTile,
   PremiumPanel,
   PrimaryButton,
@@ -62,13 +60,6 @@ const accentByState: Record<TrustStepState, string> = {
   not_started: colors.gold,
   failed: colors.red,
 };
-
-function formatDate(iso: string | null): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString();
-}
 
 const TrustCenterScreen = React.memo(function TrustCenterScreen() {
   const { user, loading } = useAuth();
@@ -167,7 +158,7 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
       if (response.error) throw new Error(response.error);
       setPhoneCode('');
     });
-  }, [phoneCode, run]);
+  }, [phoneCode, run, t]);
 
   const handleSubmitIdentity = useCallback(async () => {
     const identityError = validateIdentity(identityRef);
@@ -228,13 +219,16 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
   const effective = status ?? buildLocalFallback(user);
   const nextStep = effective?.nextStepId;
   const isNewUser = effective && effective.completedSteps === 0 && nextStep !== null;
-  const isRider = user?.role === 'rider';
+  const userMetadata = user?.user_metadata ?? {};
+  const userRole = (userMetadata.role as string) ?? 'rider';
+  const userTrustScore = (userMetadata.trust_score as number) ?? (userMetadata.trustScore as number) ?? 0;
+  const isRider = userRole === 'rider';
 
   const capabilityRows = [
-    { title: t('trustCenterExpanded.postRides'), allowed: user?.role === 'driver' || user?.role === 'both' },
-    { title: t('trustCenterExpanded.carryPackages'), allowed: user?.role === 'driver' || user?.role === 'both' },
+    { title: t('trustCenterExpanded.postRides'), allowed: userRole === 'driver' || userRole === 'both' },
+    { title: t('trustCenterExpanded.carryPackages'), allowed: userRole === 'driver' || userRole === 'both' },
     { title: t('trustCenterExpanded.receivePayouts'), allowed: true },
-    { title: t('trustCenterExpanded.prioritySupport'), allowed: (user?.trustScore ?? 0) >= 70 },
+    { title: t('trustCenterExpanded.prioritySupport'), allowed: userTrustScore >= 70 },
   ];
 
   const walletStep = effective?.steps.walletStanding;
@@ -265,7 +259,7 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
             />
             <MetricTile
               label={t('trustCenterExpanded.trustScore')}
-              value={`${user?.trustScore ?? 0}`}
+              value={`${userTrustScore}`}
               tone={colors.green}
             />
             <MetricTile
@@ -324,7 +318,7 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
         <View style={styles.stepList}>
           {Object.entries(effective?.steps ?? {}).map(([stepId, step]) => {
             if (isRider && stepId === 'driverDocuments') return null;
-            const meta = stepMeta[stepId] ?? { icon: 'help-circle', labelKey: stepId };
+            const meta = stepMeta[stepId] ?? { icon: 'help-circle' as const, labelKey: stepId };
             const accent = accentByState[step.state] ?? colors.gold;
             const isNext = stepId === nextStep;
 
@@ -503,7 +497,7 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
         </View>
 
         <PrimaryButton
-          label={t('trustCenter.refresh')}
+          label={t('trustCenterExpanded.refreshStatus')}
           variant="outline"
           tone={colors.textMuted}
           loading={loadingStatus}
@@ -515,15 +509,16 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
   );
 });
 
-function buildLocalFallback(user: { role?: string; emailVerified?: boolean; phoneVerified?: boolean; walletStatus?: string } | null): TrustStatus {
-  const role = user?.role ?? 'rider';
-  const emailVerified = user?.emailVerified ?? false;
-  const phoneVerified = user?.phoneVerified ?? false;
-  const walletStatus = user?.walletStatus ?? 'active';
-  const steps = {
+function buildLocalFallback(user: any): TrustStatus {
+  const meta = user?.user_metadata ?? {};
+  const emailVerified = Boolean(user?.email_confirmed_at || meta.email_verified || user?.emailVerified);
+  const phoneVerified = Boolean(user?.phone_confirmed_at || meta.phone_verified || user?.phoneVerified);
+  const walletStatus = String(meta.wallet_status ?? meta.walletStatus ?? user?.walletStatus ?? 'active');
+
+  const steps: TrustStatus['steps'] = {
     identity: {
       id: 'identity',
-      state: 'not_started' as TrustStepState,
+      state: 'not_started',
       detail: 'Submit Sanad verification to continue.',
       failureReason: null,
     },
@@ -541,16 +536,16 @@ function buildLocalFallback(user: { role?: string; emailVerified?: boolean; phon
     },
     driverDocuments: {
       id: 'driverDocuments',
-      state: 'not_started' as TrustStepState,
+      state: 'not_started',
       detail: 'Enable Driver mode before submitting driver documents.',
       failureReason: null,
-    } as TrustStep,
+    },
     walletStanding: {
       id: 'walletStanding',
       state: walletStatus === 'active' ? 'completed' : 'failed',
       detail: walletStatus === 'active' ? 'Wallet standing is healthy.' : `Wallet standing is ${walletStatus}.`,
       failureReason: walletStatus && walletStatus !== 'active' ? `Wallet is ${walletStatus}.` : null,
-    } as TrustStep,
+    },
   };
 
   const all = Object.values(steps);
@@ -604,10 +599,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  stepIconText: {
-    fontSize: 18,
-    fontWeight: '900',
   },
   stepTitleCopy: {
     flex: 1,

@@ -1,7 +1,7 @@
- /**
-  * Mobile Authentication Service
-  * React Native implementation with Supabase Auth
-  */
+/**
+ * Mobile Authentication Service
+ * React Native implementation with Supabase Auth
+ */
 
 import { User, type AuthError, type Session } from '@supabase/supabase-js';
 import { Linking } from 'react-native';
@@ -11,27 +11,30 @@ import { biometricAuth } from './biometricAuth';
 import { sanitizeLogValue } from '../utils/sanitize';
 import { normalizePhone, isValidE164Phone } from '../../src/shared/validation/phone';
 
-  export type AuthMetadata = Record<string, string | number | boolean | null | undefined>;
- type OAuthProvider = 'google' | 'facebook';
+export type AuthMetadata = Record<string, string | number | boolean | null | undefined>;
+type OAuthProvider = 'google' | 'facebook';
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
- interface AuthState {
-   session: Session | null;
+interface AuthState {
+  session: Session | null;
   user: User | null;
   loading: boolean;
 }
 
 export class MobileAuthService {
-  private supabase = sharedSupabase;
   private listeners = new Set<(state: AuthState) => void>();
   private currentState: AuthState = {
     session: null,
     user: null,
     loading: true,
   };
+
+  private get supabase() {
+    return sharedSupabase;
+  }
 
   constructor() {}
 
@@ -44,13 +47,15 @@ export class MobileAuthService {
       });
     });
 
-    this.supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
-      this.updateState({
-        session,
-        user: session?.user || null,
-        loading: false,
+    if (this.supabase?.auth?.onAuthStateChange) {
+      this.supabase.auth.onAuthStateChange((_event: string, session: Session | null) => {
+        this.updateState({
+          session,
+          user: session?.user || null,
+          loading: false,
+        });
       });
-    });
+    }
 
     // Process initial URL after setting up listeners to avoid race conditions
     const initialUrl = await Linking.getInitialURL();
@@ -60,8 +65,12 @@ export class MobileAuthService {
     }
 
     // If no deep link was handled, get the session from storage as the final step
-    const { data: { session } } = await this.supabase.auth.getSession();
-    this.updateState({ session, user: session?.user || null, loading: false });
+    if (this.supabase?.auth?.getSession) {
+      const { data: { session } } = await this.supabase.auth.getSession();
+      this.updateState({ session, user: session?.user || null, loading: false });
+    } else {
+      this.updateState({ loading: false });
+    }
   }
 
   private updateState(newState: Partial<AuthState>): void {
@@ -177,12 +186,11 @@ export class MobileAuthService {
   }
 
   async completeAuthFromUrl(url: string): Promise<boolean> {
-    const parsedUrl = new URL(url);
-    const params = new URLSearchParams(
-      [parsedUrl.searchParams.toString(), parsedUrl.hash.replace(/^#/, '')]
-        .filter(Boolean)
-        .join('&'),
-    );
+    const queryString = url.includes('?') ? url.split('?')[1].split('#')[0] : '';
+    const hashString = url.includes('#') ? url.split('#')[1] : '';
+    const combined = [queryString, hashString].filter(Boolean).join('&');
+    const params = new URLSearchParams(combined);
+
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
     const errorCode = params.get('error') || params.get('error_code');
@@ -211,7 +219,7 @@ export class MobileAuthService {
     if (error) {
       throw error;
     }
-    if (!data.session) {
+    if (!data?.session) {
       return false;
     }
 
@@ -293,15 +301,15 @@ export class MobileAuthService {
     return error ? { error } : {};
   }
 
-   async updatePhone(newPhone: string): Promise<{ error?: AuthError }> {
-     const { error } = await this.supabase.auth.updateUser({ phone: newPhone });
-     return error ? { error } : {};
-   }
+  async updatePhone(newPhone: string): Promise<{ error?: AuthError }> {
+    const { error } = await this.supabase.auth.updateUser({ phone: newPhone });
+    return error ? { error } : {};
+  }
 
-   async updateUser(data: AuthMetadata): Promise<{ error?: AuthError }> {
-     const { error } = await this.supabase.auth.updateUser({ data });
-     return error ? { error } : {};
-   }
+  async updateUser(data: AuthMetadata): Promise<{ error?: AuthError }> {
+    const { error } = await this.supabase.auth.updateUser({ data });
+    return error ? { error } : {};
+  }
 
   async resetPassword(email: string): Promise<{ error?: AuthError }> {
     const { error } = await this.supabase.auth.resetPasswordForEmail(normalizeEmail(email), {

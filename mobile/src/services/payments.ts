@@ -19,6 +19,8 @@ export interface PaymentMethod {
   type: string | null;
   provider: string | null;
   token_reference: string | null;
+  brand?: string;
+  last4?: string;
   isDefault: boolean;
   status: string | null;
   createdAt: string | null;
@@ -79,7 +81,7 @@ class PaymentService {
       }
       const data = response.data;
       const available = Number(data.balance ?? 0);
-      const pending = Number(data.pendingBalance ?? 0);
+      const pending = Number(data.pending_balance ?? data.pendingBalance ?? 0);
       return {
         available,
         pending,
@@ -99,16 +101,19 @@ class PaymentService {
 
       return (response.data.methods ?? []).map((row): PaymentMethod => {
         const method = row as Record<string, unknown>;
+        const tokenRef = String(method.token_reference ?? '');
         return {
           id: String(method.id ?? method.payment_method_id ?? ''),
           payment_method_id: String(method.payment_method_id ?? method.id ?? ''),
-          type: method.method_type as string | null,
+          type: (method.method_type ?? method.type) as string | null,
           provider: String(method.provider ?? null),
-          token_reference: String(method.token_reference ?? null),
-          isDefault: Boolean(method.is_default),
+          token_reference: tokenRef || null,
+          brand: (method.brand as string) ?? (method.provider as string) ?? undefined,
+          last4: (method.last4 as string) ?? (tokenRef.replace(/\D/g, '') || undefined),
+          isDefault: Boolean(method.is_default ?? method.isDefault),
           status: String(method.status ?? 'active'),
-          createdAt: String(method.created_at ?? null),
-          updatedAt: String(method.updated_at ?? null),
+          createdAt: String(method.created_at ?? method.createdAt ?? null),
+          updatedAt: String(method.updated_at ?? method.updatedAt ?? null),
         };
       });
     } catch (error) {
@@ -297,7 +302,7 @@ export async function createMobilePaymentSheet(params: {
   currency: string;
   metadata?: Record<string, unknown>;
 }): Promise<{ clientSecret: string; paymentId?: string }> {
-  const session = await createTopUpSession({ userId, amount });
+  const session = await createTopUpSession({ userId: params.userId, amount: params.amount });
   if (!session.checkoutUrl) {
     throw new Error('No checkout URL returned');
   }

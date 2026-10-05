@@ -23,7 +23,9 @@ const mockSupabaseAuth = {
 
 const mockFunctionsInvoke = jest.fn().mockResolvedValue({ data: null, error: null });
 
-jest.mock('../lib/config', () => ({
+jest.mock('../lib/config', () => {
+  console.error('MOCK_FACTORY_CONFIG:', typeof mockSupabaseAuth, typeof mockSupabaseAuth?.signInWithPassword);
+  return ({
   waselMobileConfig: {
     hasSupabase: true,
     authRedirectUrl: 'wasel://auth/callback',
@@ -32,7 +34,8 @@ jest.mock('../lib/config', () => ({
     auth: mockSupabaseAuth,
     functions: { invoke: mockFunctionsInvoke },
   },
-}));
+  });
+});
 
 jest.mock('./biometricAuth', () => ({
   biometricAuth: {

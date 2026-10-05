@@ -1,7 +1,34 @@
+const { TextEncoder, TextDecoder } = require('util');
+const { URL, URLSearchParams } = require('url');
+
+if (typeof globalThis.TextEncoder === 'undefined') {
+  globalThis.TextEncoder = TextEncoder;
+}
+if (typeof global.TextEncoder === 'undefined') {
+  global.TextEncoder = TextEncoder;
+}
+if (typeof globalThis.TextDecoder === 'undefined') {
+  globalThis.TextDecoder = TextDecoder;
+}
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = TextDecoder;
+}
+if (typeof globalThis.URL === 'undefined') {
+  globalThis.URL = URL;
+}
+if (typeof global.URL === 'undefined') {
+  global.URL = URL;
+}
+if (typeof globalThis.URLSearchParams === 'undefined') {
+  globalThis.URLSearchParams = URLSearchParams;
+}
+if (typeof global.URLSearchParams === 'undefined') {
+  global.URLSearchParams = URLSearchParams;
+}
+
 import '@testing-library/react-native/extend-expect';
 
-console.log('jest.setup.js BEFORE polyfill: crypto.randomUUID type:', typeof globalThis.crypto?.randomUUID);
-console.log('jest.setup.js BEFORE polyfill: fetch type:', typeof globalThis.fetch);
+process.env.EXPO_PUBLIC_API_URL = 'https://api.wasel14.online';
 
 if (typeof globalThis.crypto !== 'undefined' && !globalThis.crypto.randomUUID) {
   try {
@@ -35,9 +62,6 @@ if (typeof globalThis.fetch === 'undefined') {
     global.fetch = fetchPolyfill;
   }
 }
-
-console.log('jest.setup.js AFTER polyfill: crypto.randomUUID type:', typeof globalThis.crypto?.randomUUID);
-console.log('jest.setup.js AFTER polyfill: fetch type:', typeof globalThis.fetch);
 
 jest.mock('react-native-screens', () => ({
   ...jest.requireActual('react-native-screens'),
@@ -73,12 +97,6 @@ jest.mock('expo-device', () => ({
   getDeviceNameAsync: jest.fn().mockResolvedValue('TestDevice'),
   osName: 'iOS',
   osVersion: '17.0',
-}));
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: () => null,
-  FontAwesome: () => null,
-  MaterialIcons: () => null,
 }));
 
 jest.mock('@expo/vector-icons', () => ({

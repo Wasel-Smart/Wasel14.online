@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, View, AppState } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import {
   InfoCard,
@@ -39,21 +39,9 @@ const WalletScreen = React.memo(function WalletScreen() {
     setBalance(result.available);
   }, [userId]);
 
-  const refreshOnForeground = useCallback(async () => {
-    if (!userId) return;
-    const result = await paymentService.getWalletBalance(userId);
-    setBalance(result.available);
-  }, [userId]);
-
   useEffect(() => {
     void loadBalance();
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        void refreshOnForeground();
-      }
-    });
-    return () => sub.remove();
-  }, [loadBalance, refreshOnForeground]);
+  }, [loadBalance]);
 
   const startPayment = useCallback(async () => {
     if (!validPayment) {
@@ -196,3 +184,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
 });
+
+export default WalletScreen;

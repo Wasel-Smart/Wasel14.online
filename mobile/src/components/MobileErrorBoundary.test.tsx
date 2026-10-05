@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 import { MobileErrorBoundary } from '../components/MobileErrorBoundary';
 
 const originalConsoleError = console.error;
@@ -18,21 +18,21 @@ describe('MobileErrorBoundary', () => {
   });
 
   it('renders children when there is no error', () => {
-    render(
+    const { toJSON } = render(
       <MobileErrorBoundary>
         <React.Fragment>Child content</React.Fragment>
       </MobileErrorBoundary>,
     );
-    expect(JSON.stringify(screen.toJSON())).toContain('Child content');
+    expect(JSON.stringify(toJSON())).toContain('Child content');
   });
 
   it('renders custom fallback when provided', () => {
-    render(
+    const { toJSON } = render(
       <MobileErrorBoundary fallback={<React.Fragment>Custom fallback</React.Fragment>}>
         <React.Fragment>Child content</React.Fragment>
       </MobileErrorBoundary>,
     );
-    expect(JSON.stringify(screen.toJSON())).toContain('Child content');
+    expect(JSON.stringify(toJSON())).toContain('Child content');
   });
 
   it('calls onError callback when provided', () => {
@@ -46,11 +46,11 @@ describe('MobileErrorBoundary', () => {
   });
 
   it('renders retry and support buttons in normal state', () => {
-    render(
+    const { toJSON } = render(
       <MobileErrorBoundary>
         <React.Fragment>Child content</React.Fragment>
       </MobileErrorBoundary>,
     );
-    expect(JSON.stringify(screen.toJSON())).toContain('Child content');
+    expect(JSON.stringify(toJSON())).toContain('Child content');
   });
 });

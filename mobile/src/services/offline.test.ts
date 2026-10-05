@@ -171,16 +171,36 @@ describe('OfflineService', () => {
           notes: 'n',
         },
       });
-      global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+
+      const tripsResponse = {
+        ok: true,
+        status: 200,
+        json: async () => [{ id: 'trip-abc' }],
+      };
+      const bookingsResponse = {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+        statusText: 'OK',
+      };
+      let callCount = 0;
+      global.fetch = jest.fn().mockImplementation(() => {
+        callCount++;
+        return Promise.resolve(callCount === 1 ? tripsResponse : bookingsResponse);
+      });
 
       await offlineService.syncOfflineQueue();
 
-      const [, options] = (global.fetch as jest.Mock).mock.calls[0];
-      const body = JSON.parse(options.body);
-      expect(body.from).toBe('Amman');
-      expect(body.to).toBe('Zarqa');
-      expect(body.origin_lat).toBe(31.9);
-      expect(body.dest_lat).toBe(32.0);
+      const calls = (global.fetch as jest.Mock).mock.calls;
+      expect(calls[0][0]).toMatch(/trips\/search/);
+
+      const [, bookingOptions] = calls[1];
+      const body = JSON.parse(bookingOptions.body);
+      expect(body.trip_id).toBe('trip-abc');
+      expect(body.seats_requested).toBe(2);
+      expect(body.pickup_stop).toBe('Amman');
+      expect(body.dropoff_stop).toBe('Zarqa');
+      expect((await offlineService.getStats()).queueSize).toBe(0);
     });
 
     it('fails and retries a RIDE_CANCEL queued without a bookingId or rideId', async () => {

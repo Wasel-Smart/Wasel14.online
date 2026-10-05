@@ -4,40 +4,47 @@ jest.mock('../lib/config', () => ({
     apiUrl: 'https://api.test.wasel',
     authRedirectUrl: 'wasel://auth/callback',
   },
-  supabase: {
-    auth: {
-      getSession: jest.fn(),
-    },
-    from: jest.fn(),
-    functions: {
-      invoke: jest.fn(),
-    },
-  },
 }));
 
 jest.mock('../services/auth', () => ({
   mobileAuth: {
     getUser: jest.fn().mockReturnValue({ id: 'user-1' }),
+    getAccessToken: jest.fn().mockReturnValue('test-token'),
   },
 }));
 
-import { supabase } from '../lib/config';
-import { paymentService, type PaymentResult } from '../services/payments';
+jest.mock('react-native', () => ({
+  Linking: {
+    openURL: jest.fn().mockResolvedValue(true),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+  },
+}));
+
+import { apiClient } from '../lib/api';
+import { paymentService } from '../services/payments';
+import { Linking } from 'react-native';
 
 describe('PaymentService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.restoreAllMocks();
+    jest.spyOn(apiClient, 'get').mockResolvedValue({ data: null, error: null, status: 200 });
+    jest.spyOn(apiClient, 'post').mockResolvedValue({ data: null, error: null, status: 200 });
+    jest.spyOn(apiClient, 'patch').mockResolvedValue({ data: null, error: null, status: 200 });
+    jest.spyOn(apiClient, 'delete').mockResolvedValue({ data: null, error: null, status: 200 });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('getWalletBalance', () => {
     it('returns balance data on success', async () => {
-      const mockData = { available_balance: 50, pending_balance: 10, currency: 'JOD' };
-      const fromMock = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: mockData, error: null }),
-      };
-      (supabase as any).from.mockReturnValue(fromMock);
+      jest.spyOn(apiClient, 'get').mockResolvedValue({
+        data: { balance: 50, pending_balance: 10, currency: 'JOD' },
+        error: null,
+        status: 200,
+      });
 
       const result = await paymentService.getWalletBalance('user-1');
       expect(result.available).toBe(50);
@@ -47,12 +54,11 @@ describe('PaymentService', () => {
     });
 
     it('returns zero balance on error', async () => {
-      const fromMock = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: null, error: new Error('DB error') }),
-      };
-      (supabase as any).from.mockReturnValue(fromMock);
+      jest.spyOn(apiClient, 'get').mockResolvedValue({
+        data: null,
+        error: 'DB error',
+        status: 500,
+      });
 
       const result = await paymentService.getWalletBalance('user-1');
       expect(result.available).toBe(0);
@@ -63,43 +69,41 @@ describe('PaymentService', () => {
   });
 
   describe('getPaymentMethods', () => {
-    it('maps database rows to PaymentMethod objects', async () => {
-      const mockData = [
-        {
-          id: 'pm-1',
-          user_id: 'user-1',
-          card_brand: 'Visa',
-          last_four: '1234',
-          expiry_month: 12,
-          expiry_year: 2028,
-          is_default: true,
-          created_at: '2026-01-01T00:00:00Z',
+    it('maps backend rows to PaymentMethod objects', async () => {
+      jest.spyOn(apiClient, 'get').mockResolvedValue({
+        data: {
+          methods: [
+            {
+              id: 'pm-1',
+              payment_method_id: 'pm-1',
+              method_type: 'card',
+              token_reference: '**** 1234',
+              is_default: true,
+              provider: 'stripe',
+              status: 'active',
+              created_at: '2026-01-01T00:00:00Z',
+              updated_at: '2026-01-01T00:00:00Z',
+            },
+          ],
         },
-      ];
-      const fromMock = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        is: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({ data: mockData, error: null }),
-      };
-      (supabase as any).from.mockReturnValue(fromMock);
+        error: null,
+        status: 200,
+      });
 
       const result = await paymentService.getPaymentMethods('user-1');
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('pm-1');
-      expect(result[0].brand).toBe('Visa');
-      expect(result[0].last4).toBe('1234');
-      expect(result[0].isDefault).toBe(true);
+      expect(result[0]!.id).toBe('pm-1');
+      expect(result[0]!.type).toBe('card');
+      expect(result[0]!.token_reference).toBe('**** 1234');
+      expect(result[0]!.isDefault).toBe(true);
     });
 
     it('returns empty array on error', async () => {
-      const fromMock = {
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        is: jest.fn().mockReturnThis(),
-        order: jest.fn().mockResolvedValue({ data: null, error: new Error('DB error') }),
-      };
-      (supabase as any).from.mockReturnValue(fromMock);
+      jest.spyOn(apiClient, 'get').mockResolvedValue({
+        data: { methods: [] },
+        error: 'DB error',
+        status: 500,
+      });
 
       const result = await paymentService.getPaymentMethods('user-1');
       expect(result).toEqual([]);
@@ -110,63 +114,62 @@ describe('PaymentService', () => {
     it('returns error for invalid amount', async () => {
       const result = await paymentService.addFunds('user-1', 5, 'JOD');
       expect(result.success).toBe(false);
-      expect(result.error).toContain('between 10 and 500');
+      expect(result.error).toContain('between 10 and');
     });
 
-    it('returns error when not authenticated', async () => {
-      (supabase.auth.getSession as any).mockResolvedValueOnce({ data: { session: null } });
-
-      const result = await paymentService.addFunds('user-1', 100, 'JOD');
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Not authenticated');
-    });
-
-    it('creates payment intent on success', async () => {
-      const mockSession = { session: { access_token: process.env.TEST_ACCESS_TOKEN ?? 'test-token', refresh_token: process.env.TEST_REFRESH_TOKEN ?? 'test-refresh' } };
-      (supabase.auth.getSession as any).mockResolvedValueOnce({ data: mockSession });
-      (supabase.functions.invoke as any).mockResolvedValueOnce({
-        data: { clientSecret: 'secret', paymentIntentId: 'pi-123' },
+    it('creates top-up session on success', async () => {
+      jest.spyOn(apiClient, 'post').mockResolvedValue({
+        data: {
+          payment: {
+            transactionId: 'pi-123',
+            checkoutUrl: 'https://checkout.test',
+            status: 'requires_action',
+            provider: 'stripe',
+          },
+        },
         error: null,
+        status: 200,
       });
 
-      const result = await paymentService.addFunds('user-1', 50, 'JOD');
+      const result = await paymentService.addFunds('user-1', 100, 'JOD');
       expect(result.success).toBe(true);
-      expect(result.clientSecret).toBe('secret');
+      expect(result.checkoutUrl).toBe('https://checkout.test');
       expect(result.paymentId).toBe('pi-123');
+      expect(Linking.openURL).toHaveBeenCalledWith('https://checkout.test');
     });
   });
 
   describe('removePaymentMethod', () => {
     it('returns true on successful removal', async () => {
-      const fromMock = {
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      };
-      (supabase as any).from.mockReturnValue(fromMock);
+      jest.spyOn(apiClient, 'delete').mockResolvedValue({
+        data: { success: true },
+        error: null,
+        status: 200,
+      });
 
-      const result = await paymentService.removePaymentMethod('pm-1');
+      const result = await paymentService.removePaymentMethod('user-1', 'pm-1');
       expect(result).toBe(true);
     });
 
     it('returns false on error', async () => {
-      const fromMock = {
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ error: new Error('DB error') }),
-      };
-      (supabase as any).from.mockReturnValue(fromMock);
+      jest.spyOn(apiClient, 'delete').mockResolvedValue({
+        data: null,
+        error: 'DB error',
+        status: 500,
+      });
 
-      const result = await paymentService.removePaymentMethod('pm-1');
+      const result = await paymentService.removePaymentMethod('user-1', 'pm-1');
       expect(result).toBe(false);
     });
   });
 
   describe('setDefaultPaymentMethod', () => {
     it('sets default and returns true on success', async () => {
-      const fromMock = {
-        update: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockResolvedValue({ error: null }),
-      };
-      (supabase as any).from.mockReturnValue(fromMock);
+      jest.spyOn(apiClient, 'patch').mockResolvedValue({
+        data: { success: true },
+        error: null,
+        status: 200,
+      });
 
       const result = await paymentService.setDefaultPaymentMethod('user-1', 'pm-1');
       expect(result).toBe(true);

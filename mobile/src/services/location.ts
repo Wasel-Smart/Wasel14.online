@@ -427,7 +427,7 @@ export class LocationTrackingService {
         const tripId = desc.data.tripId as string;
         try {
           const token = mobileAuth.getAccessToken();
-          const fetchUrl = `${apiUrl}/rides/${encodeURIComponent(tripId)}/live`;
+          const fetchUrl = `${apiUrl}/live-trip`;
           if (!isValidApiUrl(fetchUrl)) {
             console.warn('[LocationTracking] Skipping REST poll for invalid URL');
             continue;
@@ -436,20 +436,29 @@ export class LocationTrackingService {
             headers: { Authorization: `Bearer ${token ?? ''}` },
           });
           if (!res.ok) continue;
-          const data = await res.json() as {
-            driverId?: string; driverLocation?: { latitude: number; longitude: number; heading: number | null };
+          const responseJson = await res.json() as {
+            snapshot?: {
+              bookingId?: string;
+              driver?: { id: string };
+              driverPosition?: { lat: number; lng: number };
+            } | null;
           };
-          if (data.driverLocation && data.driverId) {
+          const snapshot = responseJson.snapshot;
+          const driverId = snapshot?.driver?.id;
+          const driverPos = snapshot?.driverPosition;
+          if (driverPos && driverId) {
             const loc: DriverLocation = {
-              driverId: data.driverId,
-              latitude: data.driverLocation.latitude,
-              longitude: data.driverLocation.longitude,
-              heading: data.driverLocation.heading,
+              driverId: driverId,
+              latitude: driverPos.lat,
+              longitude: driverPos.lng,
+              heading: 0,
               status: 'busy',
               timestamp: Date.now(),
             };
-            this.dispatch(data.driverId, loc);
-            this.dispatch(`trip:${tripId}`, loc);
+            this.dispatch(driverId, loc);
+            if (tripId) {
+              this.dispatch(`trip:${tripId}`, loc);
+            }
           }
         } catch {
           // Non-fatal — next poll will retry

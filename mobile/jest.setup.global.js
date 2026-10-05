@@ -1,5 +1,7 @@
 const originalFetch = globalThis.fetch;
 
+process.env.EXPO_PUBLIC_API_URL = 'https://api.wasel14.online';
+
 const mockFetch = () => Promise.reject(new Error('fetch is not configured for this test'));
 
 Object.defineProperty(globalThis, 'fetch', {
