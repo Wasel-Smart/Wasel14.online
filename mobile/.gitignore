@@ -1,0 +1,33 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+google-play-service-account.json
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.expo/
+android/build/
+android/app/build/
+android/.gradle/
+ios/Pods/
+ios/build/
+
+# Test output
+coverage/
+.jest-localstorage
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

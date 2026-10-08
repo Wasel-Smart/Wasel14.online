@@ -186,7 +186,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const outgoingCookies: string[] = [];
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookieOptions: { name: COOKIE_NAME },
+    cookieOptions: { name: COOKIE_NAME, path: '/', sameSite: 'lax', secure: true },
     cookies: {
       getAll() {
         return Object.entries(incomingCookies).map(([name, value]) => ({ name, value }));

@@ -180,7 +180,16 @@ const getSupabaseClient = () => {
 
   try {
     const client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
-      cookieOptions: { name: AUTH_COOKIE_NAME },
+      cookieOptions: {
+        name: AUTH_COOKIE_NAME,
+        path: '/',
+        // Lax (not Strict): the OAuth/email-link redirect back from the provider is a
+        // cross-site top-level navigation and must still carry the PKCE verifier cookie.
+        sameSite: 'lax',
+        // Secure on https (production). Plain-http origins reject Secure cookies in some
+        // browsers, so only local http dev falls back to non-Secure.
+        secure: typeof window !== 'undefined' && window.location.protocol === 'https:',
+      },
       auth: {
         flowType: 'pkce',
         autoRefreshToken: true,

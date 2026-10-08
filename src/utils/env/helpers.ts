@@ -47,6 +47,14 @@ export function resolveAuthRedirectOrigin(): string {
     if (current.host === configured.host) {
       return origin;
     }
+    // apex <-> www of the same site (wasel14.online vs www.wasel14.online): stay on
+    // the host the user started on. The PKCE code-verifier cookie is host-scoped, so
+    // bouncing a visitor from one host to the other makes the code exchange fail
+    // with a missing-verifier error. Both hosts are in the Supabase redirect allow-list.
+    const stripWww = (host: string) => host.toLowerCase().replace(/^www\./, '');
+    if (stripWww(current.hostname) === stripWww(configured.hostname)) {
+      return origin;
+    }
     return configured.origin;
   } catch {
     return fallback;

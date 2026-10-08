@@ -44,6 +44,12 @@ enabled = true
 enabled = true
 site_url = "https://www.wasel14.online"
 additional_redirect_urls = [
+  # Explicit production callbacks (also add these in Dashboard -> Authentication ->
+  # URL Configuration -> Redirect URLs; `supabase config push` syncs this list).
+  "https://www.wasel14.online/app/auth/callback",
+  "https://wasel14.online/app/auth/callback",
+  "https://www.wasel14.online/api/auth/callback",
+  "https://wasel14.online/api/auth/callback",
   "https://wasel14.online/**",
   "https://www.wasel14.online/**",
   "http://localhost:3000/**",
