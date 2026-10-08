@@ -84,6 +84,8 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      const errorId = this.state.error ? `err_${Math.random().toString(36).slice(2, 8)}` : null;
+
       return (
         <div className="min-h-[var(--app-min-height)] flex items-center justify-center bg-gray-50 px-4">
           <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
@@ -110,6 +112,21 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-gray-600 text-center mb-6">
               {tx('errorBoundary.we_re_sorry_for_the_inconvenience_please_try_refreshing_the_page')}
             </p>
+
+            {errorId ? (
+              <div className="flex items-center justify-center gap-2 mb-4 text-xs text-gray-500 font-mono">
+                <span>{tx('errorBoundary.error_id')} {errorId}</span>
+                <button
+                  onClick={() => void navigator.clipboard?.writeText(errorId)}
+                  className="text-blue-600 hover:text-blue-800"
+                  title={tx('errorBoundary.copy')}
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m2 4v6a2 2 0 01-2 2h-6a2 2 0 01-2-2v-6a2 2 0 012-2h6a2 2 0 012 2z" />
+                  </svg>
+                </button>
+              </div>
+            ) : null}
 
             {import.meta.env?.DEV && this.state.error && (
               <details className="mb-4 p-4 bg-gray-50 rounded border border-gray-200">
@@ -323,6 +340,8 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, AppErro
       return this.props.children;
     }
 
+    const errorId = `err_${Math.random().toString(36).slice(2, 8)}`;
+
     return (
       <main className="flex min-h-[var(--app-min-height)] items-center justify-center bg-background p-6 text-foreground">
         <WaselCard variant="elevated" style={{ width: '100%', maxWidth: '32rem' }}>
@@ -334,9 +353,18 @@ export class AppErrorBoundary extends Component<{ children: ReactNode }, AppErro
               {tx('appErrorBoundary.app_error')}
             </h2>
             <p className="text-sm text-muted-foreground">{this.state.error}</p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {tx('appErrorBoundary.error_id')} {errorId}
+            </p>
             <WaselButton onClick={() => window.location.reload()}>
               {tx('appErrorBoundary.reload')}
             </WaselButton>
+            <button
+              onClick={() => (window.location.href = '/')}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {tx('errors.goHome')}
+            </button>
           </div>
         </WaselCard>
       </main>

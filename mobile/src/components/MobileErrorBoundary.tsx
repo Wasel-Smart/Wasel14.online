@@ -53,6 +53,19 @@ export class MobileErrorBoundary extends Component<Props, State> {
     this.setState({ hasError: false, error: null, errorId: null });
   };
 
+  handleReload = (): void => {
+    // Trigger a full app reload via the Expo/React Native runtime.
+    // In Expo/React Native, there is no window.location.reload(), so we
+    // use the global reload mechanism exposed by the bundler/runtime.
+    const globalWithReload = globalThis as unknown as { reload?: () => void };
+    if (typeof globalWithReload.reload === 'function') {
+      globalWithReload.reload();
+      return;
+    }
+    // Fallback: reset to a clean state and let the app re-mount.
+    this.setState({ hasError: false, error: null, errorId: null });
+  };
+
   handleContactSupport = (): void => {
     const { errorId } = this.state;
     const subject = encodeURIComponent(`Support request — error ${errorId ?? 'unknown'}`);
@@ -85,24 +98,33 @@ export class MobileErrorBoundary extends Component<Props, State> {
               {error.message}
             </Text>
           ) : null}
-          <View style={styles.buttonRow}>
+<View style={styles.buttonRow}>
             <TouchableOpacity
               style={[styles.button, styles.retryButton]}
               onPress={this.handleReset}
               accessible
               accessibilityRole="button"
-              accessibilityLabel="حاول مرة ثانية"
+              accessibilityLabel="Try again"
             >
-              <Text style={styles.buttonText}>حاول مرة ثانية</Text>
+              <Text style={styles.buttonText}>Try again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.reloadButton]}
+              onPress={this.handleReload}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="Reload app"
+            >
+              <Text style={styles.buttonText}>Reload</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.supportButton]}
               onPress={this.handleContactSupport}
               accessible
               accessibilityRole="button"
-              accessibilityLabel="اتصل بالدعم"
+              accessibilityLabel="Contact support"
             >
-              <Text style={styles.buttonText}>دعم</Text>
+              <Text style={styles.buttonText}>Support</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -166,6 +188,9 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: colors.teal,
+  },
+  reloadButton: {
+    backgroundColor: colors.warning,
   },
   supportButton: {
     backgroundColor: colors.primary,
