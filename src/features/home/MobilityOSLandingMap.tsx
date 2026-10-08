@@ -307,6 +307,10 @@ export function MobilityOSLandingMap({
   }, [routes]);
 
   useEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const render = (time: number) => {
       if (!visibleRef.current) {
         frameRef.current = null;
@@ -319,7 +323,12 @@ export function MobilityOSLandingMap({
         return;
       }
 
-      const dpr = window.devicePixelRatio || 1;
+      // Cap DPR at 2 — 3× on high-end Android wastes GPU budget on a canvas
+      // never viewed at native resolution.
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // On small screens reduce particle counts and skip expensive shadow
+      // layers to keep the frame budget under 16 ms on mid-range devices.
+      const isMobile = sizeRef.current.width < 600;
       const { width, height } = sizeRef.current;
 
       focusStrengthRef.current +=
@@ -365,9 +374,8 @@ export function MobilityOSLandingMap({
       ctx.fillStyle = innerGlow;
       ctx.fillRect(0, 0, width, height);
 
-      // Subtle ambient network dots. Their gentle breathing gives the empty space
-      // depth without competing with the corridor signals.
-      for (let i = 0; i < 24; i++) {
+      // Subtle ambient network dots — skip on mobile to save fill-rate.
+      for (let i = 0; i < (isMobile ? 0 : 24); i++) {
         const ax = width * (0.1 + ((i * 0.037) % 0.8));
         const ay = height * (0.08 + ((i * 0.053) % 0.84)) + Math.sin(time * 0.00055 + i) * 1.6;
         const ar = 1.2 + ((i * 0.7) % 2.4) + Math.sin(time * 0.001 + i) * 0.35;
@@ -640,9 +648,10 @@ export function MobilityOSLandingMap({
 
         // Rider particles
         const riderCount = Math.max(
-          2,
+          isMobile ? 1 : 2,
           Math.round(
-            2 + route.riderFlow * 7 + (isFocused ? focusPressure * 3 + focusUtilization * 2 : 0),
+            (isMobile ? 1 : 2) + route.riderFlow * (isMobile ? 4 : 7) +
+              (isFocused ? focusPressure * 3 + focusUtilization * 2 : 0),
           ),
         );
         for (let i = 0; i < riderCount; i += 1) {
@@ -662,7 +671,8 @@ export function MobilityOSLandingMap({
             : isFocused
               ? MAP_LAYER.routeNameActive
               : MAP_LAYER.routeName;
-          ctx.shadowBlur = isBus ? (isFocused ? 22 : 16) : isFocused ? 18 : 14;
+          // Skip expensive shadow blur on mobile to stay within frame budget.
+          ctx.shadowBlur = isMobile ? 0 : isBus ? (isFocused ? 22 : 16) : isFocused ? 18 : 14;
           ctx.shadowColor = isBus
             ? withAlpha(BUS_GREEN, isFocused ? 0.88 : 0.68)
             : withAlpha(isFocused ? focusStroke : FLOW, isFocused ? 0.78 : 0.6);
@@ -674,7 +684,8 @@ export function MobilityOSLandingMap({
         const parcelCount = Math.max(
           1,
           Math.round(
-            1 + route.parcelFlow * 4 + (isFocused ? focusUtilization * 3 + focusStrength * 1.4 : 0),
+            1 + route.parcelFlow * (isMobile ? 2 : 4) +
+              (isFocused ? focusUtilization * 3 + focusStrength * 1.4 : 0),
           ),
         );
         for (let i = 0; i < parcelCount; i += 1) {
@@ -791,7 +802,12 @@ export function MobilityOSLandingMap({
         }
       });
 
-      frameRef.current = requestAnimationFrame(render);
+      // Reduced-motion: render one static frame then stop the loop.
+      if (!prefersReducedMotion) {
+        frameRef.current = requestAnimationFrame(render);
+      } else {
+        frameRef.current = null;
+      }
     };
 
     renderRef.current = render;

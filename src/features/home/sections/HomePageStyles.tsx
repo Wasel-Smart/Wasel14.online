@@ -1070,8 +1070,20 @@ export function HomePageStyles () {
         gap: 14px;
       }
 
-      /* single definition — section, nav, hero and CTA rules. Do not re-declare
-         these earlier in this file; duplicates silently override each other. */
+      .wasel-home-hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 40px;
+        align-items: start;
+        padding: 40px 0 32px;
+        /* Hero is above the fold — do NOT apply content-visibility here;
+           it would delay LCP paint. Sections below the fold get it instead. */
+      }
+
+      .wasel-home-hero-copy {
+        padding: 8px 0 18px;
+      }
+
       .wasel-home-section {
         margin-top: 36px;
         content-visibility: auto;

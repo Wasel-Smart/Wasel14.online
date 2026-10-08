@@ -457,7 +457,21 @@ const WaselRootInner = memo( () => {
           </main>
         </div>
 
-        <Suspense fallback={ null }>
+        <Suspense fallback={
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: `calc(56px + env(safe-area-inset-bottom, 0px))`,
+              background: 'rgba(8,29,57,0.96)',
+              borderTop: '1px solid rgba(0,229,255,0.16)',
+              zIndex: 100,
+            }}
+          />
+        }>
           <MobileBottomNav language={ language } />
         </Suspense>
       </div>

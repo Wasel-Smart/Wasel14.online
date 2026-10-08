@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense } from 'react';
+﻿import { lazy, Suspense, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   ArrowRight,
@@ -16,6 +16,7 @@ import { WaselLogo } from '../../../components/wasel-ui';
 import { WaselButton } from '../../../components/wasel-ui/WaselButton';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { tx } from '../../../locales/tx';
+import { API_URL } from '../../../services/core';
 
 import { C, InlineCurrencySwitcher } from '../HomePageShared';
 
@@ -51,24 +52,65 @@ const heroProof = [
   },
 ] as const;
 
-const liveTimeline = [
-  { labelKey: 'homeHeroSection.timeline_seat_price_label', value: '8.00 JOD', accent: C.cyan },
-  { labelKey: 'homeHeroSection.timeline_driver_trust_label', value: '4.9 rating', accent: C.green },
-  { labelKey: 'homeHeroSection.timeline_parcel_option_label', value: '1 slot', accent: C.gold },
-  { labelKey: 'homeHeroSection.timeline_bus_fallback_label', value: '18:40', accent: C.blueLight },
-] as const;
+interface LivePreviewData {
+  priceJod: string;
+  rating: string;
+  parcelSlots: string;
+  nextDeparture: string;
+  utilization: number;
+}
 
-const liveTimelineAr = [
-  { labelKey: 'homeHeroSection.timeline_seat_price_label', value: '8.00 د.أ', accent: C.cyan },
-  { labelKey: 'homeHeroSection.timeline_driver_trust_label', value: 'تقييم 4.9', accent: C.green },
-  { labelKey: 'homeHeroSection.timeline_parcel_option_label', value: 'مكان واحد', accent: C.gold },
-  { labelKey: 'homeHeroSection.timeline_bus_fallback_label', value: '18:40', accent: C.blueLight },
-] as const;
+const STATIC_PREVIEW: LivePreviewData = {
+  priceJod: '8.00 JOD',
+  rating: '4.9',
+  parcelSlots: '1',
+  nextDeparture: '18:40',
+  utilization: 0.78,
+};
 
+function useLiveRoutePreview(): LivePreviewData {
+  const [data, setData] = useState<LivePreviewData>(STATIC_PREVIEW);
+
+  useEffect(() => {
+    if (!API_URL) return;
+    const controller = new AbortController();
+    fetch(`${API_URL}/mobility-os/public-snapshot`, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then((json: { corridors?: Array<{ priceJod?: number; demand?: number; seatsTotal?: number; seatsBooked?: number }> } | null) => {
+        const first = json?.corridors?.[0];
+        if (!first) return;
+        const util = first.seatsTotal ? (first.seatsBooked ?? 0) / first.seatsTotal : 0.78;
+        const slots = Math.max(0, (first.seatsTotal ?? 1) - (first.seatsBooked ?? 0));
+        setData({
+          priceJod: first.priceJod != null ? `${first.priceJod.toFixed(2)} JOD` : STATIC_PREVIEW.priceJod,
+          rating: STATIC_PREVIEW.rating,
+          parcelSlots: String(slots),
+          nextDeparture: STATIC_PREVIEW.nextDeparture,
+          utilization: util,
+        });
+      })
+      .catch(() => { /* keep static fallback */ });
+    return () => controller.abort();
+  }, []);
+
+  return data;
+}
 
 function ProductCommandPreview ( { ar }: { ar: boolean } ) {
   const { t } = useLanguage();
-  const timeline = ar ? liveTimelineAr : liveTimeline;
+  const live = useLiveRoutePreview();
+
+  const liveTimeline = [
+    { labelKey: 'homeHeroSection.timeline_seat_price_label', value: live.priceJod, accent: C.cyan },
+    { labelKey: 'homeHeroSection.timeline_driver_trust_label', value: ar ? `تقييم ${live.rating}` : `${live.rating} rating`, accent: C.green },
+    { labelKey: 'homeHeroSection.timeline_parcel_option_label', value: ar ? `${live.parcelSlots} مكان` : `${live.parcelSlots} slot`, accent: C.gold },
+    { labelKey: 'homeHeroSection.timeline_bus_fallback_label', value: live.nextDeparture, accent: C.blueLight },
+  ];
+
+  const timeline = liveTimeline;
 
   return (
     <div
@@ -94,7 +136,7 @@ function ProductCommandPreview ( { ar }: { ar: boolean } ) {
             focusRouteId="amman-aqaba"
             focusLabel={ ar ? 'عمان إلى العقبة' : 'Amman to Aqaba' }
             demandPressure={ 1.62 }
-            utilization={ 0.78 }
+            utilization={ live.utilization }
             preferredHeight={ 330 }
             minimalText
             showOverlay={ false }

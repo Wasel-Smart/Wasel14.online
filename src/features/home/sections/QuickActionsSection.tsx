@@ -1,7 +1,8 @@
 ﻿import { motion } from 'framer-motion';
-import { ArrowRight, Route } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Route } from 'lucide-react';
 import type { QuickAction } from './types';
 import { tx } from '../../../locales/tx';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface QuickActionsSectionProps {
   quickActions: QuickAction[];
@@ -9,6 +10,8 @@ interface QuickActionsSectionProps {
 }
 
 export function QuickActionsSection({ quickActions, onNavigate }: QuickActionsSectionProps) {
+  const { dir } = useLanguage();
+  const ArrowIcon = dir === 'rtl' ? ArrowLeft : ArrowRight;
   return (
     <motion.section initial={false} className="wasel-home-section">
       <div className="wasel-home-section-header">
@@ -53,7 +56,7 @@ export function QuickActionsSection({ quickActions, onNavigate }: QuickActionsSe
 
               <div className="wasel-home-action-cta" style={{ color: action.color }}>
                 {tx('homeSections.quickActionsCTA')}
-                <ArrowRight size={13} />
+                <ArrowIcon size={13} />
               </div>
             </motion.button>
           );
