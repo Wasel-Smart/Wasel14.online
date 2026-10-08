@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, type MouseEvent } from 'react';
 import {
   Calendar,

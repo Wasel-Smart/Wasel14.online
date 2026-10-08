@@ -211,50 +211,50 @@ const HomeScreen = React.memo(() => {
         {/* AI Route Recommendation */}
         <View style={styles.recommendationSection}>
           <SectionHeader
-            eyebrow="Smart suggestion"
-            title="Best option for you now"
-            body="Demand on this route is low. Book now for a better price."
+            eyebrow="اقتراح ذكي"
+            title="أفضل خيار لك الآن"
+            body="الطلب منخفض على هذا المسار. احجز الآن بسعر أفضل."
           />
           <RideCard {...recommendedRide} />
         </View>
 
         {/* Services Section */}
         <SectionHeader
-          eyebrow="Wasel services"
-          title="All mobility and delivery needs"
-          body="Clear, safe services designed for daily use."
+          eyebrow="خدمات واصل"
+          title="كل ا يحتاج التنقل والتوصيل"
+          body="خدمات واضحة وآمنة ومصممة للا استخدام اليومي."
         />
 
         <View style={styles.infoCardsContainer}>
           <InfoCard
             icon="car-sport"
-            title="Trusted rides"
-            body="Find a suitable ride, review driver details, and track the trip until arrival."
+            title="ضاوير موثوقة"
+            body="اعثر على مشوار مناسب، راجع تفاصيل السائق، وatrib الرحل حتى الوصول."
             tone={colors.teal}
           />
           <InfoCard
             icon="cube"
-            title="Package delivery with tracking"
-            body="Create a delivery request and keep track of the package, notes, and receipt records."
+            title="توصيل طرود مع تتبع"
+            body="أنشئ طلب توصيل واحتفظ بحالة الطرد وملاحظاته وسجل الاستلام والسلم."
             tone={colors.blue}
           />
           <InfoCard
             icon="git-network"
-            title="Shared networks and routes"
-            body="Browse active lines and groups for more mobility options."
+            title="شبكة وخطوط مشتركة"
+            body="استعرض الخطوط والمجموعات النشطة للوصول إلى خيارات نقل أكثر."
             tone={colors.green}
           />
           <InfoCard
             icon="shield-checkmark"
-            title="Safety first"
-            body="Quick access to the safety center, trip sharing, and verified account information."
+            title="الأمان أولاً"
+            body="الوصول السريع لمركز الأمان، مشاركة الرحلة، ومعلومات الحساب الموثوقة."
             tone={colors.lilac}
             style={styles.lastCard}
           />
         </View>
 
         <PrimaryButton
-          label="Open Safety Center"
+          label="افتح مركز الأمان"
           icon="shield-checkmark"
           tone={colors.navy}
           onPress={() => navigation.navigate('Safety')}
