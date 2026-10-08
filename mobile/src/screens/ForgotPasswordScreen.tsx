@@ -1,18 +1,23 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import { FormField } from '../components/FormField';
 import {
-  PremiumPanel,
   PrimaryButton,
   ScreenShell,
   SectionHeader,
   StateNotice,
+  TextLink,
 } from '../components/MobilePrimitives';
 import { useAuth } from '../providers/AuthProvider';
-import { colors, radii, spacing } from '../theme';
+import { colors, spacing } from '../theme';
 import { validateEmail } from '../utils/security';
 
 export default function ForgotPasswordScreen() {
   const { resetPassword } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<Record<string, undefined>>>();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,12 +25,21 @@ export default function ForgotPasswordScreen() {
 
   const handleReset = useCallback(async () => {
     setError(null);
-    if (!email.trim()) { setError('أدخل البريد الإلكتروني أولاً.'); return; }
-    if (!validateEmail(email)) { setError('أدخل بريدًا إلكترونيًا صحيحًا.'); return; }
+    if (!email.trim()) {
+      setError('أدخل البريد الإلكتروني أولاً.');
+      return;
+    }
+    if (!validateEmail(email)) {
+      setError('أدخل بريدًا إلكترونيًا صحيحًا.');
+      return;
+    }
     setLoading(true);
     try {
-      const { error: resetError } = await resetPassword(email);
-      if (resetError) { setError(resetError.message || 'فشل إعادة تعيين كلمة المرور.'); return; }
+      const { error: resetError } = await resetPassword(email.trim());
+      if (resetError) {
+        setError(resetError.message || 'فشل إعادة تعيين كلمة المرور.');
+        return;
+      }
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل إعادة تعيين كلمة المرور.');
@@ -35,24 +49,68 @@ export default function ForgotPasswordScreen() {
   }, [email, resetPassword]);
 
   return (
-    <ScreenShell testID="forgot-password-screen">
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <SectionHeader eyebrow="نسيت كلمة المرور؟" title="أعد تعيين كلمة المرور" body="أدخل بريدك الإلكتروني وسنرسل لك رابط إعادة التعيين." />
-        <PremiumPanel>
-          <View style={styles.form}>
-            <TextInput accessibilityLabel="البريد الإلكتروني" autoCapitalize="none" autoComplete="email" keyboardType="email-address" onChangeText={setEmail} placeholder="البريد الإلكتروني" placeholderTextColor={colors.muted} style={styles.input} testID="forgot-email" value={email} />
-          </View>
-        </PremiumPanel>
-        {error ? <StateNotice icon="warning" title="خطأ" body={error} tone={colors.red} testID="forgot-error" /> : null}
-        {success ? <StateNotice icon="checkmark-circle" title="تم الإرسال" body="إذا كان البريد مسجلاً، ستصلك رسالة إعادة التعيين خلال دقائق." tone={colors.green} /> : null}
-        <PrimaryButton label="أرسل رابط إعادة التعيين" icon="lock-closed" loading={loading} disabled={success} onPress={handleReset} testID="forgot-reset-button" />
+    <ScreenShell
+      footer={
+        <PrimaryButton
+          label="أرسل رابط إعادة التعيين"
+          icon="paper-plane"
+          loading={loading}
+          disabled={success || !email.trim()}
+          onPress={handleReset}
+          testID="forgot-reset-button"
+        />
+      }
+      testID="forgot-password-screen"
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <SectionHeader
+          title="نسيت كلمة المرور؟"
+          body="أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور."
+        />
+
+        {error ? (
+          <StateNotice icon="warning" title="تعذّر الإرسال" body={error} tone={colors.error} testID="forgot-error" />
+        ) : null}
+
+        {success ? (
+          <StateNotice
+            icon="checkmark-circle"
+            title="تم الإرسال"
+            body="إذا كان البريد مسجلاً لدينا، ستصلك رسالة إعادة التعيين خلال دقائق. تحقق أيضًا من مجلد الرسائل غير المرغوب فيها."
+            tone={colors.success}
+            testID="forgot-success"
+          />
+        ) : null}
+
+        <View style={styles.form}>
+          <FormField
+            label="البريد الإلكتروني"
+            icon="mail-outline"
+            autoCapitalize="none"
+            autoComplete="email"
+            autoCorrect={false}
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            placeholder="name@example.com"
+            onChangeText={setEmail}
+            onSubmitEditing={handleReset}
+            returnKeyType="send"
+            testID="forgot-email"
+            value={email}
+          />
+        </View>
+
+        <TextLink label="العودة إلى تسجيل الدخول" onPress={() => navigation.goBack()} />
       </ScrollView>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { gap: spacing.lg, paddingBottom: spacing.xxl },
-  form: { gap: spacing.sm },
-  input: { backgroundColor: colors.surfaceAlt, borderColor: colors.line, borderRadius: radii.lg, borderWidth: 1, color: colors.ink, fontSize: 16, fontWeight: '700', minHeight: 54, paddingHorizontal: spacing.md },
+  scroll: { gap: spacing.lg, paddingBottom: spacing.xl },
+  form: { gap: spacing.md },
 });

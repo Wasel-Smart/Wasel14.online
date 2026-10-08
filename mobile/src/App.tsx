@@ -16,6 +16,18 @@ import { RTLProvider } from './utils/rtl';
 import { colors } from './theme';
 import { mobileAuth } from './services/auth';
 import * as Linking from 'expo-linking';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  Cairo_400Regular,
+  Cairo_500Medium,
+  Cairo_600SemiBold,
+  Cairo_700Bold,
+  Cairo_800ExtraBold,
+} from '@expo-google-fonts/cairo';
+
+// Keep the native splash visible until the brand font is ready (no flash of system font).
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 enableScreens(true);
 enableFreeze(true);
@@ -45,6 +57,20 @@ const linking = {
 
 const App = () => {
   const [deepLinkUrl, setDeepLinkUrl] = useState<string | null>(null);
+  const [fontsLoaded, fontError] = useFonts({
+    Cairo_400Regular,
+    Cairo_500Medium,
+    Cairo_600SemiBold,
+    Cairo_700Bold,
+    Cairo_800ExtraBold,
+  });
+
+  useEffect(() => {
+    // On a font error we still continue (system font fallback) rather than block the app.
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [fontsLoaded, fontError]);
 
   useEffect(() => {
     const subscription = Linking.addEventListener('url', ({ url }) => {
@@ -60,6 +86,10 @@ const App = () => {
       });
     }
   }, [deepLinkUrl]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   if (!waselMobileConfig.hasSupabase) {
     return (

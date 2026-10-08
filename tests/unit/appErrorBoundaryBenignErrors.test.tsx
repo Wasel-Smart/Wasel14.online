@@ -78,14 +78,18 @@ describe('AppErrorBoundary benign cross-frame errors', () => {
 
     const counter = new ThrowCounter();
 
-    const { getByRole } = render(
+    const { getAllByRole } = render(
       <AppErrorBoundary>
         <Thrower counter={counter} message="Something genuinely broke" />
       </AppErrorBoundary>,
     );
 
     expect(counter.count).toBeLessThanOrEqual(2);
-    expect(getByRole('button').textContent).toBeTruthy();
+    // There are two buttons: "إعادة تحميل" (Reload) and "الصفحة الرئيسية" (Home)
+    // The primary action button should be the reload button
+    const buttons = getAllByRole('button');
+    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    expect(buttons[0]?.textContent).toBeTruthy();
   });
 });
 

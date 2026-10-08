@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createBottomTabNavigator, type BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { colors } from '../theme';
 import { useAuth } from '../providers/AuthProvider';
@@ -12,6 +13,7 @@ import PackagesScreen from '../screens/PackagesScreen';
 import NetworksScreen from '../screens/NetworksScreen';
 import MapScreen from '../screens/MapScreen';
 import AppLoadingScreen from '../screens/AppLoadingScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import WalletScreen from '../screens/WalletScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SafetyScreen from '../screens/SafetyScreen';
@@ -35,80 +37,97 @@ import PhoneAuthScreen from '../screens/PhoneAuthScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import SecuritySettingsScreen from '../screens/SecuritySettingsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import TrustCenterScreen from '../screens/TrustCenterScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const iconByRoute: Record<string, keyof typeof Ionicons.glyphMap> = {
-  Home: 'home',
-  Rides: 'car',
-  Packages: 'cube',
-  Networks: 'git-network',
-  Map: 'map',
-  Wallet: 'card',
-  Profile: 'person',
-  SignIn: 'log-in',
-  SignUp: 'person-add',
-  ForgotPassword: 'lock-closed',
-  PhoneAuth: 'phone-portrait',
-  ProfileEdit: 'create',
-  SecuritySettings: 'shield-checkmark',
-  Settings: 'settings',
+const ONBOARDING_KEY = 'wasel.onboarding.v1';
+
+// [inactive, active] icon pair — filled icon marks the selected tab so state
+// never relies on color alone.
+const iconByRoute: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
+  Home: ['home-outline', 'home'],
+  Rides: ['car-outline', 'car'],
+  Packages: ['cube-outline', 'cube'],
+  Wallet: ['card-outline', 'card'],
+  Profile: ['person-outline', 'person'],
 };
 
 const getTabScreenOptions = ({ route }: { route: { name: string } }): BottomTabNavigationOptions => ({
   tabBarAccessibilityLabel: route.name,
-  tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-    <Ionicons name={iconByRoute[route.name] ?? 'ellipse'} size={size} color={color} />
-  ),
+  tabBarIcon: ({ color, size, focused }: { color: string; size: number; focused: boolean }) => {
+    const pair = iconByRoute[route.name] ?? ['ellipse-outline', 'ellipse'];
+    return <Ionicons name={focused ? pair[1] : pair[0]} size={size} color={color} />;
+  },
   freezeOnBlur: true,
   headerStyle: { backgroundColor: colors.bg, shadowColor: 'transparent' },
   headerShadowVisible: false,
   headerTitleAlign: 'center',
   headerTitleStyle: { color: colors.ink, fontWeight: '900' },
   lazy: true,
-  tabBarActiveTintColor: colors.teal,
+  tabBarActiveTintColor: colors.primary,
   tabBarHideOnKeyboard: true,
   tabBarInactiveTintColor: colors.muted,
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '800' },
+  tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
   tabBarStyle: {
     backgroundColor: colors.surface,
     borderTopColor: colors.line,
     borderTopWidth: 1,
     elevation: 8,
-    height: 70,
+    height: 68,
     paddingBottom: 10,
     paddingTop: 8,
   },
 });
 
+// Five tabs is the usable maximum on a phone. Map and Networks stay reachable
+// from Home (quick action + service card) via the stack below.
 function TabNavigator() {
   return (
-    <Tab.Navigator
-      initialRouteName="Home"
-      screenOptions={getTabScreenOptions}
-    >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'الرئيسية', tabBarButtonTestID: 'home-tab' }} />
+    <Tab.Navigator initialRouteName="Home" screenOptions={getTabScreenOptions}>
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ title: 'الرئيسية', headerShown: false, tabBarButtonTestID: 'home-tab' }}
+      />
       <Tab.Screen name="Rides" component={RideRequestScreen} options={{ title: 'المشاوير', tabBarButtonTestID: 'rides-tab' }} />
       <Tab.Screen name="Packages" component={PackagesScreen} options={{ title: 'الطرود', tabBarButtonTestID: 'packages-tab' }} />
-      <Tab.Screen name="Networks" component={NetworksScreen} options={{ title: 'الشبكات', tabBarButtonTestID: 'networks-tab' }} />
-      <Tab.Screen name="Map" component={MapScreen} options={{ title: 'الخريطة', tabBarButtonTestID: 'map-tab' }} />
       <Tab.Screen name="Wallet" component={WalletScreen} options={{ title: 'المحفظة', tabBarButtonTestID: 'wallet-tab' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'حسابي', tabBarButtonTestID: 'profile-tab' }} />
     </Tab.Navigator>
   );
 }
 
-const stackOptions = {
-  headerStyle: { backgroundColor: colors.bg }, headerShadowVisible: false,
-  headerTitleStyle: { color: colors.ink, fontWeight: '900' }, headerTintColor: colors.teal,
-  contentStyle: { backgroundColor: colors.bg },
-} as const;
+// Auth sub-screens render their own large title, so the native header is only
+// a back affordance (it used to be hidden entirely, leaving no visible way back on iOS).
+const authBackOnly = { headerShown: true, title: '', headerTransparent: false } as const;
 
 export const AppNavigator = React.memo(function AppNavigator() {
   const { user, loading } = useAuth();
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
 
-  if (loading) return <AppLoadingScreen />;
+  useEffect(() => {
+    let alive = true;
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then((value: string | null) => {
+        if (alive) setOnboarded(value === 'done');
+      })
+      .catch(() => {
+        // Storage failure must never trap the user behind onboarding.
+        if (alive) setOnboarded(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const finishOnboarding = useCallback(() => {
+    setOnboarded(true);
+    void AsyncStorage.setItem(ONBOARDING_KEY, 'done').catch(() => undefined);
+  }, []);
+
+  if (loading || onboarded === null) return <AppLoadingScreen />;
 
   return (
     <Stack.Navigator
@@ -118,33 +137,26 @@ export const AppNavigator = React.memo(function AppNavigator() {
         headerBackTitleVisible: false,
         headerShadowVisible: false,
         headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.teal,
+        headerTintColor: colors.primary,
         headerTitleAlign: 'center',
         headerTitleStyle: { color: colors.ink, fontWeight: '900' },
       }}
     >
       {!user ? (
         <>
+          {!onboarded ? (
+            <Stack.Screen name="Onboarding" options={{ headerShown: false, animation: 'fade' }}>
+              {() => <OnboardingScreen onDone={finishOnboarding} />}
+            </Stack.Screen>
+          ) : null}
           <Stack.Screen
             name="SignIn"
             component={SignInScreen}
             options={{ title: 'تسجيل الدخول إلى واصل', headerShown: false }}
           />
-          <Stack.Screen
-            name="SignUp"
-            component={SignUpScreen}
-            options={{ title: 'إنشاء حساب', headerShown: false }}
-          />
-          <Stack.Screen
-            name="ForgotPassword"
-            component={ForgotPasswordScreen}
-            options={{ title: 'إعادة تعيين كلمة المرور', headerShown: false }}
-          />
-          <Stack.Screen
-            name="PhoneAuth"
-            component={PhoneAuthScreen}
-            options={{ title: 'تسجيل الدخول بالهاتف', headerShown: false }}
-          />
+          <Stack.Screen name="SignUp" component={SignUpScreen} options={authBackOnly} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={authBackOnly} />
+          <Stack.Screen name="PhoneAuth" component={PhoneAuthScreen} options={authBackOnly} />
         </>
       ) : (
         <>
@@ -180,6 +192,7 @@ export const AppNavigator = React.memo(function AppNavigator() {
           <Stack.Screen name="ReportIssue" component={ReportIssueScreen} options={{ title: 'الإبلاغ عن مشكلة' }} />
           <Stack.Screen name="DriverProfile" component={DriverProfileScreen} options={{ title: 'ملف السائق' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'الإعدادات' }} />
+          <Stack.Screen name="TrustCenter" component={TrustCenterScreen} options={{ title: 'مركز الثقة' }} />
         </>
       )}
     </Stack.Navigator>

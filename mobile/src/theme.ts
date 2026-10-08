@@ -1,7 +1,18 @@
+/**
+ * Wasel design tokens.
+ *
+ * Brand rule: ONE hero color (cyan) for actions + ONE support color (green)
+ * for success/route/"go" meaning. Every other hue is semantic only
+ * (warning / error / info) and must not be used for decoration.
+ * Legacy aliases are kept so existing screens keep compiling.
+ */
 export const colors = {
+  // Brand
   primary: '#00E5FF',
   secondary: '#72C70D',
+  onPrimary: '#04152B', // text/icon color on bright brand fills (AAA contrast on cyan)
 
+  // Surfaces
   bg: '#081D39',
   surface: '#0e2240',
   surfaceElevated: '#132b4d',
@@ -10,6 +21,7 @@ export const colors = {
   line: 'rgba(20,127,228,0.16)',
   lineStrong: 'rgba(20,127,228,0.28)',
 
+  // Text
   textPrimary: '#F8FBFF',
   textSecondary: 'rgba(248,251,255,0.86)',
   textMuted: 'rgba(196,220,238,0.68)',
@@ -19,8 +31,9 @@ export const colors = {
   navy: '#081D39',
   charcoal: '#E2E8F0',
 
+  // Legacy hue aliases (prefer semantic tokens below in new code)
   cyan: '#00E5FF',
-  teal: '#58DDFF',
+  teal: '#00E5FF', // was #58DDFF — unified with primary so there is one action color
   green: '#72C70D',
   amber: '#FF8A0B',
   blue: '#00E5FF',
@@ -29,6 +42,7 @@ export const colors = {
   rose: '#FF7C8B',
   red: '#FF7C8B',
 
+  // Semantic
   success: '#72C70D',
   warning: '#FF8A0B',
   error: '#FF7C8B',
@@ -53,38 +67,42 @@ export const radii = {
 };
 
 export const typography = {
-  display: { fontSize: 48, fontWeight: '800' as const, letterSpacing: -1 },
-  heading: { fontSize: 32, fontWeight: '700' as const, letterSpacing: -0.5 },
-  title: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.5 },
-  lead: { fontSize: 24, fontWeight: '600' as const, letterSpacing: -0.25 },
-  subtitle: { fontSize: 20, fontWeight: '600' as const },
+  display: { fontSize: 44, fontWeight: '800' as const, letterSpacing: -1 },
+  heading: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.5 },
+  title: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.5 },
+  lead: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.25 },
+  subtitle: { fontSize: 18, fontWeight: '600' as const },
   body: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
-  caption: { fontSize: 12, fontWeight: '500' as const },
-  micro: { fontSize: 10, fontWeight: '600' as const, textTransform: 'uppercase', letterSpacing: 0.5 },
+  caption: { fontSize: 13, fontWeight: '500' as const, lineHeight: 18 },
+  micro: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 0.3 },
   button: { fontSize: 16, fontWeight: '700' as const },
-  label: { fontSize: 12, fontWeight: '600' as const, textTransform: 'uppercase', letterSpacing: 1 },
+  // Arabic has no letter-case, and tracking breaks letter joining — so no
+  // uppercase / letterSpacing on labels (the old values corrupted Arabic shaping).
+  label: { fontSize: 13, fontWeight: '700' as const },
 } as const;
 
 export const shadows = {
   card: {
-    shadowColor: '#0B1220',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
+    shadowColor: '#000814',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
     elevation: 3,
   },
   lift: {
-    shadowColor: '#0B1220',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.12,
-    shadowRadius: 28,
+    shadowColor: '#000814',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.38,
+    shadowRadius: 24,
     elevation: 6,
   },
 };
 
+// Matches BRAND_GUIDELINES.md motion spec: 150ms fast, 200ms normal, 280ms slow
 export const motion = {
-  fast: 160,
-  standard: 240,
+  fast: 150,
+  standard: 200,
+  slow: 280,
 };
 
 export const hitSlop = {
@@ -93,3 +111,29 @@ export const hitSlop = {
   bottom: 10,
   left: 10,
 };
+
+/** Minimum comfortable touch target (WCAG 2.5.5 / Material 48dp). */
+export const MIN_TOUCH = 48;
+
+function channel(value: number): number {
+  const s = value / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+/**
+ * Picks the more legible of dark ink / white for text drawn on `background`.
+ * Only understands 6-digit hex; anything else (rgba, named) falls back to ink
+ * on brand, which is the safe choice for translucent brand fills.
+ */
+export function readableTextOn(background: string): string {
+  const match = /^#([0-9a-f]{6})$/i.exec(background);
+  if (!match) return colors.onPrimary;
+  const n = parseInt(match[1] as string, 16);
+  const luminance =
+    0.2126 * channel((n >> 16) & 255) +
+    0.7152 * channel((n >> 8) & 255) +
+    0.0722 * channel(n & 255);
+  const contrastWithInk = (luminance + 0.05) / (0.0074 + 0.05);
+  const contrastWithWhite = 1.05 / (luminance + 0.05);
+  return contrastWithInk >= contrastWithWhite ? colors.onPrimary : '#FFFFFF';
+}

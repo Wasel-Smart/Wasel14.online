@@ -33,7 +33,6 @@ export function initPerformanceMonitoring() {
       attachViewHierarchy: true,
       enableAutoSessionTracking: true,
       sessionTrackingIntervalMillis: 30000,
-      enableTracing: true,
       enableAutoPerformanceTracing: true,
       enableNativeCrashHandling: true,
       enableWatchdogTerminationTracking: true,
@@ -51,10 +50,12 @@ export function initPerformanceMonitoring() {
 
 function startTransaction(name: string, op: string, attributes?: Record<string, string | number | boolean>) {
   if (!isSentryInitialized) return null;
-  const transaction = Sentry.startTransaction({ name, op });
+  const startTransactionFn = (Sentry as any).startTransaction || (Sentry as any).startSpan;
+  if (!startTransactionFn) return null;
+  const transaction = startTransactionFn({ name, op });
   if (attributes) {
     Object.entries(attributes).forEach(([key, value]) => {
-      transaction?.setAttribute(key, value);
+      transaction?.setAttribute?.(key, value);
     });
   }
   return transaction;

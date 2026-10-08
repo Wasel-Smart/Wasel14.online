@@ -1,16 +1,20 @@
-import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+
+import { FormField } from '../components/FormField';
 import {
   InfoCard,
-  PremiumPanel,
   PrimaryButton,
   ScreenShell,
   SectionHeader,
   StateNotice,
+  TextLink,
 } from '../components/MobilePrimitives';
 import { useAuth } from '../providers/AuthProvider';
-import { colors, radii, spacing } from '../theme';
+import { colors, spacing } from '../theme';
 import { validatePhone } from '../utils/security';
+
+const RESEND_SECONDS = 30;
 
 export default function PhoneAuthScreen() {
   const { signInWithPhone, verifyOtp } = useAuth();
@@ -20,16 +24,35 @@ export default function PhoneAuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
-  const handleSendOtp = useCallback(async () => {
+  // Resend countdown — stops users hammering "resend" and tells them when they can.
+  useEffect(() => {
+    if (secondsLeft <= 0) return undefined;
+    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [secondsLeft]);
+
+  const sendOtp = useCallback(async () => {
     setError(null);
-    if (!phone.trim()) { setError('رقم الهاتف مطلوب.'); return; }
-    if (!validatePhone(phone)) { setError('رقم الهاتف لازم يكون بصيغة +962XXXXXXXXX.'); return; }
+    if (!phone.trim()) {
+      setError('رقم الهاتف مطلوب.');
+      return;
+    }
+    if (!validatePhone(phone)) {
+      setError('يجب أن يكون الرقم بصيغة +962XXXXXXXXX.');
+      return;
+    }
     setLoading(true);
     try {
       const { error: otpError } = await signInWithPhone(phone);
-      if (otpError) { setError(otpError.message || 'فشل إرسال رمز التحقق.'); return; }
+      if (otpError) {
+        setError(otpError.message || 'فشل إرسال رمز التحقق.');
+        return;
+      }
+      setOtp('');
       setStep('verify-otp');
+      setSecondsLeft(RESEND_SECONDS);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل إرسال رمز التحقق.');
     } finally {
@@ -39,12 +62,21 @@ export default function PhoneAuthScreen() {
 
   const handleVerifyOtp = useCallback(async () => {
     setError(null);
-    if (!otp.trim()) { setError('رمز التحقق مطلوب.'); return; }
-    if (otp.length < 4) { setError('رمز التحقق لازم يكون 4 أرقام على الأقل.'); return; }
+    if (!otp.trim()) {
+      setError('رمز التحقق مطلوب.');
+      return;
+    }
+    if (otp.length < 4) {
+      setError('يجب أن يتكون رمز التحقق من 4 أرقام على الأقل.');
+      return;
+    }
     setLoading(true);
     try {
       const { error: verifyError } = await verifyOtp(phone, otp);
-      if (verifyError) { setError(verifyError.message || 'رمز التحقق غير صحيح.'); return; }
+      if (verifyError) {
+        setError(verifyError.message || 'رمز التحقق غير صحيح.');
+        return;
+      }
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل التحقق.');
@@ -53,39 +85,112 @@ export default function PhoneAuthScreen() {
     }
   }, [otp, phone, verifyOtp]);
 
-  const handleResendOtp = useCallback(() => {
-    setOtp('');
-    setStep('enter-phone');
-  }, []);
+  const isOtpStep = step === 'verify-otp';
 
   return (
-    <ScreenShell testID="phone-auth-screen">
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <SectionHeader eyebrow="تسجيل الدخول بالهاتف" title="أدخل رقم هاتفك" body="سنرسل لك رمز تحقق عبر SMS لتسجيل الدخول." />
-        {step === 'verify-otp' ? (
-          <>
-            <PremiumPanel>
-              <View style={styles.form}>
-                <TextInput accessibilityLabel="رمز التحقق" keyboardType="number-pad" onChangeText={setOtp} placeholder="أدخل رمز التحقق" placeholderTextColor={colors.muted} style={styles.input} testID="otp-input" value={otp} />
-              </View>
-            </PremiumPanel>
-            {error ? <StateNotice icon="warning" title="خطأ في التحقق" body={error} tone={colors.red} testID="phone-error" /> : null}
-            {success ? <InfoCard icon="checkmark-circle" title="تم التحقق بنجاح" body="تم تسجيل دخولك عبر الهاتف." tone={colors.green} /> : null}
-            <View style={styles.buttonRow}>
-              <PrimaryButton label="تحقق" icon="checkmark" loading={loading} disabled={success} onPress={handleVerifyOtp} testID="verify-otp-button" />
-              <PrimaryButton label="أعد الإرسال" icon="refresh" loading={false} onPress={handleResendOtp} testID="resend-otp-button" />
-            </View>
-          </>
+    <ScreenShell
+      footer={
+        isOtpStep ? (
+          <PrimaryButton
+            label="تحقق"
+            icon="checkmark"
+            loading={loading}
+            disabled={success || otp.length < 4}
+            onPress={handleVerifyOtp}
+            testID="verify-otp-button"
+          />
         ) : (
-          <>
-            {error ? <StateNotice icon="warning" title="خطأ" body={error} tone={colors.red} testID="phone-error" /> : null}
-            <PremiumPanel>
-              <View style={styles.form}>
-                <TextInput accessibilityLabel="رقم الهاتف" autoCapitalize="none" keyboardType="phone-pad" onChangeText={setPhone} placeholder="+962 79 123 4567" placeholderTextColor={colors.muted} style={styles.input} testID="phone-input" value={phone} />
-              </View>
-            </PremiumPanel>
-            <PrimaryButton label="أرسل رمز التحقق" icon="paper-plane" loading={loading} disabled={success} onPress={handleSendOtp} testID="send-otp-button" />
-          </>
+          <PrimaryButton
+            label="أرسل رمز التحقق"
+            icon="paper-plane"
+            loading={loading}
+            disabled={success || !phone.trim()}
+            onPress={sendOtp}
+            testID="send-otp-button"
+          />
+        )
+      }
+      testID="phone-auth-screen"
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <SectionHeader
+          eyebrow={isOtpStep ? 'الخطوة 2 من 2' : 'الخطوة 1 من 2'}
+          title={isOtpStep ? 'أدخل رمز التحقق' : 'أدخل رقم هاتفك'}
+          body={
+            isOtpStep
+              ? `أرسلنا رمزًا عبر رسالة نصية إلى ${phone}.`
+              : 'سنرسل لك رمز تحقق عبر رسالة نصية لتسجيل الدخول.'
+          }
+        />
+
+        {error ? (
+          <StateNotice
+            icon="warning"
+            title={isOtpStep ? 'خطأ في التحقق' : 'تعذّر المتابعة'}
+            body={error}
+            tone={colors.error}
+            testID="phone-error"
+          />
+        ) : null}
+
+        {isOtpStep ? (
+          <View style={styles.form}>
+            <FormField
+              label="رمز التحقق"
+              icon="keypad-outline"
+              autoComplete="sms-otp"
+              keyboardType="number-pad"
+              maxLength={6}
+              onChangeText={(v: string) => setOtp(v.replace(/\D/g, ''))}
+              onSubmitEditing={handleVerifyOtp}
+              placeholder="000000"
+              textContentType="oneTimeCode"
+              testID="otp-input"
+              value={otp}
+            />
+            {success ? (
+              <InfoCard
+                icon="checkmark-circle"
+                title="تم التحقق بنجاح"
+                body="تم تسجيل دخولك عبر الهاتف."
+                tone={colors.success}
+              />
+            ) : null}
+            {secondsLeft > 0 ? (
+              <StateNotice icon="time-outline" title={`يمكنك إعادة الإرسال بعد ${secondsLeft} ثانية`} tone={colors.info} />
+            ) : (
+              <TextLink label="أعد إرسال الرمز" onPress={sendOtp} testID="resend-otp-button" />
+            )}
+            <TextLink
+              label="تغيير رقم الهاتف"
+              tone={colors.textMuted}
+              onPress={() => {
+                setError(null);
+                setStep('enter-phone');
+              }}
+            />
+          </View>
+        ) : (
+          <View style={styles.form}>
+            <FormField
+              label="رقم الهاتف"
+              icon="call-outline"
+              autoCapitalize="none"
+              autoComplete="tel"
+              hint="مثال: +962 79 123 4567"
+              keyboardType="phone-pad"
+              onChangeText={setPhone}
+              onSubmitEditing={sendOtp}
+              placeholder="+962 79 123 4567"
+              textContentType="telephoneNumber"
+              testID="phone-input"
+              value={phone}
+            />
+          </View>
         )}
       </ScrollView>
     </ScreenShell>
@@ -94,7 +199,5 @@ export default function PhoneAuthScreen() {
 
 const styles = StyleSheet.create({
   scroll: { gap: spacing.lg, paddingBottom: spacing.xxl },
-  form: { gap: spacing.sm },
-  input: { backgroundColor: colors.surfaceAlt, borderColor: colors.line, borderRadius: radii.lg, borderWidth: 1, color: colors.ink, fontSize: 16, fontWeight: '700', minHeight: 54, paddingHorizontal: spacing.md },
-  buttonRow: { gap: spacing.sm },
+  form: { gap: spacing.md },
 });

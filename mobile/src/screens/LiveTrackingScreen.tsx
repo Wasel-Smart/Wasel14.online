@@ -207,7 +207,7 @@ const LiveTrackingScreen = React.memo(function LiveTrackingScreen({ route }: { r
           </View>
 
           <PrimaryButton
-            label={`Call ${ride.driverName.split(' ')[0]}`}
+            label={`اتصل بـ ${ride.driverName.split(' ')[0]}`}
             icon="call"
             tone={colors.green}
             onPress={callDriver}

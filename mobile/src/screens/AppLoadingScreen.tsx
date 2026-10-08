@@ -1,10 +1,31 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { ActivityIndicator, Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
-import { colors, spacing, typography } from '../theme';
+import { BrandMark } from '../components/BrandMark';
+import { colors, motion, spacing, typography } from '../theme';
 
 const AppLoadingScreen = React.memo(function AppLoadingScreen() {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const rise = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: motion.slow,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(rise, {
+        toValue: 0,
+        duration: motion.slow,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [opacity, rise]);
+
   return (
     <View
       accessibilityLabel="جاري تجهيز تطبيق واصل"
@@ -13,12 +34,12 @@ const AppLoadingScreen = React.memo(function AppLoadingScreen() {
       testID="app-loading-screen"
     >
       <StatusBar style="light" />
-      <View style={styles.mark} accessibilityElementsHidden>
-        <Text style={styles.markText}>W</Text>
-      </View>
-      <Text style={styles.title}>واصل</Text>
-      <Text style={styles.subtitle}>نجهّز رحلتك بأمان</Text>
-      <ActivityIndicator color={colors.cyan} size="large" style={styles.loader} />
+      <Animated.View style={[styles.center, { opacity, transform: [{ translateY: rise }] }]}>
+        <BrandMark size={96} />
+        <Text style={styles.title}>واصل</Text>
+        <Text style={styles.subtitle}>نجهّز رحلتك بأمان</Text>
+      </Animated.View>
+      <ActivityIndicator color={colors.primary} size="small" style={styles.loader} />
     </View>
   );
 });
@@ -31,32 +52,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
-  mark: {
+  center: {
     alignItems: 'center',
-    backgroundColor: colors.teal,
-    borderRadius: 28,
-    height: 88,
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    width: 88,
-  },
-  markText: {
-    color: '#FFFFFF',
-    fontSize: 48,
-    fontWeight: '900',
+    gap: spacing.sm,
   },
   title: {
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     fontSize: typography.display.fontSize,
     fontWeight: '900',
+    marginTop: spacing.md,
   },
   subtitle: {
-    color: 'rgba(196,220,238,0.68)',
-    fontSize: typography.body.fontSize,
-    marginTop: spacing.sm,
+    ...typography.body,
+    color: colors.textMuted,
   },
   loader: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl,
   },
 });
 

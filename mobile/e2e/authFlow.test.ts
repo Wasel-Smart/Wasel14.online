@@ -12,6 +12,13 @@ describe('Wasel Auth Flow', () => {
       permissions: { location: 'always', notifications: 'YES', camera: 'YES' },
       newInstance: true,
     });
+    // Fresh installs now land on onboarding first; skip it (choice is persisted).
+    try {
+      await waitFor(element(by.id('onboarding-skip'))).toBeVisible().withTimeout(4000);
+      await element(by.id('onboarding-skip')).tap();
+    } catch {
+      // Already onboarded on a reused install — nothing to skip.
+    }
   });
 
   beforeEach(async () => {
@@ -44,12 +51,13 @@ describe('Wasel Auth Flow', () => {
     await expect(element(by.id('forgot-reset-button'))).toBeVisible();
   });
 
-  it('shows a validation error when submitting phone sign-in without a number', async () => {
-    // SignInScreen's phone button calls signInWithPhone directly — there is no
-    // separate phone-auth-screen reachable from here. This asserts the real
-    // inline validation behaviour instead of a screen that doesn't exist.
+  it('opens the dedicated phone-auth screen from sign-in', async () => {
+    // The phone button now routes to PhoneAuth (number + OTP) instead of firing
+    // an inline request with no input field.
     await element(by.id('phone-sign-in-button')).tap();
-    await expect(element(by.id('sign-in-error'))).toBeVisible();
+    await waitFor(element(by.id('phone-auth-screen'))).toBeVisible().withTimeout(5000);
+    await expect(element(by.id('phone-input'))).toBeVisible();
+    await expect(element(by.id('send-otp-button'))).toBeVisible();
   });
 
   // Biometric sign-in only renders when biometricAuth.isSupported() resolves

@@ -7,7 +7,7 @@ import {
     type ViewStyle,
     type TextStyle,
 } from 'react-native';
-import { colors, spacing, typography } from '../theme';
+import { colors, MIN_TOUCH, radii, spacing, typography } from '../theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -22,6 +22,11 @@ interface ButtonProps {
     testID?: string;
 }
 
+/**
+ * Legacy button kept for existing call sites. Visually aligned with
+ * `PrimaryButton` (same radius, minimum touch size and readable label colors).
+ * Prefer `PrimaryButton` for new work.
+ */
 export const Button: React.FC<ButtonProps> = ({
     title,
     onPress,
@@ -53,14 +58,20 @@ export const Button: React.FC<ButtonProps> = ({
         buttonStyles.push(styles.disabledButton);
     }
 
+    const spinnerColor = variant === 'primary' || variant === 'danger' ? colors.onPrimary : colors.textPrimary;
+
     return (
         <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            accessibilityState={{ busy: loading, disabled: disabled || loading }}
+            activeOpacity={0.85}
             onPress={onPress}
             style={[...buttonStyles, style]}
             disabled={disabled || loading}
             testID={testID}
         >
-            {loading ? <ActivityIndicator color={colors.textPrimary} /> : <Text style={[...textStyles, textStyle]}>{title}</Text>}
+            {loading ? <ActivityIndicator color={spinnerColor} /> : <Text style={[...textStyles, textStyle]}>{title}</Text>}
         </TouchableOpacity>
     );
 };
@@ -69,25 +80,25 @@ const styles = StyleSheet.create({
     baseButton: {
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.lg,
-        borderRadius: spacing.xs,
+        borderRadius: radii.lg,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 48,
+        minHeight: MIN_TOUCH + 6,
     },
     baseText: {
-        fontSize: typography.body.fontSize,
+        fontSize: typography.button.fontSize,
         fontWeight: '700',
     },
     primaryButton: {
         backgroundColor: colors.primary,
     },
     primaryText: {
-        color: colors.textPrimary,
+        color: colors.onPrimary,
     },
     secondaryButton: {
-        backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.primary,
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderColor: colors.lineStrong,
     },
     secondaryText: {
         color: colors.textPrimary,
@@ -102,9 +113,9 @@ const styles = StyleSheet.create({
         backgroundColor: colors.error,
     },
     dangerText: {
-        color: colors.textPrimary,
+        color: colors.onPrimary,
     },
     disabledButton: {
-        opacity: 0.6,
+        opacity: 0.5,
     },
 });

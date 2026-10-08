@@ -22,6 +22,7 @@ export type RootStackParamList = {
   PaymentMethods: undefined;
   Receipt: { paymentId: string };
   Settings: undefined;
+  TrustCenter: undefined;
 };
 
 export type RootStackRoute = keyof RootStackParamList;

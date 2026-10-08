@@ -1,8 +1,10 @@
 import React, { Component, type ReactNode } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform, Linking } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { colors } from '../theme';
 import { sanitizeLogValue } from '../utils/sanitize';
+
+const SUPPORT_EMAIL = 'support@wasel.app';
 
 interface Props {
   children: ReactNode;
@@ -54,23 +56,19 @@ export class MobileErrorBoundary extends Component<Props, State> {
   };
 
   handleReload = (): void => {
-    // Trigger a full app reload via the Expo/React Native runtime.
-    // In Expo/React Native, there is no window.location.reload(), so we
-    // use the global reload mechanism exposed by the bundler/runtime.
     const globalWithReload = globalThis as unknown as { reload?: () => void };
     if (typeof globalWithReload.reload === 'function') {
       globalWithReload.reload();
       return;
     }
-    // Fallback: reset to a clean state and let the app re-mount.
     this.setState({ hasError: false, error: null, errorId: null });
   };
 
   handleContactSupport = (): void => {
     const { errorId } = this.state;
-    const subject = encodeURIComponent(`Support request — error ${errorId ?? 'unknown'}`);
-    const body = encodeURIComponent(`Error ID: ${errorId ?? 'unknown'}\n\nPlease describe what happened:`);
-    Linking.openURL(`mailto:support@wasel.app?subject=${subject}&body=${body}`);
+    const subject = encodeURIComponent(`طلب دعم — خطأ ${errorId ?? 'unknown'}`);
+    const body = encodeURIComponent(`معرف الخطأ: ${errorId ?? 'unknown'}\n\nيرجى وصف ما حدث:`);
+    void Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
   };
 
   render() {
@@ -98,33 +96,33 @@ export class MobileErrorBoundary extends Component<Props, State> {
               {error.message}
             </Text>
           ) : null}
-<View style={styles.buttonRow}>
+          <View style={styles.buttonRow}>
             <TouchableOpacity
               style={[styles.button, styles.retryButton]}
               onPress={this.handleReset}
               accessible
               accessibilityRole="button"
-              accessibilityLabel="Try again"
+              accessibilityLabel="حاول مجدداً"
             >
-              <Text style={styles.buttonText}>Try again</Text>
+              <Text style={styles.buttonText}>حاول مجدداً</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.reloadButton]}
               onPress={this.handleReload}
               accessible
               accessibilityRole="button"
-              accessibilityLabel="Reload app"
+              accessibilityLabel="إعادة تشغيل"
             >
-              <Text style={styles.buttonText}>Reload</Text>
+              <Text style={styles.buttonText}>إعادة تشغيل</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.supportButton]}
               onPress={this.handleContactSupport}
               accessible
               accessibilityRole="button"
-              accessibilityLabel="Contact support"
+              accessibilityLabel="تواصل مع الدعم"
             >
-              <Text style={styles.buttonText}>Support</Text>
+              <Text style={styles.buttonText}>الدعم</Text>
             </TouchableOpacity>
           </View>
         </View>

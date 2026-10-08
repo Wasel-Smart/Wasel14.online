@@ -23,10 +23,18 @@ import {
 } from '../components/MobilePrimitives';
 import { useAuth } from '../providers/AuthProvider';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { apiClient } from '../lib/api';
 import { useOffline } from '../hooks/useOffline';
 import { colors, radii, spacing } from '../theme';
 import * as ImagePicker from 'expo-image-picker';
+
+type RootStackParamList = {
+  TrustCenter: undefined;
+};
+
+type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface ProfileStats {
   totalTrips: number;
@@ -38,6 +46,7 @@ interface ProfileStats {
 const ProfileScreen = React.memo(function ProfileScreen() {
   const { user, loading, signOut } = useAuth();
   const { t, language } = useLanguage();
+  const navigation = useNavigation<NavProp>();
   const { cacheSize, clearCache, clearQueue, isOnline, queueSize, sync, isSyncing } = useOffline();
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -316,7 +325,7 @@ const ProfileScreen = React.memo(function ProfileScreen() {
         />
 
         <View style={styles.actions}>
-          <ActionRow icon="shield-checkmark" label={t('trustCenter.title')} onPress={() => {}} />
+          <ActionRow icon="shield-checkmark" label={t('trustCenter.title')} onPress={() => navigation.navigate('TrustCenter')} />
           <ActionRow icon="trash" label={t('profile.actions.clearCache')} value={`${cacheSize}`} onPress={clearCache} />
           <ActionRow icon="archive" label={t('profile.actions.clearQueue')} value={`${queueSize}`} onPress={clearQueue} />
           <ActionRow icon="refresh" label={t('profile.actions.refreshStats')} onPress={loadStats} />

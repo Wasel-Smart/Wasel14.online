@@ -1,22 +1,15 @@
-import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, View, Text, Image, Pressable, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import {
-  InfoCard,
-  PremiumPanel,
-  ScreenShell,
-  SectionHeader,
-  StateNotice,
-  StatusPill,
-  PrimaryButton,
-} from '../components/MobilePrimitives';
+import { InfoCard, ScreenShell, SectionHeader } from '../components/MobilePrimitives';
 import { RideCard, type RideCardProps } from '../components/domain/RideCard';
 import { useOffline } from '../hooks/useOffline';
 import { useAuth } from '../providers/AuthProvider';
-import { colors, spacing, radii, typography, shadows } from '../theme';
+import { rideLifecycle, type AvailableTrip } from '../services/ride';
+import { colors, MIN_TOUCH, radii, shadows, spacing, typography } from '../theme';
 
 type RootStackParamList = {
   Tabs: undefined;
@@ -35,40 +28,21 @@ type RootStackParamList = {
   Wallet: undefined;
   ScheduledRide: undefined;
   Packages: undefined;
+  TrustCenter: undefined;
 };
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-// --- Mock Data for AI Recommendation ---
-const recommendedRide: RideCardProps = {
-  driver: {
-    name: 'Yousef Al-Majeed',
-    photoUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-    rating: 4.9,
-    isVerified: true,
-    completedTrips: 214,
-    trustScore: 99,
-  },
-  vehicle: {
-    brand: 'Hyundai',
-    model: 'Elantra',
-    color: 'White',
-    plate: '50-12345',
-  },
-  trip: {
-    from: 'Amman',
-    to: 'Aqaba',
-    distance: '330 km',
-    departureTime: '17:30',
-    availableSeats: 2,
-    packageCapacityKg: 10,
-  },
-  onReserve: () => console.log('Reserve Recommended Ride'),
-};
+function greetingForNow(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return 'صباح الخير،';
+  if (hour >= 12 && hour < 18) return 'نهارك سعيد،';
+  return 'مساء الخير،';
+}
 
 // --- Skeleton Loader ---
 const HomeSkeleton = React.memo(() => (
-  <View style={styles.skeletonContainer} accessible accessibilityLabel="Loading home screen">
+  <View style={styles.skeletonContainer} accessible accessibilityLabel="جارٍ تحميل الشاشة الرئيسية">
     <View style={styles.skeletonHeader}>
       <View style={styles.skeletonAvatar} />
       <View style={styles.skeletonTextBlock}>
@@ -81,63 +55,91 @@ const HomeSkeleton = React.memo(() => (
       <View style={styles.skeletonCardSmall} />
       <View style={styles.skeletonCardSmall} />
       <View style={styles.skeletonCardSmall} />
+      <View style={styles.skeletonCardSmall} />
     </View>
     <View style={styles.skeletonCard} />
     <View style={styles.skeletonCard} />
-    <ActivityIndicator color={colors.cyan} size="large" style={styles.skeletonLoader} />
   </View>
 ));
 
-// --- New Sub-components ---
-
+// --- Header ---
 const HomeHeader = React.memo(({
   displayName,
   avatarUrl,
+  unreadCount,
+  onNotificationsPress,
 }: {
   displayName: string;
   avatarUrl?: string | null;
-}) => {
-  return (
-    <View style={styles.homeHeader}>
+  unreadCount: number;
+  onNotificationsPress: () => void;
+}) => (
+  <View style={styles.homeHeader}>
+    {avatarUrl ? (
       <Image
         style={styles.avatar}
-        source={{ uri: avatarUrl || 'https://example.com/default-avatar.png' }}
+        source={{ uri: avatarUrl }}
+        accessible
+        accessibilityLabel={`صورة ${displayName}`}
       />
-      <View>
-        <Text style={styles.welcomeText}>أهلاً بعودتك،</Text>
-        <Text style={styles.displayName}>{displayName}</Text>
+    ) : (
+      <View style={[styles.avatar, styles.avatarFallback]} accessibilityElementsHidden>
+        <Ionicons name="person" size={24} color={colors.primary} />
       </View>
-      <Pressable style={styles.notificationButton}>
-        <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
-        <View style={styles.notificationBadge} />
-      </Pressable>
+    )}
+    <View style={styles.headerText}>
+      <Text style={styles.welcomeText}>{greetingForNow()}</Text>
+      <Text style={styles.displayName} numberOfLines={1}>{displayName}</Text>
     </View>
-  );
-});
+    <Pressable
+      style={styles.notificationButton}
+      onPress={onNotificationsPress}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={unreadCount > 0 ? `${unreadCount} إشعارات غير مقروءة` : 'الإشعارات'}
+    >
+      <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
+      {unreadCount > 0 && (
+        <View style={styles.notificationBadge}>
+          <Text style={styles.notificationBadgeText}>
+            {unreadCount > 9 ? '9+' : String(unreadCount)}
+          </Text>
+        </View>
+      )}
+    </Pressable>
+  </View>
+));
 
-const SmartSearch = React.memo(() => {
-  return (
-    <View style={styles.searchContainer}>
-      <SectionHeader
-        eyebrow="ابدأ رحلتك"
-        title="إلى أين تريد أن تذهب؟"
-        tone="dark"
-      />
-      <View style={styles.searchInputs}>
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>من</Text>
-          <Text style={styles.inputField}>موقعي الحالي</Text>
-        </View>
-        <View style={styles.inputSeparator} />
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>إلى</Text>
-          <Text style={styles.inputField}>ابحث عن وجهة...</Text>
-        </View>
+// --- Smart Search (navigates to AdvancedSearch on tap) ---
+const SmartSearch = React.memo(({ onPress }: { onPress: () => void }) => (
+  <Pressable
+    style={({ pressed }: { pressed: boolean }) => [styles.searchContainer, pressed && styles.searchContainerPressed]}
+    onPress={onPress}
+    accessible
+    accessibilityRole="button"
+    accessibilityLabel="إلى أين تريد أن تذهب؟ ابحث عن وجهة"
+    testID="home-search"
+  >
+    <SectionHeader eyebrow="ابدأ رحلتك" title="إلى أين تريد أن تذهب؟" size="md" />
+    <View style={styles.searchInputs}>
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>من</Text>
+        <Text style={styles.inputField}>موقعي الحالي</Text>
+      </View>
+      <View style={styles.inputSeparator} />
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>إلى</Text>
+        <Text style={[styles.inputField, styles.inputFieldPlaceholder]}>ابحث عن وجهة...</Text>
       </View>
     </View>
-  );
-});
+    <View style={styles.searchCta}>
+      <Text style={styles.searchCtaText}>ابحث الآن</Text>
+      <Ionicons name="arrow-forward-circle" size={28} color={colors.primary} />
+    </View>
+  </Pressable>
+));
 
+// --- Quick Action ---
 const QuickActionCard = React.memo(({
   label,
   icon,
@@ -146,42 +148,98 @@ const QuickActionCard = React.memo(({
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
-}) => {
-  return (
-    <Pressable
-      style={({ pressed }: { pressed: boolean }) => [styles.quickAction, pressed && styles.quickActionPressed]}
-      onPress={onPress}
-    >
-      <View style={styles.quickActionIcon}>
-        <Ionicons name={icon} size={28} color={colors.primary} />
-      </View>
-      <Text style={styles.quickActionLabel}>{label}</Text>
-    </Pressable>
-  );
-});
+}) => (
+  <Pressable
+    style={({ pressed }: { pressed: boolean }) => [styles.quickAction, pressed && styles.quickActionPressed]}
+    onPress={onPress}
+    accessible
+    accessibilityRole="button"
+    accessibilityLabel={label}
+  >
+    <View style={styles.quickActionIcon}>
+      <Ionicons name={icon} size={26} color={colors.primary} />
+    </View>
+    <Text style={styles.quickActionLabel} numberOfLines={2}>{label}</Text>
+  </Pressable>
+));
 
 const quickActions: Array<{
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   screen: keyof RootStackParamList;
-  tone: string;
 }> = [
-  { label: 'ابحث عن رحلة', icon: 'search-outline', screen: 'AdvancedSearch', tone: colors.teal },
-  { label: 'أرسل طرد', icon: 'cube-outline', screen: 'Packages', tone: colors.blue },
-  { label: 'اعرض رحلة', icon: 'add-circle-outline', screen: 'Driver', tone: colors.green },
+  { label: 'ابحث عن رحلة', icon: 'search-outline', screen: 'AdvancedSearch' },
+  { label: 'أرسل طرد', icon: 'cube-outline', screen: 'Packages' },
+  { label: 'اعرض رحلة', icon: 'add-circle-outline', screen: 'Driver' },
+  { label: 'الخريطة', icon: 'map-outline', screen: 'Map' },
 ];
+
+// --- Popular route (live from API; hidden when nothing is available) ---
+const RecommendedRideSection = React.memo(({
+  trip,
+  onReserve,
+}: {
+  trip: AvailableTrip | null;
+  onReserve: () => void;
+}) => {
+  if (!trip) return null;
+
+  const rideCardProps: RideCardProps = {
+    driver: {
+      name: trip.driver.name,
+      rating: trip.driver.rating,
+      isVerified: trip.driver.verified,
+    },
+    trip: {
+      from: trip.from,
+      to: trip.to,
+      departureTime: trip.time,
+      availableSeats: trip.seats,
+    },
+    onReserve,
+    onPress: onReserve,
+  };
+
+  return (
+    <View style={styles.recommendationSection}>
+      <SectionHeader
+        eyebrow="مسار شائع"
+        title="رحلات متاحة الآن"
+        body="احجز مقعدك قبل أن تمتلئ الرحلة."
+        size="md"
+      />
+      <RideCard {...rideCardProps} />
+    </View>
+  );
+});
 
 // --- Main Screen ---
 
 const HomeScreen = React.memo(() => {
   const { user, loading } = useAuth();
-  const { isOnline, queueSize } = useOffline();
+  const { isOnline } = useOffline();
   const navigation = useNavigation<NavProp>();
+  const [recommendedTrip, setRecommendedTrip] = useState<AvailableTrip | null>(null);
 
   const displayName = useMemo(
-    () => user?.user_metadata?.name || user?.email?.split('@')[0] || 'Friend',
+    () => user?.user_metadata?.name || user?.email?.split('@')[0] || 'صديقي',
     [user?.email, user?.user_metadata?.name],
   );
+
+  // Load a popular-route trip from the API on mount (real data, not mock)
+  useEffect(() => {
+    if (!isOnline) return;
+    let cancelled = false;
+    rideLifecycle.searchTrips('عمّان', 'العقبة', 1)
+      .then(trips => {
+        if (!cancelled && trips.length > 0) setRecommendedTrip(trips[0] ?? null);
+      })
+      .catch(() => { /* No recommendation available — section simply stays hidden */ });
+    return () => { cancelled = true; };
+  }, [isOnline]);
+
+  const goSearch = useCallback(() => navigation.navigate('AdvancedSearch'), [navigation]);
+  const goNotifications = useCallback(() => navigation.navigate('Notifications'), [navigation]);
 
   if (loading) {
     return <HomeSkeleton />;
@@ -190,86 +248,78 @@ const HomeScreen = React.memo(() => {
   return (
     <ScreenShell testID="home-screen">
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Premium Header */}
-        <HomeHeader displayName={displayName} avatarUrl={user?.user_metadata?.avatar_url} />
+        <HomeHeader
+          displayName={displayName}
+          avatarUrl={user?.user_metadata?.avatar_url}
+          unreadCount={0}
+          onNotificationsPress={goNotifications}
+        />
 
-        {/* Smart Search Hero */}
-        <SmartSearch />
+        <SmartSearch onPress={goSearch} />
 
-        {/* Quick Actions */}
         <View style={styles.quickActionsContainer}>
           {quickActions.map(action => (
             <QuickActionCard
               key={action.screen}
               label={action.label}
               icon={action.icon}
-              onPress={() => navigation.navigate(action.screen)}
+              onPress={() => navigation.navigate(action.screen as never)}
             />
           ))}
         </View>
 
-        {/* AI Route Recommendation */}
-        <View style={styles.recommendationSection}>
-          <SectionHeader
-            eyebrow="اقتراح ذكي"
-            title="أفضل خيار لك الآن"
-            body="الطلب منخفض على هذا المسار. احجز الآن بسعر أفضل."
-          />
-          <RideCard {...recommendedRide} />
-        </View>
+        <RecommendedRideSection trip={recommendedTrip} onReserve={goSearch} />
 
-        {/* Services Section */}
         <SectionHeader
           eyebrow="خدمات واصل"
-          title="كل ا يحتاج التنقل والتوصيل"
-          body="خدمات واضحة وآمنة ومصممة للا استخدام اليومي."
+          title="كل ما تحتاجه للتنقل والتوصيل"
+          size="md"
         />
 
         <View style={styles.infoCardsContainer}>
           <InfoCard
             icon="car-sport"
-            title="ضاوير موثوقة"
-            body="اعثر على مشوار مناسب، راجع تفاصيل السائق، وatrib الرحل حتى الوصول."
-            tone={colors.teal}
+            title="مشاوير موثوقة"
+            body="اعثر على مشوار مناسب وتابع الرحلة حتى الوصول."
+            tone={colors.primary}
+            onPress={goSearch}
           />
           <InfoCard
             icon="cube"
             title="توصيل طرود مع تتبع"
-            body="أنشئ طلب توصيل واحتفظ بحالة الطرد وملاحظاته وسجل الاستلام والسلم."
-            tone={colors.blue}
+            body="أنشئ طلب توصيل وتابع حالة الطرد حتى التسليم."
+            tone={colors.primary}
+            onPress={() => navigation.navigate('Packages' as never)}
           />
           <InfoCard
             icon="git-network"
             title="شبكة وخطوط مشتركة"
-            body="استعرض الخطوط والمجموعات النشطة للوصول إلى خيارات نقل أكثر."
-            tone={colors.green}
+            body="استعرض الخطوط والمجموعات النشطة لخيارات نقل أكثر."
+            tone={colors.secondary}
+            onPress={() => navigation.navigate('Networks')}
           />
           <InfoCard
             icon="shield-checkmark"
-            title="الأمان أولاً"
-            body="الوصول السريع لمركز الأمان، مشاركة الرحلة، ومعلومات الحساب الموثوقة."
-            tone={colors.lilac}
-            style={styles.lastCard}
+            title="مركز الأمان"
+            body="مشاركة الرحلة والوصول السريع للمساعدة عند الحاجة."
+            tone={colors.secondary}
+            onPress={() => navigation.navigate('Safety')}
           />
         </View>
-
-        <PrimaryButton
-          label="افتح مركز الأمان"
-          icon="shield-checkmark"
-          tone={colors.navy}
-          onPress={() => navigation.navigate('Safety')}
-          testID="home-safety-center"
-        />
       </ScrollView>
     </ScreenShell>
   );
 });
+
+const SKELETON_BG = colors.surfaceElevated;
 
 const styles = StyleSheet.create({
   scroll: {
     gap: spacing.xl,
     paddingBottom: spacing.xxl,
   },
+
+  // Header
   homeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -281,6 +331,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: 2,
     borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  avatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
+    flex: 1,
   },
   welcomeText: {
     ...typography.caption,
@@ -291,25 +349,45 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   notificationButton: {
-    marginLeft: 'auto',
-    padding: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: MIN_TOUCH,
+    minWidth: MIN_TOUCH,
+    position: 'relative',
   },
   notificationBadge: {
     position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 6,
+    end: 6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: colors.primary,
-    borderWidth: 1,
-    borderColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
   },
+  notificationBadgeText: {
+    color: colors.onPrimary,
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 13,
+  },
+
+  // Search
   searchContainer: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.line,
     padding: spacing.lg,
     ...shadows.lift,
+  },
+  searchContainerPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.99 }],
   },
   searchInputs: {
     marginTop: spacing.lg,
@@ -331,22 +409,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  inputFieldPlaceholder: {
+    color: colors.textMuted,
+    fontWeight: '400',
+  },
   inputSeparator: {
     height: 1,
     backgroundColor: colors.line,
     marginHorizontal: spacing.md,
   },
+  searchCta: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
+    marginTop: spacing.md,
+  },
+  searchCtaText: {
+    ...typography.body,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+
+  // Quick actions
   quickActionsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   quickAction: {
     flex: 1,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.md,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.md,
     ...shadows.card,
     borderWidth: 1,
     borderColor: colors.line,
@@ -356,26 +452,80 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   quickActionIcon: {
-    width: 56,
-    height: 56,
+    width: 48,
+    height: 48,
     borderRadius: radii.md,
     backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   quickActionLabel: {
     ...typography.caption,
     fontWeight: '700',
     color: colors.textSecondary,
+    textAlign: 'center',
   },
+
+  // Recommendation
   recommendationSection: {
     gap: spacing.md,
   },
+
+  // Info cards
   infoCardsContainer: {
     gap: spacing.md,
   },
-  lastCard: { marginBottom: spacing.xs },
+
+  // Skeleton
+  skeletonContainer: {
+    flex: 1,
+    padding: spacing.lg,
+    gap: spacing.xl,
+    backgroundColor: colors.bg,
+  },
+  skeletonHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  skeletonAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: radii.pill,
+    backgroundColor: SKELETON_BG,
+  },
+  skeletonTextBlock: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  skeletonLineShort: {
+    height: 12,
+    width: '40%',
+    borderRadius: radii.sm,
+    backgroundColor: SKELETON_BG,
+  },
+  skeletonLineLong: {
+    height: 16,
+    width: '70%',
+    borderRadius: radii.sm,
+    backgroundColor: SKELETON_BG,
+  },
+  skeletonCard: {
+    height: 120,
+    borderRadius: radii.xl,
+    backgroundColor: SKELETON_BG,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  skeletonCardSmall: {
+    flex: 1,
+    height: 80,
+    borderRadius: radii.lg,
+    backgroundColor: SKELETON_BG,
+  },
 });
 
 export default HomeScreen;

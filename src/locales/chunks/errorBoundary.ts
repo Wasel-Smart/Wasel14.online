@@ -10,6 +10,8 @@ export const errorBoundary = {
         "We're sorry for the inconvenience. Please try refreshing the page.",
       error_details_development_only: 'Error Details (Development Only)',
       try_again_2: 'Try Again',
+      error_id: 'Error ID',
+      copy: 'Copy',
   },
   ar: {
       try_again: 'حاول مجدداً',
@@ -21,6 +23,8 @@ export const errorBoundary = {
         'نعتذر عن الإزعاج. يرجى تحديث الصفحة.',
       error_details_development_only: 'تفاصيل الخطأ (وضع التطوير فقط)',
       try_again_2: 'حاول مجدداً',
+      error_id: 'معرف الخطأ',
+      copy: 'نسخ',
   }
 } as const;
 

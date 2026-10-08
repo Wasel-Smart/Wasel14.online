@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,7 +23,7 @@ export interface VehicleInfo {
 export interface TripInfo {
   from: string;
   to: string;
-  distance: string;
+  distance?: string;
   departureTime: string;
   availableSeats: number;
   packageCapacityKg?: number;
@@ -31,7 +31,7 @@ export interface TripInfo {
 
 export interface RideCardProps {
   driver: DriverInfo;
-  vehicle: VehicleInfo;
+  vehicle?: VehicleInfo;
   trip: TripInfo;
   onReserve?: () => void;
   onPress?: () => void;
@@ -46,6 +46,8 @@ export const RideCard = React.memo(function RideCard({
   onPress,
   testID,
 }: RideCardProps) {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <Pressable
       style={styles.card}
@@ -56,8 +58,14 @@ export const RideCard = React.memo(function RideCard({
     >
       <View style={styles.cardContent}>
         <View style={styles.driverRow}>
-          {driver.photoUrl ? (
-            <Image source={{ uri: driver.photoUrl }} style={styles.avatar} />
+          {driver.photoUrl && !imageError ? (
+            <Image
+              source={{ uri: driver.photoUrl }}
+              style={styles.avatar}
+              resizeMode="cover"
+              onError={() => setImageError(true)}
+              fadeDuration={200}
+            />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Ionicons name="person" size={24} color={colors.textSecondary} />
@@ -98,10 +106,16 @@ export const RideCard = React.memo(function RideCard({
 
         <View style={styles.footer}>
           <View style={styles.tripMeta}>
-            <Text style={styles.tripDetail}>{trip.distance}</Text>
-            <Text style={styles.tripDetail}>🕐 {trip.departureTime}</Text>
+            {trip.distance ? <Text style={styles.tripDetail}>{trip.distance}</Text> : null}
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.tripDetail}>{trip.departureTime}</Text>
+            </View>
             {trip.packageCapacityKg ? (
-              <Text style={styles.tripDetail}>📦 {trip.packageCapacityKg} كغ</Text>
+              <View style={styles.metaItem}>
+                <Ionicons name="cube-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.tripDetail}>{trip.packageCapacityKg} كغ</Text>
+              </View>
             ) : null}
           </View>
           {onReserve ? (
@@ -170,7 +184,7 @@ const styles = StyleSheet.create({
   tripCount: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginLeft: 6,
+    marginStart: 6,
   },
   priceBadge: {
     backgroundColor: `${colors.primary}20`,
@@ -226,6 +240,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.xs,
   },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   tripMeta: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -236,7 +255,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   reserveButton: {
-    backgroundColor: colors.teal,
+    backgroundColor: colors.primary,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -244,6 +265,6 @@ const styles = StyleSheet.create({
   reserveText: {
     ...typography.caption,
     fontWeight: '800' as const,
-    color: colors.bg,
+    color: colors.onPrimary,
   },
 });

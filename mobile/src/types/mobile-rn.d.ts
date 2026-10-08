@@ -45,6 +45,7 @@ declare module 'react-native' {
   export const Component: any;
   export const PureComponent: any;
   export const Switch: any;
+  export const Easing: any;
 
   export type StyleProp<T> = any;
   export type ViewStyle = any;
@@ -53,6 +54,8 @@ declare module 'react-native' {
   export type FlatList<T> = any;
   export type ScrollView = any;
   export type SwitchProps = any;
+  export type TextInput = any;
+  export type TextInputProps = any;
 }
 
 declare module 'react-native-safe-area-context' {
