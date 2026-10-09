@@ -16,8 +16,7 @@ create table if not exists public.payment_idempotency_keys (
 );
 
 create index if not exists idx_payment_idempotency_expires
-  on public.payment_idempotency_keys (expires_at)
-  where expires_at > now();
+  on public.payment_idempotency_keys (expires_at);
 
 alter table public.payment_idempotency_keys enable row level security;
 
@@ -122,4 +121,5 @@ begin
 end;
 $$;
 
+revoke all on function public.cleanup_expired_idempotency_keys() from public, anon, authenticated;
 grant execute on function public.cleanup_expired_idempotency_keys() to service_role;
