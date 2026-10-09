@@ -16,10 +16,9 @@ export const header = {
       profile: 'البروفايل',
       settings: 'الإعدادات',
       language: 'اللغة',
-      journeyProgress: 'تقدم الرحلة',
+      journeyProgress: 'وين وصل مشوارك',
       help: 'مساعدة',
       switchToArabic: 'العربية',
       switchToEnglish: 'English',
   }
 } as const;
-

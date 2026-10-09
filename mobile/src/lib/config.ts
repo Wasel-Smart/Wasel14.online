@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
+import { secureSessionStorage } from './secureStorage';
 
 type ExtraConfig = {
   supabaseUrl?: string;
@@ -61,12 +61,8 @@ export function validateMobileEnvironment(): { valid: boolean; missing: string[]
 }
 
 // Supabase persists refresh tokens. AsyncStorage is plaintext on most devices,
-// so authentication material is stored in the OS-protected keychain/keystore.
-const secureSessionStorage = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
-};
+// so authentication material goes to the OS-protected keychain/keystore through
+// a chunking adapter (see ./secureStorage) that copes with large sessions.
 
 // Keep module initialization safe when a release is misconfigured. App.tsx
 // gates all workflows before this inert client can be used.
@@ -79,5 +75,10 @@ export const supabase = createClient(clientUrl, clientKey, {
     detectSessionInUrl: false,
     persistSession: true,
     autoRefreshToken: true,
+    // PKCE: the deep link carries a one-time `code` that only this device can
+    // exchange. The implicit flow put raw access/refresh tokens in the URL, so
+    // any app able to open the custom scheme could sign a victim into an
+    // attacker's account.
+    flowType: 'pkce',
   },
 });

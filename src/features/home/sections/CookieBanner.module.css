@@ -32,6 +32,27 @@
 
 .cookieBannerActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* The fixed bottom nav is visible below 900px (see MobileBottomNav). Lift the
+   banner above it so neither the consent text nor its buttons are covered. */
+@media (max-width: 899px) {
+  .cookieBanner {
+    bottom: calc(var(--wasel-bottom-nav-h, 68px) + env(safe-area-inset-bottom, 0px));
+    padding: 12px 16px;
+    max-height: 45dvh;
+    overflow-y: auto;
+    overflow-wrap: break-word;
+  }
+
+  .cookieBannerActions {
+    width: 100%;
+  }
+
+  .cookieBannerActions > * {
+    flex: 1 1 auto;
+  }
 }

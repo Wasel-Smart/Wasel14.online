@@ -9,6 +9,12 @@ import { analyticsService } from './analytics';
 const BIOMETRIC_KEY = 'wasel_biometric_enabled';
 const BIOMETRIC_TOKEN_KEY = 'wasel_biometric_token';
 
+// Never let the biometric session sync to iCloud Keychain or restore onto
+// another device from a backup.
+const DEVICE_ONLY: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 class BiometricAuthService {
   private supported = false;
   private enabled = false;
@@ -38,7 +44,7 @@ class BiometricAuthService {
     });
 
     if (result.success) {
-      await SecureStore.setItemAsync(BIOMETRIC_KEY, 'true');
+      await SecureStore.setItemAsync(BIOMETRIC_KEY, 'true', DEVICE_ONLY);
       this.enabled = true;
       analyticsService.logEvent('biometric_enabled');
     }
@@ -97,10 +103,19 @@ class BiometricAuthService {
   async storeSessionForBiometric(accessToken: string, refreshToken: string): Promise<void> {
     if (!this.supported || !this.enabled) return;
 
-    await SecureStore.setItemAsync(BIOMETRIC_TOKEN_KEY, JSON.stringify({
-      accessToken,
-      refreshToken,
-    }));
+    await SecureStore.setItemAsync(
+      BIOMETRIC_TOKEN_KEY,
+      JSON.stringify({ accessToken, refreshToken }),
+      DEVICE_ONLY,
+    );
+  }
+
+  /**
+   * Drops the stored session without turning biometric login off. Called on
+   * sign-out so a stale refresh token never outlives the session it belonged to.
+   */
+  async clearStoredSession(): Promise<void> {
+    await SecureStore.deleteItemAsync(BIOMETRIC_TOKEN_KEY);
   }
 }
 

@@ -121,7 +121,7 @@ export function PageHero({
         display: 'grid',
         gridTemplateColumns: aside ? 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' : '1fr',
         gap: SPACE[5],
-        padding: `${SPACE[7]} ${SPACE[6]}`,
+        padding: `clamp(${SPACE[5]}, 4vw, ${SPACE[7]}) clamp(${SPACE[4]}, 4vw, ${SPACE[6]})`,
         borderRadius: R.xxl,
         background: `
           linear-gradient(135deg, ${accent}12, transparent 34%),
@@ -167,7 +167,8 @@ export function PageHero({
         <h1
           style={{
             margin: 0,
-            fontSize: '2.65rem',
+            fontSize: 'clamp(1.75rem, 1.1rem + 3.2vw, 2.65rem)',
+            overflowWrap: 'break-word',
             lineHeight: TYPE.lineHeight.tight,
             letterSpacing: 0,
             fontWeight: TYPE.weight.ultra,
@@ -373,7 +374,7 @@ export function ActionTile({ label, detail, icon, accent = C.cyan, onClick }: Ac
         background: C.card,
         color: C.text,
         cursor: clickable ? 'pointer' : 'default',
-        textAlign: 'left',
+        textAlign: 'start',
         transition: `transform ${ANIM.dur.normal} ${ANIM.ease.default}, border-color ${ANIM.dur.normal} ${ANIM.ease.default}, box-shadow ${ANIM.dur.normal} ${ANIM.ease.default}`,
         boxShadow: SH.sm,
       }}
@@ -457,7 +458,7 @@ export function DataRow({ label, value, sub, icon, badge, onClick, danger = fals
         background: 'transparent',
         border: 'none',
         borderBottom: `1px solid ${C.borderFaint}`,
-        textAlign: 'left',
+        textAlign: 'start',
         cursor: onClick ? 'pointer' : 'default',
         transition: `background ${ANIM.dur.normal} ${ANIM.ease.default}`,
       }}

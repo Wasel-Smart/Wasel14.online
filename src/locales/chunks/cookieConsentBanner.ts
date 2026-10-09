@@ -14,18 +14,17 @@ export const cookieConsentBanner = {
       accept_all: 'Accept all',
   },
   ar: {
-      cookie_consent: 'موافقة ملفات التتبّع',
+      cookie_consent: 'موافقة الكوكيز',
       we_use_cookies_to_enhance_your_experience_analyze_site_usage_and_provide_personalized_content_by_clicking_accept_you_consent_to_our_use_of_cookies_see_our:
-        'نستخدم ملفات التتبّع لتحسين تجربتك وتحليل استخدام الموقع وتقديم محتوى مخصّص. بالنقر على "موافقة"، توافق على استخدامنا لملفات التتبّع. اطّلع على',
+        'بنستخدم الكوكيز عشان نحسّن تجربتك ونحلل استخدام الموقع ونعرضلك محتوى يناسبك. لما تضغط "موافق" فهذا يعني إنك موافق على استخدامنا للكوكيز. شوف',
       for_details: 'للتفاصيل.',
-      decline: 'رفض',
-      accept: 'موافقة',
-      title: 'موافقة ملفات التتبّع',
+      decline: 'ارفض',
+      accept: 'موافق',
+      title: 'موافقة الكوكيز',
       description:
-        'نستخدم ملفات التتبّع لإبقاء تسجيل دخولك فعّالاً، ولحفظ لغتك، ولفهم أي أجزاء من واصل تُستخدم.',
+        'بنستخدم الكوكيز عشان تضل مسجّل دخول، وعشان نحفظ لغتك، ونفهم أي أجزاء من واصل بيستخدمها الناس.',
       privacy_policy: 'سياسة الخصوصية',
-      reject_all: 'رفض الكل',
-      accept_all: 'موافقة على الكل',
+      reject_all: 'ارفض الكل',
+      accept_all: 'وافق على الكل',
   }
 } as const;
-

@@ -22,6 +22,7 @@ jest.mock('../lib/config', () => ({
       verifyOtp: jest.fn(),
       signInWithOAuth: jest.fn(),
       setSession: jest.fn(),
+      exchangeCodeForSession: jest.fn(),
       resetPasswordForEmail: jest.fn(),
       updateUser: jest.fn(),
       signOut: jest.fn(),
@@ -39,7 +40,7 @@ jest.mock('../services/biometricAuth', () => ({
   },
 }));
 
-import { MobileAuthService } from '../services/auth';
+import { MobileAuthService, isAuthCallbackUrl } from '../services/auth';
 import { supabase } from '../lib/config';
 import { biometricAuth } from '../services/biometricAuth';
 
@@ -50,6 +51,7 @@ const mockAuth = supabase.auth as unknown as {
   verifyOtp: jest.Mock;
   signInWithOAuth: jest.Mock;
   setSession: jest.Mock;
+  exchangeCodeForSession: jest.Mock;
   resetPasswordForEmail: jest.Mock;
   updateUser: jest.Mock;
   signOut: jest.Mock;
@@ -219,5 +221,80 @@ describe('MobileAuthService', () => {
       email: 'user@example.com',
       password: testPw,
     });
+  });
+
+  describe('isAuthCallbackUrl', () => {
+    const redirect = 'wasel://auth/callback';
+
+    it('accepts the exact callback with query or fragment', () => {
+      expect(isAuthCallbackUrl(redirect, redirect)).toBe(true);
+      expect(isAuthCallbackUrl(`${redirect}?code=abc`, redirect)).toBe(true);
+      expect(isAuthCallbackUrl(`${redirect}#error=access_denied`, redirect)).toBe(true);
+    });
+
+    it('rejects look-alike paths, other schemes and empty input', () => {
+      expect(isAuthCallbackUrl(`${redirect}/evil?code=abc`, redirect)).toBe(false);
+      expect(isAuthCallbackUrl(`${redirect}X?code=abc`, redirect)).toBe(false);
+      expect(isAuthCallbackUrl('evil://auth/callback?code=abc', redirect)).toBe(false);
+      expect(isAuthCallbackUrl('', redirect)).toBe(false);
+      expect(isAuthCallbackUrl(redirect, '')).toBe(false);
+    });
+  });
+
+  describe('completeAuthFromUrl', () => {
+    it('exchanges a PKCE code for a session and updates state', async () => {
+      const session = { access_token: 'a', refresh_token: 'r', user: { id: 'user-1' } };
+      mockAuth.exchangeCodeForSession.mockResolvedValue({ data: { session }, error: null });
+
+      const handled = await service.completeAuthFromUrl('wasel://auth/callback?code=pkce-code');
+
+      expect(handled).toBe(true);
+      expect(mockAuth.exchangeCodeForSession).toHaveBeenCalledWith('pkce-code');
+      expect(service.getUser()).toEqual({ id: 'user-1' });
+      expect(mockBiometricAuth.storeSessionForBiometric).toHaveBeenCalledWith('a', 'r');
+    });
+
+    it('ignores raw tokens in the URL instead of trusting them', async () => {
+      const handled = await service.completeAuthFromUrl(
+        'wasel://auth/callback#access_token=evil&refresh_token=evil',
+      );
+
+      expect(handled).toBe(false);
+      expect(mockAuth.setSession).not.toHaveBeenCalled();
+      expect(mockAuth.exchangeCodeForSession).not.toHaveBeenCalled();
+    });
+
+    it('ignores links that are not the auth callback', async () => {
+      const handled = await service.completeAuthFromUrl('evil://auth/callback?code=abc');
+
+      expect(handled).toBe(false);
+      expect(mockAuth.exchangeCodeForSession).not.toHaveBeenCalled();
+    });
+
+    it('surfaces provider errors with a friendly message', async () => {
+      await expect(
+        service.completeAuthFromUrl('wasel://auth/callback?error=access_denied'),
+      ).rejects.toThrow('You have denied access');
+    });
+
+    it('throws when the code exchange fails', async () => {
+      const failure = new Error('bad code');
+      mockAuth.exchangeCodeForSession.mockResolvedValue({ data: null, error: failure });
+
+      await expect(
+        service.completeAuthFromUrl('wasel://auth/callback?code=bad'),
+      ).rejects.toBe(failure);
+    });
+  });
+
+  it('signOut clears the stored biometric session', async () => {
+    const clearStoredSession = jest.fn().mockResolvedValue(undefined);
+    (mockBiometricAuth as unknown as { clearStoredSession: jest.Mock }).clearStoredSession =
+      clearStoredSession;
+    mockAuth.signOut.mockResolvedValue({ error: null });
+
+    await service.signOut();
+
+    expect(clearStoredSession).toHaveBeenCalled();
   });
 });

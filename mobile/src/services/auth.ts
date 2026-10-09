@@ -18,6 +18,18 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/**
+ * A custom-scheme link can be opened by any app on the device, so only a URL
+ * that exactly matches our configured auth callback may start a session.
+ * `wasel://auth/callback?code=1` matches; `wasel://auth/callback/evil` and
+ * `wasel://auth/callbackX` do not.
+ */
+export function isAuthCallbackUrl(url: string, redirectUrl: string): boolean {
+  if (!url || !redirectUrl || !url.startsWith(redirectUrl)) return false;
+  const next = url.charAt(redirectUrl.length);
+  return next === '' || next === '?' || next === '#';
+}
+
 interface AuthState {
   session: Session | null;
   user: User | null;
@@ -186,13 +198,16 @@ export class MobileAuthService {
   }
 
   async completeAuthFromUrl(url: string): Promise<boolean> {
+    if (!isAuthCallbackUrl(url, waselMobileConfig.authRedirectUrl)) {
+      return false;
+    }
+
     const queryString = url.includes('?') ? url.split('?')[1].split('#')[0] : '';
     const hashString = url.includes('#') ? url.split('#')[1] : '';
     const combined = [queryString, hashString].filter(Boolean).join('&');
     const params = new URLSearchParams(combined);
 
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
+    const code = params.get('code');
     const errorCode = params.get('error') || params.get('error_code');
     const errorDescription =
       params.get('error_description') || 'An unknown OAuth error occurred.';
@@ -207,14 +222,14 @@ export class MobileAuthService {
       throw new Error(errorDescription);
     }
 
-    if (!accessToken || !refreshToken) {
+    // PKCE only. Raw `access_token` / `refresh_token` values in a URL are
+    // deliberately ignored: anything that can open the custom scheme could
+    // otherwise sign this device into an attacker-controlled account.
+    if (!code) {
       return false;
     }
 
-    const { data, error } = await this.supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const { data, error } = await this.supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
       throw error;
@@ -224,10 +239,6 @@ export class MobileAuthService {
     }
 
     this.persistSessionForBiometrics(data.session);
-
-    // Ensure profile exists, creating it on first OAuth sign-in
-    // This mirrors the web app's logic for a consistent user experience.
-    await this.supabase.functions.invoke('get-or-create-profile');
 
     this.updateState({
       session: data.session,
@@ -258,6 +269,7 @@ export class MobileAuthService {
 
   async signOut(): Promise<void> {
     await this.supabase.auth.signOut();
+    await this.clearBiometricSession();
   }
 
   async refreshSession(): Promise<Session | null> {
@@ -321,6 +333,16 @@ export class MobileAuthService {
   async signOutAllDevices(): Promise<void> {
     const { error } = await this.supabase.auth.signOut({ scope: 'global' });
     if (error) throw error;
+    await this.clearBiometricSession();
+  }
+
+  /** A refresh token must never outlive the session it belonged to. */
+  private async clearBiometricSession(): Promise<void> {
+    try {
+      await biometricAuth.clearStoredSession();
+    } catch {
+      // Best effort: failing to clear must not block sign-out.
+    }
   }
 }
 

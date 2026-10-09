@@ -109,7 +109,7 @@ export function ProofSection({ ar, onNavigate }: SectionNavigationProps) {
       <div
         className="wasel-home-proof-grid"
         style={{
-          gridTemplateColumns: '1.05fr 0.95fr',
+          gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 0.95fr)',
         }}
       >
         <div
@@ -317,7 +317,7 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
               minHeight: 210,
               display: 'flex',
               flexDirection: 'column',
-              textAlign: 'left',
+              textAlign: 'start',
               borderRadius: R.xl,
               padding: '20px',
               background: `linear-gradient(180deg, ${C.card}, ${C.elevated})`,
@@ -437,7 +437,7 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
                 onClick={() => { void onNavigate(card.path, 'outcome_corridor'); }}
                 style={{
                   minHeight: 72,
-                  textAlign: 'left',
+                  textAlign: 'start',
                   borderRadius: R.lg,
                   padding: '10px 12px',
                   background: C.card2,
@@ -467,7 +467,7 @@ export function TrustPagesSection({ ar, onNavigate }: SectionNavigationProps) {
       <SectionHeader title={tx('homeContent.trust_section_title')} icon="S" />
       <div
         className="wasel-home-trust-grid"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(0, 1fr))', gap: 12 }}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}
       >
         {links.map(link => {
           const Icon = link.icon;
@@ -480,7 +480,7 @@ export function TrustPagesSection({ ar, onNavigate }: SectionNavigationProps) {
                 minHeight: 172,
                 display: 'flex',
                 flexDirection: 'column',
-                textAlign: 'left',
+                textAlign: 'start',
                 borderRadius: R.xl,
                 padding: '18px',
                 background: C.card,

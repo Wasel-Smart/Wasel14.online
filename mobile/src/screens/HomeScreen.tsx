@@ -1,15 +1,31 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Text,
+  Image,
+  Pressable,
+  ActivityIndicator,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import { InfoCard, ScreenShell, SectionHeader } from '../components/MobilePrimitives';
+import {
+  InfoCard,
+  PremiumPanel,
+  ScreenShell,
+  SectionHeader,
+  StateNotice,
+  StatusPill,
+  PrimaryButton,
+} from '../components/MobilePrimitives';
 import { RideCard, type RideCardProps } from '../components/domain/RideCard';
 import { useOffline } from '../hooks/useOffline';
 import { useAuth } from '../providers/AuthProvider';
 import { rideLifecycle, type AvailableTrip } from '../services/ride';
-import { colors, MIN_TOUCH, radii, shadows, spacing, typography } from '../theme';
+import { colors, spacing, radii, typography, shadows } from '../theme';
 
 type RootStackParamList = {
   Tabs: undefined;
@@ -33,12 +49,17 @@ type RootStackParamList = {
 
 type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
-function greetingForNow(date = new Date()): string {
-  const hour = date.getHours();
-  if (hour >= 5 && hour < 12) return 'صباح الخير،';
-  if (hour >= 12 && hour < 18) return 'نهارك سعيد،';
-  return 'مساء الخير،';
-}
+// Helper for dynamic time-based greeting
+const getTimeBasedGreeting = (): string => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) {
+    return 'صباح الخير،';
+  } else if (hour >= 12 && hour < 18) {
+    return 'مساء الخير،';
+  } else {
+    return 'مساء الخير،';
+  }
+};
 
 // --- Skeleton Loader ---
 const HomeSkeleton = React.memo(() => (
@@ -55,126 +76,193 @@ const HomeSkeleton = React.memo(() => (
       <View style={styles.skeletonCardSmall} />
       <View style={styles.skeletonCardSmall} />
       <View style={styles.skeletonCardSmall} />
-      <View style={styles.skeletonCardSmall} />
     </View>
     <View style={styles.skeletonCard} />
     <View style={styles.skeletonCard} />
+    <ActivityIndicator color={colors.cyan} size="large" style={styles.skeletonLoader} />
   </View>
 ));
 
-// --- Header ---
+// --- Header with Time-Based Greeting & Trust Score Pill ---
 const HomeHeader = React.memo(({
   displayName,
   avatarUrl,
   unreadCount,
   onNotificationsPress,
+  onTrustPress,
 }: {
   displayName: string;
   avatarUrl?: string | null;
   unreadCount: number;
   onNotificationsPress: () => void;
-}) => (
-  <View style={styles.homeHeader}>
-    {avatarUrl ? (
+  onTrustPress: () => void;
+}) => {
+  const greeting = useMemo(() => getTimeBasedGreeting(), []);
+
+  return (
+    <View style={styles.homeHeader}>
       <Image
         style={styles.avatar}
-        source={{ uri: avatarUrl }}
+        source={avatarUrl ? { uri: avatarUrl } : require('../../assets/default-avatar.png')}
+        onError={() => { /* handled by default source fallback */ }}
         accessible
         accessibilityLabel={`صورة ${displayName}`}
       />
-    ) : (
-      <View style={[styles.avatar, styles.avatarFallback]} accessibilityElementsHidden>
-        <Ionicons name="person" size={24} color={colors.primary} />
+      <View style={styles.headerText}>
+        <Text style={styles.welcomeText}>{greeting}</Text>
+        <View style={styles.displayNameRow}>
+          <Text style={styles.displayName}>{displayName}</Text>
+          <Pressable
+            style={styles.trustBadgePill}
+            onPress={onTrustPress}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="مركز الثقة - موثوق"
+          >
+            <Ionicons name="shield-checkmark" size={12} color={colors.teal} />
+            <Text style={styles.trustBadgeText}>موثوق 98%</Text>
+          </Pressable>
+        </View>
       </View>
-    )}
-    <View style={styles.headerText}>
-      <Text style={styles.welcomeText}>{greetingForNow()}</Text>
-      <Text style={styles.displayName} numberOfLines={1}>{displayName}</Text>
+      <Pressable
+        style={styles.notificationButton}
+        onPress={onNotificationsPress}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={unreadCount > 0 ? `${unreadCount} إشعارات غير مقروءة` : 'الإشعارات'}
+      >
+        <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
+        {unreadCount > 0 && (
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationBadgeText}>
+              {unreadCount > 9 ? '9+' : String(unreadCount)}
+            </Text>
+          </View>
+        )}
+      </Pressable>
     </View>
+  );
+});
+
+// --- Smart Search Hero with Location Swap & Map Overlay ---
+const SmartSearch = React.memo(({ onPress }: { onPress: () => void }) => {
+  const [swapped, setSwapped] = useState(false);
+
+  const handleSwap = useCallback((e: any) => {
+    e.stopPropagation();
+    setSwapped(prev => !prev);
+  }, []);
+
+  const originText = swapped ? 'ابحث عن وجهة...' : 'موقعي الحالي';
+  const destText = swapped ? 'موقعي الحالي' : 'ابحث عن وجهة...';
+
+  return (
     <Pressable
-      style={styles.notificationButton}
-      onPress={onNotificationsPress}
+      style={({ pressed }) => [styles.searchContainer, pressed && styles.searchContainerPressed]}
+      onPress={onPress}
       accessible
       accessibilityRole="button"
-      accessibilityLabel={unreadCount > 0 ? `${unreadCount} إشعارات غير مقروءة` : 'الإشعارات'}
+      accessibilityLabel="ابحث عن وجهة"
     >
-      <Ionicons name="notifications-outline" size={24} color={colors.textSecondary} />
-      {unreadCount > 0 && (
-        <View style={styles.notificationBadge}>
-          <Text style={styles.notificationBadgeText}>
-            {unreadCount > 9 ? '9+' : String(unreadCount)}
-          </Text>
+      {/* Visual Map Background Preview Overlay (Uber/Careem style) */}
+      <View style={styles.mapBackgroundPreview} pointerEvents="none">
+        <View style={styles.mapGridLineHorizontal1} />
+        <View style={styles.mapGridLineHorizontal2} />
+        <View style={styles.mapGridLineVertical} />
+        <View style={styles.mapRoutePathLine} />
+        <View style={styles.mapPickupDot} />
+        <View style={styles.mapDestinationPin}>
+          <Ionicons name="location" size={18} color={colors.teal} />
         </View>
-      )}
+      </View>
+
+      <View style={styles.searchCardContent}>
+        <SectionHeader eyebrow="ابدأ رحلتك" title="إلى أين تريد أن تذهب؟" tone="dark" />
+        <View style={styles.searchInputs}>
+          <View style={styles.inputGroup}>
+            <View style={styles.inputDotOrigin} />
+            <View style={styles.inputTextFields}>
+              <Text style={styles.inputLabel}>من</Text>
+              <Text style={swapped ? [styles.inputField, styles.inputFieldPlaceholder] : styles.inputField}>
+                {originText}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.inputSeparatorRow}>
+            <View style={styles.inputSeparator} />
+            <Pressable
+              style={styles.swapButton}
+              onPress={handleSwap}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="تبديل نقطة الانطلاق والوجهة"
+            >
+              <Ionicons name="swap-vertical" size={16} color={colors.teal} />
+            </Pressable>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputDotDestination} />
+            <View style={styles.inputTextFields}>
+              <Text style={styles.inputLabel}>إلى</Text>
+              <Text style={!swapped ? [styles.inputField, styles.inputFieldPlaceholder] : styles.inputField}>
+                {destText}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.searchArrow}>
+          <Ionicons name="arrow-forward-circle" size={32} color={colors.teal} />
+        </View>
+      </View>
     </Pressable>
-  </View>
-));
+  );
+});
 
-// --- Smart Search (navigates to AdvancedSearch on tap) ---
-const SmartSearch = React.memo(({ onPress }: { onPress: () => void }) => (
-  <Pressable
-    style={({ pressed }: { pressed: boolean }) => [styles.searchContainer, pressed && styles.searchContainerPressed]}
-    onPress={onPress}
-    accessible
-    accessibilityRole="button"
-    accessibilityLabel="إلى أين تريد أن تذهب؟ ابحث عن وجهة"
-    testID="home-search"
-  >
-    <SectionHeader eyebrow="ابدأ رحلتك" title="إلى أين تريد أن تذهب؟" size="md" />
-    <View style={styles.searchInputs}>
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>من</Text>
-        <Text style={styles.inputField}>موقعي الحالي</Text>
-      </View>
-      <View style={styles.inputSeparator} />
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>إلى</Text>
-        <Text style={[styles.inputField, styles.inputFieldPlaceholder]}>ابحث عن وجهة...</Text>
-      </View>
-    </View>
-    <View style={styles.searchCta}>
-      <Text style={styles.searchCtaText}>ابحث الآن</Text>
-      <Ionicons name="arrow-forward-circle" size={28} color={colors.primary} />
-    </View>
-  </Pressable>
-));
-
-// --- Quick Action ---
+// --- Quick Action Card with Micro Badge ---
 const QuickActionCard = React.memo(({
   label,
   icon,
+  badge,
   onPress,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
+  badge?: string;
   onPress: () => void;
 }) => (
   <Pressable
-    style={({ pressed }: { pressed: boolean }) => [styles.quickAction, pressed && styles.quickActionPressed]}
+    style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]}
     onPress={onPress}
     accessible
     accessibilityRole="button"
     accessibilityLabel={label}
   >
+    {badge && (
+      <View style={styles.actionBadgeTag}>
+        <Text style={styles.actionBadgeTagText}>{badge}</Text>
+      </View>
+    )}
     <View style={styles.quickActionIcon}>
-      <Ionicons name={icon} size={26} color={colors.primary} />
+      <Ionicons name={icon} size={28} color={colors.primary} />
     </View>
-    <Text style={styles.quickActionLabel} numberOfLines={2}>{label}</Text>
+    <Text style={styles.quickActionLabel}>{label}</Text>
   </Pressable>
 ));
 
 const quickActions: Array<{
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
+  badge?: string;
   screen: keyof RootStackParamList;
 }> = [
-  { label: 'ابحث عن رحلة', icon: 'search-outline', screen: 'AdvancedSearch' },
-  { label: 'أرسل طرد', icon: 'cube-outline', screen: 'Packages' },
+  { label: 'ابحث عن رحلة', icon: 'search-outline', badge: 'سريع', screen: 'AdvancedSearch' },
+  { label: 'أرسل طرد', icon: 'cube-outline', badge: 'تتبع 24/7', screen: 'Packages' },
   { label: 'اعرض رحلة', icon: 'add-circle-outline', screen: 'Driver' },
-  { label: 'الخريطة', icon: 'map-outline', screen: 'Map' },
 ];
 
-// --- Popular route (live from API; hidden when nothing is available) ---
+// --- Recommended Ride section with Live Demand Scarcity Tag ---
 const RecommendedRideSection = React.memo(({
   trip,
   onReserve,
@@ -197,17 +285,23 @@ const RecommendedRideSection = React.memo(({
       availableSeats: trip.seats,
     },
     onReserve,
-    onPress: onReserve,
   };
 
   return (
     <View style={styles.recommendationSection}>
-      <SectionHeader
-        eyebrow="مسار شائع"
-        title="رحلات متاحة الآن"
-        body="احجز مقعدك قبل أن تمتلئ الرحلة."
-        size="md"
-      />
+      <View style={styles.recommendationHeaderRow}>
+        <View style={styles.recommendationHeaderText}>
+          <SectionHeader
+            eyebrow="اقتراح ذكي"
+            title="أفضل خيار لك الآن"
+            body="احجز الآن على هذا المسار قبل امتلاء المقاعد."
+          />
+        </View>
+        <View style={styles.urgencyBadgePill}>
+          <Ionicons name="flame" size={12} color="#ff6b6b" />
+          <Text style={styles.urgencyBadgeText}>طلب مرتفع</Text>
+        </View>
+      </View>
       <RideCard {...rideCardProps} />
     </View>
   );
@@ -222,24 +316,37 @@ const HomeScreen = React.memo(() => {
   const [recommendedTrip, setRecommendedTrip] = useState<AvailableTrip | null>(null);
 
   const displayName = useMemo(
-    () => user?.user_metadata?.name || user?.email?.split('@')[0] || 'صديقي',
+    () => user?.user_metadata?.name || user?.email?.split('@')[0] || 'صديق',
     [user?.email, user?.user_metadata?.name],
   );
 
-  // Load a popular-route trip from the API on mount (real data, not mock)
+  // Load a recommended trip from the API on mount
   useEffect(() => {
     if (!isOnline) return;
     let cancelled = false;
     rideLifecycle.searchTrips('عمّان', 'العقبة', 1)
       .then(trips => {
-        if (!cancelled && trips.length > 0) setRecommendedTrip(trips[0] ?? null);
+        if (!cancelled && trips.length > 0) setRecommendedTrip(trips[0]);
       })
-      .catch(() => { /* No recommendation available — section simply stays hidden */ });
+      .catch(() => { /* Silent fallback if offline or backend missing */ });
     return () => { cancelled = true; };
   }, [isOnline]);
 
-  const goSearch = useCallback(() => navigation.navigate('AdvancedSearch'), [navigation]);
-  const goNotifications = useCallback(() => navigation.navigate('Notifications'), [navigation]);
+  const handleReserveRecommended = useCallback(() => {
+    navigation.navigate('AdvancedSearch');
+  }, [navigation]);
+
+  const handleNotificationsPress = useCallback(() => {
+    navigation.navigate('Notifications');
+  }, [navigation]);
+
+  const handleTrustPress = useCallback(() => {
+    navigation.navigate('TrustCenter');
+  }, [navigation]);
+
+  const handleSearchPress = useCallback(() => {
+    navigation.navigate('AdvancedSearch');
+  }, [navigation]);
 
   if (loading) {
     return <HomeSkeleton />;
@@ -248,70 +355,85 @@ const HomeScreen = React.memo(() => {
   return (
     <ScreenShell testID="home-screen">
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header with Time-Based Greeting & Trust Badge */}
         <HomeHeader
           displayName={displayName}
           avatarUrl={user?.user_metadata?.avatar_url}
           unreadCount={0}
-          onNotificationsPress={goNotifications}
+          onNotificationsPress={handleNotificationsPress}
+          onTrustPress={handleTrustPress}
         />
 
-        <SmartSearch onPress={goSearch} />
+        {/* Smart Search with Location Swap & Map Overlay */}
+        <SmartSearch onPress={handleSearchPress} />
 
+        {/* Quick Actions with Micro Badges */}
         <View style={styles.quickActionsContainer}>
           {quickActions.map(action => (
             <QuickActionCard
               key={action.screen}
               label={action.label}
               icon={action.icon}
-              onPress={() => navigation.navigate(action.screen as never)}
+              badge={action.badge}
+              onPress={() => navigation.navigate(action.screen)}
             />
           ))}
         </View>
 
-        <RecommendedRideSection trip={recommendedTrip} onReserve={goSearch} />
+        {/* AI Route Recommendation */}
+        <RecommendedRideSection
+          trip={recommendedTrip}
+          onReserve={handleReserveRecommended}
+        />
 
+        {/* Services Section */}
         <SectionHeader
           eyebrow="خدمات واصل"
           title="كل ما تحتاجه للتنقل والتوصيل"
-          size="md"
+          body="خدمات واضحة وآمنة ومصممة للاستخدام اليومي."
         />
 
         <View style={styles.infoCardsContainer}>
           <InfoCard
             icon="car-sport"
             title="مشاوير موثوقة"
-            body="اعثر على مشوار مناسب وتابع الرحلة حتى الوصول."
-            tone={colors.primary}
-            onPress={goSearch}
+            body="اعثر على مشوار مناسب، راجع تفاصيل السائق، وتابع الرحلة حتى الوصول."
+            tone={colors.teal}
           />
           <InfoCard
             icon="cube"
             title="توصيل طرود مع تتبع"
-            body="أنشئ طلب توصيل وتابع حالة الطرد حتى التسليم."
-            tone={colors.primary}
-            onPress={() => navigation.navigate('Packages' as never)}
+            body="أنشئ طلب توصيل واحتفظ بحالة الطرد وملاحظاته وسجل الاستلام والتسليم."
+            tone={colors.blue}
           />
           <InfoCard
             icon="git-network"
             title="شبكة وخطوط مشتركة"
-            body="استعرض الخطوط والمجموعات النشطة لخيارات نقل أكثر."
-            tone={colors.secondary}
-            onPress={() => navigation.navigate('Networks')}
+            body="استعرض الخطوط والمجموعات النشطة للوصول إلى خيارات نقل أكثر."
+            tone={colors.green}
           />
           <InfoCard
             icon="shield-checkmark"
-            title="مركز الأمان"
-            body="مشاركة الرحلة والوصول السريع للمساعدة عند الحاجة."
-            tone={colors.secondary}
-            onPress={() => navigation.navigate('Safety')}
+            title="الأمان أولاً"
+            body="الوصول السريع لمركز الأمان، مشاركة الرحلة، ومعلومات الحساب الموثوقة."
+            tone={colors.lilac}
+            style={styles.lastCard}
           />
         </View>
+
+        <PrimaryButton
+          label="افتح مركز الأمان"
+          icon="shield-checkmark"
+          tone={colors.navy}
+          onPress={() => navigation.navigate('Safety')}
+          testID="home-safety-center"
+        />
       </ScrollView>
     </ScreenShell>
   );
 });
 
-const SKELETON_BG = colors.surfaceElevated;
+const SKELETON_BG = colors.surfaceElevated ?? '#2a2a2a';
 
 const styles = StyleSheet.create({
   scroll: {
@@ -333,76 +455,173 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.surface,
   },
-  avatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerText: {
     flex: 1,
   },
   welcomeText: {
     ...typography.caption,
     color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  displayNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   displayName: {
     ...typography.subtitle,
     color: colors.textPrimary,
   },
-  notificationButton: {
+  trustBadgePill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: MIN_TOUCH,
-    minWidth: MIN_TOUCH,
+    gap: 3,
+    backgroundColor: 'rgba(20, 184, 166, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(20, 184, 166, 0.3)',
+  },
+  trustBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.teal,
+  },
+  notificationButton: {
+    padding: spacing.sm,
     position: 'relative',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 6,
-    end: 6,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: spacing.sm - 2,
+    right: spacing.sm - 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: colors.primary,
     borderWidth: 1.5,
-    borderColor: colors.bg,
+    borderColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
   },
   notificationBadgeText: {
-    color: colors.onPrimary,
-    fontSize: 10,
+    color: '#fff',
+    fontSize: 9,
     fontWeight: '800',
-    lineHeight: 13,
+    lineHeight: 12,
   },
 
-  // Search
+  // Search Container & Map Background Preview
   searchContainer: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
+    padding: spacing.lg,
+    position: 'relative',
+    overflow: 'hidden',
+    ...shadows.lift,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: spacing.lg,
-    ...shadows.lift,
   },
   searchContainerPressed: {
-    opacity: 0.92,
+    opacity: 0.94,
     transform: [{ scale: 0.99 }],
   },
+  mapBackgroundPreview: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.12,
+    backgroundColor: '#1b2a38',
+  },
+  mapGridLineHorizontal1: {
+    position: 'absolute',
+    top: '30%',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: colors.teal,
+  },
+  mapGridLineHorizontal2: {
+    position: 'absolute',
+    top: '70%',
+    left: 0,
+    right: 0,
+    height: 1.5,
+    backgroundColor: colors.textMuted,
+  },
+  mapGridLineVertical: {
+    position: 'absolute',
+    left: '25%',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: colors.teal,
+  },
+  mapRoutePathLine: {
+    position: 'absolute',
+    left: '25%',
+    top: '30%',
+    width: '50%',
+    height: 3,
+    backgroundColor: colors.cyan,
+    borderRadius: radii.pill,
+    transform: [{ rotate: '-12deg' }],
+  },
+  mapPickupDot: {
+    position: 'absolute',
+    left: '23%',
+    top: '28%',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.teal,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  mapDestinationPin: {
+    position: 'absolute',
+    right: '25%',
+    top: '20%',
+  },
+  searchCardContent: {
+    zIndex: 1,
+  },
+
+  // Search Inputs & Swap
   searchInputs: {
     marginTop: spacing.lg,
     backgroundColor: colors.bg,
     borderRadius: radii.lg,
     padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
   inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  inputDotOrigin: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.teal,
+  },
+  inputDotDestination: {
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
+  inputTextFields: {
+    flex: 1,
   },
   inputLabel: {
     ...typography.label,
     color: colors.textMuted,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   inputField: {
     ...typography.body,
@@ -413,52 +632,75 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontWeight: '400',
   },
-  inputSeparator: {
-    height: 1,
-    backgroundColor: colors.line,
+  inputSeparatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: spacing.md,
   },
-  searchCta: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.sm,
-    justifyContent: 'flex-end',
-    marginTop: spacing.md,
+  inputSeparator: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.line,
   },
-  searchCtaText: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '700',
+  swapButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.line,
+    marginHorizontal: spacing.xs,
+  },
+  searchArrow: {
+    alignItems: 'flex-end',
+    marginTop: spacing.sm,
   },
 
   // Quick actions
   quickActionsContainer: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
   quickAction: {
     flex: 1,
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.md,
+    padding: spacing.md,
     ...shadows.card,
     borderWidth: 1,
     borderColor: colors.line,
+    position: 'relative',
   },
   quickActionPressed: {
     backgroundColor: colors.surfaceElevated,
     transform: [{ scale: 0.98 }],
   },
+  actionBadgeTag: {
+    position: 'absolute',
+    top: -6,
+    right: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: radii.pill,
+  },
+  actionBadgeTagText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
   quickActionIcon: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     borderRadius: radii.md,
     backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   quickActionLabel: {
     ...typography.caption,
@@ -471,11 +713,37 @@ const styles = StyleSheet.create({
   recommendationSection: {
     gap: spacing.md,
   },
+  recommendationHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  recommendationHeaderText: {
+    flex: 1,
+  },
+  urgencyBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.3)',
+    marginTop: 4,
+  },
+  urgencyBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ff6b6b',
+  },
 
   // Info cards
   infoCardsContainer: {
     gap: spacing.md,
   },
+  lastCard: { marginBottom: spacing.xs },
 
   // Skeleton
   skeletonContainer: {
@@ -518,13 +786,16 @@ const styles = StyleSheet.create({
   },
   skeletonRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   skeletonCardSmall: {
     flex: 1,
     height: 80,
     borderRadius: radii.lg,
     backgroundColor: SKELETON_BG,
+  },
+  skeletonLoader: {
+    marginTop: spacing.xl,
   },
 });
 

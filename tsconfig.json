@@ -10,7 +10,6 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
-      "*": ["./*"],
       "@/*": ["./src/*"],
       "@wasel/rbac": ["./packages/rbac/src/index.ts"],
       "@wasel/rbac/*": ["./packages/rbac/src/*"]

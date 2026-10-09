@@ -11,14 +11,14 @@ export const corridorBetaFocusSection = {
       'Do not open a new corridor until weekly rides, repeat rate, supply reliability, and three consecutive weeks are proven. Then repeat the same gate as the corridor graph expands.',
   },
   ar: {
-    sectionTitle: 'تجربة المسارات المركزة',
+    sectionTitle: 'تجربة المسارات المركّزة',
     sectionSubtitle:
-      'نضيق التجربة على 3 مسارات، نثبت الرحلات المتكررة، ثم نتوسع مساراً واحداً كل مرة.',
+      'بنركّز على 3 مسارات، وبنثبّت المشاوير المتكررة، وبعدين بنتوسع مسار مسار.',
     startFocusCta: 'ابدأ المسار',
-    ridesPerWeek: 'رحلات/أسبوع',
+    ridesPerWeek: 'مشاوير/أسبوع',
     repeatRate: 'التكرار',
-    expansionGateTitle: 'بوابة التوسع',
+    expansionGateTitle: 'شرط التوسع',
     expansionGateDesc:
-      'لا تنتقل لمسار جديد إلا بعد تحقيق الرحلات الأسبوعية، التكرار، ثبات العرض، وثلاثة أسابيع متتالية. بعد ذلك يتكرر نفس المسار للتوسع اللانهائي داخل شبكة المسارات.',
+      'ما بنفتح مسار جديد إلا لما تثبت المشاوير الأسبوعية ونسبة التكرار وثبات العرض وثلاثة أسابيع ورا بعض. وبعدها بنعيد نفس الشرط كل ما كبرت شبكة المسارات.',
   },
 } as const;

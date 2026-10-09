@@ -11,11 +11,10 @@ export const mobilityOSLandingMap = {
   ar: {
       pressure: 'الضغط',
       x: 'س',
-      utilization: 'الاستغلال',
-      network_visualization: 'شبكة ممرات الأردن المتحركة التي تعرض حركة الركاب، والسعة المشتركة، والطرود، وعُقد المدن، والمسار المختار.',
-      fallback_focus: 'تركيز احتياطي',
-      live_corridor_focus: 'تركيز الممر الحي',
+      utilization: 'نسبة الاستخدام',
+      network_visualization: 'خريطة متحركة لشبكة مسارات الأردن، بتعرض حركة الركاب وسعة المركبات والطرود ومراكز المدن والمسار المختار.',
+      fallback_focus: 'التركيز على البديل',
+      live_corridor_focus: 'المسار المباشر',
       jordan_network: 'شبكة الأردن',
   }
 } as const;
-

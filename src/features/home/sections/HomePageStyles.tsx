@@ -34,6 +34,11 @@ export function HomePageStyles () {
       .wasel-home-shell {
         min-height: 100dvh;
         position: relative;
+        /* Inherited by every descendant: long words/URLs/Arabic tokens wrap
+           instead of being clipped or pushing the layout sideways. */
+        overflow-wrap: break-word;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
         /* clip, not hidden: hidden + overflow-y: visible computes to auto and
            turns the shell into a scroll container, which breaks sticky children. */
         overflow-x: hidden;
@@ -776,9 +781,12 @@ export function HomePageStyles () {
 
       .wasel-home-proof-metric-card {
         display: grid;
-        grid-template-columns: 88px minmax(0, 1fr);
+        /* Value column sizes to its content (never a fixed 88px) and the text
+           column may shrink to 0 but wraps instead of overflowing. */
+        grid-template-columns: minmax(48px, max-content) minmax(0, 1fr);
         gap: 14px;
         align-items: center;
+        min-width: 0;
         border-radius: 18px;
         padding: 16px 18px;
         background: rgba(255,255,255,0.06);
@@ -790,6 +798,7 @@ export function HomePageStyles () {
         font-size: 1.35rem;
         font-weight: 950;
         line-height: 1;
+        white-space: nowrap;
       }
 
       .wasel-home-proof-metric-label {
@@ -1373,10 +1382,17 @@ export function HomePageStyles () {
           padding: 12px 14px !important;
         }
 
+        /* One metric per row on phones. The old 2-column rule squeezed each
+           card to ~130px, collapsing the text column next to the value. */
         .wasel-home-proof-metrics {
           display: grid !important;
-          grid-template-columns: repeat(2, 1fr) !important;
+          grid-template-columns: minmax(0, 1fr) !important;
           gap: 10px !important;
+        }
+
+        .wasel-home-proof-metric-card {
+          padding: 14px !important;
+          gap: 12px !important;
         }
 
         .wasel-home-container {

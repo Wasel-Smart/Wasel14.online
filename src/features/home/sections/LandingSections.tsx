@@ -7,7 +7,6 @@ import {
   PackageCheck,
   Route,
   Shield,
-  Star,
   Truck,
   Users,
 } from 'lucide-react';
@@ -58,14 +57,12 @@ const featureCards = [
   },
 ] as const;
 
-// Every card must land on a route the router actually declares — a path with no
-// route behind it lands the visitor on the 404 page, which is a dead end from
-// the marketing surface. These four services are delivered through existing
-// Wasel capabilities rather than a dedicated page:
-//   Freight  -> parcel/cargo capacity on the packages surface
-//   Commute  -> posting your own seats is carpooling (offer-ride)
-//   School   -> scheduled, route-fixed transport (bus)
-//   Luxury   -> the premium tier (plus)
+// Every card must land on a route the router actually declares, and every
+// card must describe something Wasel really does. The four ways to move below
+// are the product's real core navigation (see config/user-navigation.ts):
+// find a ride, offer seats, send a parcel, and the scheduled bus backup.
+// Earlier revisions also advertised freight, school transport and luxury
+// chauffeurs, which have no page behind them, so they are gone.
 const serviceCards = [
   {
     icon: Route,
@@ -73,6 +70,13 @@ const serviceCards = [
     descKey: 'servicesRidesharingDesc',
     accent: C.cyan,
     path: '/find-ride',
+  },
+  {
+    icon: MapPinned,
+    titleKey: 'servicesCarpool',
+    descKey: 'servicesCarpoolDesc',
+    accent: C.gold,
+    path: '/offer-ride',
   },
   {
     icon: PackageCheck,
@@ -83,49 +87,27 @@ const serviceCards = [
   },
   {
     icon: Truck,
-    titleKey: 'servicesFreight',
-    descKey: 'servicesFreightDesc',
-    accent: C.blue,
-    path: '/packages',
-  },
-  {
-    icon: MapPinned,
-    titleKey: 'servicesCarpool',
-    descKey: 'servicesCarpoolDesc',
+    titleKey: 'servicesPublicBus',
+    descKey: 'servicesPublicBusDesc',
     accent: C.green,
-    path: '/offer-ride',
-  },
-  {
-    icon: Shield,
-    titleKey: 'servicesSchool',
-    descKey: 'servicesSchoolDesc',
-    accent: C.gold,
     path: '/bus',
-  },
-  {
-    icon: Star,
-    titleKey: 'servicesLuxury',
-    descKey: 'servicesLuxuryDesc',
-    accent: C.purple,
-    path: '/plus',
   },
 ] as const;
 
 // Counts are derived from data the app already ships, never invented. The
-// service count matches landing.featuresFlexibleDesc ("12 specialized
-// services"), and the corridor/city counts are computed from POPULAR_ROUTES.
-// A previous revision hardcoded "50K+ / 200K+ / 5K+" user and trip totals
-// that exist in no source and on no live surface — fabricated traction
-// figures on a public marketing page, so they are gone.
-const SERVICE_COUNT = 12;
+// ways-to-move count is the length of the service list above; corridor and
+// city counts are computed from POPULAR_ROUTES; five trust checks is the
+// documented trust model (identity, email, phone, driver documents, wallet).
+const SERVICE_COUNT = serviceCards.length;
 const CORRIDOR_COUNT = POPULAR_ROUTES.length;
 const CITY_COUNT = new Set(POPULAR_ROUTES.map(r => r.to)).size;
+const TRUST_CHECK_COUNT = 5;
 
 const stats = [
   { value: String(SERVICE_COUNT), labelKey: 'statsServices', accent: C.cyan },
   { value: String(CORRIDOR_COUNT), labelKey: 'statsCorridors', accent: C.gold },
   { value: String(CITY_COUNT), labelKey: 'statsCities', accent: C.orange },
-  { value: String(CORRIDOR_COUNT), labelKey: 'statsRoutes', accent: C.green },
+  { value: String(TRUST_CHECK_COUNT), labelKey: 'homeSections.statTrustChecks', accent: C.green },
 ] as const;
 
 export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
@@ -150,7 +132,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
           className="wasel-home-features-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
             gap: 16,
           }}
         >
@@ -239,7 +221,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
           className="wasel-home-services-grid"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
             gap: 14,
           }}
         >
@@ -253,7 +235,7 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
                 whileHover={{ y: -2 }}
                 onClick={() => void onNavigate(service.path, `service_${service.path.replace('/', '')}`)}
                 style={{
-                  textAlign: 'left',
+                  textAlign: 'start',
                   borderRadius: R.xl,
                   padding: '20px',
                   background: C.card,
@@ -362,22 +344,25 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
             className="wasel-home-stats-grid"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
               gap: 16,
             }}
           >
-            {stats.map((stat, index) => (
+            {stats.map((stat) => (
               <div
                 key={stat.labelKey}
                 style={{
                   textAlign: 'center',
-                  padding: '0 12px',
-                  borderRight: index < stats.length - 1 ? `1px solid ${C.border}` : 'none',
+                  padding: '14px 10px',
+                  minWidth: 0,
+                  borderRadius: R.lg,
+                  background: `${stat.accent}0d`,
+                  border: `1px solid ${stat.accent}1f`,
                 }}
               >
                 <div
                   style={{
-                    fontSize: '2.5rem',
+                    fontSize: 'clamp(1.75rem, 1.2rem + 2.4vw, 2.5rem)',
                     fontWeight: TYPE.weight.ultra,
                     color: stat.accent,
                     lineHeight: 1.1,

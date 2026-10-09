@@ -94,7 +94,7 @@ describe('BiometricAuthService', () => {
 
       await biometricAuth.enable();
 
-      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(BIOMETRIC_KEY, 'true');
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(BIOMETRIC_KEY, 'true', expect.any(Object));
       expect(biometricAuth.isEnabled()).toBe(true);
       expect(analyticsService.logEvent).toHaveBeenCalledWith('biometric_enabled');
     });
@@ -263,7 +263,17 @@ describe('BiometricAuthService', () => {
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
         BIOMETRIC_TOKEN_KEY,
         JSON.stringify({ accessToken: 'access-1', refreshToken: 'refresh-1' }),
+        expect.any(Object),
       );
+    });
+  });
+
+  describe('clearStoredSession', () => {
+    it('deletes only the stored session token and leaves the enabled flag alone', async () => {
+      await biometricAuth.clearStoredSession();
+
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledTimes(1);
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(BIOMETRIC_TOKEN_KEY);
     });
   });
 });

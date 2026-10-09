@@ -6,10 +6,9 @@ export const corridorCard = {
       dynamic_cargo_price: 'Dynamic Cargo Price',
   },
   ar: {
-      corridor_instrument: 'أداة الممرّ',
+      corridor_instrument: 'أداة المسار',
       km: 'كم /',
-      dynamic_seat_price: 'سعر المقعد الديناميكي',
-      dynamic_cargo_price: 'سعر الشحن الديناميكي',
+      dynamic_seat_price: 'سعر المقعد المتغيّر',
+      dynamic_cargo_price: 'سعر الشحن المتغيّر',
   }
 } as const;
-
