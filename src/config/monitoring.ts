@@ -3,12 +3,7 @@
  * Defines all alerts, thresholds, and monitoring rules
  */
 
-type SentryEvent = {
-  user?: { id?: string };
-  tags?: Record<string, string>;
-  exception?: { values?: Array<{ value?: string }> };
-  [key: string]: unknown;
-};
+import type { ErrorEvent } from '@sentry/react';
 
 export interface AlertRule {
   id: string;
@@ -483,7 +478,7 @@ export function initializeMonitoring() {
         dsn: sentryDsn,
         environment: import.meta.env.MODE,
         tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
-        beforeSend(event: SentryEvent) {
+        beforeSend(event: ErrorEvent) {
           // Filter out ignored errors
           const ignoredErrors = [
             'IframeMessageAbortError',
@@ -491,7 +486,7 @@ export function initializeMonitoring() {
             'ResizeObserver loop limit exceeded',
           ];
 
-          const values = (event as { exception?: { values?: Array<{ value?: string }> } }).exception?.values;
+          const values = event.exception?.values;
           if (values?.[0]?.value) {
             const errorMessage = values[0].value;
             if (ignoredErrors.some(ignored => errorMessage.includes(ignored))) {
