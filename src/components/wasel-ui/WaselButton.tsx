@@ -10,16 +10,15 @@ import { C, GRAD, GRAD_GOLD, R, SH, TYPE } from '../../utils/wasel-ds';
 
 const STYLE_ID = 'wasel-btn-css';
 const BTN_CSS = `
-  .wbtn { position: relative; overflow: hidden; transition: transform 160ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 160ms ease, border-color 160ms ease, background 160ms ease, opacity 160ms ease; }
-  .wbtn::after { content:''; position:absolute; inset:0; background:linear-gradient(to right, transparent 0%, rgba(255,255,255,0.13) 50%, transparent 100%); transform:translateX(-110%); transition:transform 0.55s ease; pointer-events:none; border-radius:inherit; }
-  .wbtn:not(:disabled):hover::after { transform:translateX(110%); }
-  .wbtn:not(:disabled):hover { transform: translateY(-2px) scale(1.015); }
-  .wbtn:not(:disabled):active { transform: scale(0.97) !important; }
+  .wbtn { position: relative; overflow: hidden; transition: transform 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1), background 150ms cubic-bezier(0.4,0,0.2,1), opacity 150ms cubic-bezier(0.4,0,0.2,1); }
+  .wbtn:not(:disabled):hover { transform: translateY(-1px); }
+  .wbtn:not(:disabled):active { transform: scale(0.98) !important; }
   .wbtn:focus-visible { outline: 2px solid var(--wasel-focus, #00E5FF); outline-offset: 3px; }
-  .wbtn[data-variant='primary']:not(:disabled):hover { box-shadow: 0 14px 36px rgba(0,229,255,0.38), 0 1px 0 rgba(255,255,255,0.18) inset; }
-  .wbtn[data-variant='outline']:not(:disabled):hover { background: rgba(0,229,255,0.1) !important; border-color: rgba(0,229,255,0.5) !important; box-shadow: 0 0 22px rgba(0,229,255,0.16); }
+  /* Brand rule: soft navy/colour shadows, colour shifts for emphasis, no glow spreads. */
+  .wbtn[data-variant='primary']:not(:disabled):hover { box-shadow: 0 8px 22px rgba(0,229,255,0.2); filter: brightness(1.05); }
+  .wbtn[data-variant='outline']:not(:disabled):hover { background: rgba(0,229,255,0.1) !important; border-color: rgba(0,229,255,0.5) !important; }
   .wbtn[data-variant='ghost']:not(:disabled):hover { background: rgba(255,255,255,0.07) !important; color: #F8FBFF !important; }
-  .wbtn[data-variant='gold']:not(:disabled):hover { box-shadow: 0 14px 36px rgba(255,138,11,0.38); }
+  .wbtn[data-variant='gold']:not(:disabled):hover { box-shadow: 0 8px 22px rgba(255,190,92,0.24); filter: brightness(1.04); }
   .wbtn[data-variant='danger']:not(:disabled):hover { background: rgba(255,124,139,0.22) !important; }
   @keyframes wbtn-spin { to { transform: rotate(360deg); } }
   .wbtn-spinner { animation: wbtn-spin 0.9s linear infinite; }
@@ -75,8 +74,8 @@ const variantStyles: Record<
     background: GRAD_GOLD,
     color: C.bgDeep,
     border: 'none',
-    boxShadow: SH.orange,
-    hoverShadow: SH.orange,
+    boxShadow: SH.gold,
+    hoverShadow: SH.gold,
   },
   danger: {
     background: C.errorDim,

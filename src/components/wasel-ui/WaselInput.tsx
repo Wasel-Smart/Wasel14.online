@@ -4,8 +4,25 @@
 
 import { Eye, EyeOff } from 'lucide-react';
 import { type InputHTMLAttributes, type ReactNode, useId, useState } from 'react';
-import { ANIM, C, F, R, TYPE } from '../../utils/wasel-ds';
+import { C, F, R, TYPE } from '../../utils/wasel-ds';
 import { sanitizeHtml } from '../../utils/sanitization';
+
+// Focus / error styling lives in CSS (:focus-within) instead of React state, so it
+// can be themed and doesn't re-render the field on every focus change.
+const INPUT_STYLE_ID = 'wasel-input-css';
+const INPUT_CSS = `
+  .wasel-input-box { border: 1.5px solid ${ C.borderInput }; background: ${ C.cardSolid }; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1), background 150ms cubic-bezier(0.4,0,0.2,1); }
+  .wasel-input-box:hover { border-color: ${ C.cyan }99; }
+  .wasel-input-box:focus-within { border-color: ${ C.cyan }; background: ${ C.card2 }; box-shadow: 0 0 0 3px ${ C.cyanGlow }; }
+  .wasel-input-box[data-invalid='true'] { border-color: ${ C.error }; box-shadow: 0 0 0 3px ${ C.errorDim }; }
+`;
+
+if ( typeof document !== 'undefined' && !document.getElementById( INPUT_STYLE_ID ) ) {
+  const el = document.createElement( 'style' );
+  el.id = INPUT_STYLE_ID;
+  el.textContent = INPUT_CSS;
+  document.head.appendChild( el );
+}
 
 interface WaselInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   label?: string;
@@ -63,19 +80,10 @@ export function WaselInput({
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const errorId = `${inputId}-error`;
-  const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
   const resolvedType = isPassword && showPassword ? 'text' : type;
   const hasError = Boolean(error);
-
-  // Focus border must hit 3:1 against the field: the old 28%-alpha cyan did not.
-  const borderColor = hasError ? C.error : focused ? C.cyan : C.border;
-  const boxShadow = hasError
-    ? `0 0 0 3px ${C.errorDim}`
-    : focused
-      ? `0 0 0 3px ${C.cyanGlow}`
-      : 'none';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -112,6 +120,8 @@ export function WaselInput({
 
       <div
         dir={dir}
+        className="wasel-input-box"
+        data-invalid={hasError || undefined}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -119,10 +129,6 @@ export function WaselInput({
           padding: '0 14px',
           minHeight: '50px',
           borderRadius: R.lg,
-          background: focused ? C.card2 : C.cardSolid,
-          border: `1.5px solid ${borderColor}`,
-          boxShadow,
-          transition: `border-color ${ANIM.dur.normal} ${ANIM.ease.default}, box-shadow ${ANIM.dur.normal} ${ANIM.ease.default}, background ${ANIM.dur.normal} ${ANIM.ease.default}`,
         }}
       >
         {icon && (
@@ -140,14 +146,6 @@ export function WaselInput({
           aria-invalid={hasError || undefined}
           aria-describedby={hasError ? errorId : rest['aria-describedby']}
           onChange={e => onChange?.(e.target.value)}
-          onFocus={e => {
-            setFocused(true);
-            rest.onFocus?.(e);
-          }}
-          onBlur={e => {
-            setFocused(false);
-            rest.onBlur?.(e);
-          }}
           style={{
             flex: 1,
             border: 'none',

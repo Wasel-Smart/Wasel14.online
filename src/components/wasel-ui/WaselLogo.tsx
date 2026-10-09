@@ -11,42 +11,47 @@ interface WaselLogoProps {
   alt?: string;
 }
 
-const WASEL_SYMBOL_SVG = '/brand/assets/logos/symbols/symbol-default.svg';
-const WASEL_SYMBOL_WEBP = '/brand/assets/logos/symbols/symbol-default.webp';
-const WASEL_SYMBOL_SRC = '/brand/assets/logos/symbols/symbol-default.png';
-const WASEL_SYMBOL_RATIO = 1536 / 1024;
+// Symbol is 240×150 viewBox → 8:5 ratio (width = size * 1.6)
+const SYMBOL_W_RATIO = 240 / 150; // 1.6
 
-function BrandSymbol ( { size, framed = false }: { size: number; framed?: boolean } ) {
-  const width = Math.round( size * WASEL_SYMBOL_RATIO );
-  const height = Math.round( size );
+const SYMBOL_SVG  = '/brand/assets/logos/symbols/symbol-default.svg';
+const SYMBOL_WEBP = '/brand/assets/logos/symbols/symbol-default.webp';
+const SYMBOL_PNG  = '/brand/assets/logos/symbols/symbol-default.png';
+
+function BrandSymbol({ size, framed = false }: { size: number; framed?: boolean }) {
+  const w = Math.round(size * SYMBOL_W_RATIO);
+  const h = Math.round(size);
 
   return (
     <picture>
-      <source srcSet={ WASEL_SYMBOL_SVG } type="image/svg+xml" />
-      <source srcSet={ WASEL_SYMBOL_WEBP } type="image/webp" />
+      <source srcSet={SYMBOL_SVG} type="image/svg+xml" />
+      <source srcSet={SYMBOL_WEBP} type="image/webp" />
       <img
-        src={ WASEL_SYMBOL_SRC }
+        src={SYMBOL_PNG}
         alt=""
         aria-hidden="true"
-        width={ width }
-        height={ height }
+        width={w}
+        height={h}
         decoding="async"
         loading="eager"
-        draggable={ false }
-        style={ {
+        draggable={false}
+        style={{
           display: 'block',
-          width: size * WASEL_SYMBOL_RATIO,
-          height: size,
+          width: w,
+          height: h,
           objectFit: 'contain',
           flexShrink: 0,
-          filter: framed ? `drop-shadow(0 8px 18px ${ C.brandBlue }40)` : undefined,
-        } }
+          imageRendering: 'auto',
+          filter: framed
+            ? `drop-shadow(0 6px 16px ${C.brandBlue}50) drop-shadow(0 2px 6px ${C.brandBlue}30)`
+            : undefined,
+        }}
       />
     </picture>
   );
 }
 
-function BrandName ( {
+function BrandName({
   theme,
   size,
   language,
@@ -54,81 +59,87 @@ function BrandName ( {
   theme: 'dark' | 'light';
   size: number;
   language: 'ar' | 'en';
-} ) {
+}) {
   const foreground = theme === 'light' ? C.text : C.brandInk;
-  const fontSize = Math.max( 15, Math.min( 26, size * 0.5 ) );
+  // Font scales cleanly: 36px symbol → 18px text, 56px → 26px, 80px → 34px
+  const fontSize = Math.round(Math.max(14, Math.min(34, size * 0.46)));
+  const gap = Math.round(Math.max(6, fontSize * 0.3));
+
   return (
     <span
       aria-hidden="true"
-      style={ {
+      style={{
         display: 'inline-flex',
-        alignItems: 'baseline',
-        gap: Math.max( 5, fontSize * 0.28 ),
+        alignItems: 'center',
+        gap,
         color: foreground,
-        fontWeight: 900,
+        fontWeight: 800,
         fontSize,
         lineHeight: 1,
-        letterSpacing: '-0.035em',
+        letterSpacing: '-0.03em',
         whiteSpace: 'nowrap',
-        textShadow: theme === 'light' ? `0 1px 12px ${ C.brandInk }40` : undefined,
-      } }
+        fontFamily: language === 'ar'
+          ? "'Cairo', 'Tajawal', Tahoma, Arial, sans-serif"
+          : "'Plus Jakarta Sans', 'Inter', sans-serif",
+      }}
     >
-      { language === 'ar' ? (
-        <span
-          lang="ar"
-          dir="rtl"
-          style={ { fontFamily: "'Cairo', 'Tajawal', Tahoma, Arial, sans-serif", letterSpacing: 0 } }
-        >
-          واصل
-        </span>
+      {language === 'ar' ? (
+        <span lang="ar" dir="rtl" style={{ letterSpacing: 0 }}>واصل</span>
       ) : (
         <span>Wasel</span>
-      ) }
+      )}
     </span>
   );
 }
 
-export function WaselLogo ( {
-  size = 38,
+export function WaselLogo({
+  size = 36,
   showWordmark = true,
   theme = 'dark',
   style,
   variant = 'full',
   framed,
   alt,
-}: WaselLogoProps ) {
+}: WaselLogoProps) {
   const language =
     typeof document !== 'undefined' && document.documentElement.lang === 'ar' ? 'ar' : 'en';
-  const compact = variant === 'compact' || !showWordmark || size < 24;
-  const symbolSize = compact ? Math.max( 18, size ) : Math.max( 32, size );
+  const compact = variant === 'compact' || !showWordmark || size < 22;
+  // Symbol height: compact uses the raw size, full uses it directly too
+  const symbolH = Math.max(compact ? 18 : 28, size);
+  const gap = compact ? 0 : Math.round(Math.max(6, size * 0.2));
 
   return (
     <div
-      aria-label={ alt ?? ( language === 'ar' ? 'واصل' : 'Wasel' ) }
+      aria-label={alt ?? (language === 'ar' ? 'واصل' : 'Wasel')}
       role="img"
-      style={ {
+      style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: compact ? 0 : Math.max( 8, size * 0.22 ),
-        minHeight: symbolSize,
-        padding: compact ? 0 : '2px 0',
+        gap,
+        minHeight: symbolH,
         ...style,
-      } }
+      }}
     >
-      <BrandSymbol size={ symbolSize } framed={ framed } />
-      { !compact && <BrandName theme={ theme } size={ size } language={ language } /> }
+      <BrandSymbol size={symbolH} framed={framed} />
+      {!compact && <BrandName theme={theme} size={size} language={language} />}
     </div>
   );
 }
 
-export function WaselMark ( { size = 38, style }: { size?: number; style?: CSSProperties } ) {
-  return <WaselLogo size={ size } showWordmark={ false } style={ style } />;
+// ── Convenience exports ────────────────────────────────────────────────────────
+
+/** Symbol-only mark, no wordmark */
+export function WaselMark({ size = 36, style }: { size?: number; style?: CSSProperties }) {
+  return <WaselLogo size={size} showWordmark={false} style={style} />;
 }
 
-export function WaselHeroMark ( { size = 120 }: { size?: number } ) {
-  return <WaselLogo size={ Math.max( 72, size * 0.66 ) } theme="light" framed />;
+/** Large hero mark used on auth brand panel and splash screens */
+export function WaselHeroMark({ size = 120 }: { size?: number }) {
+  // Clamp: never smaller than 72, scale symbol to 70% of requested size
+  return <WaselLogo size={Math.max(72, Math.round(size * 0.7))} theme="light" framed />;
 }
 
-export function WaselIcon ( { size = 20 }: { size?: number } ) {
-  return <WaselLogo size={ size } showWordmark={ false } />;
+/** Tiny inline icon, symbol only */
+export function WaselIcon({ size = 20 }: { size?: number }) {
+  return <WaselLogo size={size} showWordmark={false} />;
 }
