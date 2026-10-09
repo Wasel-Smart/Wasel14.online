@@ -12,7 +12,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@wasel/rbac": ["./packages/rbac/src/index.ts"],
-      "@wasel/rbac/*": ["./packages/rbac/src/*"]
+      "@wasel/rbac/*": ["./packages/rbac/src/*"],
+      "lucide-react": ["./node_modules/lucide-react/dist/lucide-react.d.ts"]
     },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,

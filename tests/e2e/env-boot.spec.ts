@@ -6,6 +6,6 @@ test('app boots in isolated local E2E mode without production credentials @smoke
   await seedDemoSession(page);
   await page.goto('/app/packages', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByRole('button', { name: /send package/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /create connected package request/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: /configuration error/i })).toHaveCount(0);
 });
