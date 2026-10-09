@@ -75,7 +75,7 @@ export function Protected({ children }: { children: ReactNode }) {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-            <WaselLogo size={64} theme="light" variant="full" />
+            <WaselLogo size={44} theme="light" variant="full" />
           </div>
           <div
             style={{
@@ -165,7 +165,7 @@ export function PageShell({ children }: { children: ReactNode }) {
             marginBottom: 18,
           }}
         >
-          <WaselLogo size={56} theme="light" variant="full" />
+          <WaselLogo size={44} theme="light" variant="full" />
           <div
             style={{
               display: 'inline-flex',

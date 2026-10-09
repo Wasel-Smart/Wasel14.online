@@ -19,6 +19,7 @@ import cookieBannerStyles from './sections/CookieBanner.module.css';
 import {
   CorridorsSection,
   CorridorBetaFocusSection,
+  CoverageSection,
   FinalCtaBanner,
   HomeHeroSection,
   HomePageStyles,
@@ -32,6 +33,7 @@ import {
   TestimonialsSection,
   TrustPagesSection,
   type CorridorCard,
+  type HeroTickerItem,
   type QuickAction,
 } from './HomePageSections';
 
@@ -395,6 +397,8 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
           title: ar ? `${ item.from } ← ${ item.to }` : `${ item.from } → ${ item.to }`,
           detail: `${ svc.formatFromJOD( item.priceJod ) } ${ ar ? 'لكرسي' : 'per seat' } · ${ occupancy }% ${ ar ? 'محجوز' : 'booked' }`,
           meta: `${ ar ? 'الضغط' : 'Pressure' } ${ item.demand.toFixed( 2 ) }x`,
+          priceLabel: svc.formatFromJOD( item.priceJod ),
+          statLabel: `${ occupancy }% ${ ar ? 'محجوز' : 'booked' }`,
           insight: index === 0
             ? ( ar ? 'أفضل توازن بين العرض والطلب اليوم' : 'Best balance of supply and demand today' )
             : ( ar ? 'حركة واضحة على هذا المسار الآن' : 'Visible live movement on this corridor' ),
@@ -414,6 +418,8 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
           title: item.corridor,
           detail: item.serviceLabel,
           meta: `${ item.active } ${ ar ? 'نشط الآن' : 'active now' }`,
+          priceLabel: '',
+          statLabel: `${ item.active } ${ ar ? 'نشط الآن' : 'active now' }`,
           insight: index === 0
             ? ( ar ? 'أفضل توازن بين العرض والطلب اليوم' : 'Best balance of supply and demand today' )
             : ( ar ? 'حركة واضحة على هذا المسار الآن' : 'Visible live movement on this corridor' ),
@@ -429,6 +435,8 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
       title: ar ? `${ route.fromAr } ← ${ route.toAr }` : `${ route.from } → ${ route.to }`,
       detail: `${ route.dist } ${ ar ? 'كم' : 'km' } - ${ svc.formatFromJOD( route.priceJod ) }`,
       meta: t( 'homeSections.popularCorridor' ),
+      priceLabel: svc.formatFromJOD( route.priceJod ),
+      statLabel: `${ route.dist } ${ ar ? 'كم' : 'km' }`,
       insight: index === 0 ? t( 'homeSections.balancedPick' ) : t( 'homeSections.readyForComparison' ),
       featured: index === 0,
       path: `/find-ride?from=${ encodeURIComponent( route.from ) }&to=${ encodeURIComponent( route.to ) }`,
@@ -460,6 +468,19 @@ export function HomePage () {
 
   const corridorCards = useCorridorCards( ar, svc, t );
   const quickActions = useHomeQuickActions( role, t );
+
+  const heroTickerItems = useMemo<HeroTickerItem[]>(
+    () =>
+      corridorCards
+        .filter( card => card.priceLabel )
+        .map( card => ( {
+          key: card.key,
+          route: card.title,
+          price: card.priceLabel!,
+          stat: card.statLabel ?? card.meta,
+        } ) ),
+    [ corridorCards ],
+  );
 
   useEffect( () => {
     if ( typeof window !== 'undefined' && 'performance' in window ) {
@@ -508,7 +529,10 @@ export function HomePage () {
             firstName={ firstName }
             onNavigate={ handleNavigate }
             primaryTripPath={ primaryTripPath }
+            tickerItems={ heroTickerItems }
           />
+
+          <CoverageSection ar={ ar } onNavigate={ handleNavigate } />
 
           { !user && <ProofSection ar={ ar } onNavigate={ handleNavigate } /> }
 

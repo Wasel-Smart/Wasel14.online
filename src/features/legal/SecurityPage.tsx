@@ -162,7 +162,7 @@ export function SecurityPage() {
           }
           aside={
             <div style={{ display: 'grid', gap: SPACE[4] }}>
-              <WaselLogo size={64} theme="light" variant="full" />
+              <WaselLogo size={44} theme="light" variant="full" />
               <StatusBadge
                 label={
                   ar

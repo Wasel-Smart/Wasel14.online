@@ -10,6 +10,7 @@ import {
   PackageCheck,
   Route,
   Shield,
+  ShieldCheck,
 } from 'lucide-react';
 import type { User } from '@supabase/auth-js';
 import { WaselLogo } from '../../../components/wasel-ui';
@@ -29,6 +30,46 @@ interface HomeHeroSectionProps {
   firstName: string;
   onNavigate: ( path: string, source?: string ) => void;
   primaryTripPath: string;
+  tickerItems?: HeroTickerItem[];
+}
+
+export interface HeroTickerItem {
+  key: string;
+  route: string;
+  price: string;
+  stat: string;
+}
+
+/** Seamless marquee: the item list is rendered twice so the
+ *  translateX(±50%) loop has an exact copy to land on. */
+function CorridorTicker ( { items, ar }: { items: HeroTickerItem[]; ar: boolean } ) {
+  const { t } = useLanguage();
+  if ( items.length === 0 ) { return null; }
+  const loop = [ ...items, ...items ];
+  return (
+    <div className="wasel-ticker" aria-label={ t( 'homeHeroSection.ticker_live_label' ) }>
+      <span className="wasel-ticker-label">
+        <span aria-hidden="true" />
+        { t( 'homeHeroSection.ticker_live_label' ) }
+      </span>
+      <div className="wasel-ticker-viewport">
+        <div className="wasel-ticker-track">
+          { loop.map( ( item, index ) => (
+            <span
+              key={ `${ item.key }-${ index }` }
+              className="wasel-ticker-item"
+              aria-hidden={ index >= items.length }
+            >
+              <span className="wasel-ticker-route">{ item.route }</span>
+              <small>{ item.price }</small>
+              <small>{ item.stat }</small>
+              <span className="wasel-ticker-sep" aria-hidden="true">{ ar ? '←' : '→' }</span>
+            </span>
+          ) ) }
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const heroProof = [
@@ -215,6 +256,7 @@ export function HomeHeroSection ( {
   firstName,
   onNavigate,
   primaryTripPath,
+  tickerItems = [],
 }: HomeHeroSectionProps ) {
   const proofItems = heroProof;
 
@@ -237,7 +279,17 @@ export function HomeHeroSection ( {
           </div>
         </div>
 
-        <h1 className="wasel-home-title">
+        <div style={ { marginTop: 26 } }>
+          <span className="wasel-first-only-badge">
+            <span className="wasel-first-only-badge-dot" aria-hidden="true" />
+            <span className="wasel-first-only-badge-label">
+              <ShieldCheck size={ 14 } color={ C.cyan } aria-hidden="true" />
+              <strong>{ tx( 'homeHeroSection.first_only_badge' ) }</strong>
+            </span>
+          </span>
+        </div>
+
+        <h1 className="wasel-home-title wasel-home-hero-title">
           { tx( 'homeHeroSection.hero_title' ) }
         </h1>
 
@@ -286,6 +338,8 @@ export function HomeHeroSection ( {
             { tx( 'homeHeroSection.cta_offer_seats' ) }
           </WaselButton>
         </div>
+
+        <CorridorTicker items={ tickerItems } ar={ ar } />
       </div>
 
       <div className="wasel-home-hero-aside">

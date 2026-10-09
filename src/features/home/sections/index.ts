@@ -1,6 +1,7 @@
 export type * from './types';
 export * from './HomePageStyles';
 export * from './HomeHeroSection';
+export * from './CoverageSection';
 export * from './QuickActionsSection';
 export * from './CorridorBetaFocusSection';
 export * from './CorridorsSection';

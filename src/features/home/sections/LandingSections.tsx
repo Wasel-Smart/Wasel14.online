@@ -1,13 +1,15 @@
 import { motion } from 'framer-motion';
 import {
+  ArrowLeft,
+  ArrowRight,
   BadgeCheck,
+  Bus,
+  Check,
   CircleDollarSign,
   Clock,
-  MapPinned,
   PackageCheck,
   Route,
   Shield,
-  Truck,
   Users,
 } from 'lucide-react';
 import { WaselButton } from '../../../components/wasel-ui/WaselButton';
@@ -57,40 +59,68 @@ const featureCards = [
   },
 ] as const;
 
-// Every card must land on a route the router actually declares, and every
-// card must describe something Wasel really does. The four ways to move below
-// are the product's real core navigation (see config/user-navigation.ts):
+// Every tile must land on a route the router actually declares, and every
+// tile must describe something Wasel really does. The four ways to move
+// below are the product's real core navigation (see config/user-navigation.ts):
 // find a ride, offer seats, send a parcel, and the scheduled bus backup.
 // Earlier revisions also advertised freight, school transport and luxury
 // chauffeurs, which have no page behind them, so they are gone.
-const serviceCards = [
+const bentoTiles = [
   {
     icon: Route,
-    titleKey: 'servicesRidesharing',
-    descKey: 'servicesRidesharingDesc',
+    titleKey: 'homeSections.bentoRidersTitle',
+    descKey: 'homeSections.bentoRidersDesc',
+    points: [
+      'homeSections.bentoRidersPoint1',
+      'homeSections.bentoRidersPoint2',
+      'homeSections.bentoRidersPoint3',
+    ],
+    ctaKey: 'homeSections.findRideCTA',
     accent: C.cyan,
     path: '/find-ride',
+    hero: true,
   },
   {
-    icon: MapPinned,
-    titleKey: 'servicesCarpool',
-    descKey: 'servicesCarpoolDesc',
+    icon: CircleDollarSign,
+    titleKey: 'homeSections.bentoDriversTitle',
+    descKey: 'homeSections.bentoDriversDesc',
+    points: [
+      'homeSections.bentoDriversPoint1',
+      'homeSections.bentoDriversPoint2',
+      'homeSections.bentoDriversPoint3',
+    ],
+    ctaKey: 'homeSections.offerRideCTA',
     accent: C.gold,
     path: '/offer-ride',
+    hero: false,
   },
   {
     icon: PackageCheck,
-    titleKey: 'servicesDelivery',
-    descKey: 'servicesDeliveryDesc',
+    titleKey: 'homeSections.bentoParcelsTitle',
+    descKey: 'homeSections.bentoParcelsDesc',
+    points: [
+      'homeSections.bentoParcelsPoint1',
+      'homeSections.bentoParcelsPoint2',
+      'homeSections.bentoParcelsPoint3',
+    ],
+    ctaKey: 'homeSections.sendPackageKicker',
     accent: C.orange,
     path: '/packages',
+    hero: false,
   },
   {
-    icon: Truck,
-    titleKey: 'servicesPublicBus',
-    descKey: 'servicesPublicBusDesc',
+    icon: Bus,
+    titleKey: 'homeSections.bentoBusTitle',
+    descKey: 'homeSections.bentoBusDesc',
+    points: [
+      'homeSections.bentoBusPoint1',
+      'homeSections.bentoBusPoint2',
+      'homeSections.bentoBusPoint3',
+    ],
+    ctaKey: 'homeSections.busFallbackKicker',
     accent: C.green,
     path: '/bus',
+    hero: false,
   },
 ] as const;
 
@@ -98,7 +128,7 @@ const serviceCards = [
 // ways-to-move count is the length of the service list above; corridor and
 // city counts are computed from POPULAR_ROUTES; five trust checks is the
 // documented trust model (identity, email, phone, driver documents, wallet).
-const SERVICE_COUNT = serviceCards.length;
+const SERVICE_COUNT = bentoTiles.length;
 const CORRIDOR_COUNT = POPULAR_ROUTES.length;
 const CITY_COUNT = new Set(POPULAR_ROUTES.map(r => r.to)).size;
 const TRUST_CHECK_COUNT = 5;
@@ -217,86 +247,55 @@ export function LandingSections({ ar, onNavigate }: LandingSectionsProps) {
             {tx('servicesSubtitle')}
           </button>
         </div>
-        <div
-          className="wasel-home-services-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))',
-            gap: 14,
-          }}
-        >
-          {serviceCards.map((service) => {
-            const Icon = service.icon;
+        <div className="wasel-bento">
+          {bentoTiles.map((tile) => {
+            const Icon = tile.icon;
+            const ArrowIcon = ar ? ArrowLeft : ArrowRight;
             return (
               <motion.button
-                key={service.titleKey}
+                key={tile.titleKey}
                 type="button"
                 initial={false}
-                whileHover={{ y: -2 }}
-                onClick={() => void onNavigate(service.path, `service_${service.path.replace('/', '')}`)}
+                whileHover={{ y: -3 }}
+                onClick={() => void onNavigate(tile.path, `service_${tile.path.replace('/', '')}`)}
+                className={tile.hero ? 'wasel-bento-tile wasel-bento-tile--hero' : 'wasel-bento-tile'}
                 style={{
-                  textAlign: 'start',
-                  borderRadius: R.xl,
-                  padding: '20px',
-                  background: C.card,
-                  border: `1px solid ${service.accent}24`,
-                  boxShadow: SH.sm,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 12,
+                  ['--tile-accent-dim' as string]: `${tile.accent}1a`,
                   color: 'inherit',
+                  cursor: 'pointer',
+                  textAlign: 'start',
                 }}
               >
                 <div
+                  className="wasel-bento-tile-icon"
                   style={{
-                    width: 44,
-                    height: 44,
-                    display: 'grid',
-                    placeItems: 'center',
-                    borderRadius: R.lg,
-                    background: `${service.accent}14`,
-                    border: `1px solid ${service.accent}24`,
-                    color: service.accent,
+                    background: `${tile.accent}14`,
+                    border: `1px solid ${tile.accent}24`,
+                    color: tile.accent,
                   }}
                 >
-                  <Icon size={20} />
+                  <Icon size={22} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontSize: '1.02rem',
-                      fontWeight: TYPE.weight.black,
-                      color: C.text,
-                      lineHeight: 1.35,
-                    }}
-                  >
-                    {tx(service.titleKey)}
-                  </h3>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: C.textMuted,
-                      fontSize: '0.84rem',
-                      lineHeight: 1.55,
-                    }}
-                  >
-                    {tx(service.descKey)}
-                  </p>
+                <h3 className="wasel-bento-tile-title">
+                  {tx(tile.titleKey)}
+                </h3>
+                <p className="wasel-bento-tile-desc">
+                  {tx(tile.descKey)}
+                </p>
+                <div className="wasel-bento-points">
+                  {tile.points.map((pointKey) => (
+                    <div key={pointKey} className="wasel-bento-point">
+                      <Check size={14} color={tile.accent} aria-hidden="true" />
+                      {tx(pointKey)}
+                    </div>
+                  ))}
                 </div>
                 <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    color: service.accent,
-                    fontWeight: TYPE.weight.bold,
-                    fontSize: '0.8rem',
-                  }}
+                  className="wasel-bento-tile-cta"
+                  style={{ color: tile.accent }}
                 >
-                  {tx('homeSections.quickActionsCTA')}
-                  {ar ? <Route size={12} style={{ transform: 'rotate(180deg)' }} /> : <Route size={12} />}
+                  {tx(tile.ctaKey)}
+                  <ArrowIcon size={13} />
                 </div>
               </motion.button>
             );

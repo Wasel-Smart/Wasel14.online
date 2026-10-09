@@ -1408,9 +1408,613 @@ export function HomePageStyles () {
         }
       }
 
+      /* ─── Elite landing layer ─────────────────────────────────────── */
+
+      @keyframes wasel-gradient-shift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      @keyframes wasel-marquee {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+      }
+
+      @keyframes wasel-marquee-rtl {
+        from { transform: translateX(0); }
+        to { transform: translateX(50%); }
+      }
+
+      @keyframes wasel-aurora-drift {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(36px, -28px) scale(1.07); }
+      }
+
+      @keyframes wasel-badge-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      @keyframes wasel-scene-drift {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(-14px); }
+      }
+
+      .wasel-home-aurora {
+        animation: wasel-aurora-drift 14s ease-in-out infinite;
+      }
+
+      .wasel-home-gradient-text {
+        background: linear-gradient(
+          100deg,
+          #f8fbff 0%,
+          #00e5ff 30%,
+          #38beff 52%,
+          #32d8a6 72%,
+          #f8fbff 100%
+        );
+        background-size: 220% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: wasel-gradient-shift 7s linear infinite;
+      }
+
+      .wasel-first-only-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 16px 8px 10px;
+        border-radius: 999px;
+        background: linear-gradient(
+          120deg,
+          rgba(0, 229, 255, 0.14),
+          rgba(50, 216, 166, 0.1)
+        );
+        border: 1px solid rgba(0, 229, 255, 0.34);
+        box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.06),
+          0 10px 30px rgba(0, 229, 255, 0.12);
+      }
+
+      .wasel-first-only-badge-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #00e5ff, #32d8a6);
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.65);
+        flex: 0 0 auto;
+        animation: wasel-badge-pulse 2.8s ease-in-out infinite;
+      }
+
+      .wasel-first-only-badge-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        font-weight: 850;
+        letter-spacing: 0.02em;
+        color: rgba(226, 247, 255, 0.96);
+      }
+
+      .wasel-first-only-badge-label strong {
+        background: linear-gradient(90deg, #00e5ff, #32d8a6);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .wasel-home-hero-title {
+        background: linear-gradient(
+          100deg,
+          #f8fbff 0%,
+          #8deBff 38%,
+          #00e5ff 58%,
+          #32d8a6 80%,
+          #f8fbff 100%
+        );
+        background-size: 240% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: wasel-gradient-shift 9s linear infinite;
+      }
+
+      /* Live corridor ticker */
+      .wasel-ticker {
+        position: relative;
+        margin-top: 26px;
+        border-radius: 18px;
+        border: 1px solid rgba(0, 229, 255, 0.14);
+        background: rgba(8, 29, 57, 0.55);
+        overflow: hidden;
+        mask-image: linear-gradient(
+          90deg,
+          transparent,
+          black 8%,
+          black 92%,
+          transparent
+        );
+        -webkit-mask-image: linear-gradient(
+          90deg,
+          transparent,
+          black 8%,
+          black 92%,
+          transparent
+        );
+      }
+
+      [dir='rtl'] .wasel-ticker {
+        mask-image: linear-gradient(
+          90deg,
+          transparent,
+          black 8%,
+          black 92%,
+          transparent
+        );
+        -webkit-mask-image: linear-gradient(
+          90deg,
+          transparent,
+          black 8%,
+          black 92%,
+          transparent
+        );
+      }
+
+      .wasel-ticker-label {
+        position: absolute;
+        inset-inline-start: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 14px;
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #9af1cf;
+        background: rgba(8, 29, 57, 0.92);
+        border-inline-end: 1px solid rgba(114, 199, 13, 0.28);
+      }
+
+      .wasel-ticker-label span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #72c70d;
+        box-shadow: 0 0 10px rgba(114, 199, 13, 0.6);
+      }
+
+      .wasel-ticker-viewport {
+        overflow: hidden;
+        padding-inline-start: 118px;
+      }
+
+      .wasel-ticker-track {
+        display: flex;
+        width: max-content;
+        animation: wasel-marquee 36s linear infinite;
+      }
+
+      [dir='rtl'] .wasel-ticker-track {
+        animation-name: wasel-marquee-rtl;
+      }
+
+      .wasel-ticker:hover .wasel-ticker-track {
+        animation-play-state: paused;
+      }
+
+      .wasel-ticker-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 13px 22px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: rgba(248, 251, 255, 0.88);
+        white-space: nowrap;
+      }
+
+      .wasel-ticker-item small {
+        color: rgba(196, 220, 238, 0.62);
+        font-weight: 600;
+        font-size: 0.74rem;
+      }
+
+      .wasel-ticker-item .wasel-ticker-route {
+        color: #8deBff;
+        font-weight: 850;
+      }
+
+      .wasel-ticker-item .wasel-ticker-price {
+        color: #ffbe5c;
+        font-weight: 850;
+      }
+
+      .wasel-ticker-item .wasel-ticker-sep {
+        color: rgba(0, 229, 255, 0.3);
+      }
+
+      /* Coverage section — first & only in MEA */
+      .wasel-coverage {
+        position: relative;
+        border-radius: 24px;
+        padding: 44px 36px 38px;
+        overflow: hidden;
+        background:
+          radial-gradient(ellipse 70% 90% at 12% 0%, rgba(0, 229, 255, 0.12), transparent 60%),
+          radial-gradient(ellipse 60% 80% at 95% 100%, rgba(255, 138, 11, 0.08), transparent 60%),
+          linear-gradient(180deg, rgba(14, 34, 64, 0.9), rgba(8, 29, 57, 0.86));
+        border: 1px solid rgba(0, 229, 255, 0.18);
+        box-shadow: 0 30px 70px rgba(8, 29, 57, 0.4);
+      }
+
+      .wasel-coverage-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.72rem;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #00e5ff;
+      }
+
+      .wasel-coverage-title {
+        margin: 14px 0 0;
+        max-width: 720px;
+        font-size: clamp(1.7rem, 2.6vw + 1rem, 2.7rem);
+        line-height: 1.12;
+        font-weight: 900;
+        color: #f8fbff;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      [dir='rtl'] .wasel-coverage-title {
+        line-height: 1.3;
+      }
+
+      .wasel-coverage-subtitle {
+        margin: 16px 0 0;
+        max-width: 660px;
+        color: rgba(196, 220, 238, 0.78);
+        font-size: 0.98rem;
+        line-height: 1.75;
+      }
+
+      .wasel-coverage-regions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr));
+        gap: 12px;
+        margin-top: 30px;
+      }
+
+      .wasel-coverage-region {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 15px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid rgba(0, 229, 255, 0.14);
+        transition: transform 160ms ease, border-color 160ms ease,
+          background 160ms ease;
+      }
+
+      .wasel-coverage-region:hover {
+        transform: translateY(-2px);
+        border-color: rgba(0, 229, 255, 0.32);
+        background: rgba(255, 255, 255, 0.065);
+      }
+
+      .wasel-coverage-region.is-live {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 229, 255, 0.12),
+          rgba(50, 216, 166, 0.08)
+        );
+        border-color: rgba(0, 229, 255, 0.36);
+      }
+
+      .wasel-coverage-region-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+        background: rgba(196, 220, 238, 0.4);
+      }
+
+      .wasel-coverage-region.is-live .wasel-coverage-region-dot {
+        background: #72c70d;
+        box-shadow: 0 0 12px rgba(114, 199, 13, 0.7);
+        animation: wasel-badge-pulse 2.4s ease-in-out infinite;
+      }
+
+      .wasel-coverage-region-name {
+        font-size: 0.94rem;
+        font-weight: 850;
+        color: #f8fbff;
+      }
+
+      .wasel-coverage-region-status {
+        margin-top: 2px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: rgba(196, 220, 238, 0.62);
+      }
+
+      .wasel-coverage-region.is-live .wasel-coverage-region-status {
+        color: #9af1cf;
+      }
+
+      .wasel-coverage-note {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-top: 18px;
+        font-size: 0.8rem;
+        color: rgba(196, 220, 238, 0.66);
+      }
+
+      /* Destination marquee */
+      .wasel-dest-marquee {
+        margin-top: 34px;
+        border-radius: 18px;
+        border: 1px solid rgba(0, 229, 255, 0.1);
+        background: rgba(5, 11, 18, 0.4);
+        overflow: hidden;
+        mask-image: linear-gradient(
+          90deg,
+          transparent,
+          black 10%,
+          black 90%,
+          transparent
+        );
+        -webkit-mask-image: linear-gradient(
+          90deg,
+          transparent,
+          black 10%,
+          black 90%,
+          transparent
+        );
+      }
+
+      .wasel-dest-track {
+        display: flex;
+        width: max-content;
+        animation: wasel-marquee 44s linear infinite;
+      }
+
+      [dir='rtl'] .wasel-dest-track {
+        animation-name: wasel-marquee-rtl;
+      }
+
+      .wasel-dest-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px 26px;
+        font-size: 0.92rem;
+        font-weight: 800;
+        color: rgba(248, 251, 255, 0.72);
+        white-space: nowrap;
+      }
+
+      .wasel-dest-item svg {
+        color: rgba(0, 229, 255, 0.55);
+      }
+
+      /* Bento services showcase */
+      .wasel-bento {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: minmax(168px, auto);
+        gap: 14px;
+      }
+
+      .wasel-bento-tile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 22px;
+        border-radius: 18px;
+        background: rgba(8, 29, 57, 0.72);
+        border: 1px solid rgba(0, 229, 255, 0.14);
+        overflow: hidden;
+        transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1),
+          border-color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+          box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .wasel-bento-tile:hover {
+        transform: translateY(-3px);
+        border-color: rgba(0, 229, 255, 0.34);
+        box-shadow: 0 16px 38px rgba(8, 29, 57, 0.4);
+      }
+
+      .wasel-bento-tile::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 90% 60% at 50% -20%,
+          var(--tile-accent-dim, rgba(0, 229, 255, 0.1)),
+          transparent 70%
+        );
+      }
+
+      .wasel-bento-tile--hero {
+        grid-column: span 2;
+        grid-row: span 2;
+        background:
+          radial-gradient(ellipse 80% 60% at 20% 0%, rgba(0, 229, 255, 0.16), transparent 60%),
+          linear-gradient(180deg, rgba(14, 34, 64, 0.94), rgba(8, 29, 57, 0.9));
+        border-color: rgba(0, 229, 255, 0.26);
+      }
+
+      .wasel-bento-tile-icon {
+        width: 46px;
+        height: 46px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        flex: 0 0 auto;
+      }
+
+      .wasel-bento-tile-title {
+        font-size: 1.14rem;
+        font-weight: 900;
+        color: #f8fbff;
+        line-height: 1.25;
+      }
+
+      .wasel-bento-tile-desc {
+        color: rgba(196, 220, 238, 0.74);
+        font-size: 0.86rem;
+        line-height: 1.65;
+      }
+
+      .wasel-bento-points {
+        display: grid;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .wasel-bento-point {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: rgba(248, 251, 255, 0.86);
+      }
+
+      .wasel-bento-point svg {
+        flex: 0 0 auto;
+      }
+
+      .wasel-bento-tile-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: auto;
+        padding-top: 12px;
+        font-size: 0.8rem;
+        font-weight: 850;
+      }
+
+      /* Scenic corridor postcards */
+      .wasel-scenery {
+        position: relative;
+        display: block;
+        height: 118px;
+        margin: -18px -18px 0;
+        border-radius: 16px 16px 0 0;
+        overflow: hidden;
+      }
+
+      .wasel-scenery svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .wasel-scenery-sun {
+        animation: wasel-scene-drift 9s ease-in-out infinite;
+      }
+
+      /* Glow CTA frame */
+      .wasel-cta-glow-frame {
+        position: relative;
+        padding: 1px;
+        border-radius: 26px;
+        background: linear-gradient(
+          120deg,
+          rgba(0, 229, 255, 0.65),
+          rgba(50, 216, 166, 0.4),
+          rgba(255, 138, 11, 0.55),
+          rgba(0, 229, 255, 0.65)
+        );
+        background-size: 260% auto;
+        animation: wasel-gradient-shift 8s linear infinite;
+        box-shadow: 0 24px 60px rgba(0, 229, 255, 0.14);
+      }
+
+      .wasel-cta-glow-inner {
+        border-radius: 25px;
+        background:
+          radial-gradient(ellipse 70% 100% at 50% 0%, rgba(0, 229, 255, 0.1), transparent 65%),
+          linear-gradient(180deg, rgba(8, 29, 57, 0.96), rgba(5, 11, 18, 0.98));
+      }
+
+      @media (min-width: 981px) and (max-width: 1100px) {
+        .wasel-bento {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .wasel-bento-tile--hero {
+          grid-column: span 2;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .wasel-bento {
+          grid-template-columns: 1fr;
+        }
+
+        .wasel-bento-tile--hero {
+          grid-column: span 1;
+          grid-row: span 1;
+        }
+
+        .wasel-coverage {
+          padding: 32px 22px 28px;
+        }
+
+        .wasel-ticker-viewport {
+          padding-inline-start: 104px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .wasel-ticker-viewport {
+          padding-inline-start: 92px;
+        }
+
+        .wasel-ticker-item {
+          padding: 12px 16px;
+          font-size: 0.78rem;
+        }
+
+        .wasel-scenery {
+          height: 96px;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .wasel-home-preview-panel::after,
         .wasel-home-hero {
+          animation: none !important;
+        }
+
+        .wasel-home-aurora,
+        .wasel-home-gradient-text,
+        .wasel-home-hero-title,
+        .wasel-first-only-badge,
+        .wasel-coverage-region.is-live .wasel-coverage-region-dot,
+        .wasel-ticker-track,
+        [dir='rtl'] .wasel-ticker-track,
+        .wasel-dest-track,
+        [dir='rtl'] .wasel-dest-track,
+        .wasel-scenery-sun,
+        .wasel-cta-glow-frame {
           animation: none !important;
         }
       }

@@ -37,4 +37,7 @@ export interface CorridorCard {
   featured?: boolean;
   path: string;
   accent: string;
+  /** Ticker-facing labels (hero marquee). */
+  priceLabel?: string;
+  statLabel?: string;
 }

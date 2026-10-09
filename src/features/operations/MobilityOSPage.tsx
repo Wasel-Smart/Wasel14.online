@@ -455,7 +455,7 @@ export default function MobilityOSPage() {
                   width: 'fit-content',
                 }}
               >
-                <WaselLogo size={64} theme="light" variant="full" />
+                <WaselLogo size={44} theme="light" variant="full" />
               </div>
               <div
                 style={{

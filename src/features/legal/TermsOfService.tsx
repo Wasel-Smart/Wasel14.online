@@ -260,7 +260,7 @@ export function TermsOfService() {
           }
           aside={
             <div style={{ display: 'grid', gap: SPACE[3] }}>
-              <WaselLogo size={64} theme="light" variant="full" />
+              <WaselLogo size={44} theme="light" variant="full" />
               <StatusBadge label={copy.subtitle} accent={C.blueLight} />
               <div
                 style={{
