@@ -3,6 +3,10 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, QuadraticBezierLine } from '@react-three/drei';
 import * as THREE from 'three';
 import { C } from '../../../utils/wasel-ds';
+
+// QuadraticBezierCurve3 exists at runtime in three@0.182 but was removed from
+// @types/three@0.182. Cast through unknown to avoid the missing-export error.
+const QuadraticBezierCurve3 = (THREE as unknown as Record<string, new (...a: THREE.Vector3[]) => { getPoint(t: number): THREE.Vector3 }>)['QuadraticBezierCurve3'];
 import { POPULAR_ROUTES } from '../HomePageShared';
 
 const GLOBE_RADIUS = 1.6;
@@ -54,7 +58,7 @@ interface CorridorArc {
 
 function CorridorPulse({ arc, speed }: { arc: CorridorArc; speed: number }) {
   const ref = useRef<THREE.Mesh>(null);
-  const curve = useMemo(() => new THREE.QuadraticBezierCurve3(arc.from, arc.mid, arc.to), [arc]);
+  const curve = useMemo(() => new QuadraticBezierCurve3(arc.from, arc.mid, arc.to), [arc]);
 
   useFrame(({ clock }) => {
     if (!ref.current) {return;}

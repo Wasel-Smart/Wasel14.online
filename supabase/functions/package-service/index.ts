@@ -131,7 +131,7 @@ async function assignPackageToOpenTrip(admin: ReturnType<typeof getAdminClient>,
   return { assigned: true, tripId: trip.trip_id };
 }
 
-function parsePackageEvent(body: Record<string, unknown>): { eventId: string; topic: string; packageId: string } | { error: string } {
+function parsePackageEvent(body: Record<string, unknown>): { eventId: string; topic: string; packageId: string; payload: Record<string, unknown> } | { error: string } {
   const eventId = typeof body.id === 'string' ? body.id.trim() : '';
   if (!eventId || eventId.length > 128) {return { error: 'Missing required field: id' };}
 
@@ -159,8 +159,7 @@ async function handleEventRequest(request: Request): Promise<Response> {
   const parsed = parsePackageEvent(await request.json().catch(() => ({})) as Record<string, unknown>);
   if ('error' in parsed) {return json({ error: parsed.error }, 400);}
 
-  const { eventId, topic, packageId } = parsed;
-  const payload = parsed.payload as Record<string, unknown>;
+  const { eventId, topic, packageId, payload } = parsed;
 
   const admin = getAdminClient();
 

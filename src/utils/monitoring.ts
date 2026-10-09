@@ -1,12 +1,26 @@
 import type { DomainEventEnvelope } from '../domain/events';
-import type * as Sentry from '@sentry/react';
+import {
+  init as sentryInit,
+  addBreadcrumb,
+  captureException,
+  captureMessage,
+  getCurrentScope,
+  startInactiveSpan,
+  browserTracingIntegration,
+  replayIntegration,
+} from '@sentry/react';
 import { createCorrelationId, createStructuredLogEntry } from '../platform/observability';
 import { sanitizeLogMessage } from './sanitization';
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 
+type SentryEvent = {
+  user?: { id?: string };
+  tags?: Record<string, string>;
+  [key: string]: unknown;
+};
+
 let sentryInitialized = false;
 let sentryInitializationStarted = false;
-let sentryClient: typeof Sentry | null = null;
 
 function sanitizeContext(context?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!context) { return undefined; }
@@ -26,23 +40,19 @@ function writeConsole(
     'wasel-web',
     sanitizeContext(context),
   );
-  // Serialize to a single-line JSON string. All values are sanitized above.
-  // The string is never parsed as HTML — it is written to the browser console only.
   const serialized = JSON.stringify(entry);
   const safeOutput = String(serialized).replace(/[\r\n]/g, ' '); // nosec CWE-117
 
   if (level === 'error') {
-    console.error(safeOutput); // nosec CWE-117 — safeOutput is sanitized JSON, not raw user input
+    console.error(safeOutput); // nosec CWE-117
     return;
   }
-
   if (level === 'warning') {
-    console.warn(safeOutput); // nosec CWE-117 — safeOutput is sanitized JSON, not raw user input
+    console.warn(safeOutput); // nosec CWE-117
     return;
   }
-
   if (import.meta.env.DEV) {
-    console.info(safeOutput); // nosec CWE-117 — safeOutput is sanitized JSON, not raw user input
+    console.info(safeOutput); // nosec CWE-117
   }
 }
 
@@ -64,19 +74,12 @@ export async function initSentry(): Promise<void> {
   sentryInitializationStarted = true;
 
   try {
-    // Sentry and Session Replay are sizeable. Only download them after the app
-    // is interactive and only in deployments that have a DSN configured.
-    const Sentry = await import('@sentry/react');
-    sentryClient = Sentry;
-    const integrations = [];
-    if (typeof Sentry.browserTracingIntegration === 'function') {
-      integrations.push(Sentry.browserTracingIntegration());
-    }
-    if (typeof Sentry.replayIntegration === 'function') {
-      integrations.push(Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }));
-    }
+    const integrations = [
+      browserTracingIntegration(),
+      replayIntegration({ maskAllText: true, blockAllMedia: true }),
+    ];
 
-    Sentry.init({
+    sentryInit({
       dsn,
       environment,
       integrations,
@@ -84,20 +87,17 @@ export async function initSentry(): Promise<void> {
       replaysSessionSampleRate: environment === 'production' ? 0.05 : 0,
       replaysOnErrorSampleRate: 1.0,
       release: `wasel@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
-      // Ignore common, non-actionable browser errors to reduce noise.
       ignoreErrors: [
         'ResizeObserver loop limit exceeded',
         'Non-Error promise rejection captured',
         'Network request failed',
         'Failed to fetch',
       ],
-      beforeSend(event) {
+      beforeSend(event: SentryEvent) {
         try {
-          // Attempt to enrich the event with the user's ID for better traceability.
           const raw = localStorage.getItem('wasel_local_user_v2');
           if (raw) {
             const userData = JSON.parse(raw) as unknown;
-            // Only attach the opaque user ID — never PII
             if (
               userData !== null &&
               typeof userData === 'object' &&
@@ -105,7 +105,6 @@ export async function initSentry(): Promise<void> {
               typeof (userData as Record<string, unknown>).id === 'string'
             ) {
               const id = (userData as Record<string, string>).id;
-              // Validate strict UUID v4 format before attaching to prevent arbitrary string injection
               if (typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
                 event.user = { id };
               }
@@ -133,12 +132,11 @@ export async function initSentry(): Promise<void> {
     sentryInitialized = true;
     writeConsole('info', 'Sentry initialized.');
 
-    // Report real Core Web Vitals to Sentry as measurements.
     const reportVital = (name: string, value: number) => {
-      if (typeof (sentryClient as unknown as Record<string, unknown> | null)?.getCurrentScope === 'function') {
-        (sentryClient as unknown as { getCurrentScope: () => { setMeasurement: (n: string, v: number, u: string) => void } })
-          .getCurrentScope()
-          .setMeasurement(name, value, name === 'CLS' ? '' : 'millisecond');
+      try {
+        getCurrentScope().setMeasurement(name, value, name === 'CLS' ? '' : 'millisecond');
+      } catch {
+        // setMeasurement may not be available in all environments
       }
       logger.metric(`web_vital.${name}`, value, { name });
     };
@@ -159,8 +157,8 @@ export const logger = {
   error(message: string, error?: unknown, context?: Record<string, unknown>): void {
     const safeMessage = sanitizeLogMessage(message);
     writeConsole('error', safeMessage, context);
-    if (typeof (sentryClient as unknown as Record<string, unknown> | null)?.captureException === 'function') {
-      (sentryClient as unknown as { captureException: (e: unknown, o: unknown) => void }).captureException(error || new Error(safeMessage), {
+    if (sentryInitialized) {
+      captureException(error || new Error(safeMessage), {
         level: 'error',
         tags: { type: 'application_error' },
         extra: context,
@@ -170,8 +168,8 @@ export const logger = {
 
   warning(message: string, context?: Record<string, unknown>): void {
     writeConsole('warning', sanitizeLogMessage(message), context);
-    if (import.meta.env.PROD && typeof (sentryClient as unknown as Record<string, unknown> | null)?.captureMessage === 'function') {
-      (sentryClient as unknown as { captureMessage: (m: string, o: unknown) => void }).captureMessage(sanitizeLogMessage(message), {
+    if (import.meta.env.PROD && sentryInitialized) {
+      captureMessage(sanitizeLogMessage(message), {
         level: 'warning',
         tags: { type: 'application_warning' },
         extra: context,
@@ -181,8 +179,8 @@ export const logger = {
 
   info(message: string, context?: Record<string, unknown>): void {
     writeConsole('info', sanitizeLogMessage(message), context);
-    if (import.meta.env.PROD && context?.important && typeof (sentryClient as unknown as Record<string, unknown> | null)?.captureMessage === 'function') {
-      (sentryClient as unknown as { captureMessage: (m: string, o: unknown) => void }).captureMessage(sanitizeLogMessage(message), {
+    if (import.meta.env.PROD && context?.important && sentryInitialized) {
+      captureMessage(sanitizeLogMessage(message), {
         level: 'info',
         tags: { type: 'application_info' },
         extra: context,
@@ -193,8 +191,8 @@ export const logger = {
   metric(name: string, value: number, tags?: Record<string, string>): void {
     const safeName = sanitizeLogMessage(name);
     writeConsole('info', `metric:${safeName}`, { value, tags });
-    if (typeof (sentryClient as unknown as Record<string, unknown> | null)?.addBreadcrumb === 'function') {
-      (sentryClient as unknown as { addBreadcrumb: (b: unknown) => void }).addBreadcrumb({
+    if (sentryInitialized) {
+      addBreadcrumb({
         category: 'metric',
         message: safeName,
         level: 'info',
@@ -207,16 +205,21 @@ export const logger = {
     const requestId = createCorrelationId('txn');
     const startTime = Date.now();
     logger.addBreadcrumb(`Transaction:${sanitizeLogMessage(name)}`, 'performance', { op, requestId });
-    if (typeof (sentryClient as unknown as Record<string, unknown> | null)?.startInactiveSpan === 'function') {
-      const span = (sentryClient as unknown as { startInactiveSpan: (o: unknown) => { end: () => void } }).startInactiveSpan({ name: sanitizeLogMessage(name), op });
-      return { finish: () => { span.end(); logger.metric(`txn.${sanitizeLogMessage(name)}.duration_ms`, Date.now() - startTime); } };
+    if (sentryInitialized) {
+      const span = startInactiveSpan({ name: sanitizeLogMessage(name), op });
+      return {
+        finish: () => {
+          span.end();
+          logger.metric(`txn.${sanitizeLogMessage(name)}.duration_ms`, Date.now() - startTime);
+        },
+      };
     }
     return { finish: () => { logger.metric(`txn.${sanitizeLogMessage(name)}.duration_ms`, Date.now() - startTime); } };
   },
 
   addBreadcrumb(message: string, category: string, data?: Record<string, unknown>): void {
-    if (typeof (sentryClient as unknown as Record<string, unknown> | null)?.addBreadcrumb === 'function') {
-      (sentryClient as unknown as { addBreadcrumb: (b: unknown) => void }).addBreadcrumb({ message, category, level: 'info', data });
+    if (sentryInitialized) {
+      addBreadcrumb({ message, category, level: 'info', data });
     }
   },
 };
@@ -234,7 +237,6 @@ export function trackAPICall(
     status,
   });
 
-  // Log duration metric with sanitized, non-user-controlled tags only.
   logger.metric('api.duration_ms', duration, {
     status: String(status),
   });
