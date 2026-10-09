@@ -1,8 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 150" role="img" aria-label="Wasel">
-  <path d="M22,30 C38,64 50,90 68,114" fill="none" stroke="#00B8D4" stroke-width="18" stroke-linecap="round"/>
+  <!-- Left corridor arc (cyan: connection) -->
+  <path d="M22,30 C38,64 50,90 68,114" fill="none" stroke="#00E5FF" stroke-width="18" stroke-linecap="round"/>
+  <!-- Centre bridge arc (orange: journey) -->
   <path d="M68,114 C86,82 102,58 120,56 C138,58 154,82 172,114" fill="none" stroke="#FF8A0B" stroke-width="18" stroke-linecap="round"/>
-  <path d="M172,114 C190,90 202,64 218,30" fill="none" stroke="#4E8B00" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="22" cy="30" r="11" fill="#00B8D4"/>
-  <circle cx="218" cy="30" r="11" fill="#4E8B00"/>
+  <!-- Right corridor arc (green: movement) -->
+  <path d="M172,114 C190,90 202,64 218,30" fill="none" stroke="#72C70D" stroke-width="18" stroke-linecap="round"/>
+  <!-- Origin endpoint dot -->
+  <circle cx="22" cy="30" r="11" fill="#00E5FF"/>
+  <!-- Destination endpoint dot -->
+  <circle cx="218" cy="30" r="11" fill="#72C70D"/>
+  <!-- Midpoint location pin (gold: premium/trust) -->
   <path d="M120,38 C127.5,38 133,43.7 133,51.2 C133,59 120,72 120,72 C120,72 107,59 107,51.2 C107,43.7 112.5,38 120,38 Z" fill="#FFBE5C"/>
-  <circle cx="120" cy="51" r="5" fill="#081D39"/></svg>
+  <!-- Pin inner dot -->
+  <circle cx="120" cy="51" r="5" fill="#081D39"/>
+</svg>

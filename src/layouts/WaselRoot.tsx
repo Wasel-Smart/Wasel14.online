@@ -280,7 +280,7 @@ const WaselRootInner = memo( () => {
                 transition: 'opacity 0.15s',
               } }
             >
-              <WaselLogo size={ 56 } theme="light" variant="full" />
+              <WaselLogo size={ 36 } theme="light" variant="full" />
             </button>
 
             <nav className="wrl-desk-nav" aria-label={ shellCopy.mainNav }>

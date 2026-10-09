@@ -6,7 +6,7 @@ import { C } from '../../../utils/wasel-ds';
 
 // QuadraticBezierCurve3 exists at runtime in three@0.182 but was removed from
 // @types/three@0.182. Cast through unknown to avoid the missing-export error.
-const QuadraticBezierCurve3 = (THREE as unknown as Record<string, new (...a: THREE.Vector3[]) => { getPoint(t: number): THREE.Vector3 }>)['QuadraticBezierCurve3'];
+const QuadraticBezierCurve3 = (THREE as unknown as Record<string, new (...a: THREE.Vector3[]) => { getPoint(t: number): THREE.Vector3 }>)['QuadraticBezierCurve3']!;
 import { POPULAR_ROUTES } from '../HomePageShared';
 
 const GLOBE_RADIUS = 1.6;

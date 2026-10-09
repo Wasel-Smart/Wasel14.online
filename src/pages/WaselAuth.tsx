@@ -110,7 +110,7 @@ function BrandPanel () {
         <div
           style={ { margin: `0 0 ${ SPACE[ 6 ] }`, display: 'flex', justifyContent: 'center' } }
         >
-          <WaselHeroMark size={ 140 } />
+          <WaselHeroMark size={ 110 } />
         </div>
 
         <div
@@ -852,7 +852,7 @@ export default function WaselAuth () {
               borderBottom: `1px solid ${ C.border }`,
             } }
           >
-            <WaselLogo size={ 64 } theme="light" variant="full" />
+            <WaselLogo size={ 44 } theme="light" variant="full" />
             <h2
               style={ {
                 fontSize: TYPE.size.xl,

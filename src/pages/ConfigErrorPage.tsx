@@ -43,7 +43,7 @@ export function ConfigErrorPage({ issues }: ConfigErrorPageProps) {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-          <WaselLogo size={72} theme="light" variant="compact" />
+          <WaselLogo size={56} theme="light" variant="full" />
         </div>
 
         <div

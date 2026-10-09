@@ -405,7 +405,7 @@ export function MobileDrawer({
             flexShrink: 0,
           }}
         >
-          <WaselLogo size={56} theme="light" variant="full" />
+          <WaselLogo size={36} theme="light" variant="full" />
           <button
             onClick={() => { void onClose(); }}
             aria-label={ar ? 'إغلاق القائمة' : 'Close menu'}

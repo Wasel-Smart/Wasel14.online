@@ -72,7 +72,7 @@ function useLiveRoutePreview(): LivePreviewData {
   const [data, setData] = useState<LivePreviewData>(STATIC_PREVIEW);
 
   useEffect(() => {
-    if (!API_URL) return;
+    if (!API_URL) {return;}
     const controller = new AbortController();
     fetch(`${API_URL}/mobility-os/public-snapshot`, {
       signal: controller.signal,
@@ -81,11 +81,11 @@ function useLiveRoutePreview(): LivePreviewData {
       .then(r => (r.ok ? r.json() : null))
       .then((json: { corridors?: Array<{ priceJod?: number; demand?: number; seatsTotal?: number; seatsBooked?: number }> } | null) => {
         const first = json?.corridors?.[0];
-        if (!first) return;
+        if (!first) {return;}
         const util = first.seatsTotal ? (first.seatsBooked ?? 0) / first.seatsTotal : 0.78;
         const slots = Math.max(0, (first.seatsTotal ?? 1) - (first.seatsBooked ?? 0));
         setData({
-          priceJod: first.priceJod != null ? `${first.priceJod.toFixed(2)} JOD` : STATIC_PREVIEW.priceJod,
+          priceJod: first.priceJod !== null && first.priceJod !== undefined ? `${first.priceJod.toFixed(2)} JOD` : STATIC_PREVIEW.priceJod,
           rating: STATIC_PREVIEW.rating,
           parcelSlots: String(slots),
           nextDeparture: STATIC_PREVIEW.nextDeparture,
@@ -228,7 +228,7 @@ export function HomeHeroSection ( {
                 <Shield size={ 13 } color={ C.cyan } />
                 { tx( 'homeHeroSection.eyebrow_network' ) }
               </div>
-              <WaselLogo size={ 80 } theme="light" variant="full" />
+              <WaselLogo size={ 44 } theme="light" variant="full" />
             </div>
           </div>
           <div className="wasel-home-nav-actions">

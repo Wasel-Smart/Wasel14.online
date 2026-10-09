@@ -3,7 +3,12 @@
  * Defines all alerts, thresholds, and monitoring rules
  */
 
-import type { ErrorEvent } from '@sentry/react';
+type SentryEvent = {
+  user?: { id?: string };
+  tags?: Record<string, string>;
+  exception?: { values?: Array<{ value?: string }> };
+  [key: string]: unknown;
+};
 
 export interface AlertRule {
   id: string;
@@ -478,7 +483,7 @@ export function initializeMonitoring() {
         dsn: sentryDsn,
         environment: import.meta.env.MODE,
         tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
-        beforeSend(event: ErrorEvent) {
+        beforeSend(event: SentryEvent) {
           // Filter out ignored errors
           const ignoredErrors = [
             'IframeMessageAbortError',
