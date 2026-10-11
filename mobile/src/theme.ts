@@ -18,8 +18,12 @@ export const colors = {
   surfaceElevated: '#132b4d',
   surfaceAlt: '#132b4d',
   surfaceMuted: '#0e2240',
-  line: 'rgba(20,127,228,0.16)',
-  lineStrong: 'rgba(20,127,228,0.28)',
+  // Brand borders are cyan-based on web (utils/wasel-ds.ts C.border). The legacy
+  // rgba(20,127,228) blue was deprecated there and had drifted here.
+  line: 'rgba(0,229,255,0.16)',
+  lineStrong: 'rgba(0,229,255,0.28)',
+  // Form-control boundary: ~3.65:1 on surface (WCAG 1.4.11), matches web C.borderInput.
+  lineInput: 'rgba(0,229,255,0.5)',
 
   // Text
   textPrimary: '#F8FBFF',
@@ -74,25 +78,28 @@ export const typography = {
   subtitle: { fontSize: 18, fontWeight: '600' as const },
   body: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
   caption: { fontSize: 13, fontWeight: '500' as const, lineHeight: 18 },
-  micro: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 0.3 },
+  micro: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.3 },
   button: { fontSize: 16, fontWeight: '700' as const },
   // Arabic has no letter-case, and tracking breaks letter joining — so no
   // uppercase / letterSpacing on labels (the old values corrupted Arabic shaping).
   label: { fontSize: 13, fontWeight: '700' as const },
 } as const;
 
+// Brand rule (BRAND_GUIDELINES.md): soft navy shadows, never heavy black. Same
+// navy as the web shadow tokens (rgba(8,29,57,…)); opacity is raised slightly
+// because navy on a navy background reads lighter than the old near-black.
 export const shadows = {
   card: {
-    shadowColor: '#000814',
+    shadowColor: '#081D39',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 3,
   },
   lift: {
-    shadowColor: '#000814',
+    shadowColor: '#081D39',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.38,
+    shadowOpacity: 0.5,
     shadowRadius: 24,
     elevation: 6,
   },

@@ -762,9 +762,15 @@ export async function executeSqlStatements ( sql: string ) {
 }
 
 export function getAppBaseUrl ( request: Request ): string {
+  // The Origin header is client-controlled. It is used to build Stripe/CliQ
+  // success and cancel URLs, so only an allow-listed origin may be echoed back;
+  // anything else falls back to the canonical app URL.
   const origin = request.headers.get( 'origin' )?.trim();
   if ( origin ) {
-    return origin.replace( /\/$/, '' );
+    const allowed = resolveAllowedOrigin( origin, APP_BASE_URL, ADDITIONAL_ALLOWED_ORIGINS, ALLOW_LOCAL_ORIGINS );
+    if ( allowed ) {
+      return allowed.replace( /\/$/, '' );
+    }
   }
   return APP_BASE_URL;
 }
@@ -846,7 +852,7 @@ export async function authenticateAuthUser ( request: Request ) {
   return { admin, authUser: data.user };
 }
 
-// eslint-disable-next-line complexity
+ 
 export async function ensureCanonicalUserForAuth (
   admin: ReturnType<typeof getAdminClient>,
   authUser: Record<string, unknown>,
@@ -856,11 +862,9 @@ export async function ensureCanonicalUserForAuth (
   const email = String(
     // The auth-provider email is the verified identity; a client-supplied body
     // email must never override it (it would let a caller claim someone else's
-    // address, which wallet transfers resolve recipients by).
-    ( authUser.email || undefined ) ??
-    body.email ??
-    authUser.email ??
-    `pending-${ authUserId }@wasel.local`
+    // address, which wallet transfers resolve recipients by). Phone-only accounts
+    // therefore get a placeholder until they confirm an email through the auth provider.
+    authUser.email || `pending-${ authUserId }@wasel.local`
   ).trim();
   const fullName =
     String(
@@ -2606,7 +2610,8 @@ export async function verifyStripeWebhookSignature ( payload: string, signatureH
   }
 
   const nowSeconds = Math.floor( Date.now() / 1000 );
-  if ( Math.abs( nowSeconds - Number( timestamp ) ) > 300 ) {
+  const timestampSeconds = Number( timestamp );
+  if ( !Number.isFinite( timestampSeconds ) || Math.abs( nowSeconds - timestampSeconds ) > 300 ) {
     return false;
   }
 

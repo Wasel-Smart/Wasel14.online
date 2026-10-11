@@ -8,7 +8,7 @@ module.exports = {
         brand: {
           50: '#EFF6FF',
           100: '#DBEAFE',
-          400: '#58DDFF',
+          400: '#66E0FF',
           500: '#00E5FF',
           600: '#00E5FF',
           700: '#0e2240',
@@ -27,9 +27,16 @@ module.exports = {
           purple: '#8FA6FF',
         },
       },
+      // Must match the families App.tsx actually loads via @expo-google-fonts/cairo.
+      // The previous Inter / Poppins entries were never bundled, so they silently
+      // fell back to the system font. Latin parity with web (Plus Jakarta Sans) needs
+      // `npm i @expo-google-fonts/plus-jakarta-sans` and a useFonts() entry.
       fontFamily: {
-        sans: ['Inter', 'System'],
-        display: ['Poppins-SemiBold', 'System'],
+        sans: ['Cairo_400Regular', 'System'],
+        medium: ['Cairo_500Medium', 'System'],
+        semibold: ['Cairo_600SemiBold', 'System'],
+        bold: ['Cairo_700Bold', 'System'],
+        display: ['Cairo_800ExtraBold', 'System'],
         mono: ['JetBrainsMono', 'System'],
       },
       borderRadius: {

@@ -6,7 +6,7 @@
  * the pure canvas-math helpers extracted from MobilityOSLandingMap.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
@@ -138,7 +138,8 @@ describe('MobilityOSLandingMap — pointOnCurve()', () => {
   it('t=0.5 returns midpoint on curve', () => {
     const p = pointOnCurve(start, control, end, 0.5);
     expect(p.x).toBeCloseTo(50);
-    expect(p.y).toBeCloseTo(25);
+    // Quadratic Bézier midpoint: y = 0.25*0 + 0.5*100 + 0.25*0 = 50.
+    expect(p.y).toBeCloseTo(50);
   });
 
   it('produces values between start and end for t in (0,1)', () => {
@@ -293,8 +294,8 @@ type Role = 'driver' | 'both' | 'admin' | 'user' | undefined;
 
 function getQuickActionOrder(role: Role): string[] {
   const base = ['find', 'offer', 'packages', 'bus', 'schedule'];
-  if (role === 'driver' || role === 'both') return ['offer', 'find', 'packages', 'bus', 'schedule'];
-  if (role === 'admin') return ['find', 'packages', 'offer', 'bus', 'schedule'];
+  if (role === 'driver' || role === 'both') {return ['offer', 'find', 'packages', 'bus', 'schedule'];}
+  if (role === 'admin') {return ['find', 'packages', 'offer', 'bus', 'schedule'];}
   return base;
 }
 
@@ -348,7 +349,7 @@ function resolveCorridorTier(
   liveCorridors: LiveCorridor[],
   corridorsLoading: boolean,
 ): 'live' | 'demand-leaders' | 'static' {
-  if (!corridorsLoading && liveCorridors.length > 0) return 'live';
+  if (!corridorsLoading && liveCorridors.length > 0) {return 'live';}
   // demand leaders would be checked next — simplified here
   return 'static';
 }
@@ -373,8 +374,8 @@ describe('HomePage — corridor card fallback tiers', () => {
 // ─── Cookie consent logic ─────────────────────────────────────────────────────
 
 function resolveCookieState(stored: string | null): 'pending' | 'accepted' | 'declined' {
-  if (!stored) return 'pending';
-  if (stored === 'accepted') return 'accepted';
+  if (!stored) {return 'pending';}
+  if (stored === 'accepted') {return 'accepted';}
   return 'declined';
 }
 
@@ -407,12 +408,12 @@ function applyLiveSnapshot(
   snapshot: { corridors?: Array<{ priceJod?: number; seatsTotal?: number; seatsBooked?: number }> } | null,
 ): typeof STATIC_PREVIEW {
   const first = snapshot?.corridors?.[0];
-  if (!first) return STATIC_PREVIEW;
+  if (!first) {return STATIC_PREVIEW;}
   const util = first.seatsTotal ? (first.seatsBooked ?? 0) / first.seatsTotal : 0.78;
   const slots = Math.max(0, (first.seatsTotal ?? 1) - (first.seatsBooked ?? 0));
   return {
     ...STATIC_PREVIEW,
-    priceJod: first.priceJod != null ? `${first.priceJod.toFixed(2)} JOD` : STATIC_PREVIEW.priceJod,
+    priceJod: first.priceJod !== null && first.priceJod !== undefined ? `${first.priceJod.toFixed(2)} JOD` : STATIC_PREVIEW.priceJod,
     parcelSlots: String(slots),
     utilization: util,
   };

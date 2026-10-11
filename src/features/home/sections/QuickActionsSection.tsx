@@ -3,6 +3,8 @@ import { ArrowLeft, ArrowRight, Route } from 'lucide-react';
 import type { QuickAction } from './types';
 import { tx } from '../../../locales/tx';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { toAppHref } from '../../../hooks/useIframeSafeNavigate';
+import { handleSpaLinkClick } from '../../../utils/linkNavigation';
 
 interface QuickActionsSectionProps {
   quickActions: QuickAction[];
@@ -28,13 +30,15 @@ export function QuickActionsSection({ quickActions, onNavigate }: QuickActionsSe
         {quickActions.map(action => {
           const Icon = action.icon;
           return (
-            <motion.button
-              type="button"
+            <motion.a
               key={action.path}
-              onClick={() =>
-                onNavigate(
-                  action.path,
-                  `quick_action_${action.title.toLowerCase().replace(/\s+/g, '_')}`,
+              href={toAppHref(action.path)}
+              onClick={event =>
+                handleSpaLinkClick(event, () =>
+                  onNavigate(
+                    action.path,
+                    `quick_action_${action.title.toLowerCase().replace(/\s+/g, '_')}`,
+                  ),
                 )
               }
               whileHover={{ y: -2 }}
@@ -58,7 +62,7 @@ export function QuickActionsSection({ quickActions, onNavigate }: QuickActionsSe
                 {tx('homeSections.quickActionsCTA')}
                 <ArrowIcon size={13} />
               </div>
-            </motion.button>
+            </motion.a>
           );
         })}
       </div>

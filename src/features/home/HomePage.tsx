@@ -28,9 +28,7 @@ import {
   ProofSection,
   QuickActionsSection,
   SignedInUtilitySection,
-  SignedOutCtaSection,
   StructuredData,
-  TestimonialsSection,
   TrustPagesSection,
   type CorridorCard,
   type HeroTickerItem,
@@ -297,9 +295,9 @@ function useHomeQuickActions ( role: string | undefined, t: ( key: string ) => s
         title: t( 'homeSections.offerRideTitle' ),
         desc: t( 'homeSections.offerRideDesc' ),
         outcome: t( 'homeSections.offerRideOutcome' ),
-        color: C.gold,
-        dim: C.goldDim,
-        border: C.goldDim,
+        color: C.cyan,
+        dim: C.cyanDim,
+        border: C.borderHov,
         path: '/offer-ride',
       },
       {
@@ -330,9 +328,9 @@ function useHomeQuickActions ( role: string | undefined, t: ( key: string ) => s
         title: t( 'homeSections.scheduleTitle' ),
         desc: t( 'homeSections.scheduleDesc' ),
         outcome: t( 'homeSections.scheduleOutcome' ),
-        color: C.blue,
-        dim: C.blueDim,
-        border: C.blueDim,
+        color: C.cyan,
+        dim: C.cyanDim,
+        border: C.borderHov,
         path: '/schedule',
       },
     ];
@@ -445,6 +443,21 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
   }, [ ar, svc, t, liveCorridors, corridorsLoading ] );
 }
 
+function useHeroTickerItems ( corridorCards: CorridorCard[] ): HeroTickerItem[] {
+  return useMemo<HeroTickerItem[]>(
+    () =>
+      corridorCards
+        .filter( card => card.priceLabel )
+        .map( card => ( {
+          key: card.key,
+          route: card.title,
+          price: card.priceLabel ?? '',
+          stat: card.statLabel ?? card.meta,
+        } ) ),
+    [ corridorCards ],
+  );
+}
+
 export function HomePage () {
   const { language, dir, setLanguage, t } = useLanguage();
   const { user, waselUser } = useAuth();
@@ -468,19 +481,7 @@ export function HomePage () {
 
   const corridorCards = useCorridorCards( ar, svc, t );
   const quickActions = useHomeQuickActions( role, t );
-
-  const heroTickerItems = useMemo<HeroTickerItem[]>(
-    () =>
-      corridorCards
-        .filter( card => card.priceLabel )
-        .map( card => ( {
-          key: card.key,
-          route: card.title,
-          price: card.priceLabel!,
-          stat: card.statLabel ?? card.meta,
-        } ) ),
-    [ corridorCards ],
-  );
+  const heroTickerItems = useHeroTickerItems( corridorCards );
 
   useEffect( () => {
     if ( typeof window !== 'undefined' && 'performance' in window ) {
@@ -556,22 +557,19 @@ export function HomePage () {
 
           <LandingSections ar={ ar } onNavigate={ handleNavigate } />
 
-          { /* HowItWorksSection previously restated OnboardingDemoSection's
-               4-step flow (same icons, same order) and StatsStrip restated
-               ProofSection's proof metrics (same 4/5/0/Live figures) — both
-               already run earlier in the page for signed-out visitors, with
-               real CTAs the restatements lacked. Removed rather than hidden,
-               since the duplication existed for signed-out visitors too, not
-               just signed-in ones. TestimonialsSection and FinalCtaBanner
-               don't have that duplicate, but FinalCtaBanner's second button is
-               a "Register" CTA — wrong to show a signed-in user — so both stay
-               scoped to !user. */ }
-          { !user && (
-            <>
-              <TestimonialsSection />
-              <FinalCtaBanner ar={ ar } onNavigate={ handleNavigate } />
-            </>
-          ) }
+          { /* Accent policy (BRAND_GUIDELINES.md): cyan = primary actions, orange =
+               parcels, green = bus/success. Quick actions follow it.
+
+               Removed from the signed-out page:
+               - TestimonialsSection: the quotes are hardcoded, not sourced from real
+                 riders. Put it back once they are real, attributable testimonials.
+               - SignedOutCtaSection: a second closing CTA that repeated
+                 FinalCtaBanner directly above it.
+
+               HowItWorksSection / StatsStrip were removed earlier for restating
+               OnboardingDemoSection / ProofSection. FinalCtaBanner's second button
+               is "Register", so it stays scoped to !user. */ }
+          { !user && <FinalCtaBanner ar={ ar } onNavigate={ handleNavigate } /> }
 
           { user ? (
             <SignedInUtilitySection
@@ -592,9 +590,7 @@ export function HomePage () {
                   : undefined
               }
             />
-          ) : (
-            <SignedOutCtaSection onNavigate={ handleNavigate } />
-          ) }
+          ) : null }
         </div>
       </div>
     </WaselErrorBoundary>

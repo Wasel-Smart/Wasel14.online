@@ -4,6 +4,8 @@ import { ArrowRight, ChevronRight, Route } from 'lucide-react';
 import { C } from '../HomePageShared';
 import type { CorridorCard } from './types';
 import { tx } from '../../../locales/tx';
+import { toAppHref } from '../../../hooks/useIframeSafeNavigate';
+import { handleSpaLinkClick } from '../../../utils/linkNavigation';
 
 interface CorridorsSectionProps {
   corridorCards: CorridorCard[];
@@ -21,7 +23,7 @@ interface SceneryVariant {
   near: string;
 }
 
-const SCENERY_VARIANTS: Record<string, SceneryVariant> = {
+const SCENERY_VARIANTS = {
   dawn: {
     skyTop: '#0a1f3a', skyBottom: '#132b4d',
     sun: '#8deBff', far: '#1e3a5f', mid: '#16294a', near: '#0e1d38',
@@ -50,7 +52,7 @@ const SCENERY_VARIANTS: Record<string, SceneryVariant> = {
     skyTop: '#1e1a3a', skyBottom: '#2a2452',
     sun: '#c8b0ff', far: '#2e2a5a', mid: '#241f48', near: '#1a1638',
   },
-};
+} as const satisfies Record<string, SceneryVariant>;
 
 // Match on both scripts so live (English) and fallback
 // (Arabic) corridor titles resolve to the same skyline.
@@ -64,14 +66,10 @@ const SCENERY_MATCHERS: Array<[ RegExp, keyof typeof SCENERY_VARIANTS ]> = [
   [ /amman|عمّان|عمان/i, 'dawn' ],
 ];
 
-const SCENERY_KEYS = Object.keys( SCENERY_VARIANTS ) as Array<
-  keyof typeof SCENERY_VARIANTS
->;
-
 function sceneryFor( title: string ): SceneryVariant {
   for ( const [ pattern, variant ] of SCENERY_MATCHERS ) {
-    if ( pattern.test( title ) && SCENERY_KEYS.includes( variant ) ) {
-      return SCENERY_VARIANTS[ variant ] ?? SCENERY_VARIANTS.dawn;
+    if ( pattern.test( title ) ) {
+      return SCENERY_VARIANTS[ variant ];
     }
   }
   return SCENERY_VARIANTS.dawn;
@@ -129,17 +127,21 @@ export function CorridorsSection({ corridorCards, onNavigate }: CorridorsSection
             {tx('homeSections.corridorsReadyNow')}
           </h2>
         </div>
-        <button type="button" className="wasel-home-section-action" onClick={() => { void onNavigate('/app/find-ride', 'corridors_browse_all'); }}>
+        <a
+          href={toAppHref('/find-ride')}
+          className="wasel-home-section-action"
+          onClick={event => handleSpaLinkClick(event, () => { void onNavigate('/app/find-ride', 'corridors_browse_all'); })}
+        >
           {tx('homeSections.browseRides')}
           <ChevronRight size={12} color={C.cyan} />
-        </button>
+        </a>
       </div>
       <div className="wasel-home-corridors">
         {corridorCards.map(card => (
-          <button
-            type="button"
+          <a
             key={card.key}
-            onClick={() => { void onNavigate(card.path, 'corridor_card'); }}
+            href={toAppHref(card.path)}
+            onClick={event => handleSpaLinkClick(event, () => { void onNavigate(card.path, 'corridor_card'); })}
             className="wasel-home-corridor"
             style={{
               padding: 0,
@@ -147,7 +149,7 @@ export function CorridorsSection({ corridorCards, onNavigate }: CorridorsSection
               background: card.featured
                 ? `linear-gradient(180deg, ${C.cyanDim}, ${C.card})`
                 : undefined,
-              border: `1px solid ${card.featured ? C.cyanDim : 'rgba(20,127,228,0.08)'}`,
+              border: `1px solid ${card.featured ? C.borderHov : C.border}`,
             }}
           >
             <DestinationScenery title={card.title} />
@@ -175,7 +177,7 @@ export function CorridorsSection({ corridorCards, onNavigate }: CorridorsSection
                 <ArrowRight size={13} />
               </div>
             </div>
-          </button>
+          </a>
         ))}
       </div>
     </motion.section>

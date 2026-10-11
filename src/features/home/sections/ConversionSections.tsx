@@ -18,6 +18,8 @@ import { R, SH } from '../../../utils/wasel-ds';
 import { C, SectionHeader } from '../HomePageShared';
 import type { CorridorCard } from './types';
 import { tx } from '../../../locales/tx';
+import { toAppHref } from '../../../hooks/useIframeSafeNavigate';
+import { handleSpaLinkClick } from '../../../utils/linkNavigation';
 
 interface SectionNavigationProps {
   ar: boolean;
@@ -28,11 +30,13 @@ interface OutcomesSectionProps extends SectionNavigationProps {
   corridorCards: CorridorCard[];
 }
 
+// Accent policy (BRAND_GUIDELINES.md): cyan = primary, green = trust/success,
+// orange = parcels. Gold/purple/blueLight accents were collapsed into cyan.
 const proofMetrics = [
   { labelKey: 'homeContent.metric_flows_label', value: '4', detailKey: 'homeContent.metric_flows_detail', accent: C.cyan },
   { labelKey: 'homeContent.metric_trust_label', value: '5', detailKey: 'homeContent.metric_trust_detail', accent: C.green },
-  { labelKey: 'homeContent.metric_ads_label', value: '0', detailKey: 'homeContent.metric_ads_detail', accent: C.gold },
-  { labelKey: 'homeContent.metric_ux_label', value: 'Live', valueAr: 'مباشر', detailKey: 'homeContent.metric_ux_detail', accent: C.blueLight },
+  { labelKey: 'homeContent.metric_ads_label', value: '0', detailKey: 'homeContent.metric_ads_detail', accent: C.cyan },
+  { labelKey: 'homeContent.metric_ux_label', value: 'Live', valueAr: 'مباشر', detailKey: 'homeContent.metric_ux_detail', accent: C.cyan },
 ] as const;
 
 const onboardingSteps = [
@@ -57,7 +61,7 @@ const outcomeCards = [
     detailKey: 'homeContent.outcome_drivers_detail',
     ctaKey: 'homeContent.outcome_drivers_cta',
     path: '/offer-ride',
-    accent: C.gold,
+    accent: C.cyan,
   },
   {
     labelKey: 'homeContent.outcome_parcels_label',
@@ -72,9 +76,9 @@ const outcomeCards = [
 const trustLinks = [
   { icon: Lock, titleKey: 'homeContent.trust_privacy_title', detailKey: 'homeContent.trust_privacy_detail', path: '/privacy', accent: C.cyan },
   { icon: ShieldCheck, titleKey: 'homeContent.trust_security_title', detailKey: 'homeContent.trust_security_detail', path: '/security', accent: C.green },
-  { icon: Shield, titleKey: 'homeContent.trust_trust_title', detailKey: 'homeContent.trust_trust_detail', path: '/trust', accent: C.gold },
-  { icon: BadgeCheck, titleKey: 'homeContent.trust_terms_title', detailKey: 'homeContent.trust_terms_detail', path: '/terms', accent: C.blueLight },
-  { icon: Headphones, titleKey: 'homeContent.trust_support_title', detailKey: 'homeContent.trust_support_detail', path: '/support', accent: C.purple },
+  { icon: Shield, titleKey: 'homeContent.trust_trust_title', detailKey: 'homeContent.trust_trust_detail', path: '/trust', accent: C.cyan },
+  { icon: BadgeCheck, titleKey: 'homeContent.trust_terms_title', detailKey: 'homeContent.trust_terms_detail', path: '/terms', accent: C.cyan },
+  { icon: Headphones, titleKey: 'homeContent.trust_support_title', detailKey: 'homeContent.trust_support_detail', path: '/support', accent: C.cyan },
 ] as const;
 
 function ArrowCta({ label, accent, ar }: { label: string; accent: string; ar?: boolean }) {
@@ -85,8 +89,8 @@ function ArrowCta({ label, accent, ar }: { label: string; accent: string; ar?: b
         alignItems: 'center',
         gap: 7,
         color: accent,
-        fontWeight: 850,
-        fontSize: '0.78rem',
+        fontWeight: 800,
+        fontSize: '0.8125rem',
       }}
     >
       {label}
@@ -239,15 +243,15 @@ export function OnboardingDemoSection({ ar, onNavigate }: SectionNavigationProps
                 >
                   <Icon size={18} />
                 </span>
-                <span style={{ color: C.textDim, fontSize: '0.72rem', fontWeight: 850 }}>
+                <span style={{ color: C.textDim, fontSize: '0.8125rem', fontWeight: 800 }}>
                   0{index + 1}
                 </span>
               </div>
-              <div style={{ marginTop: 18, color: C.text, fontSize: '0.98rem', fontWeight: 900 }}>
+              <div style={{ marginTop: 18, color: C.text, fontSize: '0.98rem', fontWeight: 800 }}>
                 {tx(step.titleKey)}
               </div>
               <div
-                style={{ marginTop: 8, color: C.textMuted, fontSize: '0.8rem', lineHeight: 1.62 }}
+                style={{ marginTop: 8, color: C.textMuted, fontSize: '0.875rem', lineHeight: 1.62 }}
               >
                 {tx(step.detailKey)}
               </div>
@@ -307,17 +311,21 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
         style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}
       >
         {cards.map(card => (
-          <button
-            type="button"
+          <a
             key={card.titleKey}
-            onClick={() =>
-              onNavigate(card.path, `outcome_${card.path.replace(/\//g, '')}`)
+            href={toAppHref(card.path)}
+            onClick={event =>
+              handleSpaLinkClick(event, () =>
+                onNavigate(card.path, `outcome_${card.path.replace(/\//g, '')}`),
+              )
             }
             style={{
               minHeight: 210,
               display: 'flex',
               flexDirection: 'column',
               textAlign: 'start',
+              textDecoration: 'none',
+              color: 'inherit',
               borderRadius: R.xl,
               padding: '20px',
               background: `linear-gradient(180deg, ${C.card}, ${C.elevated})`,
@@ -329,8 +337,8 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
             <div
               style={{
                 color: card.accent,
-                fontSize: '0.68rem',
-                fontWeight: 850,
+                fontSize: '0.8125rem',
+                fontWeight: 800,
                 letterSpacing: 0,
                 textTransform: 'uppercase',
               }}
@@ -342,21 +350,21 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
                 marginTop: 14,
                 color: C.text,
                 fontSize: '1.08rem',
-                fontWeight: 950,
+                fontWeight: 800,
                 lineHeight: 1.16,
               }}
             >
               {tx(card.titleKey)}
             </div>
             <div
-              style={{ marginTop: 10, color: C.textMuted, fontSize: '0.83rem', lineHeight: 1.7 }}
+              style={{ marginTop: 10, color: C.textMuted, fontSize: '0.875rem', lineHeight: 1.7 }}
             >
               {tx(card.detailKey)}
             </div>
             <div style={{ marginTop: 'auto', paddingTop: 20 }}>
               <ArrowCta ar={ar} label={tx(card.ctaKey)} accent={card.accent} />
             </div>
-          </button>
+          </a>
         ))}
       </div>
 
@@ -431,13 +439,14 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
             }}
           >
             {corridorCards.slice(0, 3).map(card => (
-              <button
-                type="button"
+              <a
                 key={card.key}
-                onClick={() => { void onNavigate(card.path, 'outcome_corridor'); }}
+                href={toAppHref(card.path)}
+                onClick={event => handleSpaLinkClick(event, () => { void onNavigate(card.path, 'outcome_corridor'); })}
                 style={{
                   minHeight: 72,
                   textAlign: 'start',
+                  textDecoration: 'none',
                   borderRadius: R.lg,
                   padding: '10px 12px',
                   background: C.card2,
@@ -446,11 +455,11 @@ export function OutcomesSection({ ar, corridorCards, onNavigate }: OutcomesSecti
                   cursor: 'pointer',
                 }}
               >
-                <div style={{ fontSize: '0.78rem', fontWeight: 850 }}>{card.title}</div>
-                <div style={{ marginTop: 4, color: C.textMuted, fontSize: '0.68rem' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 800 }}>{card.title}</div>
+                <div style={{ marginTop: 4, color: C.textMuted, fontSize: '0.8125rem' }}>
                   {card.meta}
                 </div>
-              </button>
+              </a>
             ))}
           </div>
         </div>
@@ -472,15 +481,17 @@ export function TrustPagesSection({ ar, onNavigate }: SectionNavigationProps) {
         {links.map(link => {
           const Icon = link.icon;
           return (
-            <button
-              type="button"
+            <a
               key={link.titleKey}
-              onClick={() => onNavigate(link.path, `trust_${link.path.split('/').pop()}`)}
+              href={toAppHref(link.path)}
+              onClick={event => handleSpaLinkClick(event, () => onNavigate(link.path, `trust_${link.path.split('/').pop()}`))}
               style={{
                 minHeight: 172,
                 display: 'flex',
                 flexDirection: 'column',
                 textAlign: 'start',
+                textDecoration: 'none',
+                color: 'inherit',
                 borderRadius: R.xl,
                 padding: '18px',
                 background: C.card,
@@ -502,16 +513,16 @@ export function TrustPagesSection({ ar, onNavigate }: SectionNavigationProps) {
               >
                 <Icon size={18} />
               </span>
-              <div style={{ marginTop: 16, color: C.text, fontWeight: 900 }}>{tx(link.titleKey)}</div>
+              <div style={{ marginTop: 16, color: C.text, fontWeight: 800 }}>{tx(link.titleKey)}</div>
               <div
-                style={{ marginTop: 8, color: C.textMuted, fontSize: '0.78rem', lineHeight: 1.62 }}
+                style={{ marginTop: 8, color: C.textMuted, fontSize: '0.8125rem', lineHeight: 1.62 }}
               >
                 {tx(link.detailKey)}
               </div>
               <div style={{ marginTop: 'auto', paddingTop: 16 }}>
                 <ArrowCta ar={ar} label={tx('homeContent.trust_open_page')} accent={link.accent} />
               </div>
-            </button>
+            </a>
           );
         })}
       </div>

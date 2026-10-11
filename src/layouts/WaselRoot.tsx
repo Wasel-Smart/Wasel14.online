@@ -7,7 +7,8 @@ import { WaselLogo } from '../components/wasel-ui/WaselLogo';
 import { WaselButton } from '../components/wasel-ui/WaselButton';
 import { useLocalAuth } from '../contexts/LocalAuth';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useIframeSafeNavigate } from '../hooks/useIframeSafeNavigate';
+import { toAppHref, useIframeSafeNavigate } from '../hooks/useIframeSafeNavigate';
+import { handleSpaLinkClick } from '../utils/linkNavigation';
 import { useRoutePrefetch } from '../hooks/useRoutePrefetch';
 import { C, F, FA, GLOBAL_STYLES, R, Z } from '../utils/wasel-ds';
 import { trackPageView } from '../platform/telemetry';
@@ -28,7 +29,7 @@ const HEADER_STYLE: React.CSSProperties = {
   position: 'sticky',
   top: 0,
   zIndex: Z.sticky,
-  transition: 'background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease',
+  transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
 };
 
 const HEADER_INNER_STYLE: React.CSSProperties = {
@@ -70,7 +71,8 @@ const GLOBAL_HEADER_STYLES = `
   }
   .wrl-header button:focus-visible,
   .wrl-header a:focus-visible {
-    outline: 3px solid ${ C.cyanGlow };
+    /* Solid cyan: the old 20%-alpha glow outline was far below 3:1 on the header. */
+    outline: 2px solid ${ C.cyan };
     outline-offset: 2px;
   }
   .wrl-dropdown-item:hover {
@@ -100,8 +102,9 @@ const GLOBAL_HEADER_STYLES = `
     font-size: 0.9rem;
     font-weight: 600;
     white-space: nowrap;
+    text-decoration: none;
     cursor: pointer;
-    transition: background 160ms ease, color 160ms ease;
+    transition: background 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1);
   }
   .wrl-desk-link:hover { background: ${ C.cyanDim }; color: ${ C.text }; }
   .wrl-desk-link[aria-current='page'] { color: ${ C.cyan }; background: ${ C.cyanDim }; }
@@ -265,10 +268,10 @@ const WaselRootInner = memo( () => {
           style={ HEADER_STYLE }
         >
           <div style={ HEADER_INNER_STYLE }>
-            <button
-              type="button"
+            <a
+              href="/app"
               aria-label={ shellCopy.home }
-              onClick={ () => { void navigate( '/app' ); } }
+              onClick={ event => handleSpaLinkClick( event, () => { void navigate( '/app' ); } ) }
               style={ {
                 background: 'none',
                 border: 'none',
@@ -277,11 +280,12 @@ const WaselRootInner = memo( () => {
                 display: 'flex',
                 alignItems: 'center',
                 flexShrink: 0,
+                textDecoration: 'none',
                 transition: 'opacity 0.15s',
               } }
             >
               <WaselLogo size={ 36 } theme="light" variant="full" />
-            </button>
+            </a>
 
             <nav className="wrl-desk-nav" aria-label={ shellCopy.mainNav }>
               { CORE_NAV_ITEMS.map( item => {
@@ -290,16 +294,16 @@ const WaselRootInner = memo( () => {
                   ? ( ar ? item.labelAr : 'Network' )
                   : ( ar ? item.labelAr : item.label );
                 return (
-                  <button
+                  <a
                     key={ item.id }
-                    type="button"
+                    href={ toAppHref( item.path ) }
                     className="wrl-desk-link"
                     data-accent={ item.accent }
                     aria-current={ active ? 'page' : undefined }
-                    onClick={ () => { void navigate( item.path ); } }
+                    onClick={ event => handleSpaLinkClick( event, () => { void navigate( item.path ); } ) }
                   >
                     { label }
-                  </button>
+                  </a>
                 );
               } ) }
             </nav>

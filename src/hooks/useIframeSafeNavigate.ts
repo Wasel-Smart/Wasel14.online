@@ -50,12 +50,20 @@ export function normalizePathname(pathname: string): string {
     return pathname;
   }
 
+  // Match the prefix against the bare path only: `/find-ride?from=Amman` and
+  // `/wallet#history` must be prefixed too, not just `/find-ride`.
+  const bare = /^[^?#]*/.exec(pathname)?.[0] ?? pathname;
+  const suffix = pathname.slice(bare.length);
+
   const shouldPrefix = APP_ROUTE_PREFIXES.some(
-    prefix => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    prefix => bare === prefix || bare.startsWith(`${prefix}/`),
   );
 
-  return shouldPrefix ? `/app${pathname}` : pathname;
+  return shouldPrefix ? `/app${bare}${suffix}` : pathname;
 }
+
+/** Real, crawlable/middle-clickable URL for an in-app path (same rules as navigate()). */
+export const toAppHref = normalizePathname;
 
 function normalizeTo(to: To): To {
   if (typeof to === 'string') {

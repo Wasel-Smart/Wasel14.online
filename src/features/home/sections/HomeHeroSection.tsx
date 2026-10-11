@@ -109,8 +109,11 @@ const STATIC_PREVIEW: LivePreviewData = {
   utilization: 0.78,
 };
 
-function useLiveRoutePreview(): LivePreviewData {
+function useLiveRoutePreview(): { data: LivePreviewData; isLive: boolean } {
   const [data, setData] = useState<LivePreviewData>(STATIC_PREVIEW);
+  // Stays false until the public snapshot actually answers, so the hero never
+  // claims "LIVE" while showing the hardcoded fallback numbers.
+  const [isLive, setIsLive] = useState(false);
 
   useEffect(() => {
     if (!API_URL) {return;}
@@ -132,17 +135,18 @@ function useLiveRoutePreview(): LivePreviewData {
           nextDeparture: STATIC_PREVIEW.nextDeparture,
           utilization: util,
         });
+        setIsLive(true);
       })
       .catch(() => { /* keep static fallback */ });
     return () => controller.abort();
   }, []);
 
-  return data;
+  return { data, isLive };
 }
 
 function ProductCommandPreview ( { ar }: { ar: boolean } ) {
   const { t } = useLanguage();
-  const live = useLiveRoutePreview();
+  const { data: live, isLive } = useLiveRoutePreview();
 
   const liveTimeline = [
     { labelKey: 'homeHeroSection.timeline_seat_price_label', value: live.priceJod, accent: C.cyan },
@@ -165,9 +169,16 @@ function ProductCommandPreview ( { ar }: { ar: boolean } ) {
             { tx( 'homeHeroSection.route_preview_title' ) }
           </div>
         </div>
-        <div className="wasel-home-live-chip">
+        <div
+          className={ isLive ? 'wasel-home-live-chip' : 'wasel-home-live-chip wasel-home-live-chip--sample' }
+          title={ isLive
+            ? undefined
+            : ( ar ? 'أرقام توضيحية لحين تحميل البيانات المباشرة' : 'Illustrative figures until live data loads' ) }
+        >
           <span />
-          { tx( 'homeHeroSection.live_chip_label' ) }
+          { isLive
+            ? tx( 'homeHeroSection.live_chip_label' )
+            : ( ar ? 'عيّنة' : 'Sample' ) }
         </div>
       </div>
 
@@ -210,7 +221,7 @@ function ProductCommandPreview ( { ar }: { ar: boolean } ) {
             ) ) }
           </div>
           <div className="wasel-home-window-progress">
-            <span style={ { width: '78%' } } />
+            <span style={ { width: `${ Math.round( Math.min( 1, Math.max( 0, live.utilization ) ) * 100 ) }%` } } />
           </div>
         </div>
 
@@ -243,7 +254,7 @@ function LangToggle () {
       onClick={ () => setLanguage( ar ? 'en' : 'ar' ) }
       title={ tx( 'homeHeroSection.lang_toggle_title' ) }
       className="wasel-home-section-action"
-      style={ { height: 34, padding: '0 12px', fontSize: '0.75rem' } }
+      style={ { height: 34, padding: '0 12px', fontSize: '0.8125rem' } }
     >
       { ar ? 'EN' : 'AR' }
     </button>
@@ -262,6 +273,10 @@ export function HomeHeroSection ( {
 
   return (
     <motion.section className="wasel-home-hero" initial={ false }>
+      <span className="wasel-home-aurora wasel-home-aurora-cyan" aria-hidden="true" />
+      <span className="wasel-home-aurora wasel-home-aurora-green" aria-hidden="true" />
+      <span className="wasel-home-aurora wasel-home-aurora-orange" aria-hidden="true" />
+
       <div className="wasel-home-hero-copy">
         <div className="wasel-home-nav">
           <div className="wasel-home-nav-left">
