@@ -27,6 +27,11 @@ export default defineConfig( {
       { find: '@', replacement: path.resolve( __dirname, './src' ) },
       { find: '$deno', replacement: path.resolve( __dirname, './supabase/functions' ) },
       { find: '@wasel/rbac', replacement: path.resolve( __dirname, './packages/rbac/src' ) },
+      // geo-adapter's dynamic import('ioredis') must resolve at transform
+      // time even though the package is not installed (it is Node-only and
+      // must never reach the browser bundle). Point it at a stub; the tests
+      // never set REDIS_URL, so the real client is never needed.
+      { find: 'ioredis', replacement: path.resolve( __dirname, './tests/stubs/ioredis.ts' ) },
     ],
   },
 

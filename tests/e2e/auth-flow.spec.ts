@@ -5,8 +5,9 @@ test.beforeEach( async ( { page } ) => {
   await page.addInitScript( () => localStorage.setItem( 'wasel-language', 'en' ) );
 } );
 
-// The landing hero heading. Keep in sync with HomeHeroSection.tsx.
-const LANDING_HEADING = /shared routes that reduce travel cost/i;
+// The landing hero heading (homeHeroSection.hero_title locale key).
+// Keep in sync with HomeHeroSection.tsx and src/locales/chunks/homeHeroSection.ts.
+const LANDING_HEADING = /share the road/i;
 
 // `load` also waits for third-party fonts/images, which can stall for a minute
 // on a cold Vite dev server. The title and the heading assertions below are what
@@ -47,7 +48,9 @@ test( 'authenticated user receives the signed-in landing surface @smoke', async 
   await seedDemoSession( page, 'en' );
   await page.goto( '/app', GOTO );
   await expect( page.getByRole( 'heading', { name: LANDING_HEADING } ) ).toBeVisible();
-  await expect( page.getByRole( 'button', { name: /Demo account menu/i } ) ).toBeVisible();
+  // Signed-in visitors get the personalized lead (homeHeroSection.hero_lead_user)
+  // instead of the guest copy — that swap is the authenticated surface.
+  await expect( page.getByText( /welcome back/i ) ).toBeVisible();
 } );
 
 test( 'unknown route renders 404 with navigation link', async ( { page } ) => {
