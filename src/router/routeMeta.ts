@@ -267,10 +267,10 @@ export const ROUTE_META: WaselRouteMeta[] = [
   {
     path: '/app/services/corporate',
     requiresAuth: true,
-    title: 'Corporate Travel',
-    titleAr: 'السفر المؤسسي',
-    description: 'Managed corporate travel on Wasel.',
-    descriptionAr: 'السفر المؤسسي المُدار عبر واصل.',
+    title: 'Corporate Services',
+    titleAr: 'الخدمات المؤسسية',
+    description: 'Corporate transport services on Wasel.',
+    descriptionAr: 'خدمات النقل المؤسسية عبر واصل.',
     analyticsKey: 'services_corporate',
   },
   {

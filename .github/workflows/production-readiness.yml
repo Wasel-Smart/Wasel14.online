@@ -1,0 +1,146 @@
+name: Production Readiness Gate
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every Monday at 07:00 UTC — weekly production health check
+    - cron: '0 7 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prod-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ── 1. Coverage gate ─────────────────────────────────────────────────────────
+  coverage:
+    name: Coverage Thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+      - run: npm run verify:coverage
+      - name: Enforce thresholds (branches 75%, functions 80%, lines 85%)
+        run: |
+          node -e "
+            const fs = require('fs');
+            const s = JSON.parse(fs.readFileSync('coverage/coverage-summary.json','utf8')).total;
+            const fail = [];
+            if (s.branches.pct  < 75)  fail.push('branches '  + s.branches.pct.toFixed(1)  + '% < 75%');
+            if (s.functions.pct < 80)  fail.push('functions ' + s.functions.pct.toFixed(1) + '% < 80%');
+            if (s.lines.pct     < 85)  fail.push('lines '     + s.lines.pct.toFixed(1)     + '% < 85%');
+            if (fail.length) { console.error('Coverage gate FAILED:', fail.join(', ')); process.exit(1); }
+            console.log('Coverage gate PASSED — branches=' + s.branches.pct.toFixed(1) + '%, functions=' + s.functions.pct.toFixed(1) + '%, lines=' + s.lines.pct.toFixed(1) + '%');
+          "
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
+
+  # ── 2. Pre-flight checks ─────────────────────────────────────────────────────
+  preflight:
+    name: Production Pre-flight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+      - name: Run production pre-flight checks
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_EDGE_FUNCTION_NAME: ${{ vars.VITE_EDGE_FUNCTION_NAME || 'make-server-0b1f4071' }}
+          VITE_APP_URL: ${{ vars.PRODUCTION_URL || 'https://www.wasel14.online' }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_APP_INSIGHTS_CONNECTION_STRING: ${{ secrets.VITE_APP_INSIGHTS_CONNECTION_STRING }}
+        run: node scripts/production-preflight.mjs
+
+  # ── 3. Live integration probes ───────────────────────────────────────────────
+  live-integrations:
+    name: Live Integration Probes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only probe live endpoints when credentials are available
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+      - name: Probe live integrations
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_EDGE_FUNCTIONS_BASE_URL: ${{ secrets.VITE_EDGE_FUNCTIONS_BASE_URL }}
+          VITE_EDGE_FUNCTION_NAME: ${{ vars.VITE_EDGE_FUNCTION_NAME || 'make-server-0b1f4071' }}
+          VITE_APP_URL: ${{ vars.PRODUCTION_URL || 'https://www.wasel14.online' }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_APP_INSIGHTS_CONNECTION_STRING: ${{ secrets.VITE_APP_INSIGHTS_CONNECTION_STRING }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Supabase credentials not set — skipping live integration probes."
+            exit 0
+          fi
+          node scripts/verify-live-integrations.mjs
+
+  # ── 4. Security audit ────────────────────────────────────────────────────────
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - run: npm ci --legacy-peer-deps
+      - run: npm run secrets:check
+      - run: npm run env:check
+      - run: npm audit --audit-level=high
+
+  # ── 5. Full build verification ───────────────────────────────────────────────
+  build-verify:
+    name: Full Build Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [coverage, preflight, security-audit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci --legacy-peer-deps
+      - run: npm run verify:ci
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-build
+          path: dist/
+          retention-days: 7

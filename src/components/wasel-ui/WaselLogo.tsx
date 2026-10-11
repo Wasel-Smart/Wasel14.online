@@ -11,11 +11,11 @@ interface WaselLogoProps {
   alt?: string;
 }
 
-// Primary brand lockup (logo-default): the interlocking blue/orange/green
+// Primary brand lockup (logo-dark): the interlocking blue/orange/green
 // route mark with the bilingual wordmark.
 // SVG viewBox is 1929×341 → width = height × 1929/341.
-const LOGO_SVG = '/brand/assets/logos/primary/logo-default.svg';
-const LOGO_PNG = '/brand/assets/logos/primary/logo-default.png';
+const LOGO_SVG = '/brand/assets/logos/primary/logo-dark.svg';
+const LOGO_PNG = '/brand/assets/logos/primary/logo-dark.png';
 const LOGO_W_RATIO = 1929 / 341;
 
 function BrandLockup({ size, framed = false }: { size: number; framed?: boolean }) {

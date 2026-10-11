@@ -8,7 +8,7 @@ const ORGANIZATION_SCHEMA = {
   name: 'Wasel',
   alternateName: 'وصل',
   url: 'https://wasel14.online',
-  logo: 'https://wasel14.online/brand/assets/logos/primary/logo-default.svg',
+  logo: 'https://wasel14.online/brand/assets/logos/primary/logo-dark.png',
   sameAs: [
     'https://twitter.com/wasel14',
     'https://instagram.com/wasel14',

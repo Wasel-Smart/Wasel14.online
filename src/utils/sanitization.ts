@@ -190,6 +190,9 @@ export function sanitizeFilename(filename: string): string {
     .replace(/[\\/]/g, '_')
     // Replace other invalid characters (keep dots/underscores/hyphens).
     .replace(/[^a-zA-Z0-9._-]/g, '_')
+    // Collapse dot-runs (e.g. "file..name", traversal leftovers) to a single dot,
+    // before splitting base/extension so the junction can't recreate "..".
+    .replace(/\.{2,}/g, '.')
     .substring(0, 255);
 
   // If the name starts with a dot, make it non-hidden and non-relative by prefixing.
@@ -199,12 +202,9 @@ export function sanitizeFilename(filename: string): string {
   const base = dot > 0 ? safe.slice(0, dot) : safe;
   const ext = dot > 0 ? safe.slice(dot) : '';
 
-  // Collapse dot-runs only when they are between alphanumerics (e.g. "file..name").
-  const normalizedBase = base.replace(/([A-Za-z0-9])\.{2,}([A-Za-z0-9])/g, '$1.$2');
-
   // Tests expect that when the original filename had invalid characters and an extension,
   // we pad with two underscores before the extension (even if the base already ends with _).
-  const paddedBase = ext && hadInvalid ? `${normalizedBase}__` : normalizedBase;
+  const paddedBase = ext && hadInvalid ? `${base}__` : base;
 
   return `${paddedBase}${ext}`.substring(0, 255);
 }

@@ -36,6 +36,8 @@ class TelemetryCollector {
   private flushInterval: number = 30000; // 30 seconds
   private endpoint: string;
   private authToken: string | undefined;
+  private serviceName: string | undefined;
+  private environmentOverride: string | undefined;
 
   constructor(endpoint?: string) {
     this.endpoint = endpoint || '/api/telemetry';
@@ -44,6 +46,19 @@ class TelemetryCollector {
         ? (import.meta.env?.VITE_TELEMETRY_TOKEN as string | undefined)
         : undefined;
     this.startAutoFlush();
+  }
+
+  /** Reconfigure the collector at runtime. Only provided fields change. */
+  configure(config: {
+    endpoint?: string;
+    serviceName?: string;
+    environment?: string;
+    authToken?: string;
+  }): void {
+    if (config.endpoint !== undefined) {this.endpoint = config.endpoint;}
+    if (config.serviceName !== undefined) {this.serviceName = config.serviceName;}
+    if (config.environment !== undefined) {this.environmentOverride = config.environment;}
+    if (config.authToken !== undefined) {this.authToken = config.authToken;}
   }
 
   // Record a metric point

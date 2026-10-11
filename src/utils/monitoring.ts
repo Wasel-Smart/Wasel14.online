@@ -4,11 +4,11 @@ import {
   addBreadcrumb,
   captureException,
   captureMessage,
-  getCurrentScope,
   startInactiveSpan,
   browserTracingIntegration,
   replayIntegration,
 } from '@sentry/react';
+import { getCurrentScope } from '@sentry/core';
 import { createCorrelationId, createStructuredLogEntry } from '../platform/observability';
 import { sanitizeLogMessage } from './sanitization';
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
@@ -93,7 +93,8 @@ export async function initSentry(): Promise<void> {
         'Network request failed',
         'Failed to fetch',
       ],
-      beforeSend(event: SentryEvent) {
+      beforeSend(event: SentryEvent | null) {
+        if (!event) {return null;}
         try {
           const raw = localStorage.getItem('wasel_local_user_v2');
           if (raw) {
@@ -134,7 +135,7 @@ export async function initSentry(): Promise<void> {
 
     const reportVital = (name: string, value: number) => {
       try {
-        getCurrentScope().setMeasurement(name, value, name === 'CLS' ? '' : 'millisecond');
+        (getCurrentScope() as any).setMeasurement(name, value, name === 'CLS' ? '' : 'millisecond');
       } catch {
         // setMeasurement may not be available in all environments
       }

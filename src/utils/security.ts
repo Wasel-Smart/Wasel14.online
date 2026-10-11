@@ -300,8 +300,8 @@ export function validatePhone(phone: string): boolean {
 
 export function validateIraqPhone(phone: string): boolean {
   // Iraqi mobile: +9647xxxxxxxxx (10 digits after country code)
-  // Iraqi landline: +96401xxxxxxxx or +96402xxxxxxxx etc.
-  return /^\+964[0-9]{9,10}$/.test(phone);
+  // Iraqi landline: +9640xxxxxxxx or +96401xxxxxxxx etc. (8-9 digits)
+  return /^\+964[0-9]{8,10}$/.test(phone);
 }
 
 export function validateJordanPhone(phone: string): boolean {

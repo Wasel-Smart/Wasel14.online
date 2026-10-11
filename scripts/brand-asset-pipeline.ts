@@ -14,9 +14,9 @@ const PUBLIC_BRAND = path.join(ROOT, 'public', 'brand');
 const ARTIFACTS_BRAND = path.join(ROOT, 'artifacts', 'brand');
 
 const REQUIRED_ASSETS = [
-  'logos/primary/logo-default.svg',
-  'logos/primary/logo-default.svg',
-  'logos/primary/logo-light.svg',
+  'logos/primary/logo-dark.svg',
+  'logos/primary/logo-dark.svg',
+  'logos/primary/logo-dark.svg',
   'logos/primary/logo-white.svg',
   'logos/primary/logo-black.svg',
   'logos/primary/logo-monochrome.svg',

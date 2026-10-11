@@ -483,8 +483,9 @@ export function initializeMonitoring() {
         dsn: sentryDsn,
         environment: import.meta.env.MODE,
         tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
-        beforeSend(event: SentryEvent) {
+        beforeSend(event: SentryEvent | null) {
           // Filter out ignored errors
+          if (!event) {return null;}
           const ignoredErrors = [
             'IframeMessageAbortError',
             'message port was destroyed',

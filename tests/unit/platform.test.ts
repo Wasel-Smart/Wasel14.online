@@ -207,8 +207,9 @@ describe('Sanitization', () => {
   it('sanitizeFilename prevents directory traversal', async () => {
     const { sanitizeFilename } = await import('../../src/utils/sanitization');
 
-    // Leading dot gets prefixed with underscore
-    expect(sanitizeFilename('../../../etc/passwd')).toBe('_.._.._.._etc_passwd');
+    // Leading dot gets prefixed with underscore; dot-runs from the
+    // traversal segments collapse so no ".." survives in the output.
+    expect(sanitizeFilename('../../../etc/passwd')).toBe('_._._._etc_passwd');
     // Invalid characters get replaced with underscore, and dot-runs are normalized
     expect(sanitizeFilename('file<script>.txt')).toBe('file_script___.txt');
   });

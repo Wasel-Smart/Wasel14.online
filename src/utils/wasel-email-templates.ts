@@ -146,7 +146,7 @@ export function wrapEmailTemplate(content: string, options: { title?: string; ct
           <!-- Header -->
           <tr>
             <td style="padding: 24px; text-align: center; background-color: #0D1B2A; border-radius: 16px 16px 0 0; border-bottom: 1px solid rgba(0,229,255,0.1);">
-              <img src="${getBaseUrl()}/brand/assets/logos/primary/logo-light-160.png" alt="Wasel" width="120" height="38" style="display: block; margin: 0 auto;">
+              <img src="${getBaseUrl()}/brand/assets/logos/primary/logo-dark.png" alt="Wasel" width="120" height="38" style="display: block; margin: 0 auto;">
             </td>
           </tr>
           <!-- Content -->
