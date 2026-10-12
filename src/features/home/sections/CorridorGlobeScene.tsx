@@ -3,11 +3,15 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, QuadraticBezierLine } from '@react-three/drei';
 import * as THREE from 'three';
 import { C } from '../../../utils/wasel-ds';
+import { POPULAR_ROUTES } from '../HomePageShared';
 
 // QuadraticBezierCurve3 exists at runtime in three@0.182 but was removed from
 // @types/three@0.182. Cast through unknown to avoid the missing-export error.
-const QuadraticBezierCurve3 = (THREE as unknown as Record<string, new (...a: THREE.Vector3[]) => { getPoint(t: number): THREE.Vector3 }>)['QuadraticBezierCurve3']!;
-import { POPULAR_ROUTES } from '../HomePageShared';
+// Destructuring a named property (rather than indexing a Record) keeps the
+// type non-optional, so no non-null assertion is needed.
+const { QuadraticBezierCurve3 } = THREE as unknown as {
+  QuadraticBezierCurve3: new (...a: THREE.Vector3[]) => { getPoint(t: number): THREE.Vector3 };
+};
 
 const GLOBE_RADIUS = 1.6;
 
@@ -18,12 +22,16 @@ const GLOBE_SHELL_COLOR = C.teal;
 const GLOBE_CORE_COLOR = C.navyMid;
 const HUB_COLOR = C.gold;
 
+// The hub is referenced directly (arcs and its marker), so it is a named
+// constant instead of an indexed lookup that would need a non-null assertion.
+const HUB_COORDS = { lat: 31.9539, lng: 35.9106 };
+
 // Approximate real-world coordinates for the Jordanian destinations in
 // POPULAR_ROUTES. This isn't a literal map — just enough geographic
 // grounding for the stylised globe below to feel like a real network
 // rather than an abstract decoration.
 const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
-  Amman: { lat: 31.9539, lng: 35.9106 },
+  Amman: HUB_COORDS,
   Aqaba: { lat: 29.5321, lng: 35.0063 },
   Irbid: { lat: 32.5556, lng: 35.85 },
   'Dead Sea': { lat: 31.75, lng: 35.58 },
@@ -118,14 +126,13 @@ function GlobeCore({ reduceMotion }: { reduceMotion: boolean }) {
   });
 
   const arcs = useMemo<CorridorArc[]>(() => {
-    const hub = CITY_COORDS.Amman;
-    if (!hub) {return [];}
-    const hubVec = latLngToVector3(hub.lat, hub.lng, GLOBE_RADIUS);
+    const hubVec = latLngToVector3(HUB_COORDS.lat, HUB_COORDS.lng, GLOBE_RADIUS);
 
-    return POPULAR_ROUTES.filter(route => Boolean(CITY_COORDS[route.to])).map(route => {
-      const dest = CITY_COORDS[route.to]!;
+    return POPULAR_ROUTES.flatMap((route): CorridorArc[] => {
+      const dest = CITY_COORDS[route.to];
+      if (!dest) {return [];}
       const destVec = latLngToVector3(dest.lat, dest.lng, GLOBE_RADIUS);
-      return {
+      return [{
         key: `${route.from}-${route.to}`,
         from: hubVec,
         to: destVec,
@@ -134,7 +141,7 @@ function GlobeCore({ reduceMotion }: { reduceMotion: boolean }) {
         // Deterministic: longer corridors move slightly slower, so the speed is
         // stable across re-renders and reads as distance rather than noise.
         speed: 0.26 - Math.min(route.dist, 350) / 350 * 0.1,
-      };
+      }];
     });
   }, []);
 
@@ -171,7 +178,7 @@ function GlobeCore({ reduceMotion }: { reduceMotion: boolean }) {
       ))}
 
       <Marker
-        position={latLngToVector3(CITY_COORDS.Amman!.lat, CITY_COORDS.Amman!.lng, GLOBE_RADIUS)}
+        position={latLngToVector3(HUB_COORDS.lat, HUB_COORDS.lng, GLOBE_RADIUS)}
         color={HUB_COLOR}
         size={0.06}
         reduceMotion={reduceMotion}

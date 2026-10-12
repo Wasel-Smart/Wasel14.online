@@ -19,6 +19,13 @@ type SentryEvent = {
   [key: string]: unknown;
 };
 
+// @sentry/core's Scope type does not declare setMeasurement, but some runtime
+// builds expose it. Model it as optional so the call stays a safe no-op where
+// it is missing, without resorting to `any`.
+type MeasurementCapableScope = {
+  setMeasurement?: (name: string, value: number, unit: string) => void;
+};
+
 let sentryInitialized = false;
 let sentryInitializationStarted = false;
 
@@ -135,7 +142,8 @@ export async function initSentry(): Promise<void> {
 
     const reportVital = (name: string, value: number) => {
       try {
-        (getCurrentScope() as any).setMeasurement(name, value, name === 'CLS' ? '' : 'millisecond');
+        const scope = getCurrentScope() as unknown as MeasurementCapableScope;
+        scope.setMeasurement?.(name, value, name === 'CLS' ? '' : 'millisecond');
       } catch {
         // setMeasurement may not be available in all environments
       }

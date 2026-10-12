@@ -6,7 +6,7 @@
  * ALL_RIDES seed data only when the database returns nothing, so the UI is
  * never empty during development.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { searchDirectTrips } from '../../services/directSupabase/trips';
 import { getConnectedRides } from '../../services/journeyLogistics';
 import {
@@ -40,24 +40,32 @@ export function useRideInventory ( {
     ...getConnectedRides().map( buildRideFromPostedRide ),
     ...ALL_RIDES,
   ] );
-  const [ loading, setLoading ] = useState( false );
-  const [ error, setError ] = useState<string | null>( null );
-  const abortRef = useRef<AbortController | null>( null );
+
+  // A search is identified by its inputs; `null` means no search is requested.
+  const requestKey = searched ? JSON.stringify( [ from, to, date ] ) : null;
+  const [ loading, setLoading ] = useState( requestKey !== null );
+  const [ trackedRequestKey, setTrackedRequestKey ] = useState<string | null>( requestKey );
+
+  // Loading starts the moment a new search is requested. It is adjusted during
+  // render, guarded by the key comparison, rather than by calling setState
+  // synchronously inside the effect (react-hooks/set-state-in-effect). React
+  // re-renders immediately, before the effect below runs, so the UI never
+  // shows a stale "not loading" frame for a new request.
+  if ( trackedRequestKey !== requestKey ) {
+    setTrackedRequestKey( requestKey );
+    setLoading( requestKey !== null );
+  }
 
   useEffect( () => {
-    const localRides = getConnectedRides().map( buildRideFromPostedRide );
-
-    if ( !searched ) {
+    if ( requestKey === null ) {
       // Initial state already includes localRides + ALL_RIDES
       return;
     }
 
-    abortRef.current?.abort();
+    const localRides = getConnectedRides().map( buildRideFromPostedRide );
+    // Cleanup aborts the previous request before the next effect run, so a stale
+    // response can never overwrite a newer one.
     const controller = new AbortController();
-    abortRef.current = controller;
-
-    setLoading( true );
-    setError( null );
 
     searchDirectTrips( from || undefined, to || undefined, date || undefined )
       .then( results => {
@@ -69,7 +77,6 @@ export function useRideInventory ( {
       .catch( err => {
         if ( controller.signal.aborted ) { return; }
         console.warn( '[useRideInventory] DB fetch failed, using local+static:', sanitizeLogMessage( err ) );
-        setError( null );
         setRides( [ ...localRides, ...ALL_RIDES ] );
       } )
       .finally( () => {
@@ -77,9 +84,10 @@ export function useRideInventory ( {
       } );
 
     return () => { controller.abort(); };
-  }, [ from, to, date, searched ] );
+  }, [ from, to, date, requestKey ] );
 
-  return { rides, loading, error };
+  // A failed fetch falls back to local + static rides, so no error is surfaced.
+  return { rides, loading, error: null };
 }
 
 /** Deduplicate by id, preferring earlier entries (db > static). */

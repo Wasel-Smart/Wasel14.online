@@ -12,115 +12,154 @@ import {
 } from '../_shared/pricing.ts';
 
 
+type BookingAuth = Extract<Awaited<ReturnType<typeof authenticateRequest>>, { admin: unknown }>;
+
 export async function handleBookingRequest ( request: Request, path: string ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
 
   if ( request.method === 'POST' && path === '/bookings' ) {
-    const body = await request.json().catch( () => ( {} ) );
-    const tripId = String( body.trip_id ?? '' );
-    const seatsRequested = Math.max( 1, toNumber( body.seats_requested, 1 ) );
-    const status = String( body.status ?? body.booking_status ?? 'confirmed' );
-
-    // Booking creation runs inside app_create_ride_booking so the trip row is
-    // locked for the whole operation. The previous read-then-write sequence let
-    // two concurrent requests both observe the last seat and both confirm it.
-    const { data: created, error: createError } = await auth.admin.rpc( 'app_create_ride_booking', {
-      p_trip_id: tripId,
-      p_passenger_id: auth.canonicalUser.id,
-      p_seats_requested: seatsRequested,
-      p_pickup: body.pickup_stop ?? body.pickup_location ?? null,
-      p_dropoff: body.dropoff_stop ?? body.dropoff_location ?? null,
-      p_booking_status: status,
-      // Ignored by the function, which derives the fare from the locked trip
-      // row. The argument is retained only to keep the signature stable.
-      p_total_price: 0,
-    } );
-
-    if ( createError ) {
-      return json( { error: createError.message }, 400 );
-    }
-
-    const data = ( Array.isArray( created ) ? created[ 0 ] : created );
-    if ( !data ) {return json( { error: 'Booking could not be created' }, 500 );}
-
-    const { data: driver } = await auth.admin
-      .from( 'drivers' )
-      .select( 'driver_id, user_id' )
-      .in( 'driver_status', [ 'online', 'approved', 'busy' ] )
-      .limit( 1 )
-      .maybeSingle();
-
-    if ( driver && status !== 'pending_driver' ) {
-      await auth.admin
-        .from( 'trips' )
-        .update( { driver_id: driver.driver_id, trip_status: 'booked' } )
-        .eq( 'trip_id', tripId );
-
-      await auth.admin
-        .from( 'bookings' )
-        .update( { driver_id: driver.driver_id, confirmed_by_driver: true } )
-        .eq( 'booking_id', data.booking_id );
-    }
-
-    return json( { booking: mapBookingRow( data ) } );
+    return createBooking( request, auth );
   }
 
   const bookingRoute = parseEntityRoute( path, 'bookings' );
   if ( request.method === 'GET' && bookingRoute?.id === 'user' ) {
-    const requestedUserId = bookingRoute.action ?? '';
-    if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
-      return json( { error: 'Booking route is not authorized for this user.' }, 403 );
-    }
-    const { data, error } = await auth.admin
-      .from( 'bookings' )
-      .select( '*' )
-      .eq( 'passenger_id', auth.canonicalUser.id )
-      .order( 'created_at', { ascending: false } );
-    if ( error ) {return json( { error: error.message }, 500 );}
-    return json( ( Array.isArray( data ) ? data : [] ).map( mapBookingRow ) );
+    return listPassengerBookings( auth, bookingRoute.action ?? '' );
   }
 
   if ( request.method === 'PUT' && bookingRoute?.id ) {
-    const body = await request.json().catch( () => ( {} ) );
-    // IDOR guard: verify the caller is the passenger or the trip's driver.
-    const { data: bookingRow, error: bookingErr } = await auth.admin
-      .from( 'bookings' )
-      .select( 'booking_id, passenger_id, trip_id' )
-      .eq( 'booking_id', bookingRoute.id )
-      .maybeSingle();
-    if ( bookingErr ) {return json( { error: bookingErr.message }, 500 );}
-    if ( !bookingRow ) {return json( { error: 'Booking not found' }, 404 );}
-    const isPassenger = bookingRow.passenger_id === auth.canonicalUser.id;
-    let isDriver = false;
-    if ( bookingRow.trip_id ) {
-      const { data: tripRow } = await auth.admin
-        .from( 'trips' )
-        .select( 'driver_id' )
-        .eq( 'trip_id', bookingRow.trip_id )
-        .maybeSingle();
-      isDriver = tripRow?.driver_id === auth.canonicalUser.id;
-    }
-    const canManage = hasPermission( resolveAccessRole( auth.canonicalUser.role ), 'rides:assign' );
-    if ( !isPassenger && !isDriver && !canManage ) {
-      return json( { error: 'Not authorized to update this booking.' }, 403 );
-    }
-    const status = body.status === 'accepted' ? 'confirmed' : body.status === 'rejected' ? 'cancelled' : String( body.status ?? 'cancelled' );
-    const { data, error } = await auth.admin
-      .from( 'bookings' )
-      .update( {
-        booking_status: status,
-        status,
-        confirmed_by_driver: status === 'confirmed',
-      } )
-      .eq( 'booking_id', bookingRoute.id )
-      .select( '*' )
-      .single();
-    if ( error ) {return json( { error: error.message }, 500 );}
-    return json( mapBookingRow( data ) );
+    return updateBooking( request, auth, bookingRoute.id );
   }
 
   return undefined;
+}
+
+async function createBooking ( request: Request, auth: BookingAuth ): Promise<Response> {
+  const body = await request.json().catch( () => ( {} ) );
+  const tripId = String( body.trip_id ?? '' );
+  const seatsRequested = Math.max( 1, toNumber( body.seats_requested, 1 ) );
+  const status = String( body.status ?? body.booking_status ?? 'confirmed' );
+
+  // Booking creation runs inside app_create_ride_booking so the trip row is
+  // locked for the whole operation. The previous read-then-write sequence let
+  // two concurrent requests both observe the last seat and both confirm it.
+  const { data: created, error: createError } = await auth.admin.rpc( 'app_create_ride_booking', {
+    p_trip_id: tripId,
+    p_passenger_id: auth.canonicalUser.id,
+    p_seats_requested: seatsRequested,
+    p_pickup: body.pickup_stop ?? body.pickup_location ?? null,
+    p_dropoff: body.dropoff_stop ?? body.dropoff_location ?? null,
+    p_booking_status: status,
+    // Ignored by the function, which derives the fare from the locked trip
+    // row. The argument is retained only to keep the signature stable.
+    p_total_price: 0,
+  } );
+
+  if ( createError ) {
+    return json( { error: createError.message }, 400 );
+  }
+
+  const data = ( Array.isArray( created ) ? created[ 0 ] : created );
+  if ( !data ) {return json( { error: 'Booking could not be created' }, 500 );}
+
+  await assignAvailableDriver( auth, tripId, data.booking_id, status );
+
+  return json( { booking: mapBookingRow( data ) } );
+}
+
+/**
+ * Post-creation driver assignment, moved verbatim out of createBooking to keep
+ * that handler small. Behaviour is unchanged: the lookup always runs, and the
+ * trip/booking updates only apply for non-`pending_driver` bookings.
+ */
+async function assignAvailableDriver (
+  auth: BookingAuth,
+  tripId: string,
+  bookingId: string,
+  status: string,
+): Promise<void> {
+  const { data: driver } = await auth.admin
+    .from( 'drivers' )
+    .select( 'driver_id, user_id' )
+    .in( 'driver_status', [ 'online', 'approved', 'busy' ] )
+    .limit( 1 )
+    .maybeSingle();
+
+  if ( driver && status !== 'pending_driver' ) {
+    await auth.admin
+      .from( 'trips' )
+      .update( { driver_id: driver.driver_id, trip_status: 'booked' } )
+      .eq( 'trip_id', tripId );
+
+    await auth.admin
+      .from( 'bookings' )
+      .update( { driver_id: driver.driver_id, confirmed_by_driver: true } )
+      .eq( 'booking_id', bookingId );
+  }
+}
+
+async function listPassengerBookings ( auth: BookingAuth, requestedUserId: string ): Promise<Response> {
+  if ( !matchesAuthenticatedUser( auth, requestedUserId ) ) {
+    return json( { error: 'Booking route is not authorized for this user.' }, 403 );
+  }
+  const { data, error } = await auth.admin
+    .from( 'bookings' )
+    .select( '*' )
+    .eq( 'passenger_id', auth.canonicalUser.id )
+    .order( 'created_at', { ascending: false } );
+  if ( error ) {return json( { error: error.message }, 500 );}
+  return json( ( Array.isArray( data ) ? data : [] ).map( mapBookingRow ) );
+}
+
+async function isTripDriver (
+  auth: BookingAuth,
+  tripId: string | null | undefined,
+  userId: string,
+): Promise<boolean> {
+  if ( !tripId ) {return false;}
+  const { data: tripRow } = await auth.admin
+    .from( 'trips' )
+    .select( 'driver_id' )
+    .eq( 'trip_id', tripId )
+    .maybeSingle();
+  return tripRow?.driver_id === userId;
+}
+
+function normalizeBookingStatusUpdate ( rawStatus: unknown ): string {
+  if ( rawStatus === 'accepted' ) {return 'confirmed';}
+  if ( rawStatus === 'rejected' ) {return 'cancelled';}
+  return String( rawStatus ?? 'cancelled' );
+}
+
+async function updateBooking ( request: Request, auth: BookingAuth, bookingId: string ): Promise<Response> {
+  const body = await request.json().catch( () => ( {} ) );
+  // IDOR guard: verify the caller is the passenger or the trip's driver.
+  const { data: bookingRow, error: bookingErr } = await auth.admin
+    .from( 'bookings' )
+    .select( 'booking_id, passenger_id, trip_id' )
+    .eq( 'booking_id', bookingId )
+    .maybeSingle();
+  if ( bookingErr ) {return json( { error: bookingErr.message }, 500 );}
+  if ( !bookingRow ) {return json( { error: 'Booking not found' }, 404 );}
+  const isPassenger = bookingRow.passenger_id === auth.canonicalUser.id;
+  const isDriver = await isTripDriver( auth, bookingRow.trip_id, auth.canonicalUser.id );
+  const canManage = hasPermission( resolveAccessRole( auth.canonicalUser.role ), 'rides:assign' );
+  if ( !isPassenger && !isDriver && !canManage ) {
+    return json( { error: 'Not authorized to update this booking.' }, 403 );
+  }
+  const status = normalizeBookingStatusUpdate( body.status );
+  const { data, error } = await auth.admin
+    .from( 'bookings' )
+    .update( {
+      booking_status: status,
+      status,
+      confirmed_by_driver: status === 'confirmed',
+    } )
+    .eq( 'booking_id', bookingId )
+    .select( '*' )
+    .single();
+  if ( error ) {return json( { error: error.message }, 500 );}
+  return json( mapBookingRow( data ) );
 }
 
 export async function handleSubmitRating ( request: Request ) {

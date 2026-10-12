@@ -16,6 +16,13 @@ declare
   seed_booking_id uuid := '00000000-0000-0000-0000-000000000002'::uuid;
   seed_payment_intent_id text := 'pi_test_seed_0001';
 begin
+  -- Guard: never insert test fixtures into production.
+  -- Set app.environment='production' on the prod database (ALTER DATABASE
+  -- <name> SET app.environment = 'production';) so this block is a no-op.
+  if current_setting('app.environment', true) = 'production' then
+    return;
+  end if;
+
   -- Insert seed user if not exists
   if not exists (select 1 from users where id = seed_user_id) then
     insert into users (id, email, full_name, role, created_at, updated_at)
