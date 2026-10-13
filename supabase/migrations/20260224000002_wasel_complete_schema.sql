@@ -351,7 +351,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 
 CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
   sender_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   recipient_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   message TEXT NOT NULL,
@@ -369,7 +369,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS typing_indicators (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   is_typing BOOLEAN DEFAULT FALSE,
   updated_at TIMESTAMPTZ DEFAULT NOW(),

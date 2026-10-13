@@ -3062,14 +3062,14 @@ export async function finalizeBookingPayment ( args: {
     console.warn( '[payments] payment_intent.succeeded currency mismatch', { intentId, bookingId, paidCurrency: currencyLower, expectedCurrency } );
     return { applied: false, reason: 'currency_mismatch', bookingId };
   }
-  if ( args.paidAmount !== expectedMinor ) {
+  if ( args._paidAmount !== expectedMinor ) {
     // A mismatched amount is a red flag (a different charge succeeded for this
     // binding). Refuse to credit the booking and leave the provider payload for
     // investigation.
     console.warn( '[payments] payment_intent.succeeded amount mismatch', {
       intentId,
       bookingId,
-      paidAmount: args.paidAmount,
+      paidAmount: args._paidAmount,
       expectedAmount: expectedMinor,
     } );
     return { applied: false, reason: 'amount_mismatch', bookingId };
@@ -3083,7 +3083,7 @@ export async function finalizeBookingPayment ( args: {
     .from( 'bookings' )
     .update( { payment_status: 'succeeded', updated_at: now } )
     .eq( 'id', bookingId )
-    .in_( 'payment_status', [ 'pending', 'failed', 'paid', 'completed', 'processing', 'partially_refunded' ] )
+    .in( 'payment_status', [ 'pending', 'failed', 'paid', 'completed', 'processing', 'partially_refunded' ] )
     .select( 'id' )
     .maybeSingle();
 

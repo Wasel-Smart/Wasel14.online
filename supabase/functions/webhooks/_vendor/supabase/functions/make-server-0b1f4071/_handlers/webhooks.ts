@@ -13,6 +13,7 @@ import {
     STRIPE_WEBHOOK_SECRET,
     fetchStripeSubscription,
     finalizeTopUpTransaction,
+    finalizeBookingPayment,
     firstStringValue,
     isFailedProviderStatus,
     isSuccessfulProviderStatus,
@@ -21,13 +22,15 @@ import {
     syncStripeSubscriptionRecord,
     updateTopUpTransactionMetadata,
     verifyProviderWebhookSignature,
+    verifyResendWebhookSignature,
     verifyStripeWebhookSignature,
+    _verifyTwilioWebhookSignature,
 } from './shared.ts';
 
 import {
-  hasValidWebhookToken,
-  mapResendEventToStatus,
-  mapTwilioStatusToLifecycle,
+    mapResendEventToStatus,
+    mapTwilioStatusToLifecycle,
+    hasValidWebhookToken,
 } from '../_shared/communication-runtime.ts';
 
 
@@ -153,6 +156,33 @@ export async function handleStripeWebhook ( request: Request ) {
     return json( { received: true, transactionId, failed: true } );
   }
 
+  // A successful PaymentIntent. `checkout.session.completed` already finalizes
+  // wallet top-ups; this branch finalizes *booking* card payments created via
+  // `/payment/create-intent`, which previously had no success handler and could
+  // therefore collect money with no record (finding P7). The bind is verified and
+  // the paid amount/currency are reconciled before any booking state is written.
+  if ( event?.type === 'payment_intent.succeeded' ) {
+    const intent = event?.data?.object ?? {};
+    const intentId = String( intent?.id ?? '' );
+    const paidAmount = Number( intent?.amount ?? 0 );
+    const currency = String( intent?.currency ?? '' ).toLowerCase();
+    const metadata = ( ( intent?.metadata ?? {} ) as Record<string, unknown> );
+    const transactionId = String( metadata.transaction_id ?? '' );
+    const bookingId = String( metadata.booking_id ?? '' );
+
+    if ( transactionId ) {
+      const result = await finalizeTopUpTransaction( transactionId, intentId, event, 'stripe' );
+      return json( { received: true, transactionId, finalized: result.applied } );
+    }
+
+    if ( bookingId ) {
+      const result = await finalizeBookingPayment( { admin, intentId, _paidAmount: paidAmount, currency } );
+      return json( { received: true, bookingId, intentId, finalized: result.applied, reason: result.reason } );
+    }
+
+    return json( { received: true, ignored: true, reason: 'missing_booking_or_transaction_reference' } );
+  }
+
   return json( { received: true, ignored: true } );
 }
 
@@ -271,8 +301,14 @@ export async function handleSanadWebhook ( request: Request ) {
       updated_at: new Date().toISOString(),
     } )
     .eq( 'provider_reference', providerReference )
-    // level_3 (approved driver) already implies verified identity; a Sanad callback
-    // must never lower it to level_2 or level_1.
+    // Only a `pending` record may transition to a terminal status. This makes a
+    // replayed or stale signed callback harmless: a `verified` or `rejected`
+    // verification (a `completed` state) can no longer be overwritten to
+    // `rejected` by an old callback, which previously reset verified users back
+    // to level_1.
+    .eq( 'sanad_status', 'pending' )
+    // level_3 (approved driver) already implies verified identity; a Sanad
+    // callback must never lower it to level_2 or level_1.
     .neq( 'verification_level', 'level_3' )
     .select( 'user_id' );
 
@@ -296,12 +332,28 @@ export async function handleSanadWebhook ( request: Request ) {
 }
 
 export async function handleResendWebhook ( request: Request ) {
-  const url = new URL( request.url );
-  if ( !hasValidWebhookToken( url, deliveryEnv.communicationWebhookToken ) ) {
-    return json( { error: 'Invalid webhook token' }, 401 );
+  const rawPayload = await request.text();
+  // Verify the Resend webhook signature (HMAC-SHA256 over `<timestamp>.<body>`)
+  // instead of a URL token. Fail closed when the signing secret is not configured.
+  if ( !await verifyResendWebhookSignature( rawPayload, request.headers.get( 'resend-signature' ) ) ) {
+    return json( { error: 'Invalid Resend signature' }, 401 );
   }
 
-  const payload = await request.json().catch( () => ( {} ) );
+  interface ResendWebhookPayload {
+    type: string;
+    data?: {
+      email_id?: string;
+      id?: string;
+      email?: { id?: string };
+    };
+  }
+
+  let payload: ResendWebhookPayload;
+  try {
+    payload = JSON.parse( rawPayload ) as ResendWebhookPayload;
+  } catch {
+    return json( { error: 'Invalid request body' }, 400 );
+  }
   const eventType = String( payload?.type ?? '' );
   const externalReference = String(
     payload?.data?.email_id ??

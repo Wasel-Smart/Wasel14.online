@@ -26,6 +26,7 @@ import {
 import {
     mapResendEventToStatus,
     mapTwilioStatusToLifecycle,
+    hasValidWebhookToken,
 } from '../_shared/communication-runtime.ts';
 
 
@@ -171,7 +172,7 @@ export async function handleStripeWebhook ( request: Request ) {
     }
 
     if ( bookingId ) {
-      const result = await finalizeBookingPayment( { admin, intentId, paidAmount, currency } );
+      const result = await finalizeBookingPayment( { admin, intentId, _paidAmount: paidAmount, currency } );
       return json( { received: true, bookingId, intentId, finalized: result.applied, reason: result.reason } );
     }
 
@@ -334,9 +335,18 @@ export async function handleResendWebhook ( request: Request ) {
     return json( { error: 'Invalid Resend signature' }, 401 );
   }
 
-  let payload: Record<string, unknown>;
+  interface ResendWebhookPayload {
+    type: string;
+    data?: {
+      email_id?: string;
+      id?: string;
+      email?: { id?: string };
+    };
+  }
+
+  let payload: ResendWebhookPayload;
   try {
-    payload = JSON.parse( rawPayload ) as Record<string, unknown>;
+    payload = JSON.parse( rawPayload ) as ResendWebhookPayload;
   } catch {
     return json( { error: 'Invalid request body' }, 400 );
   }

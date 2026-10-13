@@ -10,37 +10,41 @@
 -- ============================================================================
 
 -- ── KV Store Security ───────────────────────────────────────────────────────
--- Secure the key-value store with proper RLS policies
+-- Secure the key-value store with proper RLS policies (if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'kv_store_0b1f4071' AND table_schema = 'public') THEN
+    ALTER TABLE kv_store_0b1f4071 ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE kv_store_0b1f4071 ENABLE ROW LEVEL SECURITY;
+    -- Allow users to access their own KV data
+    DROP POLICY IF EXISTS "Users can access their own KV data" ON kv_store_0b1f4071;
+    CREATE POLICY "Users can access their own KV data" ON kv_store_0b1f4071 FOR ALL
+      USING (
+        key LIKE 'user:' || auth.uid()::TEXT || ':%' OR
+        key LIKE 'profile:' || auth.uid()::TEXT OR
+        key LIKE 'wallet:' || auth.uid()::TEXT || ':%' OR
+        key LIKE 'notification:' || auth.uid()::TEXT || ':%'
+      );
 
--- Allow users to access their own KV data
-DROP POLICY IF EXISTS "Users can access their own KV data" ON kv_store_0b1f4071;
-CREATE POLICY "Users can access their own KV data" ON kv_store_0b1f4071 FOR ALL
-  USING (
-    key LIKE 'user:' || auth.uid()::TEXT || ':%' OR
-    key LIKE 'profile:' || auth.uid()::TEXT OR
-    key LIKE 'wallet:' || auth.uid()::TEXT || ':%' OR
-    key LIKE 'notification:' || auth.uid()::TEXT || ':%'
-  );
+    -- Allow system to access shared/public KV data
+    DROP POLICY IF EXISTS "System can access shared KV data" ON kv_store_0b1f4071;
+    CREATE POLICY "System can access shared KV data" ON kv_store_0b1f4071 FOR ALL
+      USING (
+        key LIKE 'system:%' OR
+        key LIKE 'trip:%' OR
+        key LIKE 'package:%' OR
+        key LIKE 'route:%' OR
+        key LIKE 'cache:%' OR
+        key LIKE 'config:%'
+      );
 
--- Allow system to access shared/public KV data
-DROP POLICY IF EXISTS "System can access shared KV data" ON kv_store_0b1f4071;
-CREATE POLICY "System can access shared KV data" ON kv_store_0b1f4071 FOR ALL
-  USING (
-    key LIKE 'system:%' OR
-    key LIKE 'trip:%' OR
-    key LIKE 'package:%' OR
-    key LIKE 'route:%' OR
-    key LIKE 'cache:%' OR
-    key LIKE 'config:%'
-  );
-
--- Allow service role to access everything
-DROP POLICY IF EXISTS "Service role can access all KV data" ON kv_store_0b1f4071;
-CREATE POLICY "Service role can access all KV data" ON kv_store_0b1f4071 FOR ALL
-  TO service_role
-  USING (true);
+    -- Allow service role to access everything
+    DROP POLICY IF EXISTS "Service role can access all KV data" ON kv_store_0b1f4071;
+    CREATE POLICY "Service role can access all KV data" ON kv_store_0b1f4071 FOR ALL
+      TO service_role
+      USING (true);
+  END IF;
+END $$;
 
 -- ── Trips Table Security ────────────────────────────────────────────────────
 -- Enhanced policies for trips
@@ -306,15 +310,6 @@ CREATE INDEX IF NOT EXISTS idx_profiles_phone
   ON profiles(phone) 
   WHERE phone IS NOT NULL;
 
--- Index for location queries
-CREATE INDEX IF NOT EXISTS idx_profiles_city_country 
-  ON profiles(city, country);
-
--- Index for verification status
-CREATE INDEX IF NOT EXISTS idx_profiles_verified 
-  ON profiles(is_verified) 
-  WHERE is_verified = true;
-
 -- ── Messages Table Indexes ──────────────────────────────────────────────────
 
 -- Index for sender queries
@@ -364,14 +359,19 @@ CREATE INDEX IF NOT EXISTS idx_reviews_reviewer_id
   ON reviews(reviewer_id, created_at DESC);
 
 -- ── KV Store Indexes ────────────────────────────────────────────────────────
+-- Only create if table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'kv_store_0b1f4071' AND table_schema = 'public') THEN
+    -- Index for key prefix queries
+    CREATE INDEX IF NOT EXISTS idx_kv_store_key_prefix 
+      ON kv_store_0b1f4071(key text_pattern_ops);
 
--- Index for key prefix queries
-CREATE INDEX IF NOT EXISTS idx_kv_store_key_prefix 
-  ON kv_store_0b1f4071(key text_pattern_ops);
-
--- GIN index for JSONB value queries (if needed)
-CREATE INDEX IF NOT EXISTS idx_kv_store_value_gin 
-  ON kv_store_0b1f4071 USING gin(value);
+    -- GIN index for JSONB value queries (if needed)
+    CREATE INDEX IF NOT EXISTS idx_kv_store_value_gin 
+      ON kv_store_0b1f4071 USING gin(value);
+  END IF;
+END $$;
 
 -- ============================================================================
 -- PART 3: DATABASE FUNCTIONS & TRIGGERS
@@ -547,12 +547,41 @@ CREATE TRIGGER update_rating_on_review
 
 CREATE OR REPLACE VIEW v_trips_with_driver AS
 SELECT 
-  t.*,
+  t.id,
+  t.user_id,
+  t.origin,
+  t.destination,
+  t.origin_lat,
+  t.origin_lng,
+  t.destination_lat,
+  t.destination_lng,
+  t.departure_time,
+  t.arrival_time,
+  t.duration_minutes,
+  t.distance_km,
+  t.total_seats,
+  t.available_seats,
+  t.booked_seats,
+  t.price_per_seat,
+  t.luggage_allowed,
+  t.status,
+  t.created_at,
+  t.updated_at,
+  t.deleted_at,
+  t.trip_type,
+  t.route_polyline,
+  t.started_at,
+  t.completed_at,
+  t.cancelled_at,
+  t.cancellation_reason,
+  t.cancelled_by,
+  t.currency,
+  t.estimated_duration_minutes,
   p.full_name AS driver_name,
   p.avatar_url AS driver_avatar,
   p.rating_as_driver AS driver_rating,
   p.trips_as_driver AS driver_trips_count,
-  p.is_verified AS driver_verified,
+  p.driver_license_verified AS driver_verified,
   (t.available_seats - t.booked_seats) AS available_seats_remaining
 FROM trips t
 JOIN profiles p ON t.user_id = p.id
@@ -562,11 +591,36 @@ WHERE t.deleted_at IS NULL;
 
 CREATE OR REPLACE VIEW v_user_bookings AS
 SELECT 
-  b.*,
+  b.id,
+  b.trip_id,
+  b.passenger_id,
+  b.seats_requested,
+  b.pickup_location,
+  b.dropoff_location,
+  b.pickup_coordinates,
+  b.dropoff_coordinates,
+  b.price_per_seat,
+  b.total_price,
+  b.currency,
+  b.platform_fee,
+  b.status,
+  b.payment_status,
+  b.payment_method,
+  b.payment_intent_id,
+  b.paid_at,
+  b.cancellation_reason,
+  b.cancelled_by,
+  b.cancelled_at,
+  b.special_requests,
+  b.luggage_count,
+  b.created_at,
+  b.updated_at,
+  b.accepted_at,
+  b.completed_at,
   t.origin,
   t.destination,
   t.departure_time,
-  t.price_per_seat,
+  t.price_per_seat AS trip_price_per_seat,
   t.status AS trip_status,
   p.full_name AS driver_name,
   p.avatar_url AS driver_avatar,
@@ -633,7 +687,12 @@ ANALYZE profiles;
 ANALYZE messages;
 ANALYZE notifications;
 ANALYZE reviews;
-ANALYZE kv_store_0b1f4071;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'kv_store_0b1f4071' AND table_schema = 'public') THEN
+    ANALYZE kv_store_0b1f4071;
+  END IF;
+END $$;
 
 -- ============================================================================
 -- MIGRATION COMPLETE
@@ -648,10 +707,9 @@ BEGIN
   RAISE NOTICE '   - Triggers: ✅ Auto-update timestamps, stats, ratings';
   RAISE NOTICE '   - Views: ✅ Created 3 views for common queries';
   RAISE NOTICE '   - Statistics: ✅ Analyzed all tables';
-  RAISE NOTICE '';
   RAISE NOTICE '🚀 Expected improvements:';
-  RAISE NOTICE '   - Search queries: 80% faster';
-  RAISE NOTICE '   - User dashboard: 90% faster';
-  RAISE NOTICE '   - Booking lookups: 75% faster';
+  RAISE NOTICE '   - Search queries: 80%% faster';
+  RAISE NOTICE '   - User dashboard: 90%% faster';
+  RAISE NOTICE '   - Booking lookups: 75%% faster';
   RAISE NOTICE '   - Security: Production-grade';
 END $$;

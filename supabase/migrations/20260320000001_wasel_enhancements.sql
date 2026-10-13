@@ -20,9 +20,28 @@ CREATE TABLE IF NOT EXISTS ratings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_booking_rider ON ratings(booking_id, rider_id);
-CREATE INDEX IF NOT EXISTS idx_ratings_driver ON ratings(driver_id);
-CREATE INDEX IF NOT EXISTS idx_ratings_trip ON ratings(trip_id);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'rider_id')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'booking_id') THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_booking_rider ON ratings(booking_id, rider_id);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'driver_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_ratings_driver ON ratings(driver_id);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'trip_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_ratings_trip ON ratings(trip_id);
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_ratings_created ON ratings(created_at DESC);
 
 -- =====================================================
@@ -97,13 +116,39 @@ END $$;
 -- 4. CREATE INDEXES
 -- =====================================================
 
-CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status) WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bookings');
-CREATE INDEX IF NOT EXISTS idx_bookings_cancelled ON bookings(cancelled_at) WHERE cancelled_at IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bookings');
-CREATE INDEX IF NOT EXISTS idx_profiles_rating ON profiles(average_rating DESC) WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles');
-CREATE INDEX IF NOT EXISTS idx_messages_trip ON messages(trip_id, created_at DESC) WHERE trip_id IS NOT NULL AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'messages');
-CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id) WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'messages');
-CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC) WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notifications');
-CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = FALSE AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notifications');
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bookings') THEN
+    CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status);
+    CREATE INDEX IF NOT EXISTS idx_bookings_cancelled ON bookings(cancelled_at) WHERE cancelled_at IS NOT NULL;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'average_rating') THEN
+    CREATE INDEX IF NOT EXISTS idx_profiles_rating ON profiles(average_rating DESC);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'messages')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'messages' AND column_name = 'trip_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_messages_trip ON messages(trip_id, created_at DESC) WHERE trip_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notifications')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'read') THEN
+    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = FALSE;
+  END IF;
+END $$;
 
 -- =====================================================
 -- 5. TRIGGERS & FUNCTIONS
@@ -113,7 +158,9 @@ CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, re
 CREATE OR REPLACE FUNCTION update_driver_rating()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'driver_id')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'rating') THEN
     UPDATE profiles
     SET 
       average_rating = (
@@ -133,29 +180,42 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_update_driver_rating ON ratings;
-CREATE TRIGGER trigger_update_driver_rating
-  AFTER INSERT OR UPDATE ON ratings
-  FOR EACH ROW
-  EXECUTE FUNCTION update_driver_rating();
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'ratings')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'driver_id')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'rating') THEN
+    DROP TRIGGER IF EXISTS trigger_update_driver_rating ON ratings;
+    CREATE TRIGGER trigger_update_driver_rating
+      AFTER INSERT OR UPDATE ON ratings
+      FOR EACH ROW
+      EXECUTE FUNCTION update_driver_rating();
+  END IF;
+END $$;
 
 -- Function to restore seats on cancellation
 CREATE OR REPLACE FUNCTION restore_seats_on_cancel()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.status = 'cancelled' AND OLD.status != 'cancelled' THEN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'trips') THEN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'trips')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'seats_requested')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'trip_id') THEN
       UPDATE trips
       SET available_seats = available_seats + NEW.seats_requested
       WHERE id = NEW.trip_id;
     END IF;
     
-    UPDATE bookings
-    SET 
-      cancelled_at = NOW(),
-      cancelled_by = NEW.cancelled_by,
-      cancellation_reason = NEW.cancellation_reason
-    WHERE id = NEW.id;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'cancelled_at')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'cancelled_by')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bookings' AND column_name = 'cancellation_reason') THEN
+      UPDATE bookings
+      SET 
+        cancelled_at = NOW(),
+        cancelled_by = NEW.cancelled_by,
+        cancellation_reason = NEW.cancellation_reason
+      WHERE id = NEW.id;
+    END IF;
   END IF;
   
   RETURN NEW;
@@ -184,9 +244,14 @@ ALTER TABLE refunds ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view all ratings" ON ratings;
 CREATE POLICY "Users can view all ratings" ON ratings FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Users can create ratings for their bookings" ON ratings;
-CREATE POLICY "Users can create ratings for their bookings" ON ratings FOR INSERT
-  WITH CHECK (rider_id = auth.uid());
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ratings' AND column_name = 'rider_id') THEN
+    DROP POLICY IF EXISTS "Users can create ratings for their bookings" ON ratings;
+    CREATE POLICY "Users can create ratings for their bookings" ON ratings FOR INSERT
+      WITH CHECK (rider_id = auth.uid());
+  END IF;
+END $$;
 
 DROP POLICY IF EXISTS "Users can view their refunds" ON refunds;
 CREATE POLICY "Users can view their refunds" ON refunds FOR SELECT USING (true);
@@ -196,20 +261,17 @@ CREATE POLICY "Users can view their refunds" ON refunds FOR SELECT USING (true);
 -- =====================================================
 
 DO $$
+DECLARE
+  v_table TEXT;
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'messages') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS messages;
-  END IF;
-  
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notifications') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS notifications;
-  END IF;
-  
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'bookings') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS bookings;
-  END IF;
-  
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'trips') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS trips;
-  END IF;
+  FOR v_table IN SELECT unnest(ARRAY['messages', 'notifications', 'bookings', 'trips'])
+  LOOP
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = v_table)
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_publication_tables 
+         WHERE pubname = 'supabase_realtime' AND tablename = v_table
+       ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', v_table);
+    END IF;
+  END LOOP;
 END $$;
