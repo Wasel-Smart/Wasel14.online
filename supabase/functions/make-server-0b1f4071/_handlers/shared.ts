@@ -217,6 +217,8 @@ export const SUPABASE_DB_URL = Deno.env.get( 'SUPABASE_DB_URL' ) ?? '';
 export const STRIPE_SECRET_KEY = Deno.env.get( 'STRIPE_SECRET_KEY' ) ?? '';
 export const stripe = STRIPE_SECRET_KEY ? new Stripe( STRIPE_SECRET_KEY, { apiVersion: '2024-11-20' } ) : null;
 export const STRIPE_WEBHOOK_SECRET = Deno.env.get( 'STRIPE_WEBHOOK_SECRET' ) ?? '';
+export const RESEND_WEBHOOK_SIGNING_SECRET = Deno.env.get( 'RESEND_WEBHOOK_SIGNING_SECRET' ) ?? '';
+export const TWILIO_WEBHOOK_SIGNING_SECRET = Deno.env.get( 'TWILIO_WEBHOOK_SIGNING_SECRET' ) ?? '';
 export const STRIPE_API_VERSION = Deno.env.get( 'STRIPE_API_VERSION' ) ?? '2026-02-25.clover';
 export const TWILIO_VERIFY_SERVICE_SID = Deno.env.get( 'TWILIO_VERIFY_SERVICE_SID' ) ?? '';
 export const APP_BASE_URL = ( Deno.env.get( 'APP_BASE_URL' ) ?? 'https://wasel14.online' ).replace( /\/$/, '' );
@@ -267,6 +269,8 @@ export const deliveryEnv: DeliveryProcessorEnv = {
   twilioSmsFrom: Deno.env.get( 'TWILIO_SMS_FROM' ) ?? undefined,
   twilioWhatsappFrom: Deno.env.get( 'TWILIO_WHATSAPP_FROM' ) ?? undefined,
   communicationWebhookToken: Deno.env.get( 'COMMUNICATION_WEBHOOK_TOKEN' ) ?? undefined,
+  resendWebhookSigningSecret: Deno.env.get( 'RESEND_WEBHOOK_SIGNING_SECRET' ) ?? undefined,
+  twilioWebhookSigningSecret: Deno.env.get( 'TWILIO_WEBHOOK_SIGNING_SECRET' ) ?? undefined,
   maxDeliveryAttempts: Number( Deno.env.get( 'COMMUNICATION_MAX_ATTEMPTS' ) ?? '5' ),
 };
 
@@ -1994,7 +1998,19 @@ export function toWalletTransaction ( row: WalletTransactionRow ) {
   };
 }
 
-export function buildWalletInsights ( transactions: ReturnType<typeof toWalletTransaction>[] ) {
+const UNSETTLED_TRANSACTION_STATUSES: ReadonlySet<string> = new Set( [
+  'pending', 'processing', 'requires_action', 'failed', 'cancelled', 'canceled', 'expired',
+] );
+
+/** True for ledger rows that represent money that actually moved. */
+function isSettledStatus ( status: unknown ): boolean {
+  return !UNSETTLED_TRANSACTION_STATUSES.has( String( status ?? '' ).trim().toLowerCase() );
+}
+
+export function buildWalletInsights ( allTransactions: ReturnType<typeof toWalletTransaction>[] ) {
+  // Pending/failed top-ups are not money movements; counting them inflated every
+  // total below (each abandoned checkout added a phantom credit).
+  const transactions = allTransactions.filter( ( tx ) => isSettledStatus( tx.status ) );
   const now = new Date();
   const currentMonthKey = `${ now.getUTCFullYear() }-${ String( now.getUTCMonth() + 1 ).padStart( 2, '0' ) }`;
   const previousMonthDate = new Date( Date.UTC( now.getUTCFullYear(), now.getUTCMonth() - 1, 1 ) );
@@ -2062,13 +2078,14 @@ export function buildWalletPayload (
   subscription: Awaited<ReturnType<typeof getWalletSubscription>>,
 ) {
   const normalizedTransactions = transactions.map( toWalletTransaction );
-  const totalEarned = transactions
+  const settledRows = transactions.filter( ( row ) => isSettledStatus( row.transaction_status ) );
+  const totalEarned = settledRows
     .filter( row => row.direction === 'credit' )
     .reduce( ( total, row ) => total + toNumber( row.amount, 0 ), 0 );
-  const totalSpent = transactions
+  const totalSpent = settledRows
     .filter( row => row.direction === 'debit' )
     .reduce( ( total, row ) => total + toNumber( row.amount, 0 ), 0 );
-  const totalDeposited = transactions
+  const totalDeposited = settledRows
     .filter( row => row.transaction_type === 'add_funds' && row.direction === 'credit' )
     .reduce( ( total, row ) => total + toNumber( row.amount, 0 ), 0 );
   const currency = String( wallet.currency_code ?? 'JOD' ).toUpperCase();
@@ -2288,7 +2305,16 @@ export async function resolveWalletRecipient ( admin: ReturnType<typeof getAdmin
   }
 
   if ( isPhone ) {
-    const byPhone = await admin.from( 'users' ).select( 'id' ).eq( 'phone_number', recipient ).maybeSingle();
+    // Only a phone number that completed OTP verification may receive transfers.
+    // `users.phone_number` is written from the sign-up body before it is proven,
+    // so an unverified claim on someone else's number must never capture money
+    // sent to that number.
+    const byPhone = await admin
+      .from( 'users' )
+      .select( 'id' )
+      .eq( 'phone_number', recipient )
+      .not( 'phone_verified_at', 'is', null )
+      .maybeSingle();
     if ( byPhone.error ) {throw new Error( byPhone.error.message );}
     if ( byPhone.data?.id ) {return String( byPhone.data.id );}
   }
@@ -2406,6 +2432,7 @@ export async function finalizeTopUpTransaction (
   externalReference: string,
   providerPayload: unknown,
   provider = 'stripe',
+  expected?: { amountJod?: number | null; currency?: string | null },
 ) {
   if ( !SUPABASE_DB_URL ) {
     throw new Error( 'SUPABASE_DB_URL is not configured' );
@@ -2432,9 +2459,38 @@ export async function finalizeTopUpTransaction (
       return { applied: false, reason: 'already_posted' };
     }
 
-    if ( transaction.transaction_status === 'failed' ) {
+    // A signed "paid" event means real money arrived, so a row that an earlier failure
+    // event marked 'failed' is still credited; otherwise the customer ends up charged
+    // with nothing in the wallet (e.g. CliQ reporting a failed attempt, then a success).
+    const recoveredFromFailed = transaction.transaction_status === 'failed';
+
+    // Never credit more than the provider says was paid. CliQ's checkout URL carries the
+    // amount as a plain query parameter, so the webhook is the only trustworthy source.
+    // The 0.0051 tolerance absorbs the 3-decimal -> 2-decimal rounding of legacy rows.
+    const storedAmount = Number( transaction.amount );
+    const paidAmount = expected?.amountJod;
+    const reportedCurrency = String( expected?.currency ?? '' ).trim();
+    const currencyMismatch = /^[a-z]{3}$/i.test( reportedCurrency ) && reportedCurrency.toLowerCase() !== 'jod';
+    const amountMismatch =
+      typeof paidAmount === 'number' && Number.isFinite( paidAmount ) &&
+      Math.abs( paidAmount - storedAmount ) > 0.0051;
+    if ( currencyMismatch || amountMismatch ) {
+      console.error( '[wallet] top-up amount/currency mismatch, wallet not credited', {
+        transactionId,
+        provider,
+        storedAmount,
+        paidAmount: paidAmount ?? null,
+        currency: reportedCurrency || null,
+      } );
+      await client.queryObject(
+        'update public.transactions set metadata = coalesce(metadata, \'{}\'::jsonb) || $1::jsonb, updated_at = timezone(\'utc\', now()) where transaction_id = $2',
+        [
+          JSON.stringify( { amount_mismatch: { provider, storedAmount, paidAmount: paidAmount ?? null, currency: reportedCurrency || null } } ),
+          transactionId,
+        ],
+      );
       await client.queryArray( 'commit' );
-      return { applied: false, reason: 'already_failed' };
+      return { applied: false, reason: 'amount_mismatch' };
     }
 
     await client.queryObject(
@@ -2447,6 +2503,7 @@ export async function finalizeTopUpTransaction (
       provider,
       provider_payload: providerPayload,
       credited_via: `${ provider }_webhook`,
+      recovered_from_failed: recoveredFromFailed,
     };
 
     await client.queryObject(
@@ -2654,7 +2711,11 @@ export async function sendDelivery (
   const env = { ...deliveryEnv, functionBaseUrl };
   const attemptsCount = ( delivery.attempts_count ?? 0 ) + 1;
 
-  await admin
+  // Atomic claim: the status filter makes the UPDATE a compare-and-set, so when
+  // two workers (cron + a manual /communications/process, or overlapping runs)
+  // pick up the same row only the one that flips queued -> processing sends it.
+  // Previously both sent, and the customer got a duplicate SMS/email.
+  const { data: claimed, error: claimError } = await admin
     .from( 'communication_deliveries' )
     .update( {
       delivery_status: 'processing',
@@ -2664,7 +2725,16 @@ export async function sendDelivery (
       processed_by: 'edge:communications-process',
       updated_at: now,
     } )
-    .eq( 'delivery_id', delivery.delivery_id );
+    .eq( 'delivery_id', delivery.delivery_id )
+    .eq( 'delivery_status', 'queued' )
+    .select( 'delivery_id' );
+
+  if ( claimError ) {
+    return { ok: false, skipped: false, error: claimError.message };
+  }
+  if ( !claimed || claimed.length === 0 ) {
+    return { ok: false, skipped: true, error: 'already_claimed' };
+  }
 
   try {
     let response: Response;
@@ -2748,10 +2818,27 @@ export async function processQueuedDeliveries (
   functionBaseUrl: string,
 ) {
   const now = new Date().toISOString();
+
+  // A worker that crashed after claiming a row (isolate killed mid-send) used to
+  // leave it in 'processing' forever. Rows locked for more than 10 minutes go
+  // back to the queue; at-least-once beats silently lost.
+  const staleBefore = new Date( Date.now() - 10 * 60 * 1000 ).toISOString();
+  const { error: reclaimError } = await admin
+    .from( 'communication_deliveries' )
+    .update( { delivery_status: 'queued', locked_at: null, updated_at: now } )
+    .eq( 'delivery_status', 'processing' )
+    .lt( 'locked_at', staleBefore );
+  if ( reclaimError ) {
+    console.error( '[communications] stale-lock reclaim failed', reclaimError.message );
+  }
+
+  // The due-time filter belongs in the query: filtering after `limit( 25 )` let 25
+  // rows that were all backing off starve every deliverable row behind them.
   const { data, error } = await admin
     .from( 'communication_deliveries' )
     .select( '*' )
     .eq( 'delivery_status', 'queued' )
+    .or( `next_attempt_at.is.null,next_attempt_at.lte.${ now }` )
     .order( 'queued_at', { ascending: true } )
     .limit( 25 );
 
@@ -2765,17 +2852,19 @@ export async function processQueuedDeliveries (
 
   let sent = 0;
   let failed = 0;
+  let claimedElsewhere = 0;
   for ( const delivery of dueDeliveries ) {
     const result = await sendDelivery( admin, delivery, functionBaseUrl );
     if ( result.ok ) {sent += 1;}
+    else if ( 'skipped' in result && result.skipped ) {claimedElsewhere += 1;}
     else {failed += 1;}
   }
 
   return {
-    processed: dueDeliveries.length,
+    processed: dueDeliveries.length - claimedElsewhere,
     sent,
     failed,
-    skipped: ( Array.isArray( data ) ? data.length : 0 ) - dueDeliveries.length,
+    skipped: ( Array.isArray( data ) ? data.length : 0 ) - dueDeliveries.length + claimedElsewhere,
   };
 }
 
@@ -2861,10 +2950,147 @@ export async function assertTripParticipant ( admin: ReturnType<typeof getAdminC
 
 export function cityCoord ( city: string | null | undefined ) {
   const coords: Record<string, { lat: number; lng: number }> = {
-    amman: { lat: 31.9539, lng: 35.9106 },
+    amman: { lat: 31.9454, lng: 35.9284 },
     aqaba: { lat: 29.5321, lng: 35.006 },
     irbid: { lat: 32.5568, lng: 35.8479 },
     zarqa: { lat: 32.0728, lng: 36.088 },
   };
   return coords[ String( city ?? '' ).toLowerCase() ] ?? coords.amman;
+}
+
+// â”€â”€ Provider webhook signature verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Replaces URL-token-only authentication for Resend and Twilio delivery
+// receipts. The token-in-URL pattern is replayable, gets logged by proxies/CDNs,
+// and was previously leaked from this repo (see docs/SECURITY.md â†’ rotate
+// `COMMUNICATION_WEBHOOK_TOKEN`).
+
+function bytesToBase64 ( bytes: Uint8Array ): string {
+  return btoa( String.fromCharCode( ...Array.from( bytes ) ) );
+}
+
+async function computeHmacBase64 ( secret: string, payload: string, algorithm: 'SHA-1' | 'SHA-256' ): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode( secret ),
+    { name: 'HMAC', hash: algorithm },
+    false,
+    [ 'sign' ],
+  );
+  const signature = await crypto.subtle.sign( 'HMAC', key, new TextEncoder().encode( payload ) );
+  return bytesToBase64( new Uint8Array( signature ) );
+}
+
+// Parses a `t=<ts>,v1=<hex>` style header (Stripe/Resend/Standard-Webhooks).
+function parseTimestampedSignature ( header: string ): { timestamp: string; candidates: string[] } | null {
+  if ( !header ) {return null;}
+  const segments = header.split( ',' ).map( ( segment ) => segment.trim() ).filter( Boolean );
+  const timestamp = segments.find( ( segment ) => segment.startsWith( 't=' ) )?.slice( 2 ) ?? '';
+  const candidates = segments.filter( ( segment ) => segment.startsWith( 'v1=' ) ).map( ( segment ) => segment.slice( 3 ) );
+  if ( !timestamp || candidates.length === 0 ) {return null;}
+  return { timestamp, candidates };
+}
+
+// Resend signs webhooks with HMAC-SHA256 over `<timestamp>.<raw_body>` and sends
+// the signature in the `Resend-Signature` header as `t=<ts>,v1=<hex>`.
+export async function verifyResendWebhookSignature ( payload: string, signatureHeader: string | null ): Promise<boolean> {
+  if ( !RESEND_WEBHOOK_SIGNING_SECRET ) {return false;}
+  const parsed = parseTimestampedSignature( signatureHeader ?? '' );
+  if ( !parsed ) {return false;}
+  const issuedAt = Number( parsed.timestamp );
+  if ( !Number.isFinite( issuedAt ) || Math.abs( Date.now() / 1000 - issuedAt ) > 300 ) {return false;}
+  const expected = await computeHmacHex( RESEND_WEBHOOK_SIGNING_SECRET, `${ parsed.timestamp }.${ payload }` );
+  return parsed.candidates.some( ( candidate ) => constantTimeEquals( candidate, expected ) );
+}
+
+// Twilio signs webhooks with HMAC-SHA1 over `<url><form_body>` using the account
+// Auth Token (or an app-specific signing secret) and sends the base64 digest in
+// `X-Twilio-Signature`.
+export async function _verifyTwilioWebhookSignature (
+  payload: string,
+  signatureHeader: string | null,
+  requestUrl: string,
+): Promise<boolean> {
+  const secret = TWILIO_WEBHOOK_SIGNING_SECRET || deliveryEnv.twilioAuthToken;
+  if ( !secret || !signatureHeader || !requestUrl ) {return false;}
+  const expected = await computeHmacBase64( secret, `${ requestUrl }${ payload }`, 'SHA-1' );
+  return constantTimeEquals( expected, signatureHeader.trim() );
+}
+
+export interface BookingPaymentResult {
+  applied: boolean;
+  reason: string;
+  bookingId: string | null;
+}
+
+// Idempotent server-side completion of a booking card payment from a
+// `payment_intent.succeeded` event. The PaymentIntent was bound to the booking
+// at creation time via bookings.stripe_payment_intent_id, so that binding is the
+// ownership check. The paid amount and currency are reconciled against the
+// booking's fare before any state is written, and the status update is guarded
+// to non-terminal rows so a retried/duplicate webhook cannot double-credit.
+export async function finalizeBookingPayment ( args: {
+  admin: AdminClient;
+  intentId: string;
+  _paidAmount: number;
+  currency: string;
+} ): Promise<BookingPaymentResult> {
+  const { admin, intentId, _paidAmount, currency: paidCurrency } = args;
+  const currencyLower = String( paidCurrency ?? '' ).toLowerCase();
+
+  const { data: booking, error: loadError } = await admin
+    .from( 'bookings' )
+    .select( '*' )
+    .eq( 'stripe_payment_intent_id', intentId )
+    .maybeSingle();
+
+  if ( loadError ) {
+    return { applied: false, reason: 'booking_lookup_failed', bookingId: null };
+  }
+  if ( !booking ) {
+    return { applied: false, reason: 'payment_intent_not_bound_to_booking', bookingId: null };
+  }
+
+  const row = booking as Record<string, unknown>;
+  const bookingId = String( row.id ?? '' );
+  const expectedCurrency = String( row.currency ?? 'jod' ).toLowerCase();
+  const major = toNumber( row.total_price ?? row.amount ?? row.fare ?? 0, 2 );
+  const expectedMinor = expectedCurrency === 'jod'
+    ? Number( toStripeMinorAmount( major ) )
+    : Math.round( major * 100 );
+
+  if ( currencyLower && currencyLower !== expectedCurrency ) {
+    console.warn( '[payments] payment_intent.succeeded currency mismatch', { intentId, bookingId, paidCurrency: currencyLower, expectedCurrency } );
+    return { applied: false, reason: 'currency_mismatch', bookingId };
+  }
+  if ( args.paidAmount !== expectedMinor ) {
+    // A mismatched amount is a red flag (a different charge succeeded for this
+    // binding). Refuse to credit the booking and leave the provider payload for
+    // investigation.
+    console.warn( '[payments] payment_intent.succeeded amount mismatch', {
+      intentId,
+      bookingId,
+      paidAmount: args.paidAmount,
+      expectedAmount: expectedMinor,
+    } );
+    return { applied: false, reason: 'amount_mismatch', bookingId };
+  }
+
+  const now = new Date().toISOString();
+  // Idempotent: only a non-terminal booking advances to 'succeeded'. A retried
+  // or duplicated webhook therefore cannot double-credit. 'succeeded' and
+  // 'refunded' are excluded so an already-settled booking is never re-opened.
+  const { data: updated, error: updateError } = await admin
+    .from( 'bookings' )
+    .update( { payment_status: 'succeeded', updated_at: now } )
+    .eq( 'id', bookingId )
+    .in_( 'payment_status', [ 'pending', 'failed', 'paid', 'completed', 'processing', 'partially_refunded' ] )
+    .select( 'id' )
+    .maybeSingle();
+
+  if ( updateError ) {
+    throw updateError;
+  }
+
+  const applied = Boolean( updated );
+  return { applied, reason: applied ? 'finalized' : 'already_settled', bookingId };
 }

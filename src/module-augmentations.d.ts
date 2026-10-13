@@ -9,8 +9,6 @@ declare module '@sentry/react' {
     tags?: Record<string, string>;
     [key: string]: unknown;
   };
-  export function browserTracingIntegration(options?: Record<string, unknown>): unknown;
-  export function replayIntegration(options?: Record<string, unknown>): unknown;
   export function startInactiveSpan(options: { name: string; op?: string }): { end(): void };
   export function addBreadcrumb(breadcrumb: Record<string, unknown>): void;
   export function captureException(exception: unknown, captureContext?: Record<string, unknown>): string;

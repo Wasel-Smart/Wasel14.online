@@ -59,15 +59,24 @@ export async function handleGetWalletTransactions ( request: Request, requestedU
     const page = Math.max( 1, Number.parseInt( url.searchParams.get( 'page' ) ?? '1', 10 ) || 1 );
     const limit = Math.min( 100, Math.max( 1, Number.parseInt( url.searchParams.get( 'limit' ) ?? '20', 10 ) || 20 ) );
     const type = url.searchParams.get( 'type' );
-    const details = await loadWalletDetails( auth.admin, auth.canonicalUser.id );
-    const all = details.transactions.map( toWalletTransaction );
-    const filtered = type ? all.filter( ( tx ) => tx.type === type ) : all;
+    const wallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
     const start = ( page - 1 ) * limit;
+    // Paginate in the database. This used to slice the newest 50 rows in memory, so
+    // page 2+ came back empty and anything older than the 50th transaction was unreachable.
+    let query = auth.admin
+      .from( 'transactions' )
+      .select( '*', { count: 'exact' } )
+      .eq( 'wallet_id', wallet.wallet_id );
+    if ( type ) {query = query.eq( 'transaction_type', type );}
+    const { data, error, count } = await query
+      .order( 'created_at', { ascending: false } )
+      .range( start, start + limit - 1 );
+    if ( error ) {throw new Error( error.message );}
     return json( {
-      transactions: filtered.slice( start, start + limit ),
+      transactions: ( Array.isArray( data ) ? data : [] ).map( toWalletTransaction ),
       page,
       limit,
-      total: filtered.length,
+      total: count ?? 0,
     } );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
@@ -372,6 +381,17 @@ export async function handleSetDefaultPaymentMethod ( request: Request, requeste
   if ( !methodId ) {return json( { error: 'Payment method id is required.' }, 400 );}
 
   try {
+    // Confirm the target exists *before* clearing the current default; a bad id used to
+    // leave the user with no default payment method at all.
+    const { data: target, error: targetError } = await auth.admin
+      .from( 'payment_methods' )
+      .select( 'payment_method_id' )
+      .eq( 'user_id', auth.canonicalUser.id )
+      .eq( 'payment_method_id', methodId )
+      .maybeSingle();
+    if ( targetError ) {throw new Error( targetError.message );}
+    if ( !target ) {return json( { error: 'Payment method not found' }, 404 );}
+
     const { error: clearError } = await auth.admin
       .from( 'payment_methods' )
       .update( { is_default: false, updated_at: new Date().toISOString() } )
@@ -388,10 +408,12 @@ export async function handleSetDefaultPaymentMethod ( request: Request, requeste
       .select( '*' )
       .maybeSingle();
 
-    if ( error ) {return json( { error: error.message }, 500 );}
+    if ( error ) {return walletOperationFailed( 'set-default-payment-method', error );}
     if ( !data ) {return json( { error: 'Payment method not found' }, 404 );}
 
-    return json( { success: true, method: normalizeWalletPaymentMethod( data ) } );
+    // Was `normalizeWalletPaymentMethod( data )`, which stringifies the row to
+    // "[object Object]" and always answered with the literal 'card_payment'.
+    return json( { success: true, method: data } );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
   }
@@ -466,7 +488,10 @@ export async function handleWalletTopUp ( request: Request, requestedUserId: str
   }
 
   const body = await request.json().catch( () => ( {} ) );
-  const amountJod = toMoneyNumber( body.amount );
+  // Card and CliQ settle in whole 0.01 JOD steps (Stripe rejects JOD amounts that are not a
+  // multiple of 10 fils). Quantising here keeps the amount credited to the wallet identical to
+  // the amount actually charged; before, 5.124 was charged as 5.120 but credited as 5.124.
+  const amountJod = Math.round( toMoneyNumber( body.amount ) * 100 ) / 100;
   const paymentMethod = String( body.paymentMethod ?? 'card' ).trim() || 'card';
 
   if ( amountJod <= 0 ) {
@@ -674,11 +699,19 @@ async function resolvePayableAmount (
     if ( !isOwnedByCaller( data, callerUserId ) ) {
       return { error: json( { error: 'This booking does not belong to you.' }, 403 ) };
     }
+    // `payment_status` was selected but never consulted, so a double-tap (or a replayed
+    // request) could settle the same booking twice, and a cancelled booking could be paid.
+    if ( [ 'cancelled', 'canceled', 'rejected' ].includes( String( data.booking_status ?? '' ).toLowerCase() ) ) {
+      return { error: json( { error: 'This booking is cancelled and cannot be paid.' }, 409 ) };
+    }
+    if ( [ 'paid', 'completed', 'settled' ].includes( String( data.payment_status ?? '' ).toLowerCase() ) ) {
+      return { error: json( { error: 'This booking has already been paid.' }, 409 ) };
+    }
 
     // Prefer the recomputed fare so a tampered stored total cannot be settled.
     const perSeat = toMoneyNumber( data.price_per_seat );
     const seats = toNumber( data.seats_requested, 1 );
-    const computed = perSeat > 0 && seats > 0 ? perSeat * seats : 0;
+    const computed = perSeat > 0 && seats > 0 ? toMoneyNumber( perSeat * seats ) : 0;
     const amountJod = computed > 0 ? computed : toMoneyNumber( data.total_price ?? data.amount );
 
     if ( amountJod <= 0 ) {

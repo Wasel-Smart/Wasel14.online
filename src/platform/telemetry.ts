@@ -77,7 +77,7 @@ class TelemetryCollector {
       unit: resolvedUnit,
       timestamp: Date.now(),
       tags: {
-        environment: runtimeEnvironment,
+        environment: this.environmentOverride ?? runtimeEnvironment,
         ...resolvedTags,
       },
     });
@@ -94,8 +94,8 @@ class TelemetryCollector {
       name,
       startTime: Date.now(),
       attributes: {
-        service: 'wasel-web',
-        environment: runtimeEnvironment,
+        service: this.serviceName ?? 'wasel-web',
+        environment: this.environmentOverride ?? runtimeEnvironment,
         ...attributes,
       },
       status: 'ok',

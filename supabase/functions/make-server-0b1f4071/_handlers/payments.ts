@@ -4,14 +4,19 @@ import {
     enforcePermission,
     consumeRateLimit,
     ALLOWED_PAYMENT_CURRENCIES,
+    MAX_PAYMENT_AMOUNT_MINOR,
     normalizePaymentAmount,
     stripe,
+    toNumber,
+    toStripeMinorAmount,
+    type getAdminClient,
 } from './shared.ts';
 
 // Metadata keys the server owns. A client must never be able to set these:
 // `transaction_id` / `client_reference_id` drive wallet top-up finalization and
-// failure handling in the Stripe webhook, and `user_id` / `plan*` drive
-// ownership and subscription sync.
+// failure handling in the Stripe webhook, `user_id` / `plan*` drive ownership and
+// subscription sync, and `booking_id` binds the intent to a payable record we
+// load and price server-side.
 const RESERVED_METADATA_KEYS = new Set( [
   'user_id',
   'transaction_id',
@@ -19,8 +24,27 @@ const RESERVED_METADATA_KEYS = new Set( [
   'plan',
   'plan_name',
   'wallet_id',
+  'booking_id',
   'booking_id_verified',
 ] );
+
+const BOOKING_PREPAID_STATUSES = new Set( [ 'succeeded', 'completed', 'paid', 'refunded' ] );
+
+function deriveBookingAmountMinor ( booking: Record< string, unknown >, currencyLower: string ): number | null {
+  // The payable amount is owned by the server. Prefer the per-seat breakdown
+  // (price_per_seat * seats_requested, mirroring `resolvePayableAmount` in
+  // wallet.ts), then fall back to the booking's stored totals. Reading several
+  // candidate columns keeps this working across checkout-schema migrations that
+  // rename the price field.
+  const perSeat = toNumber( booking?.price_per_seat ?? 0, 2 );
+  const seats = toNumber( booking?.seats_requested ?? 0, 0 );
+  const major = perSeat > 0 && seats > 0
+    ? perSeat * seats
+    : toNumber( booking?.total_price ?? booking?.fare ?? booking?.amount ?? 0, 2 );
+
+  if ( !Number.isFinite( major ) || major <= 0 ) {return null;}
+  return currencyLower === 'jod' ? Number( toStripeMinorAmount( major ) ) : Math.round( major * 100 );
+}
 
 const MAX_METADATA_ENTRIES = 10;
 const MAX_METADATA_VALUE_LENGTH = 200;
@@ -40,6 +64,98 @@ function sanitizeClientMetadata ( input: unknown ): Record<string, string> {
   return out;
 }
 
+// Returns the canonical minor-unit amount for a booking, or null if the
+// booking is not in a payable state / has no computable fare.
+export async function computeBookingAmountMinor (
+  admin: ReturnType<typeof getAdminClient>,
+  bookingId: string,
+  authUser: { id: string },
+): Promise<
+  | { amountMinor: number; currency: string; booking: Record<string, unknown> }
+  | null
+> {
+  const bookingIdTrim = String( bookingId ?? '' ).trim();
+  if ( !bookingIdTrim ) {return null;}
+
+  const { data: booking, error: bookingError } = await admin
+    .from( 'bookings' )
+    .select( 'id, passenger_id, user_id, fare, amount, total_price, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id, status' )
+    .eq( 'id', bookingIdTrim )
+    .maybeSingle();
+
+  if ( bookingError ) {
+    console.error( '[payments] booking lookup failed', bookingError.message );
+    return null;
+  }
+  if ( !booking ) {return null;}
+
+  const isOwnedByCaller = String( booking.passenger_id ?? booking.user_id ?? '' ) === authUser.id;
+  if ( !isOwnedByCaller ) {return null;}
+
+  if ( BOOKING_PREPAID_STATUSES.has( String( booking.payment_status ?? '' ).toLowerCase() ) ) {
+    return null;
+  }
+
+  const currency = String( booking.currency ?? 'jod' ).toLowerCase();
+  if ( !ALLOWED_PAYMENT_CURRENCIES.has( currency ) ) {return null;}
+
+  const amountMinor = deriveBookingAmountMinor( booking as Record<string, unknown>, currency );
+  if ( !amountMinor || amountMinor < 50 || amountMinor > MAX_PAYMENT_AMOUNT_MINOR ) {
+    return null;
+  }
+
+  return { amountMinor, currency, booking: booking as Record<string, unknown> };
+}
+
+// Prove a Stripe PaymentIntent id belongs to one of the platform's payment
+// records before it is refunded. A card intent is bound to a booking; a
+// top-up/checkout intent is referenced by a `payments` ledger row. The
+// `payments` table shape varies across checkout revisions, so a missing
+// table/columns are tolerated rather than crashing an admin refund.
+export async function verifyPaymentIntentOwnership (
+  admin: ReturnType<typeof getAdminClient>,
+  intentId: string,
+): Promise<{ owned: boolean; booking: Record<string, unknown> | null; amountMinor: number | null }> {
+  const bookingColumns =
+    'id, passenger_id, user_id, fare, amount, total_price, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id';
+
+  const { data: booking, error: bookingError } = await admin
+    .from( 'bookings' )
+    .select( bookingColumns )
+    .eq( 'stripe_payment_intent_id', intentId )
+    .maybeSingle();
+
+  if ( !bookingError && booking ) {
+    const row = booking as Record<string, unknown>;
+    const currency = String( row.currency ?? 'jod' ).toLowerCase();
+    return { owned: true, booking: row, amountMinor: deriveBookingAmountMinor( row, currency ) };
+  }
+
+  try {
+    const { data: paymentRow, error: paymentError } = await admin
+      .from( 'payments' )
+      .select( 'id, booking_id, amount, currency, status' )
+      .eq( 'id', intentId )
+      .maybeSingle();
+    if ( !paymentError && paymentRow && String( paymentRow.id ) === intentId ) {
+      const minor = Number.isFinite( toNumber( paymentRow.amount ) ) ? toNumber( paymentRow.amount ) : null;
+      return { owned: true, booking: null, amountMinor: minor };
+    }
+  } catch {
+    // `payments` table/columns may differ this revision; the booking lookup above
+    // is the authoritative check for card payments.
+  }
+
+  return { owned: false, booking: null, amountMinor: null };
+}
+
+// `handlePaymentIntentCreate` is the card-payment entry point for paying a
+// booking (NOT a generic amount-accepting endpoint). The amount and currency are
+// derived from the payable booking record server-side — a client-supplied
+// amount is only accepted if it matches, so a caller cannot inflate or alter
+// the fare they are being charged for. The created PaymentIntent is bound to the
+// booking record (bookings.stripe_payment_intent_id) so the success webhook and
+// refund flow can verify it belongs to the platform.
 export async function handlePaymentIntentCreate ( request: Request ): Promise<Response> {
   if ( !stripe ) {
     return json( { error: 'Stripe is not configured' }, 503 );
@@ -52,57 +168,109 @@ export async function handlePaymentIntentCreate ( request: Request ): Promise<Re
   const {
     action,
     amount,
-    currency = 'usd',
+    currency: clientCurrency,
+    booking_id,
     metadata,
     idempotency_key,
   } = body as {
     action?: string;
     amount?: unknown;
     currency?: string;
+    booking_id?: string;
     metadata?: unknown;
     idempotency_key?: string;
   };
+
+  if ( action && action !== 'create-payment-intent' ) {
+    return json( { error: 'Unsupported payment action' }, 400 );
+  }
+
   // Card-testing / fee-abuse guard: each call creates a live PaymentIntent on
   // the platform's Stripe account. Fail closed - a money path must not run
   // unthrottled just because the limiter is down.
   const limited = await consumeRateLimit( auth.admin, `payment-intent:${ auth.authUser.id }`, 10, { windowSeconds: 3600, failClosed: true } );
   if ( limited ) {return limited;}
 
-  // NOTE: a client-supplied `customer_id` is intentionally ignored. Accepting
-  // one lets a caller attach a PaymentIntent to another user's Stripe customer.
-
-  if ( action && action !== 'create-payment-intent' ) {
-    return json( { error: 'Unsupported payment action' }, 400 );
+  const bookingId = String( booking_id ?? '' ).trim();
+  if ( !bookingId ) {
+    return json( { error: 'booking_id is required to create a payment intent' }, 400 );
   }
 
-  const normalizedAmount = normalizePaymentAmount( amount );
-  const normalizedCurrency = String( currency ).toLowerCase();
-  if ( !normalizedAmount ) {
-    return json( { error: 'Invalid amount' }, 400 );
-  }
-  if ( !ALLOWED_PAYMENT_CURRENCIES.has( normalizedCurrency ) ) {
-    return json( { error: 'Invalid currency' }, 400 );
+  const booking = await computeBookingAmountMinor( auth.admin, bookingId, auth.canonicalUser );
+  // Never disclose whether a booking exists for another user; a 403 covers both
+  // "not found" and "not yours" to avoid leaking booking identifiers.
+  if ( !booking ) {
+    return json( { error: 'Booking not found or not payable by this user' }, 403 );
   }
 
-  // Scope the idempotency key to the caller so one user can never replay or
-  // collide with another user's key.
+  const { amountMinor, currency, booking: bookingRow } = booking;
+
+  // Defense in depth: if the caller asserts an amount/currency it must match the
+  // server-derived payable exactly. Mismatch = refused, not "corrected".
+  const clientAmount = normalizePaymentAmount( amount );
+  if ( clientAmount !== null && clientAmount !== amountMinor ) {
+    console.warn( '[payments] create-intent amount mismatch', {
+      bookingId,
+      user: auth.authUser.id,
+      clientAmount,
+      serverAmount: amountMinor,
+    } );
+    return json( { error: 'Amount does not match the booking total' }, 409 );
+  }
+  if ( clientCurrency && String( clientCurrency ).toLowerCase() !== currency ) {
+    return json( { error: 'Currency does not match the booking' }, 409 );
+  }
+
+  // A PaymentIntent already bound to this booking is returned idempotently so a
+  // retried client call cannot mint duplicate intents.
+  const existingIntentId = String( bookingRow.stripe_payment_intent_id ?? '' );
+  if ( existingIntentId.startsWith( 'pi_' ) ) {
+    try {
+      const existing = await stripe.paymentIntents.retrieve( existingIntentId );
+      if ( Number( existing.amount ) === amountMinor && String( existing.currency ?? '' ).toLowerCase() === currency ) {
+        return json( {
+          clientSecret: existing.client_secret,
+          paymentIntentId: existing.id,
+          client_secret: existing.client_secret,
+        } );
+      }
+      // Bound intent does not match the current fare; fall through and create a
+      // fresh one so a price change is never charged at a stale amount.
+    } catch ( error ) {
+      console.error( '[payments] existing-intent lookup failed', error instanceof Error ? error.message : String( error ) );
+    }
+  }
+
   const scopedIdempotencyKey =
     typeof idempotency_key === 'string' && idempotency_key.trim().length > 0
       ? `${ auth.authUser.id }:${ idempotency_key.trim().slice( 0, 120 ) }`
-      : undefined;
+      : `payment-intent:${ auth.authUser.id }:booking:${ bookingId }`;
 
   try {
     const pi = await stripe.paymentIntents.create(
       {
-        amount: normalizedAmount,
-        currency: normalizedCurrency,
+        amount: amountMinor,
+        currency,
         metadata: {
           ...sanitizeClientMetadata( metadata ),
           user_id: auth.authUser.id,
+          booking_id: bookingId,
         },
       },
-      scopedIdempotencyKey ? { idempotencyKey: scopedIdempotencyKey } : undefined,
+      { idempotencyKey: scopedIdempotencyKey },
     );
+
+    // Bind the PaymentIntent to the payable record. prepaid bookings are rejected
+    // upstream, and the idempotency key above guarantees the same key yields the
+    // same Stripe intent, so this update is safe to overwrite on retry.
+    const { error: bindError } = await auth.admin
+      .from( 'bookings' )
+      .update( { stripe_payment_intent_id: pi.id, updated_at: new Date().toISOString() } )
+      .eq( 'id', bookingId );
+
+    if ( bindError ) {
+      console.error( '[payments] intent binding failed', bindError.message );
+    }
 
     return json( {
       clientSecret: pi.client_secret,
@@ -138,40 +306,69 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
     reason?: string;
   };
 
-  let resolvedPaymentIntentId =
-    typeof payment_intent_id === 'string' && payment_intent_id.startsWith( 'pi_' )
-      ? payment_intent_id
-      : undefined;
+  let resolvedPaymentIntentId: string | undefined;
+  let bookingRow: Record< string, unknown > | null;
+  let expectedAmountMinor: number | null;
 
-  if ( !resolvedPaymentIntentId && typeof booking_id === 'string' && booking_id ) {
-    const { data: paymentRecord, error: lookupError } = await auth.admin
-      .from( 'payments' )
-      .select( 'id' )
-      .eq( 'booking_id', booking_id )
-      .order( 'created_at', { ascending: false } )
-      .limit( 1 )
+  if ( typeof payment_intent_id === 'string' && payment_intent_id.startsWith( 'pi_' ) ) {
+    resolvedPaymentIntentId = payment_intent_id;
+    // Verify the intent belongs to one of the platform's payment records before
+    // touching it. A card PaymentIntent is bound to a booking; top-up/checkout
+    // intents are referenced from a payments row. Anything else is refused so an
+    // operator cannot refund an arbitrary Stripe payment_intent_id.
+    const ownership = await verifyPaymentIntentOwnership( auth.admin, resolvedPaymentIntentId );
+    if ( !ownership.owned ) {
+      return json( { error: 'This payment intent does not belong to the platform' }, 403 );
+    }
+    bookingRow = ownership.booking;
+    expectedAmountMinor = ownership.amountMinor;
+  } else if ( typeof booking_id === 'string' && booking_id.trim() ) {
+    const bookingIdTrim = booking_id.trim();
+    const { data, error: lookupError } = await auth.admin
+      .from( 'bookings' )
+      .select( 'id, passenger_id, user_id, fare, amount, total_price, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id' )
+      .eq( 'id', bookingIdTrim )
       .maybeSingle();
 
     if ( lookupError ) {
-      console.error( '[payments] refund lookup failed', lookupError.message );
+      console.error( '[payments] refund booking lookup failed', lookupError.message );
       return json( { error: 'Payment lookup failed' }, 500 );
     }
 
-    const candidate = paymentRecord?.id ? String( paymentRecord.id ) : '';
-    // Only a Stripe PaymentIntent id can be refunded; a bare DB uuid cannot.
-    resolvedPaymentIntentId = candidate.startsWith( 'pi_' ) ? candidate : undefined;
+    if ( !data ) {
+      return json( { error: 'Booking not found' }, 404 );
+    }
+
+    bookingRow = data as Record< string, unknown >;
+    const boundIntent = String( bookingRow.stripe_payment_intent_id ?? '' );
+    // Only a Stripe PaymentIntent id can be refunded; a bare DB uuid cannot, and
+    // a booking with no recorded card payment cannot be refunded here.
+    if ( !boundIntent.startsWith( 'pi_' ) ) {
+      return json( { error: 'No card payment is recorded for this booking' }, 409 );
+    }
+    resolvedPaymentIntentId = boundIntent;
+    expectedAmountMinor = deriveBookingAmountMinor( bookingRow, String( bookingRow.currency ?? 'jod' ).toLowerCase() );
+  } else {
+    return json( { error: 'A payment_intent_id (pi_…) or booking_id is required' }, 400 );
   }
 
   if ( !resolvedPaymentIntentId ) {
     return json( { error: 'A valid payment_intent_id (pi_…) or a booking with a card payment is required' }, 400 );
   }
 
+  // Amount guard: a client-supplied refund amount must not exceed the original
+  // charge. The ceiling is derived server-side from the payable record; it is not
+  // trusted from the request. Omitting `amount` => full refund.
   let refundAmount: number | undefined;
   if ( amount !== undefined && amount !== null ) {
-    if ( typeof amount !== 'number' || !Number.isInteger( amount ) || amount <= 0 ) {
+    const parsed = normalizePaymentAmount( amount );
+    if ( parsed === null ) {
       return json( { error: 'Refund amount must be a positive integer in minor units' }, 400 );
     }
-    refundAmount = amount;
+    if ( expectedAmountMinor !== null && parsed > expectedAmountMinor ) {
+      return json( { error: 'Refund amount exceeds the original charge' }, 409 );
+    }
+    refundAmount = parsed;
   }
 
   const normalizedReason = REFUND_REASONS.has( String( reason ) )
@@ -201,6 +398,21 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
     // issue a second refund.
     const idempotencyKey = `refund:${ resolvedPaymentIntentId }:${ refundAmount ?? 'full' }`;
     const refund = await stripe.refunds.create( params, { idempotencyKey } );
+
+    // Reflect the refund on the bound booking. The conditional match on
+    // payment_status 'succeeded' keeps this idempotent and never re-opens a
+    // booking that was already refunded; failure to persist state is not fatal
+    // to the Stripe refund itself, which is the source of truth here.
+    if ( bookingRow && String( bookingRow.id ?? '' ) ) {
+      const { error: stateError } = await auth.admin
+        .from( 'bookings' )
+        .update( { payment_status: 'refunded', updated_at: new Date().toISOString() } )
+        .eq( 'stripe_payment_intent_id', resolvedPaymentIntentId )
+        .eq( 'payment_status', 'succeeded' );
+      if ( stateError ) {
+        console.warn( '[payments] refund state update skipped', stateError.message );
+      }
+    }
 
     console.info( '[payments] refund issued', {
       refundId: refund.id,

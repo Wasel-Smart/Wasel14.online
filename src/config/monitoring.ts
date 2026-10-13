@@ -3,13 +3,6 @@
  * Defines all alerts, thresholds, and monitoring rules
  */
 
-type SentryEvent = {
-  user?: { id?: string };
-  tags?: Record<string, string>;
-  exception?: { values?: Array<{ value?: string }> };
-  [key: string]: unknown;
-};
-
 export interface AlertRule {
   id: string;
   name: string;
@@ -483,7 +476,8 @@ export function initializeMonitoring() {
         dsn: sentryDsn,
         environment: import.meta.env.MODE,
         tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
-        beforeSend(event: SentryEvent | null) {
+        // `event` is contextually typed by Sentry (ErrorEvent); see utils/monitoring.ts.
+        beforeSend(event) {
           // Filter out ignored errors
           if (!event) {return null;}
           const ignoredErrors = [

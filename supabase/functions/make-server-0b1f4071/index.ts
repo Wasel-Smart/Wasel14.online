@@ -658,7 +658,10 @@ Deno.serve( async ( request: Request ) => {
 
   try {
     const url = new URL( request.url );
-    const path = url.pathname.replace( /^.*make-server-0b1f4071/, '' ) || '/';
+    const rawPath = url.pathname.replace( /^.*make-server-0b1f4071/, '' ) || '/';
+    // Same /v1 normalisation as resolveRoute(): without it GET /v1/health missed the
+    // health branch below and fell through to a 404.
+    const path = rawPath === '/v1' || rawPath.startsWith( '/v1/' ) ? ( rawPath.slice( 3 ) || '/' ) : rawPath;
 
     const securityResponse = enforceRequestSecurity( request, path );
     if ( securityResponse ) {

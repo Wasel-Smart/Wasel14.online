@@ -13,12 +13,6 @@ import { createCorrelationId, createStructuredLogEntry } from '../platform/obser
 import { sanitizeLogMessage } from './sanitization';
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 
-type SentryEvent = {
-  user?: { id?: string };
-  tags?: Record<string, string>;
-  [key: string]: unknown;
-};
-
 // @sentry/core's Scope type does not declare setMeasurement, but some runtime
 // builds expose it. Model it as optional so the call stays a safe no-op where
 // it is missing, without resorting to `any`.
@@ -100,7 +94,10 @@ export async function initSentry(): Promise<void> {
         'Network request failed',
         'Failed to fetch',
       ],
-      beforeSend(event: SentryEvent | null) {
+      // `event` is contextually typed by Sentry (ErrorEvent). A hand-written event
+      // type drifts from Sentry's (e.g. `user.id` is `string | number`) and breaks
+      // type-check whenever the SDK or TypeScript is upgraded.
+      beforeSend(event) {
         if (!event) {return null;}
         try {
           const raw = localStorage.getItem('wasel_local_user_v2');

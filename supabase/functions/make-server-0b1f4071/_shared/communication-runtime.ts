@@ -26,6 +26,8 @@ export type DeliveryProcessorEnv = {
   twilioSmsFrom?: string;
   twilioWhatsappFrom?: string;
   communicationWebhookToken?: string;
+  resendWebhookSigningSecret?: string;
+  twilioWebhookSigningSecret?: string;
   functionBaseUrl?: string;
   maxDeliveryAttempts?: number;
 };
@@ -234,11 +236,11 @@ export function buildTwilioRequest(
   }
 
   const providerWebhookBaseUrl = resolveProviderWebhookBaseUrl(env.functionBaseUrl);
-  if (env.communicationWebhookToken && providerWebhookBaseUrl) {
-    params.set(
-      'StatusCallback',
-      `${providerWebhookBaseUrl}/twilio?token=${encodeURIComponent(env.communicationWebhookToken)}`,
-    );
+  // Callbacks are now authenticated by Twilio signature verification
+  // (X-Twilio-Signature) instead of a URL token, so the StatusCallback URL must
+  // not carry a secret query parameter.
+  if (providerWebhookBaseUrl) {
+    params.set('StatusCallback', `${providerWebhookBaseUrl}/twilio`);
   }
 
   return {
