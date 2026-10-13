@@ -1,2 +1,0 @@
-ALTER TABLE public.trips
-DROP COLUMN IF EXISTS notes;
