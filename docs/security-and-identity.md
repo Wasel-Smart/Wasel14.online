@@ -82,7 +82,7 @@ The static container contract in `docker/nginx.conf` includes:
 | Hardcoded secrets in source | `.gitleaks.toml`, `validate-no-secrets.mjs`, CI secret-scan job | ✅ Production |
 | Cascading failures from external services | Circuit breaker in `src/utils/circuitBreaker.ts` | ✅ Production |
 | MFA bypass | MFA feature-flagged; enable with `VITE_ENABLE_TWO_FACTOR_AUTH=true` | ✅ Backend live, UI opt-in |
-| Committed secrets in git history | Google service account key committed — rotation + history purge required | 🔴 Outstanding |
+| Committed secrets in git history | Google service account key committed — rotation + history purge required | 🟡 In Progress |
 
 ## Secrets rotation checklist
 
