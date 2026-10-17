@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 const ROOT = resolve(__dirname, '../..');
 function readSource(relativePath: string): string {
   return readFileSync(resolve(ROOT, relativePath), 'utf8');
 }
-const OPENAPI_SPEC = yaml.load(readSource('docs/openapi/wasel-v1.yaml')) as Record<string, unknown>;
+const OPENAPI_SPEC = load(readSource('docs/openapi/wasel-v1.yaml')) as Record<string, unknown>;
 const EDGE_INDEX = readSource('supabase/functions/make-server-0b1f4071/index.ts');
 interface OpenApiPath {
   get?: Record<string, unknown>;
