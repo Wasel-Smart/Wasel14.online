@@ -13,9 +13,9 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["../../../src/*"]
+      "@/*": ["../../src/*"]
     }
   },
-  "include": ["src/**/*", "../../../src/domain/**/*", "../../../src/utils/currency.ts", "../../../src/utils/sanitization.ts"]
+  "include": ["src/**/*", "../../src/domain/**/*", "../../src/utils/currency.ts", "../../src/utils/sanitization.ts"]
 }
 
