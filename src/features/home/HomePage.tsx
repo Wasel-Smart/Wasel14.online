@@ -353,7 +353,6 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
     const controller = new AbortController();
 
     async function loadCorridors () {
-      setCorridorsLoading( true );
       try {
         const res = await fetch( `${ API_URL }/mobility-os/public-snapshot`, {
           signal: controller.signal,

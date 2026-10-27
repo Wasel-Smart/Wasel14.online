@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getAllCorridorOpportunities,
   getCorridorOpportunity,
@@ -327,19 +327,17 @@ export function getLiveCorridorSignal(
 function useContentStableSnapshot(
   snapshot: RouteIntelligenceSnapshot,
 ): RouteIntelligenceSnapshot {
-  const heldRef = useRef<RouteIntelligenceSnapshot>(snapshot);
-  const held = heldRef.current;
+  const [held, setHeld] = useState<RouteIntelligenceSnapshot>(snapshot);
 
-  if (held !== snapshot) {
+  useEffect(() => {
     const { updatedAt: _heldAt, ...heldRest } = held;
     const { updatedAt: _nextAt, ...nextRest } = snapshot;
-    if (JSON.stringify(heldRest) === JSON.stringify(nextRest)) {
-      return held;
+    if (JSON.stringify(heldRest) !== JSON.stringify(nextRest)) {
+      setHeld(snapshot);
     }
-    heldRef.current = snapshot;
-  }
+  }, [held, snapshot]);
 
-  return snapshot;
+  return held;
 }
 
 export function useLiveRouteIntelligence(args?: { from?: string | null; to?: string | null }) {
