@@ -9,11 +9,32 @@ export interface StartupEnvironment {
   VITE_APP_INSIGHTS_CONNECTION_STRING?: string;
   VITE_SENTRY_DSN?: string;
   MODE?: string;
+  VITE_ENABLE_DEMO_RIDES?: string;
+  VITE_ALLOW_DIRECT_SUPABASE_FALLBACK?: string;
 }
 
-export function getStartupConfigurationError(environment: StartupEnvironment): string | null {
+function currentHostname(): string | undefined {
+  return typeof window !== 'undefined' ? window.location?.hostname : undefined;
+}
+
+function isLocalHostname(hostname: string | undefined): boolean {
+  // No window (SSR / node) is treated as local so tooling and tests are unaffected.
+  if (!hostname) { return true; }
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1';
+}
+
+export function getStartupConfigurationError(
+  environment: StartupEnvironment,
+  hostname: string | undefined = currentHostname(),
+): string | null {
   if (environment.DEV) {
     return null;
+  }
+
+  // Fake-auth test mode is only legitimate on a local origin. On a deployed host it
+  // would bypass every check below and run the app against seeded local sessions.
+  if (environment.VITE_E2E_LOCAL_AUTH === 'true' && !isLocalHostname(hostname)) {
+    return 'Local-auth test mode (VITE_E2E_LOCAL_AUTH) must not be enabled on a deployed build.';
   }
 
   if (environment.VITE_E2E_LOCAL_AUTH === 'true') {
@@ -76,6 +97,12 @@ export function getObservabilityWarnings(environment: StartupEnvironment): strin
     return [];
   }
   const warnings: string[] = [];
+  if (environment.VITE_ENABLE_DEMO_RIDES === 'true') {
+    warnings.push('VITE_ENABLE_DEMO_RIDES is true in a production build — seeded demo rides may appear as real inventory.');
+  }
+  if (environment.VITE_ALLOW_DIRECT_SUPABASE_FALLBACK === 'true') {
+    warnings.push('VITE_ALLOW_DIRECT_SUPABASE_FALLBACK is true in a production build — browser-to-database fallback is active; RLS is the only guard.');
+  }
   if (isPlaceholder(environment.VITE_SENTRY_DSN)) {
     warnings.push('VITE_SENTRY_DSN is not set — runtime errors will not be captured in Sentry.');
   }

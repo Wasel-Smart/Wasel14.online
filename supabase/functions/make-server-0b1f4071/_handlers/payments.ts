@@ -270,6 +270,14 @@ export async function handlePaymentIntentCreate ( request: Request ): Promise<Re
 
     if ( bindError ) {
       console.error( '[payments] intent binding failed', bindError.message );
+      // An intent that is not bound to the booking can never be matched by the success
+      // webhook or passed the refund ownership check, so never hand it to the client.
+      try {
+        await stripe.paymentIntents.cancel( pi.id );
+      } catch ( cancelError ) {
+        console.error( '[payments] could not cancel unbound intent', cancelError instanceof Error ? cancelError.message : String( cancelError ) );
+      }
+      return json( { error: 'Payment intent creation failed' }, 502 );
     }
 
     return json( {

@@ -149,17 +149,20 @@ src/imports/google-services.json
 
 # ---- Root-level scratch / audit-export files ----
 arabic-full-route-leaks.json
-common.json
+/common.json
 find-ride-ar-check.png
 screenshot.png
+# Anchored to the repo root with a leading slash. Un-anchored names (`d`, `schema.sql`,
+# `i18n.ts`, `MobilityOSPage.tsx`) matched at ANY depth and could hide real source or
+# migrations from git.
 ChatGPT*
-d
-20260725023554_add_driver_locations_and_update_notifications.sql
-MobilityOSPage.tsx
-schema.prisma
-schema.test.prisma
-schema.sql
-i18n.ts
+/d
+/20260725023554_add_driver_locations_and_update_notifications.sql
+/MobilityOSPage.tsx
+/schema.prisma
+/schema.test.prisma
+/schema.sql
+/i18n.ts
 landing-axe.json
 landing-desktop.json
 landing-desktop-fold.json

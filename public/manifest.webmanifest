@@ -90,8 +90,7 @@
   ],
   "share_target": {
     "action": "/app/packages",
-    "method": "POST",
-    "enctype": "application/x-www-form-urlencoded",
+    "method": "GET",
     "params": {
       "title": "title",
       "text": "text",

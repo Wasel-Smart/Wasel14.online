@@ -390,8 +390,12 @@ if ( environmentIsValid ) {
           );
         } catch { /* non-fatal */ }
 
+        // A first-ever install has no previous controller; claiming the page then is not an
+        // update, so it must not trigger a reload (that interrupted OAuth callbacks and forms).
+        const hadController = Boolean( navigator.serviceWorker.controller );
         const onControllerChange = () => {
           navigator.serviceWorker.removeEventListener( 'controllerchange', onControllerChange );
+          if ( !hadController ) { return; }
           reloadAfterServiceWorkerUpdate();
         };
 

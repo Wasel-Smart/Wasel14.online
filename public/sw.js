@@ -114,10 +114,16 @@ self.addEventListener('activate', (event) => {
         // Let the fresh shell start loading before removing caches used by an
         // old controller. Once clients reload, no stale chunk can be mixed
         // with the new module graph.
-        clients.forEach((client) => client.postMessage({ type: 'SW_UPDATED' }));
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Only delete caches from OLDER deploys. Deleting every cache here also wiped the
+        // precache this version had just filled (offline.html included).
+        // No SW_UPDATED broadcast: main.tsx reloads on a genuine controller swap only, so a
+        // first-time visitor is no longer force-reloaded mid-load.
         const names = await caches.keys();
-        await Promise.all(names.map((name) => caches.delete(name)));
+        await Promise.all(
+          names
+            .filter((name) => !name.startsWith(`${CACHE_VERSION}-`))
+            .map((name) => caches.delete(name)),
+        );
       })
       .catch(() => self.clients.claim()),
   );
