@@ -39,7 +39,7 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2020,
       parserOptions: {
-        project: [ './tsconfig.json', './tsconfig.api.json', './tsconfig.tests.json', './supabase/functions/tsconfig.json', './packages/rbac/tsconfig.json' ],
+        project: [ './tsconfig.json', './tsconfig.api.json', './tsconfig.tests.json', './supabase/functions/tsconfig.json', './packages/rbac/tsconfig.json', './packages/shared/tsconfig.json' ],
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {

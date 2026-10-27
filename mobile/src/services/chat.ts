@@ -1,30 +1,33 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { supabase } from '../lib/config';
-import { mobileAuth } from './auth';
+import { getUserIdentity, type UserIdentity } from './identity';
 
+/**
+ * Trip chat on top of the real schema:
+ *   conversations(conversation_id, created_by, title)
+ *   conversation_members(conversation_id, user_id, role)
+ *   messages(message_id, conversation_id, user_id, content, created_at)
+ *
+ * A trip's conversation is identified by title = `trip:<trip_id>`.
+ * messages.user_id is public.users.id; the UI compares against the auth id, so
+ * `senderId` is mapped back to the auth id for the signed-in user.
+ */
 export type TripMessageType = 'text' | 'location' | 'system';
 
 type SenderProfile = {
-  id?: string;
+  id?: string | null;
   full_name?: string | null;
   avatar_url?: string | null;
 };
 
-type RawTripMessage = {
-  id: string;
-  trip_id?: string | null;
-  sender_id: string;
-  content?: string | null;
-  message?: string | null;
-  type?: TripMessageType | null;
-  message_type?: TripMessageType | null;
-  metadata?: Record<string, unknown> | null;
-  read_by?: string[] | null;
-  read_at?: string | null;
-  created_at?: string | null;
+type RawMessage = {
+  message_id: string;
+  conversation_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
   sender?: SenderProfile | SenderProfile[] | null;
-  profiles?: SenderProfile | SenderProfile[] | null;
 };
 
 export interface TripMessage {
@@ -47,35 +50,28 @@ export interface SendTripMessageRequest {
   metadata?: Record<string, unknown>;
 }
 
-type TripParticipantRow = {
-  driver_id?: string | null;
-};
+const PLAIN_SELECT = 'message_id, conversation_id, user_id, content, created_at';
+const MESSAGE_SELECT = `${PLAIN_SELECT}, sender:v_users_public!messages_user_id_fkey(id, full_name, avatar_url)`;
 
-type BookingParticipantRow = {
-  passenger_id?: string | null;
-};
+const tripTitle = (tripId: string) => `trip:${tripId}`;
 
-const MESSAGE_SELECT =
-  'id, trip_id, sender_id, content, type, metadata, read_by, read_at, created_at, sender:profiles(id, full_name, avatar_url)';
-
-function firstProfile(profile: RawTripMessage['sender']): SenderProfile | null {
+function firstProfile(profile: RawMessage['sender']): SenderProfile | null {
   if (Array.isArray(profile)) return profile[0] ?? null;
   return profile ?? null;
 }
 
-function normalizeMessage(raw: RawTripMessage): TripMessage {
-  const sender = firstProfile(raw.sender) ?? firstProfile(raw.profiles);
-
+function normalizeMessage(raw: RawMessage, tripId: string, me: UserIdentity): TripMessage {
+  const sender = firstProfile(raw.sender);
   return {
-    id: raw.id,
-    tripId: raw.trip_id ?? '',
-    senderId: raw.sender_id,
-    senderName: sender?.full_name?.trim() || 'Driver',
-    content: raw.content ?? raw.message ?? '',
-    type: raw.type ?? raw.message_type ?? 'text',
-    metadata: raw.metadata ?? {},
-    readBy: raw.read_by ?? [],
-    readAt: raw.read_at ?? null,
+    id: raw.message_id,
+    tripId,
+    senderId: raw.user_id === me.publicId ? me.authId : raw.user_id,
+    senderName: sender?.full_name?.trim() || 'Wasel',
+    content: raw.content ?? '',
+    type: 'text',
+    metadata: {},
+    readBy: [],
+    readAt: null,
     createdAt: raw.created_at ?? new Date().toISOString(),
   };
 }
@@ -89,17 +85,15 @@ export class MobileChatService {
 
   async getMessages(tripId: string, limit = 50): Promise<TripMessage[]> {
     if (!tripId) throw new Error('Missing trip id');
+    const me = await getUserIdentity();
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select(MESSAGE_SELECT)
-      .eq('trip_id', tripId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    const conversationId = await this.findConversationId(tripId);
+    if (!conversationId) return [];
 
-    if (error) throw error;
-
-    return ((data ?? []) as RawTripMessage[]).map(normalizeMessage).sort(byCreatedAt);
+    const rows = await this.selectMessages(q =>
+      q.eq('conversation_id', conversationId).order('created_at', { ascending: false }).limit(limit),
+    );
+    return rows.map(row => normalizeMessage(row, tripId, me)).sort(byCreatedAt);
   }
 
   async sendMessage(request: SendTripMessageRequest): Promise<TripMessage> {
@@ -107,54 +101,23 @@ export class MobileChatService {
     if (!request.tripId) throw new Error('Missing trip id');
     if (!content) throw new Error('Message is empty');
 
-    const userId = await this.getAuthenticatedUserId();
-    await this.assertTripParticipant(request.tripId, userId);
+    const me = await getUserIdentity();
+    await this.assertTripParticipant(request.tripId, me.publicId);
+    const conversationId = await this.ensureConversation(request.tripId, me.publicId);
 
     const { data, error } = await supabase
       .from('messages')
-      .insert({
-        trip_id: request.tripId,
-        sender_id: userId,
-        content,
-        type: request.type ?? 'text',
-        metadata: request.metadata ?? {},
-        read_by: [userId],
-      })
-      .select(MESSAGE_SELECT)
+      .insert({ conversation_id: conversationId, user_id: me.publicId, content })
+      .select(PLAIN_SELECT)
       .single();
 
     if (error) throw error;
-
-    return normalizeMessage(data as RawTripMessage);
+    return normalizeMessage({ ...(data as RawMessage), sender: { full_name: null } }, request.tripId, me);
   }
 
-  async markAsRead(messageIds: string[]): Promise<void> {
-    const userId = await this.getAuthenticatedUserId();
-    const uniqueIds = Array.from(new Set(messageIds)).filter(Boolean);
-    if (uniqueIds.length === 0) return;
-
-    const { data, error } = await supabase
-      .from('messages')
-      .select('id, read_by')
-      .in('id', uniqueIds);
-
-    if (error || !data) return;
-
-    const unread = (data as Array<{ id: string; read_by?: string[] | null }>).filter(
-      message => !(message.read_by ?? []).includes(userId),
-    );
-
-    await Promise.all(
-      unread.map(message =>
-        supabase
-          .from('messages')
-          .update({
-            read_by: [...(message.read_by ?? []), userId],
-            read_at: new Date().toISOString(),
-          })
-          .eq('id', message.id),
-      ),
-    );
+  /** The schema has no per-message read receipts yet, so this is intentionally a no-op. */
+  async markAsRead(_messageIds: string[]): Promise<void> {
+    return;
   }
 
   subscribeToTrip(
@@ -164,90 +127,134 @@ export class MobileChatService {
   ): () => void {
     if (!tripId) throw new Error('Missing trip id');
 
+    let cancelled = false;
+    let channel: RealtimeChannel | null = null;
     const channelName = `mobile-trip-messages-${tripId}`;
+
     const existing = this.channels.get(channelName);
     if (existing) {
       void supabase.removeChannel(existing);
       this.channels.delete(channelName);
     }
 
-    const channel = supabase
-      .channel(channelName, {
-        config: { broadcast: { self: false } },
-      })
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-          filter: `trip_id=eq.${tripId}`,
-        },
-        async (payload: { new?: { id?: string } }) => {
-          const id = payload.new?.id;
-          if (!id) return;
+    void (async () => {
+      try {
+        const me = await getUserIdentity();
+        const conversationId = await this.findConversationId(tripId);
+        if (cancelled || !conversationId) return;
 
-          try {
-            const { data, error } = await supabase
-              .from('messages')
-              .select(MESSAGE_SELECT)
-              .eq('id', id)
-              .single();
+        channel = supabase
+          .channel(channelName)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+              filter: `conversation_id=eq.${conversationId}`,
+            },
+            async (payload: { new?: { message_id?: string } }) => {
+              const id = payload.new?.message_id;
+              if (!id) return;
+              try {
+                const rows = await this.selectMessages(q => q.eq('message_id', id).limit(1));
+                if (rows[0]) onMessage(normalizeMessage(rows[0], tripId, me));
+              } catch (error) {
+                onError?.(error instanceof Error ? error : new Error('Could not load new message'));
+              }
+            },
+          )
+          .subscribe((status: string) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              onError?.(new Error('Live chat connection failed'));
+            }
+          });
 
-            if (error) throw error;
-            if (data) onMessage(normalizeMessage(data as RawTripMessage));
-          } catch (error) {
-            onError?.(error instanceof Error ? error : new Error('Could not load new message'));
-          }
-        },
-      )
-      .subscribe((status: string) => {
-        if (status === 'SUBSCRIPTION_ERROR' || status === 'CHANNEL_ERROR') {
-          onError?.(new Error('Live chat connection failed'));
+        if (cancelled) {
+          void supabase.removeChannel(channel);
+          return;
         }
-      });
-
-    this.channels.set(channelName, channel);
+        this.channels.set(channelName, channel);
+      } catch (error) {
+        onError?.(error instanceof Error ? error : new Error('Live chat connection failed'));
+      }
+    })();
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
       this.channels.delete(channelName);
     };
   }
 
-  private async getAuthenticatedUserId(): Promise<string> {
-    const cachedUser = mobileAuth.getUser();
-    if (cachedUser?.id) return cachedUser.id;
+  /** Selects with the sender join; falls back to a plain select if the embed is not permitted. */
+  private async selectMessages(build: (q: any) => PromiseLike<{ data: unknown; error: unknown }>): Promise<RawMessage[]> {
+    const withSender = await build(supabase.from('messages').select(MESSAGE_SELECT) as any);
+    if (!withSender.error) return (withSender.data ?? []) as RawMessage[];
 
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error) throw error;
-    if (!user?.id) throw new Error('User not authenticated');
-    return user.id;
+    const plain = await build(supabase.from('messages').select(PLAIN_SELECT) as any);
+    if (plain.error) throw plain.error;
+    return (plain.data ?? []) as RawMessage[];
   }
 
-  private async assertTripParticipant(tripId: string, userId: string): Promise<void> {
-    // Consolidated query to check if the user is either the driver of the trip
-    // or has a booking on the trip. This is more efficient than two separate queries.
+  private async findConversationId(tripId: string): Promise<string | null> {
     const { data, error } = await supabase
-      .from('trips')
-      .select('driver_id, bookings(passenger_id)')
-      .eq('id', tripId)
-      .or(`driver_id.eq.${userId},bookings.passenger_id.eq.${userId}`)
+      .from('conversations')
+      .select('conversation_id')
+      .eq('title', tripTitle(tripId))
+      .order('created_at', { ascending: true })
       .limit(1)
-      .single();
-
+      .maybeSingle();
     if (error) throw error;
+    return data?.conversation_id ?? null;
+  }
 
-    const isDriver = data?.driver_id === userId;
-    const isPassenger = Array.isArray(data.bookings) && data.bookings.length > 0;
+  private async ensureConversation(tripId: string, publicUserId: string): Promise<string> {
+    let conversationId = await this.findConversationId(tripId);
 
-    if (!isDriver && !isPassenger) {
-      throw new Error('Not authorized to send messages in this trip');
+    if (!conversationId) {
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert({ created_by: publicUserId, title: tripTitle(tripId) })
+        .select('conversation_id')
+        .single();
+      if (error) throw error;
+      conversationId = data.conversation_id;
     }
+
+    const { error: memberError } = await supabase
+      .from('conversation_members')
+      .upsert(
+        { conversation_id: conversationId, user_id: publicUserId, role: 'member' },
+        { onConflict: 'conversation_id,user_id', ignoreDuplicates: true },
+      );
+    if (memberError) throw memberError;
+
+    return conversationId;
+  }
+
+  /** The user must be the trip's driver (drivers.user_id) or hold a booking on it. */
+  private async assertTripParticipant(tripId: string, publicUserId: string): Promise<void> {
+    const { data: trip, error: tripError } = await supabase
+      .from('trips')
+      .select('trip_id, driver:drivers!trips_driver_id_fkey(user_id)')
+      .eq('trip_id', tripId)
+      .maybeSingle();
+    if (tripError) throw tripError;
+    if (!trip) throw new Error('Trip not found');
+
+    const driver = Array.isArray(trip.driver) ? trip.driver[0] : trip.driver;
+    if (driver?.user_id === publicUserId) return;
+
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('booking_id')
+      .eq('trip_id', tripId)
+      .eq('passenger_id', publicUserId)
+      .limit(1)
+      .maybeSingle();
+    if (bookingError) throw bookingError;
+    if (!booking) throw new Error('Not authorized to send messages in this trip');
   }
 }
 

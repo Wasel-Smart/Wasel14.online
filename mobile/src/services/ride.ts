@@ -6,6 +6,10 @@
 import { mobileAuth } from './auth';
 import { offlineService } from './offline';
 import { apiClient } from '../lib/api';
+import { supabase } from '../lib/config';
+import { getUserIdentity } from './identity';
+
+const stripLikeWildcards = (value: string): string => value.replace(/[%_\\,()]/g, ' ').trim();
 
 export type RideStatus =
   | 'requested'
@@ -139,12 +143,117 @@ export class RideLifecycleService {
   constructor() {}
 
   async searchTrips(from: string, to: string, seats = 1, date?: string): Promise<AvailableTrip[]> {
+    try {
+      const direct = await this.searchTripsDirect(from, to, seats, date);
+      if (direct) return direct;
+    } catch (error) {
+      console.warn('[RideLifecycle] Direct trip search failed, trying API:', error);
+    }
+
     const params = new URLSearchParams({ from, to, seats: String(seats) });
     if (date) params.set('date', date);
 
     const { data, error } = await apiClient.get<AvailableTrip[]>(`/v1/trips/search?${params.toString()}`);
     if (error || !data) return [];
     return data;
+  }
+
+  /** Reads open trips from the public view (RLS-safe columns only). Returns null on query error. */
+  private async searchTripsDirect(
+    from: string,
+    to: string,
+    seats: number,
+    date?: string,
+  ): Promise<AvailableTrip[] | null> {
+    const now = new Date();
+    const dayStart = date ? new Date(`${date}T00:00:00`) : now;
+    const lowerBound = dayStart.getTime() > now.getTime() ? dayStart : now;
+
+    let query = supabase
+      .from('v_trips_public')
+      .select('trip_id, origin_city, destination_city, departure_time, available_seats, price_per_seat, driver_id, trip_status')
+      .eq('trip_status', 'open')
+      .gte('available_seats', Math.max(1, seats))
+      .gte('departure_time', lowerBound.toISOString())
+      .order('departure_time', { ascending: true })
+      .limit(20);
+
+    const fromTerm = stripLikeWildcards(from);
+    const toTerm = stripLikeWildcards(to);
+    if (fromTerm) query = query.ilike('origin_city', `%${fromTerm}%`);
+    if (toTerm) query = query.ilike('destination_city', `%${toTerm}%`);
+
+    const { data: rows, error } = await query;
+    if (error) return null;
+    if (!rows || rows.length === 0) return [];
+
+    const driverIds = Array.from(new Set(rows.map(r => r.driver_id).filter((id): id is string => Boolean(id))));
+    const driverInfo = await this.loadDriverSummaries(driverIds);
+
+    return rows.map(row => {
+      const departure = new Date(row.departure_time ?? Date.now());
+      const info = driverInfo.get(row.driver_id ?? '');
+      return {
+        id: String(row.trip_id),
+        from: row.origin_city ?? '',
+        to: row.destination_city ?? '',
+        date: departure.toISOString().slice(0, 10),
+        time: departure.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        seats: Number(row.available_seats ?? 0),
+        price: Number(row.price_per_seat ?? 0),
+        driver: {
+          id: String(row.driver_id ?? ''),
+          name: info?.name ?? 'Wasel Driver',
+          rating: info?.rating ?? 0,
+          verified: info?.verified ?? false,
+        },
+      };
+    });
+  }
+
+  private async loadDriverSummaries(
+    driverIds: string[],
+  ): Promise<Map<string, { name: string; rating: number; verified: boolean }>> {
+    const result = new Map<string, { name: string; rating: number; verified: boolean }>();
+    if (driverIds.length === 0) return result;
+
+    try {
+      const { data: drivers } = await supabase
+        .from('v_drivers_public')
+        .select('driver_id, user_id, driver_status')
+        .in('driver_id', driverIds);
+      const userIds = Array.from(new Set((drivers ?? []).map(d => d.user_id).filter((id): id is string => Boolean(id))));
+
+      const names = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: users } = await supabase.from('v_users_public').select('id, full_name').in('id', userIds);
+        (users ?? []).forEach(u => {
+          if (u.id) names.set(u.id, (u.full_name ?? '').trim());
+        });
+      }
+
+      const sums = new Map<string, { total: number; count: number }>();
+      const { data: ratings } = await supabase.from('ratings').select('driver_id, rating').in('driver_id', driverIds);
+      (ratings ?? []).forEach(r => {
+        const entry = sums.get(r.driver_id) ?? { total: 0, count: 0 };
+        entry.total += Number(r.rating);
+        entry.count += 1;
+        sums.set(r.driver_id, entry);
+      });
+
+      (drivers ?? []).forEach(d => {
+        if (!d.driver_id) return;
+        const rating = sums.get(d.driver_id);
+        result.set(d.driver_id, {
+          name: (d.user_id && names.get(d.user_id)) || 'Wasel Driver',
+          rating: rating && rating.count > 0 ? Math.round((rating.total / rating.count) * 10) / 10 : 0,
+          verified: d.driver_status !== null && d.driver_status !== 'draft' && d.driver_status !== 'pending_approval' && d.driver_status !== 'rejected' && d.driver_status !== 'suspended',
+        });
+      });
+    } catch (error) {
+      console.warn('[RideLifecycle] Driver summary lookup failed:', error);
+    }
+    return result;
   }
 
   async requestRide(request: RideRequest): Promise<{ ride?: Ride; error?: Error; bookingId?: string }> {
@@ -179,24 +288,89 @@ export class RideLifecycleService {
         return { error: new Error('No available rides on this route') };
       }
 
-      const selectedTrip = trips[0];
-      const { data, error } = await apiClient.post<{ booking?: unknown } & Record<string, unknown>>(
-        '/v1/bookings',
+      return this.bookTrip(trips[0], request.seats, request.origin.address, request.destination.address);
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }
+
+  /**
+   * Books seats on a trip the rider explicitly chose, via the atomic
+   * app_book_trip() database function (one call per seat).
+   */
+  async bookTrip(
+    trip: AvailableTrip,
+    seats: number,
+    pickup?: string,
+    dropoff?: string,
+  ): Promise<{ ride?: Ride; error?: Error; bookingId?: string }> {
+    if (!mobileAuth.getUser()) return { error: new Error('User not authenticated') };
+    if (!offlineService.isDeviceOnline()) {
+      return { error: new Error('تحتاج اتصالاً بالإنترنت لتأكيد الحجز.') };
+    }
+    if (!Number.isInteger(seats) || seats < 1 || seats > trip.seats) {
+      return { error: new Error('عدد المقاعد غير متاح لهذه الرحلة.') };
+    }
+
+    try {
+      const me = await getUserIdentity();
+
+      // Pick the lowest seat numbers not already taken on this trip.
+      const { data: taken, error: takenError } = await supabase
+        .from('bookings')
+        .select('seat_number')
+        .eq('trip_id', trip.id)
+        .neq('booking_status', 'cancelled')
+        .neq('booking_status', 'refunded');
+      if (takenError) throw takenError;
+      const takenSeats = new Set((taken ?? []).map(row => Number(row.seat_number)));
+      const seatNumbers: number[] = [];
+      for (let n = 1; seatNumbers.length < seats && n <= trip.seats + takenSeats.size + 1; n += 1) {
+        if (!takenSeats.has(n)) seatNumbers.push(n);
+      }
+      if (seatNumbers.length < seats) throw new Error('ما في مقاعد كافية على هذه الرحلة.');
+
+      const bookingIds: string[] = [];
+      for (const seatNumber of seatNumbers) {
+        const { data, error } = await supabase.rpc('app_book_trip', {
+          p_passenger_id: me.publicId,
+          p_trip_id: trip.id,
+          p_seat_number: seatNumber,
+        });
+        if (error) {
+          const done = bookingIds.length;
+          throw new Error(
+            done > 0
+              ? `حجزنا ${done} من ${seats} مقاعد فقط: ${error.message}`
+              : error.message,
+          );
+        }
+        bookingIds.push(String(data));
+      }
+
+      const firstId = bookingIds[0];
+      const { data: row } = await supabase
+        .from('bookings')
+        .select('booking_id, trip_id, booking_status, total_price, price_per_seat, created_at, pickup_name, dropoff_name')
+        .eq('booking_id', firstId)
+        .maybeSingle();
+
+      const ride = this.mapBookingToRide(
         {
-          trip_id: selectedTrip.id,
-          seats_requested: request.seats,
-          pickup_stop: request.origin.address,
-          dropoff_stop: request.destination.address,
+          ...(row ?? {}),
+          booking_id: firstId,
+          trip_id: trip.id,
+          driver_id: trip.driver.id,
+          pickup_stop: pickup ?? row?.pickup_name ?? trip.from,
+          dropoff_stop: dropoff ?? row?.dropoff_name ?? trip.to,
+          seats,
+          total_price: trip.price * seats,
         },
+        trip,
       );
-
-      if (error || !data) throw new Error(error ?? 'Empty response');
-
-      const booking = (data.booking ?? data) as Record<string, unknown>;
-      const ride = this.mapBookingToRide(booking, selectedTrip);
       this.setActiveRide(ride);
       await offlineService.cacheActiveRide(ride);
-      return { ride, bookingId: String(booking.booking_id ?? booking.id ?? '') };
+      return { ride, bookingId: firstId };
     } catch (error) {
       return { error: error as Error };
     }

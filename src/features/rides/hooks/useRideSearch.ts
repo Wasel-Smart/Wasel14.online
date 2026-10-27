@@ -7,8 +7,8 @@ import { readStoredStringList, writeStoredStringList } from '../../../pages/wase
 import { useLocalAuth } from '../../../contexts/LocalAuth';
 import { ALL_CITIES } from '../../../utils/validation';
 
-const DEFAULT_FROM = 'Baghdad';
-const DEFAULT_TO = 'Basra';
+const DEFAULT_FROM = 'Amman';
+const DEFAULT_TO = 'Aqaba';
 
 export function useRideSearch() {
   const location = useLocation();
@@ -21,7 +21,7 @@ export function useRideSearch() {
   const [to, setTo] = useState(initialTo || DEFAULT_TO);
   const [date, setDate] = useState(initialDate);
   const [searched, setSearched] = useState(initialSearched);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>(() =>
     readStoredStringList(RIDE_SEARCHES_KEY),
@@ -52,24 +52,20 @@ export function useRideSearch() {
       return;
     }
     setSearchError(null);
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSearched(true);
-      setRecentSearches(prev => {
-        const label = `${from} to ${to}${date ? ` on ${date}` : ''}`;
-        return [label, ...prev.filter(item => item !== label)].slice(0, 4);
-      });
-      void trackGrowthEvent({
-        userId: user?.id,
-        eventName: 'ride_search_executed',
-        funnelStage: 'searched',
-        serviceType: 'ride',
-        from,
-        to,
-        metadata: { date: date || null },
-      });
-    }, 700);
+    setSearched(true);
+    setRecentSearches(prev => {
+      const label = `${from} to ${to}${date ? ` on ${date}` : ''}`;
+      return [label, ...prev.filter(item => item !== label)].slice(0, 4);
+    });
+    void trackGrowthEvent({
+      userId: user?.id,
+      eventName: 'ride_search_executed',
+      funnelStage: 'searched',
+      serviceType: 'ride',
+      from,
+      to,
+      metadata: { date: date || null },
+    });
   }, [from, to, date, user?.id]);
 
   return {

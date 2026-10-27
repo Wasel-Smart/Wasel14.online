@@ -157,25 +157,43 @@ const environmentIsValid = ( () => {
     return true;
   } catch ( envError ) {
     console.error( '[Wasel] Environment not configured:', envError );
+    // React has not mounted, so this is plain DOM. Language comes from
+    // /initial-locale.js, which sets <html lang> before first paint.
+    const ar = document.documentElement.lang === 'ar';
     const configErrorDiv = document.createElement( 'div' );
-    configErrorDiv.style.padding = '24px';
-    configErrorDiv.style.color = '#ef4444';
-    configErrorDiv.style.fontFamily = 'monospace';
+    configErrorDiv.setAttribute( 'role', 'alert' );
+    configErrorDiv.setAttribute( 'dir', ar ? 'rtl' : 'ltr' );
+    configErrorDiv.style.cssText = [
+      'min-height:100vh', 'display:flex', 'flex-direction:column', 'align-items:center',
+      'justify-content:center', 'padding:24px', 'box-sizing:border-box', 'text-align:center',
+      'color:#F8FBFF', 'background:#050B12',
+      "font-family:'Plus Jakarta Sans','Cairo','Tajawal',sans-serif",
+    ].join( ';' );
     const heading = document.createElement( 'h1' );
-    heading.textContent = 'Configuration Error';
+    heading.textContent = ar ? 'خطأ في الإعداد' : 'Configuration Error';
+    heading.style.cssText = 'margin:0 0 12px;color:#FF8A0B';
     const paragraph = document.createElement( 'p' );
-    paragraph.textContent = 'The application is not configured correctly. Contact support.';
+    paragraph.textContent = ar
+      ? 'التطبيق غير مُهيّأ بشكل صحيح. يرجى التواصل مع الدعم.'
+      : 'The application is not configured correctly. Please contact support.';
+    paragraph.style.cssText = 'margin:0 0 12px;max-width:520px;line-height:1.7';
     configErrorDiv.appendChild( heading );
     configErrorDiv.appendChild( paragraph );
     // The guard messages only name variables (never values), so they are safe
     // to show and tell the operator exactly what to fix in the Vercel dashboard.
     if ( envError instanceof Error && envError.message ) {
       const detail = document.createElement( 'p' );
-      detail.style.opacity = '0.75';
-      detail.style.fontSize = '0.9rem';
+      detail.setAttribute( 'dir', 'ltr' );
+      detail.style.cssText = "margin:0 0 16px;max-width:560px;opacity:0.8;font-size:0.9rem;font-family:'JetBrains Mono','Fira Mono',monospace";
       detail.textContent = `Reason: ${ envError.message }`;
       configErrorDiv.appendChild( detail );
     }
+    const reloadButton = document.createElement( 'button' );
+    reloadButton.type = 'button';
+    reloadButton.textContent = ar ? 'إعادة تحميل' : 'Reload';
+    reloadButton.style.cssText = "padding:10px 20px;border:none;border-radius:12px;background:#00E5FF;color:#081D39;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit";
+    reloadButton.addEventListener( 'click', () => window.location.reload() );
+    configErrorDiv.appendChild( reloadButton );
     if ( rootElement ) {
       rootElement.innerHTML = '';
       rootElement.appendChild( configErrorDiv );

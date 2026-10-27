@@ -310,10 +310,10 @@ export function buildRideFromPostedRide(ride: PostedRide): Ride {
     driver: {
       name: ride.carModel ? `${ride.carModel.split(' ')[0]} Captain` : 'Wasel Captain',
       nameAr: ride.carModel ? `${ride.carModel.split(' ')[0]} Captain` : 'Wasel Captain',
-      rating: 4.8,
-      verified: true,
+      rating: 0,
+      verified: false,
       trips: 0,
-      phone: '+962790000000',
+      phone: '',
       avatar: (ride.carModel || 'Wasel').slice(0, 2).toUpperCase(),
     },
     from: ride.from,
@@ -335,12 +335,16 @@ export function buildRideFromPostedRide(ride: PostedRide): Ride {
         : ride.gender === 'family_only'
           ? 'family_only'
           : 'mixed',
-    amenities: ['Live post', ride.carModel || 'Private vehicle', capacityLabel],
+    amenities: [
+      'Live post',
+      ride.carModel || 'Private vehicle',
+      capacityLabel,
+      ...(ride.note ? [ride.note.trim().slice(0, 60)] : []),
+    ],
     prayerStops: ride.prayer,
     car: ride.carModel || 'Private vehicle',
     pkgCapacity: ride.acceptsPackages ? ride.packageCapacity : 'none',
     conversationLevel: 'normal',
-    reviews: ride.note ? [{ name: 'Route note', rating: 5, text: ride.note }] : undefined,
   };
 }
 
@@ -364,15 +368,15 @@ export function buildRideFromTripSearchResult(ride: TripSearchResult): Ride {
       rating: ride.driver.rating,
       verified: ride.driver.verified,
       trips: 0,
-      phone: '+962790000000',
+      phone: '',
       avatar: driverInitials,
     },
     from: ride.from,
     fromAr: ride.from,
-    fromPoint: 'Verified pickup point',
+    fromPoint: 'Pickup point',
     to: ride.to,
     toAr: ride.to,
-    toPoint: 'Verified dropoff point',
+    toPoint: 'Dropoff point',
     date: normalizedDate,
     time: ride.time || 'Flexible',
     seatsAvailable: normalizedSeats,
@@ -381,9 +385,9 @@ export function buildRideFromTripSearchResult(ride: TripSearchResult): Ride {
     distance: 0,
     duration: 'Scheduled route',
     genderPref: 'mixed',
-    amenities: ['Verified route', ride.driver.verified ? 'Verified driver' : 'Driver profile'],
+    amenities: ['Scheduled route', ride.driver.verified ? 'Verified driver' : 'Driver profile'],
     prayerStops: false,
-    car: 'Wasel vehicle',
+    car: 'Vehicle details on booking',
     pkgCapacity: 'none',
     conversationLevel: 'normal',
   };

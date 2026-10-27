@@ -79,6 +79,21 @@ async function tryEdgeThenDirect<T>(edgeFn: () => Promise<T>, directFn: () => Pr
   throw new Error('Secure API is not configured and direct database access is disabled for this environment.');
 }
 
+/**
+ * Money-moving operations (withdraw, send, pay) must only ever run through the
+ * edge function: it enforces the wallet PIN and re-derives prices server-side.
+ * The direct tier calls the wallet RPCs from the browser with client-supplied
+ * amounts and bypasses both, so it is never used in a production build, even if
+ * VITE_ALLOW_DIRECT_SUPABASE_FALLBACK is switched on by mistake.
+ */
+async function tryEdgeThenDirectForMoney<T>(edgeFn: () => Promise<T>, directFn: () => Promise<T>): Promise<T> {
+  if (import.meta.env.PROD) {
+    if (!canUseEdgeApi()) {throw new Error('Secure wallet API is not configured.');}
+    return edgeFn();
+  }
+  return tryEdgeThenDirect(edgeFn, directFn);
+}
+
 function getWalletPath(userId: string, suffix = ''): string {
   return `/v1/wallet/${userId}${suffix}`;
 }
@@ -202,14 +217,14 @@ export const walletApi = {
   },
 
   async withdraw(userId: string, amount: number, bankAccount: string, method = 'bank_transfer', pin?: string) {
-    return tryEdgeThenDirect(
+    return tryEdgeThenDirectForMoney(
       () => requestWalletJson(userId, '/withdraw', 'Withdraw wallet funds', { method: 'POST', body: { amount, bankAccount, method, ...(pin ? { pin } : {}) } }),
       () => withdrawWalletFundsDirect(userId, amount, bankAccount, method),
     );
   },
 
   async sendMoney(userId: string, recipientId: string, amount: number, note?: string, pin?: string) {
-    return tryEdgeThenDirect(
+    return tryEdgeThenDirectForMoney(
       () => requestWalletJson<{ success: boolean; note?: string; wallet: WalletData }>(userId, '/send', 'Send wallet funds', { method: 'POST', body: { recipientId, amount, note, ...(pin ? { pin } : {}) } }),
       async () => ({ success: true, note, wallet: await transferWalletFundsDirect(userId, recipientId, amount) }),
     );
@@ -264,9 +279,9 @@ export const walletApi = {
     );
   },
 
-  async setPin(userId: string, pin: string) {
+  async setPin(userId: string, pin: string, currentPin?: string) {
     if (!canUseEdgeApi()) {throw new Error('Wallet PIN management requires the wallet backend.');}
-    return requestWalletJson(userId, '/pin/set', 'Set wallet PIN', { method: 'POST', body: { pin } });
+    return requestWalletJson(userId, '/pin/set', 'Set wallet PIN', { method: 'POST', body: { pin, ...(currentPin ? { currentPin } : {}) } });
   },
 
   async verifyPin(userId: string, pin: string) {
@@ -328,7 +343,7 @@ export const walletApi = {
   },
 
   async pay(userId: string, amount: number, referenceType: string, referenceId?: string, metadata?: Record<string, unknown>) {
-    return tryEdgeThenDirect(
+    return tryEdgeThenDirectForMoney(
       () => requestWalletJson(userId, '/pay', 'Wallet checkout payment', { method: 'POST', body: { amount, referenceType, referenceId, metadata } }),
        () => payWithWalletDirect({ userId, amount, referenceType, referenceId, metadata }),
     );

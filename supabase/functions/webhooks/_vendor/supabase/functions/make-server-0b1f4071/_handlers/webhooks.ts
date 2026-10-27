@@ -33,6 +33,20 @@ import {
     hasValidWebhookToken,
 } from '../_shared/communication-runtime.ts';
 
+// Stripe reports JOD in fils (1 JOD = 1000 fils) while wallets are credited in JOD.
+// Convert the provider-reported figure so finalizeTopUpTransaction can refuse to
+// credit when the amount or currency actually paid differs from the pending row.
+// A non-JOD currency yields amountJod = null with the currency set, which the
+// finalizer also refuses.
+function stripeReportedPayment ( amountMinor: unknown, currency: unknown ) {
+  const reportedCurrency = String( currency ?? '' ).trim().toLowerCase();
+  const minor = Number( amountMinor );
+  return {
+    amountJod: reportedCurrency === 'jod' && Number.isFinite( minor ) ? minor / 1000 : null,
+    currency: reportedCurrency || null,
+  };
+}
+
 
 // eslint-disable-next-line complexity
 export async function handleStripeWebhook ( request: Request ) {
@@ -82,7 +96,13 @@ export async function handleStripeWebhook ( request: Request ) {
       return json( { received: true, transactionId, pending: true, paymentStatus: String( session?.payment_status ?? '' ) } );
     }
 
-    await finalizeTopUpTransaction( transactionId, String( session?.id ?? '' ), event );
+    await finalizeTopUpTransaction(
+      transactionId,
+      String( session?.id ?? '' ),
+      event,
+      'stripe',
+      stripeReportedPayment( session?.amount_total, session?.currency ),
+    );
     return json( { received: true, transactionId, finalized: true } );
   }
 
@@ -171,7 +191,13 @@ export async function handleStripeWebhook ( request: Request ) {
     const bookingId = String( metadata.booking_id ?? '' );
 
     if ( transactionId ) {
-      const result = await finalizeTopUpTransaction( transactionId, intentId, event, 'stripe' );
+      const result = await finalizeTopUpTransaction(
+        transactionId,
+        intentId,
+        event,
+        'stripe',
+        stripeReportedPayment( intent?.amount_received ?? paidAmount, currency ),
+      );
       return json( { received: true, transactionId, finalized: result.applied } );
     }
 
@@ -223,7 +249,18 @@ export async function handleCliqWebhook ( request: Request ) {
   }
 
   if ( isSuccessfulProviderStatus( status ) ) {
-    await finalizeTopUpTransaction( transactionId, providerReference, event, 'cliq' );
+    // Reconcile against what the provider says was paid. The checkout URL carries
+    // the amount as a plain query parameter, so the signed webhook is the only
+    // trustworthy source. If the provider omits the amount, the finalizer skips the
+    // amount check (unchanged behaviour). VERIFY against the CliQ sandbox payload
+    // that `amount` is in JOD major units (the checkout URL uses toFixed(3) JOD);
+    // if it is sent in fils, legitimate credits would be held as amount_mismatch.
+    const reportedAmount = Number( firstStringValue( eventObject, [ 'amount', 'paidAmount', 'paid_amount', 'amountPaid' ] ) );
+    const reportedCurrency = firstStringValue( eventObject, [ 'currency', 'currencyCode' ] );
+    await finalizeTopUpTransaction( transactionId, providerReference, event, 'cliq', {
+      amountJod: Number.isFinite( reportedAmount ) && reportedAmount > 0 ? reportedAmount : null,
+      currency: reportedCurrency || null,
+    } );
     return json( { received: true, transactionId, finalized: true } );
   }
 
@@ -387,11 +424,34 @@ export async function handleResendWebhook ( request: Request ) {
 
 export async function handleTwilioWebhook ( request: Request ) {
   const url = new URL( request.url );
-  if ( !hasValidWebhookToken( url, deliveryEnv.communicationWebhookToken ) ) {
-    return json( { error: 'Invalid webhook token' }, 401 );
-  }
-
   const form = await request.formData();
+
+  // Twilio signs the callback URL plus every POST parameter (sorted by name) with
+  // HMAC-SHA1 and sends the digest in X-Twilio-Signature. That proof is preferred.
+  // The URL token stays as a fallback until TWILIO_WEBHOOK_REQUIRE_SIGNATURE=true is
+  // set. Behind a proxy request.url can differ from the URL configured in Twilio,
+  // so TWILIO_WEBHOOK_PUBLIC_URL overrides it when needed.
+  const signature = request.headers.get( 'x-twilio-signature' );
+  const signingSecretConfigured = Boolean( deliveryEnv.twilioWebhookSigningSecret || deliveryEnv.twilioAuthToken );
+  let authorized = false;
+  if ( signature && signingSecretConfigured ) {
+    const signedParams = [ ...form.entries() ]
+      .filter( ( entry ): entry is [ string, string ] => typeof entry[ 1 ] === 'string' )
+      .sort( ( left, right ) => ( left[ 0 ] < right[ 0 ] ? -1 : left[ 0 ] > right[ 0 ] ? 1 : 0 ) )
+      .map( ( [ key, value ] ) => `${ key }${ value }` )
+      .join( '' );
+    authorized = await _verifyTwilioWebhookSignature(
+      signedParams,
+      signature,
+      Deno.env.get( 'TWILIO_WEBHOOK_PUBLIC_URL' ) ?? request.url,
+    );
+  }
+  if ( !authorized ) {
+    const signatureRequired = Deno.env.get( 'TWILIO_WEBHOOK_REQUIRE_SIGNATURE' ) === 'true';
+    if ( signatureRequired || !hasValidWebhookToken( url, deliveryEnv.communicationWebhookToken ) ) {
+      return json( { error: 'Invalid Twilio webhook authentication' }, 401 );
+    }
+  }
   const externalReference = String( form.get( 'MessageSid' ) ?? '' );
   const rawStatus = String( form.get( 'MessageStatus' ) ?? '' );
 

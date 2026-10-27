@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { buildLivePreview, STATIC_PREVIEW } from '@/features/home/sections/livePreview';
 
 // ─── Pure math helpers re-exported for testing ───────────────────────────────
 // We test the pure functions directly without mounting the canvas component.
@@ -396,67 +397,61 @@ describe('HomePage — cookie consent state', () => {
 
 // ─── Live route preview hook — static fallback ────────────────────────────────
 
-const STATIC_PREVIEW = {
-  priceJod: '8.00 JOD',
-  rating: '4.9',
-  parcelSlots: '1',
-  nextDeparture: '18:40',
-  utilization: 0.78,
-};
+const AMMAN_AQABA = { id: 'amman-aqaba', from: 'Amman', to: 'Aqaba' };
 
-function applyLiveSnapshot(
-  snapshot: { corridors?: Array<{ priceJod?: number; seatsTotal?: number; seatsBooked?: number }> } | null,
-): typeof STATIC_PREVIEW {
-  const first = snapshot?.corridors?.[0];
-  if (!first) {return STATIC_PREVIEW;}
-  const util = first.seatsTotal ? (first.seatsBooked ?? 0) / first.seatsTotal : 0.78;
-  const slots = Math.max(0, (first.seatsTotal ?? 1) - (first.seatsBooked ?? 0));
-  return {
-    ...STATIC_PREVIEW,
-    priceJod: first.priceJod !== null && first.priceJod !== undefined ? `${first.priceJod.toFixed(2)} JOD` : STATIC_PREVIEW.priceJod,
-    parcelSlots: String(slots),
-    utilization: util,
-  };
-}
-
-describe('HomeHeroSection — useLiveRoutePreview fallback logic', () => {
-  it('returns static fallback when snapshot is null', () => {
-    expect(applyLiveSnapshot(null)).toEqual(STATIC_PREVIEW);
+describe('HomeHeroSection — buildLivePreview', () => {
+  it('returns null (keep labelled sample) when snapshot is null or empty', () => {
+    expect(buildLivePreview(null)).toBeNull();
+    expect(buildLivePreview({ corridors: [] })).toBeNull();
   });
 
-  it('returns static fallback when corridors array is empty', () => {
-    expect(applyLiveSnapshot({ corridors: [] })).toEqual(STATIC_PREVIEW);
+  it('returns null when there is no Amman-Aqaba corridor', () => {
+    expect(
+      buildLivePreview({ corridors: [{ id: 'amman-irbid', from: 'Amman', to: 'Irbid', priceJod: 4 }] }),
+    ).toBeNull();
   });
 
-  it('applies live price from snapshot', () => {
-    const result = applyLiveSnapshot({ corridors: [{ priceJod: 9.5, seatsTotal: 4, seatsBooked: 2 }] });
-    expect(result.priceJod).toBe('9.50 JOD');
+  it('returns null when the corridor has no real price', () => {
+    expect(buildLivePreview({ corridors: [{ ...AMMAN_AQABA }] })).toBeNull();
   });
 
-  it('calculates utilization correctly', () => {
-    const result = applyLiveSnapshot({ corridors: [{ priceJod: 8, seatsTotal: 4, seatsBooked: 3 }] });
-    expect(result.utilization).toBeCloseTo(0.75);
+  it('picks the Amman-Aqaba corridor even when it is not first', () => {
+    const result = buildLivePreview({
+      corridors: [
+        { id: 'amman-irbid', from: 'Amman', to: 'Irbid', priceJod: 4 },
+        { ...AMMAN_AQABA, priceJod: 9.5, seatsTotal: 4, seatsBooked: 2 },
+      ],
+    });
+    expect(result?.priceJod).toBe('9.50 JOD');
   });
 
-  it('calculates available parcel slots correctly', () => {
-    const result = applyLiveSnapshot({ corridors: [{ priceJod: 8, seatsTotal: 4, seatsBooked: 3 }] });
-    expect(result.parcelSlots).toBe('1');
+  it('calculates utilization from real seats', () => {
+    const result = buildLivePreview({ corridors: [{ ...AMMAN_AQABA, priceJod: 8, seatsTotal: 4, seatsBooked: 3 }] });
+    expect(result?.utilization).toBeCloseTo(0.75);
   });
 
-  it('clamps parcel slots to minimum 0', () => {
-    const result = applyLiveSnapshot({ corridors: [{ priceJod: 8, seatsTotal: 4, seatsBooked: 5 }] });
-    expect(Number(result.parcelSlots)).toBeGreaterThanOrEqual(0);
+  it('reports 0 utilization (not a sample value) when seat totals are unknown', () => {
+    const result = buildLivePreview({ corridors: [{ ...AMMAN_AQABA, priceJod: 8, seatsTotal: 0, seatsBooked: 0 }] });
+    expect(result?.utilization).toBe(0);
   });
 
-  it('falls back to static utilization when seatsTotal is 0', () => {
-    const result = applyLiveSnapshot({ corridors: [{ priceJod: 8, seatsTotal: 0, seatsBooked: 0 }] });
-    expect(result.utilization).toBe(0.78);
+  it('clamps utilization to 1 when overbooked', () => {
+    const result = buildLivePreview({ corridors: [{ ...AMMAN_AQABA, priceJod: 8, seatsTotal: 4, seatsBooked: 5 }] });
+    expect(result?.utilization).toBe(1);
   });
 
-  it('preserves static rating and departure time', () => {
-    const result = applyLiveSnapshot({ corridors: [{ priceJod: 8, seatsTotal: 4, seatsBooked: 2 }] });
-    expect(result.rating).toBe(STATIC_PREVIEW.rating);
-    expect(result.nextDeparture).toBe(STATIC_PREVIEW.nextDeparture);
+  it('uses the real demand pressure from the snapshot', () => {
+    const result = buildLivePreview({ corridors: [{ ...AMMAN_AQABA, priceJod: 8, demand: 1.4 }] });
+    expect(result?.demandPressure).toBe(1.4);
+  });
+
+  it('never carries sample rating, departure or parcel figures into live mode', () => {
+    const result = buildLivePreview({ corridors: [{ ...AMMAN_AQABA, priceJod: 8, seatsTotal: 4, seatsBooked: 2 }] });
+    expect(result?.rating).toBe('');
+    expect(result?.nextDeparture).toBe('');
+    expect(result?.parcelSlots).toBe('');
+    expect(result?.rating).not.toBe(STATIC_PREVIEW.rating);
+    expect(result?.nextDeparture).not.toBe(STATIC_PREVIEW.nextDeparture);
   });
 });
 

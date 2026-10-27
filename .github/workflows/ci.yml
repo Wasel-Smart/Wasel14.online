@@ -185,11 +185,45 @@ jobs:
           fi
           node scripts/verify-frontend-backend-wiring.mjs
 
+  rls-static:
+    name: RLS Coverage (static)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # Replays the migrations and fails if any public table ends up without
+      # ROW LEVEL SECURITY or without a policy. Deliberate exceptions go in
+      # supabase/rls-allowlist.json, each with a written reason.
+      - run: node scripts/check-rls-coverage.mjs
+
+  rls-live:
+    name: RLS Coverage (live database)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # Applies every migration to a real Postgres, so this also proves the
+      # migrations run cleanly from scratch.
+      - run: supabase start
+      - name: Tables, views, functions and policies are safe
+        run: |
+          DB_URL="$(supabase status -o env | sed -n 's/^DB_URL=//p' | tr -d '"')"
+          ALLOW="$(jq -r 'keys|join(",")' supabase/rls-allowlist.json)"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -v allow="$ALLOW" -f supabase/tests/rls_coverage.sql
+      - if: always()
+        run: supabase stop --no-backup
+
   build:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [lint, typecheck, test, oauth-check, edge-functions, route-contract, secrets-check, translations, deno-lint]
+    needs: [lint, typecheck, test, oauth-check, edge-functions, route-contract, secrets-check, translations, deno-lint, rls-static]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

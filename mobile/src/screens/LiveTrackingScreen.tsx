@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Linking, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
+import { locationTracking } from '../services/location';
 import { InfoCard, MetricTile, PrimaryButton, ScreenShell, StatusPill } from '../components/MobilePrimitives';
 import { colors, radii, shadows, spacing, typography } from '../theme';
 
@@ -21,6 +22,7 @@ interface LiveRideData {
   driverId: string;
   driverName: string;
   driverRating: number;
+  driverPhone?: string;
   vehicleModel: string;
   licensePlate: string;
   status: 'matching' | 'driver_en_route' | 'driver_arrived' | 'in_progress';
@@ -40,16 +42,49 @@ const LiveTrackingScreen = React.memo(function LiveTrackingScreen({ route }: { r
   const { rideId } = route.params as { rideId: string };
   const [, setUserLocation] = useState<Location.LocationObject | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [socketLoc, setSocketLoc] = useState<DriverLocation | null>(null);
+  const [socketUp, setSocketUp] = useState(false);
 
-  const { data: ride, isLoading, error, refetch } = useQuery({
-    queryKey: ['live-ride', rideId],
+  useEffect(() => {
+    const off = locationTracking.onStatusChange(s => setSocketUp(s === 'connected'));
+    return () => {
+      off();
+    };
+  }, []);
+
+  const { data: polledRide, isLoading, error, refetch } = useQuery({
+    // Distinct key: useLiveRide caches a different shape under 'live-ride'.
+    queryKey: ['live-ride-by-id', rideId],
     queryFn: () => fetchLiveRide(rideId),
-    refetchInterval: 3000,
-    refetchIntervalInBackground: true,
+    // Position arrives over the socket; REST only reconciles status/ETA while it is up.
+    refetchInterval: socketUp ? 15000 : 3000,
+    refetchIntervalInBackground: false,
     staleTime: 1000,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
   });
+
+  const driverId = polledRide?.driverId;
+  useEffect(() => {
+    if (!driverId) return;
+    const leaveRoom = locationTracking.joinTripRoom(rideId);
+    const unsubscribe = locationTracking.subscribeToDriver(driverId, loc => {
+      setSocketLoc({
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        heading: loc.heading ?? undefined,
+        timestamp: new Date(loc.timestamp).toISOString(),
+      });
+    });
+    return () => {
+      leaveRoom();
+      unsubscribe();
+    };
+  }, [driverId, rideId]);
+
+  const ride = polledRide
+    ? { ...polledRide, driverLocation: socketLoc ?? polledRide.driverLocation }
+    : polledRide;
 
   useEffect(() => {
     let mounted = true;
@@ -94,12 +129,18 @@ const LiveTrackingScreen = React.memo(function LiveTrackingScreen({ route }: { r
   }, [pulseAnim]);
 
   const callDriver = useCallback(() => {
-    if (ride?.driverId) {
-      Alert.alert('اتصال بالسائق', `جاري الاتصال بـ ${ride.driverName}...`);
+    if (!ride) return;
+    const phone = ride.driverPhone?.replace(/[^\d+]/g, '');
+    if (!phone) {
+      Alert.alert('اتصال بالسائق', 'رقم السائق غير متاح حالياً. جرّب المراسلة من داخل التطبيق.');
+      return;
     }
+    Linking.openURL(`tel:${phone}`).catch(() =>
+      Alert.alert('اتصال بالسائق', 'تعذّر فتح تطبيق الاتصال.'),
+    );
   }, [ride]);
 
-  if (isLoading || !ride) {
+  if (!error && (isLoading || !ride)) {
     return (
       <ScreenShell>
         <View style={styles.loadingContainer}>
@@ -110,7 +151,7 @@ const LiveTrackingScreen = React.memo(function LiveTrackingScreen({ route }: { r
     );
   }
 
-  if (error) {
+  if (error || !ride) {
     return (
       <ScreenShell>
         <View style={styles.errorContainer}>

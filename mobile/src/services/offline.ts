@@ -165,6 +165,9 @@ export class OfflineService {
     this.saveDedupCache(persistedDedup);
     void this.notifyStats();
     console.log(`[Offline] Queued: ${sanitizeLogValue(action.type)} (id=${offlineAction.id})`);
+    // Online callers (e.g. package requests) expect the action to go out now,
+    // not only after the next offline->online transition.
+    if (this.isOnline) void this.syncOfflineQueue();
   }
 
   // ── Sync ────────────────────────────────────────────────────────────────────
@@ -183,10 +186,16 @@ export class OfflineService {
       const queue = this.loadQueue();
       if (queue.length === 0) return;
 
-      // Dispatch all actions in parallel
-      const results = await Promise.allSettled(
-        queue.map(action => this.executeAction(action)),
-      );
+      // Dispatch sequentially in queue order so e.g. a cancel never races the booking it cancels.
+      const results: PromiseSettledResult<void>[] = [];
+      for (const action of queue) {
+        try {
+          await this.executeAction(action);
+          results.push({ status: 'fulfilled', value: undefined });
+        } catch (reason) {
+          results.push({ status: 'rejected', reason });
+        }
+      }
 
       const failed: OfflineAction[] = [];
 
@@ -205,14 +214,18 @@ export class OfflineService {
         }
       });
 
-      this.saveQueue(failed);
+      // Actions queued while the sync was in flight must not be lost: reload the
+      // live queue, drop everything we processed, keep retried failures.
+      const processedIds = new Set(queue.map(a => a.id));
+      const arrivedDuringSync = this.loadQueue().filter(a => !processedIds.has(a.id));
+      this.saveQueue([...failed, ...arrivedDuringSync]);
 
       // Only clear dedup cache for successfully synced actions
       if (failed.length < queue.length) {
         // Rebuild dedup from remaining failed actions only — anything that
         // synced successfully should no longer block a legitimate retry.
         const newDedup = new Set<string>();
-        for (const action of failed) {
+        for (const action of [...failed, ...arrivedDuringSync]) {
           newDedup.add(`${action.type}:${JSON.stringify(action.payload)}`);
         }
         this.saveDedupCache(newDedup);
@@ -304,7 +317,10 @@ export class OfflineService {
             body: JSON.stringify({
               bookingId,
               rating: this.readField(action.payload, 'rating'),
-              feedback: this.readField(action.payload, 'feedback'),
+              review: this.readField(action.payload, 'review') ?? this.readField(action.payload, 'feedback'),
+              tags: this.readField(action.payload, 'tags'),
+              driverId: this.readField(action.payload, 'driverId'),
+              tripId: this.readField(action.payload, 'tripId'),
             }),
           },
           token,

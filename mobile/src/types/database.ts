@@ -12,100 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  api: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      Wasel: "14141414"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  pgmq_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      archive: {
-        Args: { message_id: number; queue_name: string }
-        Returns: boolean
-      }
-      delete: {
-        Args: { message_id: number; queue_name: string }
-        Returns: boolean
-      }
-      pop: {
-        Args: { queue_name: string }
-        Returns: unknown[]
-        SetofOptions: {
-          from: "*"
-          to: "message_record"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
-      read: {
-        Args: { n: number; queue_name: string; sleep_seconds: number }
-        Returns: unknown[]
-        SetofOptions: {
-          from: "*"
-          to: "message_record"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
-      send: {
-        Args: { message: Json; queue_name: string; sleep_seconds?: number }
-        Returns: number[]
-      }
-      send_batch: {
-        Args: { messages: Json[]; queue_name: string; sleep_seconds?: number }
-        Returns: number[]
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       admin_logs: {
@@ -152,6 +58,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      api_rate_limits: {
+        Row: {
+          bucket_key: string
+          hit_count: number
+          window_start: string
+        }
+        Insert: {
+          bucket_key: string
+          hit_count?: number
+          window_start?: string
+        }
+        Update: {
+          bucket_key?: string
+          hit_count?: number
+          window_start?: string
+        }
+        Relationships: []
       }
       audit_logs: {
         Row: {
@@ -306,6 +230,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_users_public"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_payment_transaction_id_fkey"
+            columns: ["payment_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["transaction_id"]
           },
           {
             foreignKeyName: "bookings_trip_id_fkey"
@@ -1032,6 +963,71 @@ export type Database = {
         }
         Relationships: []
       }
+      fraud_events: {
+        Row: {
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          risk_score: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          risk_score?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          risk_score?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_events_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fraud_events_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "v_users_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fraud_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fraud_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_users_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       growth_events: {
         Row: {
           created_at: string
@@ -1482,6 +1478,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "packages_payment_transaction_id_fkey"
+            columns: ["payment_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["transaction_id"]
+          },
+          {
             foreignKeyName: "packages_receiver_id_fkey"
             columns: ["receiver_id"]
             isOneToOne: false
@@ -1522,6 +1525,105 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_trips_public"
             referencedColumns: ["trip_id"]
+          },
+        ]
+      }
+      payment_events: {
+        Row: {
+          amount: number | null
+          currency: string
+          event_type: string
+          id: string
+          idempotency_key: string | null
+          metadata: Json
+          occurred_at: string
+          payment_id: string
+          provider: string | null
+          provider_ref: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          currency?: string
+          event_type: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json
+          occurred_at?: string
+          payment_id: string
+          provider?: string | null
+          provider_ref?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          currency?: string
+          event_type?: string
+          id?: string
+          idempotency_key?: string | null
+          metadata?: Json
+          occurred_at?: string
+          payment_id?: string
+          provider?: string | null
+          provider_ref?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_users_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_idempotency_keys: {
+        Row: {
+          created_at: string
+          expires_at: string
+          key: string
+          operation: string
+          response_body: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          key: string
+          operation: string
+          response_body?: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          key?: string
+          operation?: string
+          response_body?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_idempotency_keys_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_idempotency_keys_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "v_users_public"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2894,7 +2996,17 @@ export type Database = {
         Args: { available_drivers: number; pending_trips: number }
         Returns: number
       }
+      cleanup_api_rate_limits: { Args: never; Returns: number }
+      cleanup_expired_idempotency_keys: { Args: never; Returns: number }
       cleanup_old_profile_changes: { Args: never; Returns: undefined }
+      consume_rate_limit: {
+        Args: { p_key: string; p_limit: number; p_window_seconds: number }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          retry_after_seconds: number
+        }[]
+      }
       create_critical_data_snapshot: { Args: never; Returns: Json }
       current_user_id: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
@@ -2913,6 +3025,7 @@ export type Database = {
         }
         Returns: string
       }
+      reset_rate_limit: { Args: { p_key: string }; Returns: undefined }
       verify_backup_integrity: {
         Args: never
         Returns: {
@@ -3013,2411 +3126,6 @@ export type Database = {
         | "rejected"
         | "expired"
       wallet_status_v2: "active" | "limited" | "frozen" | "closed"
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-  stripe: {
-    Tables: {
-      _managed_webhooks: {
-        Row: {
-          account_id: string
-          api_version: string | null
-          created: number | null
-          description: string | null
-          enabled: boolean | null
-          enabled_events: Json
-          id: string
-          last_synced_at: string | null
-          livemode: boolean | null
-          metadata: Json | null
-          object: string | null
-          secret: string
-          status: string | null
-          updated_at: string
-          url: string
-        }
-        Insert: {
-          account_id: string
-          api_version?: string | null
-          created?: number | null
-          description?: string | null
-          enabled?: boolean | null
-          enabled_events: Json
-          id: string
-          last_synced_at?: string | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          secret: string
-          status?: string | null
-          updated_at?: string
-          url: string
-        }
-        Update: {
-          account_id?: string
-          api_version?: string | null
-          created?: number | null
-          description?: string | null
-          enabled?: boolean | null
-          enabled_events?: Json
-          id?: string
-          last_synced_at?: string | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          secret?: string
-          status?: string | null
-          updated_at?: string
-          url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_managed_webhooks_account"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      _migrations: {
-        Row: {
-          executed_at: string | null
-          hash: string
-          id: number
-          name: string
-        }
-        Insert: {
-          executed_at?: string | null
-          hash: string
-          id: number
-          name: string
-        }
-        Update: {
-          executed_at?: string | null
-          hash?: string
-          id?: number
-          name?: string
-        }
-        Relationships: []
-      }
-      _rate_limits: {
-        Row: {
-          count: number
-          key: string
-          window_start: string
-        }
-        Insert: {
-          count?: number
-          key: string
-          window_start?: string
-        }
-        Update: {
-          count?: number
-          key?: string
-          window_start?: string
-        }
-        Relationships: []
-      }
-      _sync_obj_runs: {
-        Row: {
-          _account_id: string
-          completed_at: string | null
-          created_gte: number
-          created_lte: number
-          cursor: string | null
-          error_message: string | null
-          object: string
-          page_cursor: string | null
-          priority: number
-          processed_count: number
-          run_started_at: string
-          started_at: string | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          _account_id: string
-          completed_at?: string | null
-          created_gte?: number
-          created_lte?: number
-          cursor?: string | null
-          error_message?: string | null
-          object: string
-          page_cursor?: string | null
-          priority?: number
-          processed_count?: number
-          run_started_at: string
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          _account_id?: string
-          completed_at?: string | null
-          created_gte?: number
-          created_lte?: number
-          cursor?: string | null
-          error_message?: string | null
-          object?: string
-          page_cursor?: string | null
-          priority?: number
-          processed_count?: number
-          run_started_at?: string
-          started_at?: string | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_sync_obj_runs_parent"
-            columns: ["_account_id", "run_started_at"]
-            isOneToOne: false
-            referencedRelation: "_sync_runs"
-            referencedColumns: ["_account_id", "started_at"]
-          },
-          {
-            foreignKeyName: "fk_sync_obj_runs_parent"
-            columns: ["_account_id", "run_started_at"]
-            isOneToOne: false
-            referencedRelation: "sync_runs"
-            referencedColumns: ["account_id", "started_at"]
-          },
-        ]
-      }
-      _sync_runs: {
-        Row: {
-          _account_id: string
-          closed_at: string | null
-          error_message: string | null
-          max_concurrent: number
-          started_at: string
-          triggered_by: string | null
-          updated_at: string
-        }
-        Insert: {
-          _account_id: string
-          closed_at?: string | null
-          error_message?: string | null
-          max_concurrent?: number
-          started_at?: string
-          triggered_by?: string | null
-          updated_at?: string
-        }
-        Update: {
-          _account_id?: string
-          closed_at?: string | null
-          error_message?: string | null
-          max_concurrent?: number
-          started_at?: string
-          triggered_by?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_sync_runs_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      accounts: {
-        Row: {
-          _last_synced_at: string
-          _raw_data: Json
-          _updated_at: string
-          api_key_hashes: string[]
-          first_synced_at: string
-          id: string
-        }
-        Insert: {
-          _last_synced_at?: string
-          _raw_data: Json
-          _updated_at?: string
-          api_key_hashes?: string[]
-          first_synced_at?: string
-          id?: string
-        }
-        Update: {
-          _last_synced_at?: string
-          _raw_data?: Json
-          _updated_at?: string
-          api_key_hashes?: string[]
-          first_synced_at?: string
-          id?: string
-        }
-        Relationships: []
-      }
-      active_entitlements: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          customer: string | null
-          feature: string | null
-          id: string
-          livemode: boolean | null
-          lookup_key: string | null
-          object: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          customer?: string | null
-          feature?: string | null
-          id?: string
-          livemode?: boolean | null
-          lookup_key?: string | null
-          object?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          customer?: string | null
-          feature?: string | null
-          id?: string
-          livemode?: boolean | null
-          lookup_key?: string | null
-          object?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_active_entitlements_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      charges: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          amount: number | null
-          amount_refunded: number | null
-          application: string | null
-          application_fee: string | null
-          application_fee_amount: number | null
-          balance_transaction: string | null
-          billing_details: Json | null
-          calculated_statement_descriptor: string | null
-          captured: boolean | null
-          created: number | null
-          currency: string | null
-          customer: string | null
-          description: string | null
-          disputed: boolean | null
-          failure_code: string | null
-          failure_message: string | null
-          fraud_details: Json | null
-          id: string
-          invoice: string | null
-          livemode: boolean | null
-          metadata: Json | null
-          object: string | null
-          on_behalf_of: string | null
-          order: string | null
-          outcome: Json | null
-          paid: boolean | null
-          payment_intent: string | null
-          payment_method: string | null
-          payment_method_details: Json | null
-          receipt_email: string | null
-          receipt_number: string | null
-          receipt_url: string | null
-          refunded: boolean | null
-          refunds: Json | null
-          review: string | null
-          shipping: Json | null
-          source_transfer: string | null
-          statement_descriptor: string | null
-          statement_descriptor_suffix: string | null
-          status: string | null
-          transfer: string | null
-          transfer_data: Json | null
-          transfer_group: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          amount?: number | null
-          amount_refunded?: number | null
-          application?: string | null
-          application_fee?: string | null
-          application_fee_amount?: number | null
-          balance_transaction?: string | null
-          billing_details?: Json | null
-          calculated_statement_descriptor?: string | null
-          captured?: boolean | null
-          created?: number | null
-          currency?: string | null
-          customer?: string | null
-          description?: string | null
-          disputed?: boolean | null
-          failure_code?: string | null
-          failure_message?: string | null
-          fraud_details?: Json | null
-          id?: string
-          invoice?: string | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          on_behalf_of?: string | null
-          order?: string | null
-          outcome?: Json | null
-          paid?: boolean | null
-          payment_intent?: string | null
-          payment_method?: string | null
-          payment_method_details?: Json | null
-          receipt_email?: string | null
-          receipt_number?: string | null
-          receipt_url?: string | null
-          refunded?: boolean | null
-          refunds?: Json | null
-          review?: string | null
-          shipping?: Json | null
-          source_transfer?: string | null
-          statement_descriptor?: string | null
-          statement_descriptor_suffix?: string | null
-          status?: string | null
-          transfer?: string | null
-          transfer_data?: Json | null
-          transfer_group?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          amount?: number | null
-          amount_refunded?: number | null
-          application?: string | null
-          application_fee?: string | null
-          application_fee_amount?: number | null
-          balance_transaction?: string | null
-          billing_details?: Json | null
-          calculated_statement_descriptor?: string | null
-          captured?: boolean | null
-          created?: number | null
-          currency?: string | null
-          customer?: string | null
-          description?: string | null
-          disputed?: boolean | null
-          failure_code?: string | null
-          failure_message?: string | null
-          fraud_details?: Json | null
-          id?: string
-          invoice?: string | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          on_behalf_of?: string | null
-          order?: string | null
-          outcome?: Json | null
-          paid?: boolean | null
-          payment_intent?: string | null
-          payment_method?: string | null
-          payment_method_details?: Json | null
-          receipt_email?: string | null
-          receipt_number?: string | null
-          receipt_url?: string | null
-          refunded?: boolean | null
-          refunds?: Json | null
-          review?: string | null
-          shipping?: Json | null
-          source_transfer?: string | null
-          statement_descriptor?: string | null
-          statement_descriptor_suffix?: string | null
-          status?: string | null
-          transfer?: string | null
-          transfer_data?: Json | null
-          transfer_group?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_charges_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      checkout_session_line_items: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          amount_discount: number | null
-          amount_subtotal: number | null
-          amount_tax: number | null
-          amount_total: number | null
-          checkout_session: string | null
-          currency: string | null
-          description: string | null
-          discounts: Json | null
-          id: string
-          object: string | null
-          price: Json | null
-          quantity: number | null
-          taxes: Json | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          amount_discount?: number | null
-          amount_subtotal?: number | null
-          amount_tax?: number | null
-          amount_total?: number | null
-          checkout_session?: string | null
-          currency?: string | null
-          description?: string | null
-          discounts?: Json | null
-          id?: string
-          object?: string | null
-          price?: Json | null
-          quantity?: number | null
-          taxes?: Json | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          amount_discount?: number | null
-          amount_subtotal?: number | null
-          amount_tax?: number | null
-          amount_total?: number | null
-          checkout_session?: string | null
-          currency?: string | null
-          description?: string | null
-          discounts?: Json | null
-          id?: string
-          object?: string | null
-          price?: Json | null
-          quantity?: number | null
-          taxes?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_checkout_session_line_items_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      checkout_sessions: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          allow_promotion_codes: boolean | null
-          amount_subtotal: number | null
-          amount_total: number | null
-          billing_address_collection: string | null
-          cancel_url: string | null
-          client_reference_id: string | null
-          currency: string | null
-          customer: string | null
-          customer_email: string | null
-          id: string
-          line_items: Json | null
-          livemode: boolean | null
-          locale: string | null
-          metadata: Json | null
-          mode: string | null
-          object: string | null
-          payment_intent: string | null
-          payment_method_types: Json | null
-          setup_intent: string | null
-          shipping: Json | null
-          shipping_address_collection: Json | null
-          submit_type: string | null
-          subscription: string | null
-          success_url: string | null
-          total_details: Json | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          allow_promotion_codes?: boolean | null
-          amount_subtotal?: number | null
-          amount_total?: number | null
-          billing_address_collection?: string | null
-          cancel_url?: string | null
-          client_reference_id?: string | null
-          currency?: string | null
-          customer?: string | null
-          customer_email?: string | null
-          id?: string
-          line_items?: Json | null
-          livemode?: boolean | null
-          locale?: string | null
-          metadata?: Json | null
-          mode?: string | null
-          object?: string | null
-          payment_intent?: string | null
-          payment_method_types?: Json | null
-          setup_intent?: string | null
-          shipping?: Json | null
-          shipping_address_collection?: Json | null
-          submit_type?: string | null
-          subscription?: string | null
-          success_url?: string | null
-          total_details?: Json | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          allow_promotion_codes?: boolean | null
-          amount_subtotal?: number | null
-          amount_total?: number | null
-          billing_address_collection?: string | null
-          cancel_url?: string | null
-          client_reference_id?: string | null
-          currency?: string | null
-          customer?: string | null
-          customer_email?: string | null
-          id?: string
-          line_items?: Json | null
-          livemode?: boolean | null
-          locale?: string | null
-          metadata?: Json | null
-          mode?: string | null
-          object?: string | null
-          payment_intent?: string | null
-          payment_method_types?: Json | null
-          setup_intent?: string | null
-          shipping?: Json | null
-          shipping_address_collection?: Json | null
-          submit_type?: string | null
-          subscription?: string | null
-          success_url?: string | null
-          total_details?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_checkout_sessions_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      coupons: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          amount_off: number | null
-          applies_to: Json | null
-          created: number | null
-          currency: string | null
-          duration: string | null
-          duration_in_months: number | null
-          id: string
-          livemode: boolean | null
-          max_redemptions: number | null
-          metadata: Json | null
-          name: string | null
-          object: string | null
-          percent_off: number | null
-          redeem_by: number | null
-          times_redeemed: number | null
-          valid: boolean | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          amount_off?: number | null
-          applies_to?: Json | null
-          created?: number | null
-          currency?: string | null
-          duration?: string | null
-          duration_in_months?: number | null
-          id?: string
-          livemode?: boolean | null
-          max_redemptions?: number | null
-          metadata?: Json | null
-          name?: string | null
-          object?: string | null
-          percent_off?: number | null
-          redeem_by?: number | null
-          times_redeemed?: number | null
-          valid?: boolean | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          amount_off?: number | null
-          applies_to?: Json | null
-          created?: number | null
-          currency?: string | null
-          duration?: string | null
-          duration_in_months?: number | null
-          id?: string
-          livemode?: boolean | null
-          max_redemptions?: number | null
-          metadata?: Json | null
-          name?: string | null
-          object?: string | null
-          percent_off?: number | null
-          redeem_by?: number | null
-          times_redeemed?: number | null
-          valid?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_coupons_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      credit_notes: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          amount: number | null
-          created: number | null
-          currency: string | null
-          customer: string | null
-          customer_balance_transaction: string | null
-          discount_amount: number | null
-          discount_amounts: Json | null
-          id: string
-          invoice: string | null
-          lines: Json | null
-          livemode: boolean | null
-          memo: string | null
-          metadata: Json | null
-          number: string | null
-          object: string | null
-          out_of_band_amount: number | null
-          pdf: string | null
-          reason: string | null
-          refund: string | null
-          status: string | null
-          subtotal: number | null
-          tax_amounts: Json | null
-          total: number | null
-          type: string | null
-          voided_at: number | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          amount?: number | null
-          created?: number | null
-          currency?: string | null
-          customer?: string | null
-          customer_balance_transaction?: string | null
-          discount_amount?: number | null
-          discount_amounts?: Json | null
-          id?: string
-          invoice?: string | null
-          lines?: Json | null
-          livemode?: boolean | null
-          memo?: string | null
-          metadata?: Json | null
-          number?: string | null
-          object?: string | null
-          out_of_band_amount?: number | null
-          pdf?: string | null
-          reason?: string | null
-          refund?: string | null
-          status?: string | null
-          subtotal?: number | null
-          tax_amounts?: Json | null
-          total?: number | null
-          type?: string | null
-          voided_at?: number | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          amount?: number | null
-          created?: number | null
-          currency?: string | null
-          customer?: string | null
-          customer_balance_transaction?: string | null
-          discount_amount?: number | null
-          discount_amounts?: Json | null
-          id?: string
-          invoice?: string | null
-          lines?: Json | null
-          livemode?: boolean | null
-          memo?: string | null
-          metadata?: Json | null
-          number?: string | null
-          object?: string | null
-          out_of_band_amount?: number | null
-          pdf?: string | null
-          reason?: string | null
-          refund?: string | null
-          status?: string | null
-          subtotal?: number | null
-          tax_amounts?: Json | null
-          total?: number | null
-          type?: string | null
-          voided_at?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_credit_notes_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      customers: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          address: Json | null
-          balance: number | null
-          created: number | null
-          currency: string | null
-          default_source: string | null
-          deleted: boolean | null
-          delinquent: boolean | null
-          description: string | null
-          discount: Json | null
-          email: string | null
-          id: string
-          invoice_prefix: string | null
-          invoice_settings: Json | null
-          livemode: boolean | null
-          metadata: Json | null
-          name: string | null
-          next_invoice_sequence: number | null
-          object: string | null
-          phone: string | null
-          preferred_locales: Json | null
-          shipping: Json | null
-          sources: Json | null
-          subscriptions: Json | null
-          tax_exempt: string | null
-          tax_ids: Json | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          address?: Json | null
-          balance?: number | null
-          created?: number | null
-          currency?: string | null
-          default_source?: string | null
-          deleted?: boolean | null
-          delinquent?: boolean | null
-          description?: string | null
-          discount?: Json | null
-          email?: string | null
-          id?: string
-          invoice_prefix?: string | null
-          invoice_settings?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          name?: string | null
-          next_invoice_sequence?: number | null
-          object?: string | null
-          phone?: string | null
-          preferred_locales?: Json | null
-          shipping?: Json | null
-          sources?: Json | null
-          subscriptions?: Json | null
-          tax_exempt?: string | null
-          tax_ids?: Json | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          address?: Json | null
-          balance?: number | null
-          created?: number | null
-          currency?: string | null
-          default_source?: string | null
-          deleted?: boolean | null
-          delinquent?: boolean | null
-          description?: string | null
-          discount?: Json | null
-          email?: string | null
-          id?: string
-          invoice_prefix?: string | null
-          invoice_settings?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          name?: string | null
-          next_invoice_sequence?: number | null
-          object?: string | null
-          phone?: string | null
-          preferred_locales?: Json | null
-          shipping?: Json | null
-          sources?: Json | null
-          subscriptions?: Json | null
-          tax_exempt?: string | null
-          tax_ids?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_customers_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      disputes: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          amount: number | null
-          balance_transactions: Json | null
-          charge: string | null
-          created: number | null
-          currency: string | null
-          evidence: Json | null
-          evidence_details: Json | null
-          id: string
-          is_charge_refundable: boolean | null
-          livemode: boolean | null
-          metadata: Json | null
-          object: string | null
-          payment_intent: string | null
-          reason: string | null
-          status: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          amount?: number | null
-          balance_transactions?: Json | null
-          charge?: string | null
-          created?: number | null
-          currency?: string | null
-          evidence?: Json | null
-          evidence_details?: Json | null
-          id?: string
-          is_charge_refundable?: boolean | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          payment_intent?: string | null
-          reason?: string | null
-          status?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          amount?: number | null
-          balance_transactions?: Json | null
-          charge?: string | null
-          created?: number | null
-          currency?: string | null
-          evidence?: Json | null
-          evidence_details?: Json | null
-          id?: string
-          is_charge_refundable?: boolean | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          payment_intent?: string | null
-          reason?: string | null
-          status?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_disputes_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      early_fraud_warnings: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          actionable: boolean | null
-          charge: string | null
-          created: number | null
-          fraud_type: string | null
-          id: string
-          livemode: boolean | null
-          object: string | null
-          payment_intent: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          actionable?: boolean | null
-          charge?: string | null
-          created?: number | null
-          fraud_type?: string | null
-          id?: string
-          livemode?: boolean | null
-          object?: string | null
-          payment_intent?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          actionable?: boolean | null
-          charge?: string | null
-          created?: number | null
-          fraud_type?: string | null
-          id?: string
-          livemode?: boolean | null
-          object?: string | null
-          payment_intent?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_early_fraud_warnings_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      features: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          active: boolean | null
-          id: string
-          livemode: boolean | null
-          lookup_key: string | null
-          metadata: Json | null
-          name: string | null
-          object: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          active?: boolean | null
-          id?: string
-          livemode?: boolean | null
-          lookup_key?: string | null
-          metadata?: Json | null
-          name?: string | null
-          object?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          active?: boolean | null
-          id?: string
-          livemode?: boolean | null
-          lookup_key?: string | null
-          metadata?: Json | null
-          name?: string | null
-          object?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_features_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      invoices: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          account_country: string | null
-          account_name: string | null
-          amount_due: number | null
-          amount_paid: number | null
-          amount_remaining: number | null
-          application_fee_amount: number | null
-          attempt_count: number | null
-          attempted: boolean | null
-          auto_advance: boolean | null
-          billing_reason: string | null
-          charge: string | null
-          collection_method: string | null
-          created: number | null
-          currency: string | null
-          custom_fields: Json | null
-          customer: string | null
-          customer_address: Json | null
-          customer_email: string | null
-          customer_name: string | null
-          customer_phone: string | null
-          customer_shipping: Json | null
-          customer_tax_exempt: string | null
-          customer_tax_ids: Json | null
-          default_payment_method: string | null
-          default_source: string | null
-          default_tax_rates: Json | null
-          description: string | null
-          discount: Json | null
-          discounts: Json | null
-          due_date: number | null
-          ending_balance: number | null
-          footer: string | null
-          hosted_invoice_url: string | null
-          id: string
-          invoice_pdf: string | null
-          lines: Json | null
-          livemode: boolean | null
-          metadata: Json | null
-          next_payment_attempt: number | null
-          number: string | null
-          object: string | null
-          paid: boolean | null
-          payment_intent: string | null
-          period_end: number | null
-          period_start: number | null
-          post_payment_credit_notes_amount: number | null
-          pre_payment_credit_notes_amount: number | null
-          receipt_number: string | null
-          starting_balance: number | null
-          statement_descriptor: string | null
-          status: string | null
-          status_transitions: Json | null
-          subscription: string | null
-          subscription_proration_date: number | null
-          subtotal: number | null
-          tax: number | null
-          threshold_reason: Json | null
-          total: number | null
-          total_discount_amounts: Json | null
-          total_tax_amounts: Json | null
-          transfer_data: Json | null
-          webhooks_delivered_at: number | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          account_country?: string | null
-          account_name?: string | null
-          amount_due?: number | null
-          amount_paid?: number | null
-          amount_remaining?: number | null
-          application_fee_amount?: number | null
-          attempt_count?: number | null
-          attempted?: boolean | null
-          auto_advance?: boolean | null
-          billing_reason?: string | null
-          charge?: string | null
-          collection_method?: string | null
-          created?: number | null
-          currency?: string | null
-          custom_fields?: Json | null
-          customer?: string | null
-          customer_address?: Json | null
-          customer_email?: string | null
-          customer_name?: string | null
-          customer_phone?: string | null
-          customer_shipping?: Json | null
-          customer_tax_exempt?: string | null
-          customer_tax_ids?: Json | null
-          default_payment_method?: string | null
-          default_source?: string | null
-          default_tax_rates?: Json | null
-          description?: string | null
-          discount?: Json | null
-          discounts?: Json | null
-          due_date?: number | null
-          ending_balance?: number | null
-          footer?: string | null
-          hosted_invoice_url?: string | null
-          id?: string
-          invoice_pdf?: string | null
-          lines?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          next_payment_attempt?: number | null
-          number?: string | null
-          object?: string | null
-          paid?: boolean | null
-          payment_intent?: string | null
-          period_end?: number | null
-          period_start?: number | null
-          post_payment_credit_notes_amount?: number | null
-          pre_payment_credit_notes_amount?: number | null
-          receipt_number?: string | null
-          starting_balance?: number | null
-          statement_descriptor?: string | null
-          status?: string | null
-          status_transitions?: Json | null
-          subscription?: string | null
-          subscription_proration_date?: number | null
-          subtotal?: number | null
-          tax?: number | null
-          threshold_reason?: Json | null
-          total?: number | null
-          total_discount_amounts?: Json | null
-          total_tax_amounts?: Json | null
-          transfer_data?: Json | null
-          webhooks_delivered_at?: number | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          account_country?: string | null
-          account_name?: string | null
-          amount_due?: number | null
-          amount_paid?: number | null
-          amount_remaining?: number | null
-          application_fee_amount?: number | null
-          attempt_count?: number | null
-          attempted?: boolean | null
-          auto_advance?: boolean | null
-          billing_reason?: string | null
-          charge?: string | null
-          collection_method?: string | null
-          created?: number | null
-          currency?: string | null
-          custom_fields?: Json | null
-          customer?: string | null
-          customer_address?: Json | null
-          customer_email?: string | null
-          customer_name?: string | null
-          customer_phone?: string | null
-          customer_shipping?: Json | null
-          customer_tax_exempt?: string | null
-          customer_tax_ids?: Json | null
-          default_payment_method?: string | null
-          default_source?: string | null
-          default_tax_rates?: Json | null
-          description?: string | null
-          discount?: Json | null
-          discounts?: Json | null
-          due_date?: number | null
-          ending_balance?: number | null
-          footer?: string | null
-          hosted_invoice_url?: string | null
-          id?: string
-          invoice_pdf?: string | null
-          lines?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          next_payment_attempt?: number | null
-          number?: string | null
-          object?: string | null
-          paid?: boolean | null
-          payment_intent?: string | null
-          period_end?: number | null
-          period_start?: number | null
-          post_payment_credit_notes_amount?: number | null
-          pre_payment_credit_notes_amount?: number | null
-          receipt_number?: string | null
-          starting_balance?: number | null
-          statement_descriptor?: string | null
-          status?: string | null
-          status_transitions?: Json | null
-          subscription?: string | null
-          subscription_proration_date?: number | null
-          subtotal?: number | null
-          tax?: number | null
-          threshold_reason?: Json | null
-          total?: number | null
-          total_discount_amounts?: Json | null
-          total_tax_amounts?: Json | null
-          transfer_data?: Json | null
-          webhooks_delivered_at?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_invoices_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payment_intents: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          amount: number | null
-          amount_capturable: number | null
-          amount_received: number | null
-          application: string | null
-          application_fee_amount: number | null
-          canceled_at: number | null
-          cancellation_reason: string | null
-          capture_method: string | null
-          charges: Json | null
-          client_secret: string | null
-          confirmation_method: string | null
-          created: number | null
-          currency: string | null
-          customer: string | null
-          description: string | null
-          id: string
-          invoice: string | null
-          last_payment_error: Json | null
-          livemode: boolean | null
-          metadata: Json | null
-          next_action: Json | null
-          object: string | null
-          on_behalf_of: string | null
-          payment_method: string | null
-          payment_method_options: Json | null
-          payment_method_types: Json | null
-          receipt_email: string | null
-          review: string | null
-          setup_future_usage: string | null
-          shipping: Json | null
-          statement_descriptor: string | null
-          statement_descriptor_suffix: string | null
-          status: string | null
-          transfer_data: Json | null
-          transfer_group: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          amount?: number | null
-          amount_capturable?: number | null
-          amount_received?: number | null
-          application?: string | null
-          application_fee_amount?: number | null
-          canceled_at?: number | null
-          cancellation_reason?: string | null
-          capture_method?: string | null
-          charges?: Json | null
-          client_secret?: string | null
-          confirmation_method?: string | null
-          created?: number | null
-          currency?: string | null
-          customer?: string | null
-          description?: string | null
-          id?: string
-          invoice?: string | null
-          last_payment_error?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          next_action?: Json | null
-          object?: string | null
-          on_behalf_of?: string | null
-          payment_method?: string | null
-          payment_method_options?: Json | null
-          payment_method_types?: Json | null
-          receipt_email?: string | null
-          review?: string | null
-          setup_future_usage?: string | null
-          shipping?: Json | null
-          statement_descriptor?: string | null
-          statement_descriptor_suffix?: string | null
-          status?: string | null
-          transfer_data?: Json | null
-          transfer_group?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          amount?: number | null
-          amount_capturable?: number | null
-          amount_received?: number | null
-          application?: string | null
-          application_fee_amount?: number | null
-          canceled_at?: number | null
-          cancellation_reason?: string | null
-          capture_method?: string | null
-          charges?: Json | null
-          client_secret?: string | null
-          confirmation_method?: string | null
-          created?: number | null
-          currency?: string | null
-          customer?: string | null
-          description?: string | null
-          id?: string
-          invoice?: string | null
-          last_payment_error?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          next_action?: Json | null
-          object?: string | null
-          on_behalf_of?: string | null
-          payment_method?: string | null
-          payment_method_options?: Json | null
-          payment_method_types?: Json | null
-          receipt_email?: string | null
-          review?: string | null
-          setup_future_usage?: string | null
-          shipping?: Json | null
-          statement_descriptor?: string | null
-          statement_descriptor_suffix?: string | null
-          status?: string | null
-          transfer_data?: Json | null
-          transfer_group?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_payment_intents_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payment_methods: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          alipay: Json | null
-          au_becs_debit: Json | null
-          bacs_debit: Json | null
-          bancontact: Json | null
-          billing_details: Json | null
-          card: Json | null
-          card_present: Json | null
-          created: number | null
-          customer: string | null
-          eps: Json | null
-          fpx: Json | null
-          giropay: Json | null
-          id: string
-          ideal: Json | null
-          interac_present: Json | null
-          livemode: boolean | null
-          metadata: Json | null
-          object: string | null
-          p24: Json | null
-          sepa_debit: Json | null
-          type: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          alipay?: Json | null
-          au_becs_debit?: Json | null
-          bacs_debit?: Json | null
-          bancontact?: Json | null
-          billing_details?: Json | null
-          card?: Json | null
-          card_present?: Json | null
-          created?: number | null
-          customer?: string | null
-          eps?: Json | null
-          fpx?: Json | null
-          giropay?: Json | null
-          id?: string
-          ideal?: Json | null
-          interac_present?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          p24?: Json | null
-          sepa_debit?: Json | null
-          type?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          alipay?: Json | null
-          au_becs_debit?: Json | null
-          bacs_debit?: Json | null
-          bancontact?: Json | null
-          billing_details?: Json | null
-          card?: Json | null
-          card_present?: Json | null
-          created?: number | null
-          customer?: string | null
-          eps?: Json | null
-          fpx?: Json | null
-          giropay?: Json | null
-          id?: string
-          ideal?: Json | null
-          interac_present?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          p24?: Json | null
-          sepa_debit?: Json | null
-          type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_payment_methods_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      plans: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          active: boolean | null
-          aggregate_usage: string | null
-          amount: number | null
-          amount_decimal: string | null
-          billing_scheme: string | null
-          created: number | null
-          currency: string | null
-          id: string
-          interval: string | null
-          interval_count: number | null
-          livemode: boolean | null
-          metadata: Json | null
-          nickname: string | null
-          object: string | null
-          product: string | null
-          tiers: Json | null
-          tiers_mode: string | null
-          transform_usage: Json | null
-          trial_period_days: number | null
-          usage_type: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          active?: boolean | null
-          aggregate_usage?: string | null
-          amount?: number | null
-          amount_decimal?: string | null
-          billing_scheme?: string | null
-          created?: number | null
-          currency?: string | null
-          id?: string
-          interval?: string | null
-          interval_count?: number | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          nickname?: string | null
-          object?: string | null
-          product?: string | null
-          tiers?: Json | null
-          tiers_mode?: string | null
-          transform_usage?: Json | null
-          trial_period_days?: number | null
-          usage_type?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          active?: boolean | null
-          aggregate_usage?: string | null
-          amount?: number | null
-          amount_decimal?: string | null
-          billing_scheme?: string | null
-          created?: number | null
-          currency?: string | null
-          id?: string
-          interval?: string | null
-          interval_count?: number | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          nickname?: string | null
-          object?: string | null
-          product?: string | null
-          tiers?: Json | null
-          tiers_mode?: string | null
-          transform_usage?: Json | null
-          trial_period_days?: number | null
-          usage_type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_plans_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      prices: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          active: boolean | null
-          billing_scheme: string | null
-          created: number | null
-          currency: string | null
-          id: string
-          livemode: boolean | null
-          lookup_key: string | null
-          metadata: Json | null
-          nickname: string | null
-          object: string | null
-          product: string | null
-          recurring: Json | null
-          tiers: Json | null
-          tiers_mode: string | null
-          transform_quantity: Json | null
-          type: string | null
-          unit_amount: number | null
-          unit_amount_decimal: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          active?: boolean | null
-          billing_scheme?: string | null
-          created?: number | null
-          currency?: string | null
-          id?: string
-          livemode?: boolean | null
-          lookup_key?: string | null
-          metadata?: Json | null
-          nickname?: string | null
-          object?: string | null
-          product?: string | null
-          recurring?: Json | null
-          tiers?: Json | null
-          tiers_mode?: string | null
-          transform_quantity?: Json | null
-          type?: string | null
-          unit_amount?: number | null
-          unit_amount_decimal?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          active?: boolean | null
-          billing_scheme?: string | null
-          created?: number | null
-          currency?: string | null
-          id?: string
-          livemode?: boolean | null
-          lookup_key?: string | null
-          metadata?: Json | null
-          nickname?: string | null
-          object?: string | null
-          product?: string | null
-          recurring?: Json | null
-          tiers?: Json | null
-          tiers_mode?: string | null
-          transform_quantity?: Json | null
-          type?: string | null
-          unit_amount?: number | null
-          unit_amount_decimal?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_prices_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      products: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          active: boolean | null
-          attributes: Json | null
-          caption: string | null
-          created: number | null
-          deactivate_on: Json | null
-          description: string | null
-          id: string
-          images: Json | null
-          livemode: boolean | null
-          metadata: Json | null
-          name: string | null
-          object: string | null
-          package_dimensions: Json | null
-          shippable: boolean | null
-          statement_descriptor: string | null
-          type: string | null
-          unit_label: string | null
-          updated: number | null
-          url: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          active?: boolean | null
-          attributes?: Json | null
-          caption?: string | null
-          created?: number | null
-          deactivate_on?: Json | null
-          description?: string | null
-          id?: string
-          images?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          name?: string | null
-          object?: string | null
-          package_dimensions?: Json | null
-          shippable?: boolean | null
-          statement_descriptor?: string | null
-          type?: string | null
-          unit_label?: string | null
-          updated?: number | null
-          url?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          active?: boolean | null
-          attributes?: Json | null
-          caption?: string | null
-          created?: number | null
-          deactivate_on?: Json | null
-          description?: string | null
-          id?: string
-          images?: Json | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          name?: string | null
-          object?: string | null
-          package_dimensions?: Json | null
-          shippable?: boolean | null
-          statement_descriptor?: string | null
-          type?: string | null
-          unit_label?: string | null
-          updated?: number | null
-          url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_products_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      refunds: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          amount: number | null
-          balance_transaction: string | null
-          charge: string | null
-          created: number | null
-          currency: string | null
-          description: string | null
-          failure_balance_transaction: string | null
-          failure_reason: string | null
-          id: string
-          metadata: Json | null
-          object: string | null
-          payment_intent: string | null
-          reason: string | null
-          receipt_number: string | null
-          source_transfer_reversal: string | null
-          status: string | null
-          transfer_reversal: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          amount?: number | null
-          balance_transaction?: string | null
-          charge?: string | null
-          created?: number | null
-          currency?: string | null
-          description?: string | null
-          failure_balance_transaction?: string | null
-          failure_reason?: string | null
-          id?: string
-          metadata?: Json | null
-          object?: string | null
-          payment_intent?: string | null
-          reason?: string | null
-          receipt_number?: string | null
-          source_transfer_reversal?: string | null
-          status?: string | null
-          transfer_reversal?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          amount?: number | null
-          balance_transaction?: string | null
-          charge?: string | null
-          created?: number | null
-          currency?: string | null
-          description?: string | null
-          failure_balance_transaction?: string | null
-          failure_reason?: string | null
-          id?: string
-          metadata?: Json | null
-          object?: string | null
-          payment_intent?: string | null
-          reason?: string | null
-          receipt_number?: string | null
-          source_transfer_reversal?: string | null
-          status?: string | null
-          transfer_reversal?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_refunds_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      reviews: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          billing_zip: string | null
-          charge: string | null
-          closed_reason: string | null
-          created: number | null
-          id: string
-          ip_address: string | null
-          ip_address_location: Json | null
-          livemode: boolean | null
-          object: string | null
-          open: boolean | null
-          opened_reason: string | null
-          payment_intent: string | null
-          reason: string | null
-          session: Json | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          billing_zip?: string | null
-          charge?: string | null
-          closed_reason?: string | null
-          created?: number | null
-          id?: string
-          ip_address?: string | null
-          ip_address_location?: Json | null
-          livemode?: boolean | null
-          object?: string | null
-          open?: boolean | null
-          opened_reason?: string | null
-          payment_intent?: string | null
-          reason?: string | null
-          session?: Json | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          billing_zip?: string | null
-          charge?: string | null
-          closed_reason?: string | null
-          created?: number | null
-          id?: string
-          ip_address?: string | null
-          ip_address_location?: Json | null
-          livemode?: boolean | null
-          object?: string | null
-          open?: boolean | null
-          opened_reason?: string | null
-          payment_intent?: string | null
-          reason?: string | null
-          session?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_reviews_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      setup_intents: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          application: string | null
-          cancellation_reason: string | null
-          client_secret: string | null
-          created: number | null
-          customer: string | null
-          description: string | null
-          id: string
-          last_setup_error: Json | null
-          livemode: boolean | null
-          mandate: string | null
-          metadata: Json | null
-          next_action: Json | null
-          object: string | null
-          on_behalf_of: string | null
-          payment_method: string | null
-          payment_method_options: Json | null
-          payment_method_types: Json | null
-          single_use_mandate: string | null
-          status: string | null
-          usage: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          application?: string | null
-          cancellation_reason?: string | null
-          client_secret?: string | null
-          created?: number | null
-          customer?: string | null
-          description?: string | null
-          id?: string
-          last_setup_error?: Json | null
-          livemode?: boolean | null
-          mandate?: string | null
-          metadata?: Json | null
-          next_action?: Json | null
-          object?: string | null
-          on_behalf_of?: string | null
-          payment_method?: string | null
-          payment_method_options?: Json | null
-          payment_method_types?: Json | null
-          single_use_mandate?: string | null
-          status?: string | null
-          usage?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          application?: string | null
-          cancellation_reason?: string | null
-          client_secret?: string | null
-          created?: number | null
-          customer?: string | null
-          description?: string | null
-          id?: string
-          last_setup_error?: Json | null
-          livemode?: boolean | null
-          mandate?: string | null
-          metadata?: Json | null
-          next_action?: Json | null
-          object?: string | null
-          on_behalf_of?: string | null
-          payment_method?: string | null
-          payment_method_options?: Json | null
-          payment_method_types?: Json | null
-          single_use_mandate?: string | null
-          status?: string | null
-          usage?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_setup_intents_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscription_items: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          billing_thresholds: Json | null
-          created: number | null
-          deleted: boolean | null
-          id: string
-          metadata: Json | null
-          object: string | null
-          price: Json | null
-          quantity: number | null
-          subscription: string | null
-          tax_rates: Json | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          billing_thresholds?: Json | null
-          created?: number | null
-          deleted?: boolean | null
-          id?: string
-          metadata?: Json | null
-          object?: string | null
-          price?: Json | null
-          quantity?: number | null
-          subscription?: string | null
-          tax_rates?: Json | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          billing_thresholds?: Json | null
-          created?: number | null
-          deleted?: boolean | null
-          id?: string
-          metadata?: Json | null
-          object?: string | null
-          price?: Json | null
-          quantity?: number | null
-          subscription?: string | null
-          tax_rates?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_subscription_items_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscription_schedules: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          canceled_at: number | null
-          completed_at: number | null
-          created: number | null
-          current_phase: Json | null
-          customer: string | null
-          default_settings: Json | null
-          end_behavior: string | null
-          id: string
-          livemode: boolean | null
-          metadata: Json | null
-          object: string | null
-          phases: Json | null
-          released_at: number | null
-          released_subscription: string | null
-          status: string | null
-          subscription: string | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          canceled_at?: number | null
-          completed_at?: number | null
-          created?: number | null
-          current_phase?: Json | null
-          customer?: string | null
-          default_settings?: Json | null
-          end_behavior?: string | null
-          id?: string
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          phases?: Json | null
-          released_at?: number | null
-          released_subscription?: string | null
-          status?: string | null
-          subscription?: string | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          canceled_at?: number | null
-          completed_at?: number | null
-          created?: number | null
-          current_phase?: Json | null
-          customer?: string | null
-          default_settings?: Json | null
-          end_behavior?: string | null
-          id?: string
-          livemode?: boolean | null
-          metadata?: Json | null
-          object?: string | null
-          phases?: Json | null
-          released_at?: number | null
-          released_subscription?: string | null
-          status?: string | null
-          subscription?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_subscription_schedules_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscriptions: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          application_fee_percent: number | null
-          billing_cycle_anchor: number | null
-          billing_thresholds: Json | null
-          cancel_at: number | null
-          cancel_at_period_end: boolean | null
-          canceled_at: number | null
-          collection_method: string | null
-          created: number | null
-          current_period_end: number | null
-          current_period_start: number | null
-          customer: string | null
-          days_until_due: number | null
-          default_payment_method: string | null
-          default_source: string | null
-          default_tax_rates: Json | null
-          discount: Json | null
-          ended_at: number | null
-          id: string
-          items: Json | null
-          latest_invoice: string | null
-          livemode: boolean | null
-          metadata: Json | null
-          next_pending_invoice_item_invoice: number | null
-          object: string | null
-          pause_collection: Json | null
-          pending_invoice_item_interval: Json | null
-          pending_setup_intent: string | null
-          pending_update: Json | null
-          quantity: number | null
-          schedule: string | null
-          start_date: number | null
-          status: string | null
-          transfer_data: Json | null
-          trial_end: number | null
-          trial_start: number | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          application_fee_percent?: number | null
-          billing_cycle_anchor?: number | null
-          billing_thresholds?: Json | null
-          cancel_at?: number | null
-          cancel_at_period_end?: boolean | null
-          canceled_at?: number | null
-          collection_method?: string | null
-          created?: number | null
-          current_period_end?: number | null
-          current_period_start?: number | null
-          customer?: string | null
-          days_until_due?: number | null
-          default_payment_method?: string | null
-          default_source?: string | null
-          default_tax_rates?: Json | null
-          discount?: Json | null
-          ended_at?: number | null
-          id?: string
-          items?: Json | null
-          latest_invoice?: string | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          next_pending_invoice_item_invoice?: number | null
-          object?: string | null
-          pause_collection?: Json | null
-          pending_invoice_item_interval?: Json | null
-          pending_setup_intent?: string | null
-          pending_update?: Json | null
-          quantity?: number | null
-          schedule?: string | null
-          start_date?: number | null
-          status?: string | null
-          transfer_data?: Json | null
-          trial_end?: number | null
-          trial_start?: number | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          application_fee_percent?: number | null
-          billing_cycle_anchor?: number | null
-          billing_thresholds?: Json | null
-          cancel_at?: number | null
-          cancel_at_period_end?: boolean | null
-          canceled_at?: number | null
-          collection_method?: string | null
-          created?: number | null
-          current_period_end?: number | null
-          current_period_start?: number | null
-          customer?: string | null
-          days_until_due?: number | null
-          default_payment_method?: string | null
-          default_source?: string | null
-          default_tax_rates?: Json | null
-          discount?: Json | null
-          ended_at?: number | null
-          id?: string
-          items?: Json | null
-          latest_invoice?: string | null
-          livemode?: boolean | null
-          metadata?: Json | null
-          next_pending_invoice_item_invoice?: number | null
-          object?: string | null
-          pause_collection?: Json | null
-          pending_invoice_item_interval?: Json | null
-          pending_setup_intent?: string | null
-          pending_update?: Json | null
-          quantity?: number | null
-          schedule?: string | null
-          start_date?: number | null
-          status?: string | null
-          transfer_data?: Json | null
-          trial_end?: number | null
-          trial_start?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_subscriptions_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tax_ids: {
-        Row: {
-          _account_id: string
-          _last_synced_at: string | null
-          _raw_data: Json
-          _updated_at: string
-          country: string | null
-          created: number | null
-          customer: string | null
-          id: string
-          livemode: boolean | null
-          object: string | null
-          type: string | null
-          value: string | null
-          verification: Json | null
-        }
-        Insert: {
-          _account_id: string
-          _last_synced_at?: string | null
-          _raw_data: Json
-          _updated_at?: string
-          country?: string | null
-          created?: number | null
-          customer?: string | null
-          id?: string
-          livemode?: boolean | null
-          object?: string | null
-          type?: string | null
-          value?: string | null
-          verification?: Json | null
-        }
-        Update: {
-          _account_id?: string
-          _last_synced_at?: string | null
-          _raw_data?: Json
-          _updated_at?: string
-          country?: string | null
-          created?: number | null
-          customer?: string | null
-          id?: string
-          livemode?: boolean | null
-          object?: string | null
-          type?: string | null
-          value?: string | null
-          verification?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_tax_ids_account"
-            columns: ["_account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-    }
-    Views: {
-      sync_obj_progress: {
-        Row: {
-          account_id: string | null
-          object: string | null
-          pct_complete: number | null
-          processed: number | null
-          run_started_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_sync_obj_runs_parent"
-            columns: ["account_id", "run_started_at"]
-            isOneToOne: false
-            referencedRelation: "_sync_runs"
-            referencedColumns: ["_account_id", "started_at"]
-          },
-          {
-            foreignKeyName: "fk_sync_obj_runs_parent"
-            columns: ["account_id", "run_started_at"]
-            isOneToOne: false
-            referencedRelation: "sync_runs"
-            referencedColumns: ["account_id", "started_at"]
-          },
-        ]
-      }
-      sync_runs: {
-        Row: {
-          account_id: string | null
-          closed_at: string | null
-          complete_count: number | null
-          error_count: number | null
-          error_message: string | null
-          max_concurrent: number | null
-          pending_count: number | null
-          running_count: number | null
-          started_at: string | null
-          status: string | null
-          total_objects: number | null
-          total_processed: number | null
-          triggered_by: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_sync_runs_account"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-    }
-    Functions: {
-      check_rate_limit: {
-        Args: { max_requests: number; rate_key: string; window_seconds: number }
-        Returns: undefined
-      }
-    }
-    Enums: {
-      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5543,17 +3251,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  api: {
-    Enums: {
-      Wasel: ["14141414"],
-    },
-  },
-  graphql_public: {
-    Enums: {},
-  },
-  pgmq_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       booking_status_v2: [
@@ -5642,8 +3339,5 @@ export const Constants = {
       ],
       wallet_status_v2: ["active", "limited", "frozen", "closed"],
     },
-  },
-  stripe: {
-    Enums: {},
   },
 } as const

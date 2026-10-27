@@ -73,7 +73,9 @@ minimum_password_length = 12
 password_requirements = "lower_upper_letters_digits_symbols"
 
 [auth.mfa.totp]
-enroll_enabled = false
+# Authenticator-app MFA. Enrollment is on so users (and especially drivers/admins)
+# can opt in; the app shows it only when VITE_ENABLE_TWO_FACTOR_AUTH is enabled.
+enroll_enabled = true
 verify_enabled = true
 
 [auth.mfa.phone]
@@ -90,7 +92,11 @@ otp_length = 8
 otp_expiry = 3600
 
 [auth.sms]
-enable_signup = true
+# Phone signup stays OFF in this config: no SMS provider (Twilio / Twilio Verify /
+# send_sms hook) is enabled below, so the CLI would disable it anyway and print
+# "WARN: no SMS provider is enabled". To use phone login, enable ONE provider
+# below first, then set this back to true.
+enable_signup = false
 enable_confirmations = false
 template = "Your code is {{ .Code }}"
 max_frequency = "5s"

@@ -71,6 +71,7 @@ export function useWalletDashboardController() {
   const [sendAmount, setSendAmount] = useState('');
   const [sendNote, setSendNote] = useState('');
   const [pinValue, setPinValue] = useState('');
+  const [currentPinValue, setCurrentPinValue] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [autoTopUpEnabled, setAutoTopUpEnabled] = useState(false);
   const [autoTopUpAmount, setAutoTopUpAmount] = useState('20');
@@ -303,14 +304,26 @@ export function useWalletDashboardController() {
       return toast.error(t.pinMustBeFourDigits);
     }
 
+    // Replacing an existing PIN requires the current one; the server enforces this too.
+    const changingExistingPin = Boolean(walletData?.pinSet);
+    if (changingExistingPin && !/^\d{4}$/.test(currentPinValue)) {
+      return toast.error(t.walletPinRequired ?? t.pinMustBeFourDigits);
+    }
+
     setActionLoading(true);
     try {
-      await walletApi.setPin(effectiveUserId, pinValue);
+      if (changingExistingPin) {
+        await walletApi.setPin(effectiveUserId, pinValue, currentPinValue);
+      } else {
+        await walletApi.setPin(effectiveUserId, pinValue);
+      }
       toast.success(t.pinSetSuccess);
       setShowPinSetup(false);
       setPinValue('');
+      setCurrentPinValue('');
       await fetchWallet();
     } catch (err) {
+      setCurrentPinValue('');
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
       setActionLoading(false);
@@ -394,6 +407,7 @@ export function useWalletDashboardController() {
     autoTopUpEnabled,
     autoTopUpThreshold,
     balanceVisible,
+    currentPinValue,
     effectiveUserId,
     fetchInsights,
     fetchWallet,
@@ -418,6 +432,7 @@ export function useWalletDashboardController() {
     setAutoTopUpAmount,
     setAutoTopUpThreshold,
     setBalanceVisible,
+    setCurrentPinValue,
     setPinValue,
     setSendAmount,
     setSendNote,

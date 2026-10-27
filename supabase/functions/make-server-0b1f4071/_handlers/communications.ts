@@ -12,6 +12,7 @@ import {
     hasTwilioVerifyRuntime,
     hasWorkerAccess,
     processQueuedDeliveries,
+    consumeRateLimit,
 } from './shared.ts';
 
 import {
@@ -80,7 +81,40 @@ export async function handleQueueCommunicationDeliveries ( request: Request ) {
   if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
-  const deliveries = Array.isArray( body.deliveries ) ? body.deliveries : [];
+  const rawDeliveries: Array<Record<string, unknown>> = Array.isArray( body.deliveries ) ? body.deliveries : [];
+
+  // This route queues messages that are sent from the platform's own Resend/
+  // SendGrid/Twilio accounts. It used to accept any destination, subject and body
+  // from any signed-in user, which made it an open SMS/email relay (SMS pumping,
+  // phishing from the platform's sender domain). Messages may now only go to the
+  // caller's own email, or to their own phone once it has been OTP-verified; any
+  // client-supplied destination is ignored.
+  const limited = await consumeRateLimit( auth.admin, `communications-deliver:${ auth.canonicalUser.id }`, 60, { windowSeconds: 3600 } );
+  if ( limited ) {return limited;}
+
+  const ownEmail = String( auth.canonicalUser.email ?? auth.authUser.email ?? '' ).trim();
+  const ownPhone = auth.canonicalUser.phone_verified_at ? String( auth.canonicalUser.phone_number ?? '' ).trim() : '';
+  const MAX_DELIVERIES_PER_REQUEST = 10;
+
+  const deliveries = rawDeliveries.slice( 0, MAX_DELIVERIES_PER_REQUEST ).flatMap( ( delivery ) => {
+    const channel = String( delivery?.channel ?? 'email' );
+    const destination = channel === 'email'
+      ? ownEmail
+      : ( channel === 'sms' || channel === 'whatsapp' ) ? ownPhone : '';
+    if ( !destination ) {return [];}
+    return [ {
+      ...delivery,
+      channel,
+      destination,
+      subject: typeof delivery?.subject === 'string' ? delivery.subject.slice( 0, 200 ) : undefined,
+      body: String( delivery?.body ?? '' ).slice( 0, 2000 ),
+      // Namespaced per user so one account cannot pre-claim (and thereby suppress)
+      // another account's idempotency key.
+      idempotencyKey: typeof delivery?.idempotencyKey === 'string' && delivery.idempotencyKey
+        ? `${ auth.canonicalUser.id }:${ delivery.idempotencyKey }`.slice( 0, 200 )
+        : undefined,
+    } ];
+  } );
   const now = new Date().toISOString();
 
   if ( deliveries.length === 0 ) {

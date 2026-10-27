@@ -80,6 +80,10 @@ export default defineConfig( {
       // local .env/.env.local (which Vite loads into every mode, including
       // 'test') can't silently change what the test suite sees.
       VITE_ENABLE_TWO_FACTOR_AUTH: 'false',
+      // Demo ride seed (ALL_RIDES) is dev/test-only; tests assert against it.
+      VITE_ENABLE_DEMO_RIDES: 'true',
+      // Testimonials render only when enabled; keeps existing component tests working.
+      VITE_SHOW_TESTIMONIALS: 'true',
     },
     coverage: {
       provider: 'v8',

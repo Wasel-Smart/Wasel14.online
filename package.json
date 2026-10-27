@@ -21,14 +21,16 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix --no-warn-ignored"
+      "eslint --fix --no-warn-ignored --ignore-pattern 'mobile/**'"
     ],
     "*.{js,mjs,cjs}": [
-      "eslint --fix --no-warn-ignored"
+      "eslint --fix --no-warn-ignored --ignore-pattern 'mobile/**'"
     ]
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/verify-supabase-key.mjs",
+    "verify:supabase-key": "node scripts/verify-supabase-key.mjs",
     "build": "tsc && vite build && node scripts/generate-pwa-manifest.mjs && node scripts/version-sw.mjs",
     "lint": "eslint . --report-unused-disable-directives",
     "preview": "vite preview",
@@ -178,7 +180,7 @@
     "prettier": "^3.9.8",
     "rollup-plugin-visualizer": "^7.0.1",
     "standard-version": "^9.5.0",
-    "supabase": "^2.118.0",
+    "supabase": "^2.121.0",
     "tailwindcss": "^4.1.4",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.66.0",

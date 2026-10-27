@@ -99,12 +99,35 @@ export async function handleGetWalletInsights ( request: Request, requestedUserI
 const MAX_WALLET_WITHDRAW_JOD = 2000;
 const MAX_WALLET_SEND_JOD = 1000;
 const MAX_WALLET_TOPUP_JOD = 2000;
+const MAX_WALLET_AUTO_TOPUP_THRESHOLD_JOD = 1000;
 const WITHDRAW_METHODS = new Set( [ 'bank_transfer', 'instant' ] );
 const PIN_MAX_ATTEMPTS = 5;
 const PIN_LOCKOUT_SECONDS = 15 * 60;
 
 function pinAttemptKey ( userId: string ): string {
   return `wallet-pin:${ userId }`;
+}
+
+/**
+ * Legacy PINs were stored as a single unsalted SHA-256. verifyWalletPinHash still
+ * accepts them, so once a correct PIN has been presented, re-hash it with PBKDF2.
+ * Best effort: an upgrade failure must never fail the operation that triggered it.
+ */
+async function upgradeLegacyPinHash (
+  admin: Parameters<typeof consumeRateLimit>[ 0 ],
+  userId: string,
+  storedHash: string | null | undefined,
+  pin: string,
+): Promise<void> {
+  if ( !storedHash || String( storedHash ).startsWith( 'pbkdf2_sha256$' ) ) {return;}
+  try {
+    await admin
+      .from( 'wallets' )
+      .update( { pin_hash: await hashWalletPin( pin ), updated_at: new Date().toISOString() } )
+      .eq( 'user_id', userId );
+  } catch ( error ) {
+    console.warn( '[wallet] legacy PIN hash upgrade skipped', error instanceof Error ? error.message : String( error ) );
+  }
 }
 
 function walletOperationFailed ( scope: string, error: unknown ): Response {
@@ -151,6 +174,7 @@ async function enforceWalletPin (
   }
 
   await resetRateLimit( admin, pinAttemptKey( userId ) );
+  await upgradeLegacyPinHash( admin, userId, wallet.pin_hash, pin );
   return null;
 }
 
@@ -255,6 +279,12 @@ export async function handleSetWalletPin ( request: Request, requestedUserId: st
   if ( !/^\d{4}$/.test( pin ) ) {return json( { error: 'Wallet PIN must be four digits.' }, 400 );}
 
   try {
+    // Replacing an existing PIN must prove knowledge of the current one (same
+    // lockout bucket as withdraw/send). Without this, anyone holding a stolen
+    // session could set their own PIN and then pass the PIN gate on withdrawals.
+    const existingWallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
+    const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, existingWallet, body.currentPin );
+    if ( pinDenied ) {return pinDenied;}
     const pinHash = await hashWalletPin( pin );
     const { error } = await auth.admin
       .from( 'wallets' )
@@ -288,7 +318,10 @@ export async function handleVerifyWalletPin ( request: Request, requestedUserId:
     if ( limited ) {return limited;}
 
     const verified = await verifyWalletPinHash( pin, wallet.pin_hash );
-    if ( verified ) {await resetRateLimit( auth.admin, pinAttemptKey( auth.canonicalUser.id ) );}
+    if ( verified ) {
+      await resetRateLimit( auth.admin, pinAttemptKey( auth.canonicalUser.id ) );
+      await upgradeLegacyPinHash( auth.admin, auth.canonicalUser.id, wallet.pin_hash, pin );
+    }
     return json( { verified } );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
@@ -307,8 +340,8 @@ export async function handleSetWalletAutoTopUp ( request: Request, requestedUser
       .from( 'wallets' )
       .update( {
         auto_top_up_enabled: Boolean( body.enabled ),
-        auto_top_up_amount: amount > 0 ? amount : 20,
-        auto_top_up_threshold: threshold >= 0 ? threshold : 5,
+        auto_top_up_amount: amount > 0 ? Math.min( amount, MAX_WALLET_TOPUP_JOD ) : 20,
+        auto_top_up_threshold: threshold >= 0 ? Math.min( threshold, MAX_WALLET_AUTO_TOPUP_THRESHOLD_JOD ) : 5,
         updated_at: new Date().toISOString(),
       } )
       .eq( 'user_id', auth.canonicalUser.id );
@@ -512,7 +545,8 @@ export async function handleWalletTopUp ( request: Request, requestedUserId: str
     .maybeSingle();
 
   if ( walletError ) {
-    return json( { error: walletError.message }, 500 );
+    console.error( '[wallet] top-up wallet lookup failed', walletError.message );
+    return json( { error: 'Wallet lookup failed. Please try again.' }, 500 );
   }
   if ( !wallet?.wallet_id ) {
     return json( { error: 'Wallet not found.' }, 404 );
@@ -615,7 +649,9 @@ export async function handleWalletTopUp ( request: Request, requestedUserId: str
       message,
       { requested_method: paymentMethod },
     ).catch( () => undefined );
-    return json( { error: message }, 502 );
+    // Log the provider detail server-side; never echo raw Stripe text to the client.
+    console.error( '[wallet] stripe checkout creation failed', message );
+    return json( { error: 'Could not start checkout. Please try again.' }, 502 );
   }
 }
 

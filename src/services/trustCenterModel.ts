@@ -172,12 +172,16 @@ function buildWalletStep(user: FallbackTrustUser): TrustCenterStatus['steps']['w
     });
   }
 
+  const failureReason =
+    user.walletStatus === 'closed'
+      ? 'Wallet is closed and must be restored before payouts can continue.'
+      : user.walletStatus === 'frozen'
+        ? 'Wallet is frozen and needs review before payouts can continue.'
+        : 'Wallet status could not be confirmed right now. Please try again shortly.';
+
   return buildStatus('wallet_standing', 'failed', { walletStatus }, {
     detail: `Wallet standing is ${user.walletStatus}.`,
-    failureReason:
-      user.walletStatus === 'closed'
-        ? 'Wallet is closed and must be restored before payouts can continue.'
-        : 'Wallet is frozen and needs review before payouts can continue.',
+    failureReason,
   });
 }
 

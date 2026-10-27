@@ -11,6 +11,8 @@ type WalletActionModalsProps = {
   balance: number;
   isRTL: boolean;
   pinValue: string;
+  currentPinValue: string;
+  setCurrentPinValue: (value: string) => void;
   sendAmount: string;
   sendNote: string;
   sendRecipient: string;
@@ -49,6 +51,8 @@ export function WalletActionModals({
   balance,
   isRTL,
   pinValue,
+  currentPinValue,
+  setCurrentPinValue,
   sendAmount,
   sendNote,
   sendRecipient,
@@ -253,11 +257,29 @@ export function WalletActionModals({
         onClose={() => {
           setShowPinSetup(false);
           setPinValue('');
+          setCurrentPinValue('');
         }}
         title={walletData?.pinSet ? changePinLabel : setPinLabel}
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">{t.pinDescription}</p>
+          {walletData?.pinSet && (
+            <div>
+              <Label className="text-xs text-muted-foreground">
+                {t.currentPin ?? 'Current PIN'}
+              </Label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={currentPinValue}
+                onChange={e => setCurrentPinValue(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                className="mt-1 rounded-lg text-center text-2xl tracking-[1em]"
+                placeholder={t.maskedPin}
+                autoComplete="current-password"
+              />
+            </div>
+          )}
           <div className="flex justify-center gap-3">
             {[0, 1, 2, 3].map(index => (
               <div
@@ -279,7 +301,11 @@ export function WalletActionModals({
           />
           <Button
             onClick={() => { void onSetPin(); }}
-            disabled={actionLoading || pinValue.length !== 4}
+            disabled={
+              actionLoading ||
+              pinValue.length !== 4 ||
+              Boolean(walletData?.pinSet && currentPinValue.length !== 4)
+            }
             className="h-11 w-full rounded-xl font-semibold"
             style={{ background: WaselColors.teal }}
           >

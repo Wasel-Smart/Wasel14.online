@@ -1,11 +1,11 @@
 export type {
   RideLifecycleState,
-  RideBookingRecord,
+  LegacyRideBookingStatus,
 } from '../../../../src/domain/rides/lifecycle';
 
 export type {
   PackageLifecycleState,
-  PackageDeliveryRecord,
+  LegacyPackageStatus,
 } from '../../../../src/domain/packages/lifecycle';
 
 export type {
@@ -13,6 +13,13 @@ export type {
 } from '../../../../src/domain/drivers/availability';
 
 export type {
-  TrustScore,
-  TrustProfile,
+  TrustScoreInput,
+  TrustScoreFactor,
+  TrustScoreFactorKey,
 } from '../../../../src/domain/trust/score';
+
+export type {
+  TrustProfileInput,
+  RuntimeTrustProfile,
+  VerificationLevel,
+} from '../../../../src/domain/trust/profile';

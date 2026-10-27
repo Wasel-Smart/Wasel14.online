@@ -56,8 +56,10 @@ function localizeSignalText(value: string) {
   if (getCurrentLang() !== 'ar') {return value;}
   return value
     .replace(/\band\b/g, 'و')
-    .replace(/live searches/g, 'عمليات بحث مباشرة')
-    .replace(/live bookings/g, 'حجوزات مباشرة')
+    .replace(/recent searches/g, 'عمليات بحث حديثة')
+    .replace(/bookings/g, 'حجوزات')
+    .replace(/demand alerts/g, 'تنبيهات طلب')
+    .replace(/route posts/g, 'مسارات منشورة')
     .replace(/package moves/g, 'حركة طرود')
     .replace(/ownership/g, 'ملكية المسار')
     .replace(/pickup/g, 'نقطة الانطلاق');
@@ -197,12 +199,22 @@ export const FindRideCard = React.memo(({
                 )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                <Star size={11} fill={C.gold} color={C.gold} />
-                <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.75rem' }}>
-                  {ride.driver.rating}
-                </span>
-                <span style={{ color: DS.muted, fontSize: '0.72rem' }}>
-                  | {ride.driver.trips} {tx('findRideCard.trips')}</span>
+                {ride.driver.rating > 0 ? (
+                  <>
+                    <Star size={11} fill={C.gold} color={C.gold} />
+                    <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.75rem' }}>
+                      {ride.driver.rating}
+                    </span>
+                  </>
+                ) : (
+                  <span style={{ color: DS.muted, fontWeight: 600, fontSize: '0.74rem' }}>
+                    {ar ? 'سائق جديد' : 'New driver'}
+                  </span>
+                )}
+                {ride.driver.trips > 0 && (
+                  <span style={{ color: DS.muted, fontSize: '0.72rem' }}>
+                    | {ride.driver.trips} {tx('findRideCard.trips')}</span>
+                )}
               </div>
             </div>
           </div>
@@ -301,8 +313,8 @@ export const FindRideCard = React.memo(({
             <div style={{ color: DS.sub, fontSize: '0.76rem', lineHeight: 1.6 }}>
               {signal
                   ? ar
-                  ? `ملكية المسار الحالية ${signal.routeOwnershipScore}/100 ونقطة الانطلاق ${pickupLabel(signal.recommendedPickupPoint)}.`
-                  : `${signal.recommendedReason} Current route ownership is ${signal.routeOwnershipScore}/100 and pickup is ${signal.recommendedPickupPoint}.`
+                  ? `نقطة الانطلاق المقترحة: ${pickupLabel(signal.recommendedPickupPoint)}.`
+                  : `Suggested pickup: ${signal.recommendedPickupPoint}.`
                 : ar
                   ? `أوفر ${corridorPlan.savingsPercent}% من المشوار الفردي على مسار ${cityLabel(ride.from)} إلى ${cityLabel(ride.to)}. أفضل نقطة انطلاق: ${pickupLabel(corridorPlan.pickupPoints[0] ?? '')}.`
                   : `${corridorPlan.savingsPercent}% cheaper than solo movement on ${corridorPlan.label}. Best pickup: ${corridorPlan.pickupPoints[0]}.`}
@@ -338,7 +350,6 @@ export const FindRideCard = React.memo(({
               </span>
             )}
             {signal && <span style={pill(DS.green)}>{tx('findRideCard.demand')}{signal.forecastDemandScore}</span>}
-            {signal && <span style={pill(DS.cyan)}>{tx('findRideCard.owns')}{signal.routeOwnershipScore}</span>}
             {!signal && corridorPlan && (
               <span style={pill(DS.green)}>{tx('findRideCard.demand_2')}{corridorPlan.predictedDemandScore}</span>
             )}
@@ -367,7 +378,7 @@ export const FindRideCard = React.memo(({
                 : soldOut
                   ? ar ? 'بديل الباص متاح' : 'Bus fallback available'
                   : signal
-                    ? ar ? `${localizeSignalText(signal.nextWaveWindow)} التالي` : `${signal.nextWaveWindow} next`
+                    ? ar ? `وقت الذروة ${localizeSignalText(signal.nextWaveWindow)}` : `Busy window ${signal.nextWaveWindow}`
                     : ar ? 'جاهز للحجز' : 'Ready to reserve'}
             </span>
             <button

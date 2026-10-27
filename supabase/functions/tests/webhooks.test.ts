@@ -23,6 +23,8 @@ const STRIPE_SECRET = 'whsec_placeholder_for_testing_only';
 Deno.env.set('STRIPE_WEBHOOK_SECRET', STRIPE_SECRET);
 Deno.env.set('CLIQ_WEBHOOK_SECRET', 'test-cliq-secret-32-chars-minimum!');
 Deno.env.set('SANAD_WEBHOOK_SECRET', 'test-sanad-secret-32-chars-minimum!!');
+const TWILIO_TEST_SECRET = 'test-twilio-signing-secret-32-chars!';
+Deno.env.set('TWILIO_WEBHOOK_SIGNING_SECRET', TWILIO_TEST_SECRET);
 Deno.env.set('SUPABASE_AUTH_HOOK_SEND_SMS_SECRET', STRIPE_SECRET);
 
 // `handleStripeWebhook` builds the admin client before it branches on the event
@@ -54,8 +56,11 @@ async function signStripe(payload: string, secret: string): Promise<string> {
   return `t=${timestamp},v1=${hex}`;
 }
 
-const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook } = await import(
+const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook, handleTwilioWebhook } = await import(
   '../make-server-0b1f4071/_handlers/webhooks.ts'
+);
+const { toStripeMinorUnits } = await import(
+  '../make-server-0b1f4071/_handlers/shared.ts'
 );
 
 // ── Stripe ────────────────────────────────────────────────────────────────────
@@ -116,4 +121,76 @@ Deno.test('handleSendSmsHook — 401 on invalid Standard Webhooks signature', as
   );
   const res = await handleSendSmsHook(req);
   assertEquals(res.status, 401);
+});
+
+// ── Twilio ────────────────────────────────────────────────────────────────────
+
+const TWILIO_URL = 'https://example.supabase.co/functions/v1/webhooks/communications/webhooks/twilio';
+
+// Twilio signs the full URL followed by every POST parameter, sorted by name and
+// concatenated as name+value, with HMAC-SHA1 (base64).
+async function signTwilio(url: string, params: Record<string, string>, secret: string): Promise<string> {
+  const data = Object.keys(params).sort().reduce((acc, name) => acc + name + params[name], url);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-1' },
+    false,
+    ['sign'],
+  );
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+  return btoa(String.fromCharCode(...new Uint8Array(mac)));
+}
+
+function makeTwilioRequest(params: Record<string, string>, signature?: string): Request {
+  return new Request(TWILIO_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...(signature ? { 'x-twilio-signature': signature } : {}),
+    },
+    body: new URLSearchParams(params).toString(),
+  });
+}
+
+Deno.test('handleTwilioWebhook — 200 on a valid X-Twilio-Signature (no MessageSid is acknowledged and ignored)', async () => {
+  const params = { MessageStatus: 'delivered', AccountSid: 'ACtest' };
+  const sig = await signTwilio(TWILIO_URL, params, TWILIO_TEST_SECRET);
+  const res = await handleTwilioWebhook(makeTwilioRequest(params, sig));
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.ignored, true);
+});
+
+Deno.test('handleTwilioWebhook — 401 when a signed parameter is tampered with', async () => {
+  const signed = { MessageStatus: 'delivered', AccountSid: 'ACtest' };
+  const sig = await signTwilio(TWILIO_URL, signed, TWILIO_TEST_SECRET);
+  const res = await handleTwilioWebhook(makeTwilioRequest({ ...signed, MessageStatus: 'failed' }, sig));
+  assertEquals(res.status, 401);
+});
+
+Deno.test('handleTwilioWebhook — 401 with no signature and no URL token', async () => {
+  const res = await handleTwilioWebhook(makeTwilioRequest({ MessageStatus: 'delivered' }));
+  assertEquals(res.status, 401);
+});
+
+// ── Stripe minor units ────────────────────────────────────────────────────────
+
+Deno.test('toStripeMinorUnits — three-decimal currencies use fils, rounded to a multiple of 10', () => {
+  assertEquals(toStripeMinorUnits(12.5, 'JOD'), 12500);
+  assertEquals(toStripeMinorUnits(5, 'kwd'), 5000);
+  assertEquals(toStripeMinorUnits(5, 'BHD'), 5000);
+});
+
+Deno.test('toStripeMinorUnits — two-decimal currencies use x100', () => {
+  assertEquals(toStripeMinorUnits(12.34, 'usd'), 1234);
+  assertEquals(toStripeMinorUnits(0.5, 'eur'), 50);
+  assertEquals(toStripeMinorUnits(100, 'aed'), 10000);
+});
+
+Deno.test('toStripeMinorUnits — fails closed for unknown currencies and invalid amounts', () => {
+  assertEquals(toStripeMinorUnits(10, 'iqd'), null);
+  assertEquals(toStripeMinorUnits(0, 'jod'), null);
+  assertEquals(toStripeMinorUnits(-1, 'usd'), null);
+  assertEquals(toStripeMinorUnits(Number.NaN, 'jod'), null);
 });

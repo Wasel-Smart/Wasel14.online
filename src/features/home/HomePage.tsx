@@ -8,7 +8,6 @@ import { useIframeSafeNavigate } from '../../hooks/useIframeSafeNavigate';
 import { WaselButton } from '../../components/wasel-ui/WaselButton';
 import { useLiveUserStats } from '../../services/liveDataService';
 import { buildCorridorBetaPlan } from '../../services/corridorBeta';
-import { getCorridorDemandLeaders } from '../../services/growthEngine';
 import { CurrencyService } from '../../utils/currency';
 import { trackUserAction } from '../../utils/monitoring';
 import { API_URL } from '../../services/core';
@@ -384,7 +383,7 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
     };
   }, [] );
 
-  return useMemo<CorridorCard[]>( () => {
+  const cards = useMemo<CorridorCard[]>( () => {
     if ( !corridorsLoading && liveCorridors.length > 0 ) {
       return liveCorridors.map( ( item, index ) => {
         const from = item.from || '';
@@ -407,27 +406,9 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
       } );
     }
 
-    const leaders = getCorridorDemandLeaders().slice( 0, 3 );
-    if ( leaders.length > 0 ) {
-      return leaders.map( ( item, index ) => {
-        const [ from, to ] = item.corridor.split( ' to ' );
-        return {
-          key: item.corridor,
-          title: item.corridor,
-          detail: item.serviceLabel,
-          meta: `${ item.active } ${ ar ? 'نشط الآن' : 'active now' }`,
-          priceLabel: '',
-          statLabel: `${ item.active } ${ ar ? 'نشط الآن' : 'active now' }`,
-          insight: index === 0
-            ? ( ar ? 'أفضل توازن بين العرض والطلب اليوم' : 'Best balance of supply and demand today' )
-            : ( ar ? 'حركة واضحة على هذا المسار الآن' : 'Visible live movement on this corridor' ),
-          featured: index === 0,
-          path: `/find-ride?from=${ encodeURIComponent( from ?? '' ) }&to=${ encodeURIComponent( to ?? '' ) }&search=1`,
-          accent: C.cyan,
-        };
-      } );
-    }
-
+    // Fallback is the static popular-routes list. Per-device growth events are
+    // not shown here: they are the visitor's own activity, not platform-wide
+    // "active now" counts.
     return POPULAR_ROUTES.slice( 0, 3 ).map( ( route, index ) => ( {
       key: `${ route.from }-${ route.to }`,
       title: ar ? `${ route.fromAr } ← ${ route.toAr }` : `${ route.from } → ${ route.to }`,
@@ -441,6 +422,8 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
       accent: route.color,
     } ) );
   }, [ ar, svc, t, liveCorridors, corridorsLoading ] );
+
+  return { cards, isLive: !corridorsLoading && liveCorridors.length > 0 };
 }
 
 function useHeroTickerItems ( corridorCards: CorridorCard[] ): HeroTickerItem[] {
@@ -479,9 +462,11 @@ export function HomePage () {
   const { cookieConsented, cookieDeclined, cookieBannerRef, acceptCookies, declineCookies } =
     useCookieConsent( language, setLanguage );
 
-  const corridorCards = useCorridorCards( ar, svc, t );
+  const { cards: corridorCards, isLive: corridorsLive } = useCorridorCards( ar, svc, t );
   const quickActions = useHomeQuickActions( role, t );
-  const heroTickerItems = useHeroTickerItems( corridorCards );
+  // The ticker is labelled "live", so it only renders from the real snapshot,
+  // never from the static popular-routes fallback.
+  const heroTickerItems = useHeroTickerItems( corridorsLive ? corridorCards : [] );
 
   useEffect( () => {
     if ( typeof window !== 'undefined' && 'performance' in window ) {

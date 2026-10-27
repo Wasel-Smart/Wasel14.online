@@ -139,6 +139,8 @@ export class LocationTrackingService {
   // ── Public API ──────────────────────────────────────────────────────────────
 
   async initialize(): Promise<void> {
+    // disconnect() marks the service destroyed; a new sign-in must be able to reconnect.
+    this.destroyed = false;
     const wsUrl = process.env.EXPO_PUBLIC_WS_URL ?? 'wss://wasel14.online/ws';
     const token = mobileAuth.getAccessToken();
     if (!token) return;

@@ -18,6 +18,7 @@ import { WaselButton } from '../../../components/wasel-ui/WaselButton';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { tx } from '../../../locales/tx';
 import { API_URL } from '../../../services/core';
+import { buildLivePreview, STATIC_PREVIEW, type LivePreviewData, type PublicSnapshot } from './livePreview';
 
 import { C, InlineCurrencySwitcher } from '../HomePageShared';
 
@@ -93,26 +94,10 @@ const heroProof = [
   },
 ] as const;
 
-interface LivePreviewData {
-  priceJod: string;
-  rating: string;
-  parcelSlots: string;
-  nextDeparture: string;
-  utilization: number;
-}
-
-const STATIC_PREVIEW: LivePreviewData = {
-  priceJod: '8.00 JOD',
-  rating: '4.9',
-  parcelSlots: '1',
-  nextDeparture: '18:40',
-  utilization: 0.78,
-};
-
 function useLiveRoutePreview(): { data: LivePreviewData; isLive: boolean } {
   const [data, setData] = useState<LivePreviewData>(STATIC_PREVIEW);
-  // Stays false until the public snapshot actually answers, so the hero never
-  // claims "LIVE" while showing the hardcoded fallback numbers.
+  // Stays false until the public snapshot actually answers with a real
+  // Amman -> Aqaba price, so the hero never claims "LIVE" over sample numbers.
   const [isLive, setIsLive] = useState(false);
 
   useEffect(() => {
@@ -123,21 +108,13 @@ function useLiveRoutePreview(): { data: LivePreviewData; isLive: boolean } {
       headers: { Accept: 'application/json' },
     })
       .then(r => (r.ok ? r.json() : null))
-      .then((json: { corridors?: Array<{ priceJod?: number; demand?: number; seatsTotal?: number; seatsBooked?: number }> } | null) => {
-        const first = json?.corridors?.[0];
-        if (!first) {return;}
-        const util = first.seatsTotal ? (first.seatsBooked ?? 0) / first.seatsTotal : 0.78;
-        const slots = Math.max(0, (first.seatsTotal ?? 1) - (first.seatsBooked ?? 0));
-        setData({
-          priceJod: first.priceJod !== null && first.priceJod !== undefined ? `${first.priceJod.toFixed(2)} JOD` : STATIC_PREVIEW.priceJod,
-          rating: STATIC_PREVIEW.rating,
-          parcelSlots: String(slots),
-          nextDeparture: STATIC_PREVIEW.nextDeparture,
-          utilization: util,
-        });
+      .then((json: PublicSnapshot | null) => {
+        const live = buildLivePreview(json);
+        if (!live) {return;}
+        setData(live);
         setIsLive(true);
       })
-      .catch(() => { /* keep static fallback */ });
+      .catch(() => { /* keep the labelled sample */ });
     return () => controller.abort();
   }, []);
 
@@ -155,7 +132,13 @@ function ProductCommandPreview ( { ar }: { ar: boolean } ) {
     { labelKey: 'homeHeroSection.timeline_bus_fallback_label', value: live.nextDeparture, accent: C.blueLight },
   ];
 
-  const timeline = liveTimeline;
+  // The public snapshot carries no driver rating, departure time or parcel
+  // capacity, so in live mode those rows are omitted rather than faked.
+  const timeline = liveTimeline.filter( item =>
+    !( live.rating === '' && item.labelKey === 'homeHeroSection.timeline_driver_trust_label' ) &&
+    !( live.parcelSlots === '' && item.labelKey === 'homeHeroSection.timeline_parcel_option_label' ) &&
+    !( live.nextDeparture === '' && item.labelKey === 'homeHeroSection.timeline_bus_fallback_label' ),
+  );
 
   return (
     <div
@@ -187,7 +170,7 @@ function ProductCommandPreview ( { ar }: { ar: boolean } ) {
           <MobilityOSLandingMap
             focusRouteId="amman-aqaba"
             focusLabel={ ar ? 'عمان إلى العقبة' : 'Amman to Aqaba' }
-            demandPressure={ 1.62 }
+            demandPressure={ live.demandPressure }
             utilization={ live.utilization }
             preferredHeight={ 330 }
             minimalText

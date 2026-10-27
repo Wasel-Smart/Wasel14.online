@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { load } from 'js-yaml';
@@ -12,14 +12,6 @@ function readSource(relativePath: string): string {
 const OPENAPI_SPEC = load(readSource('docs/openapi/wasel-v1.yaml')) as Record<string, unknown>;
 const API_ENDPOINTS_SOURCE = readSource('src/utils/api.ts');
 const EDGE_INDEX = readSource('supabase/functions/make-server-0b1f4071/index.ts');
-
-interface EndpointDefinition {
-  path: string;
-  method: string;
-  handler: string;
-  requiresAuth: boolean;
-  requiresCSRF: boolean;
-}
 
 describe('API endpoint contracts between frontend and backend', () => {
   const apiEndpoints = extractApiEndpoints(API_ENDPOINTS_SOURCE);
@@ -58,7 +50,7 @@ describe('API endpoint contracts between frontend and backend', () => {
 
   it('dynamic endpoints have proper parameter handling', () => {
     const dynamicEndpoints = Object.entries(apiEndpoints).filter(([_, e]) => e.path.includes('('));
-    for (const [name, endpoint] of dynamicEndpoints) {
+    for (const [, endpoint] of dynamicEndpoints) {
       expect(endpoint.path).toMatch(/\$\{[^}]+\}/);
     }
   });
@@ -176,18 +168,15 @@ function extractApiEndpoints(source: string): Record<string, { path: string; met
   const endpointSection = source.slice(source.indexOf('export const API_ENDPOINTS'));
   const lines = endpointSection.split('\n');
 
-  let currentKey = '';
   for (const line of lines) {
-    const match = line.match(/^\s*([A-Z_]+):\s*['"`]([^'"`]+)['"`]/);
-    if (match) {
-      currentKey = match[1];
-      endpoints[currentKey] = { path: match[2], method: inferMethod(currentKey) };
+    const [, key, endpointPath] = line.match(/^\s*([A-Z_]+):\s*['"`]([^'"`]+)['"`]/) ?? [];
+    if (key && endpointPath) {
+      endpoints[key] = { path: endpointPath, method: inferMethod(key) };
     }
     // Also match function endpoints
-    const fnMatch = line.match(/^\s*([A-Z_]+):\s*\([^)]*\)\s*=>\s*['"`]([^'"`]+)['"`]/);
-    if (fnMatch) {
-      currentKey = fnMatch[1];
-      endpoints[currentKey] = { path: fnMatch[2], method: inferMethod(currentKey) };
+    const [, fnKey, fnPath] = line.match(/^\s*([A-Z_]+):\s*\([^)]*\)\s*=>\s*['"`]([^'"`]+)['"`]/) ?? [];
+    if (fnKey && fnPath) {
+      endpoints[fnKey] = { path: fnPath, method: inferMethod(fnKey) };
     }
   }
 
@@ -221,15 +210,17 @@ function extractEdgeHandlers(source: string): Map<string, { method: string; hand
   const routeRegex = /id:\s*'([^']+)'[\s\S]*?methods:\s*\[([^\]]+)\][\s\S]*?handle:\s*\([^)]*\)\s*=>\s*([^\n]+)/g;
 
   for (const match of source.matchAll(routeRegex)) {
-    const id = match[1];
-    const methods = match[2].split(',').map(m => m.trim().replace(/'/g, ''));
-    const handler = match[3].trim();
+    const [, id, methodsRaw, handlerRaw] = match;
+    if (!id || !methodsRaw || !handlerRaw) { continue; }
+    const methods = methodsRaw.split(',').map(m => m.trim().replace(/'/g, ''));
+    const handler = handlerRaw.trim();
 
     // Extract path from test function (simplified)
     const routeSection = source.slice(source.indexOf(`id: '${id}'`));
     const pathMatch = routeSection.match(/test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,200})/);
-    if (pathMatch) {
-      const paths = extractPathsFromTest(pathMatch[1]);
+    const pathBody = pathMatch?.[1];
+    if (pathBody) {
+      const paths = extractPathsFromTest(pathBody);
       for (const path of paths) {
         for (const method of methods) {
           handlers.set(path, { method, handler });
@@ -245,12 +236,13 @@ function extractPathsFromTest(testFn: string): string[] {
   const paths: string[] = [];
 
   for (const m of testFn.matchAll(/path\s*===\s*'([^']+)'/g)) {
-    paths.push(m[1]);
+    const [, direct] = m;
+    if (direct) { paths.push(direct); }
   }
   for (const m of testFn.matchAll(/path\.startsWith\(\s*'([^']+)'\s*\)/g)) {
     paths.push(m[1] + '*');
   }
-  for (const m of testFn.matchAll(/parseWalletRoute\(\s*path\s*\)/g)) {
+  if (/parseWalletRoute\(\s*path\s*\)/.test(testFn)) {
     paths.push('/wallet/:userId/:action?/:resourceId?');
   }
   for (const m of testFn.matchAll(/parseEntityRoute\(\s*path\s*,\s*'([^']+)'/g)) {

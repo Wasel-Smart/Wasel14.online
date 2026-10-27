@@ -7,6 +7,12 @@ export function TestimonialsSection() {
   const { language, t } = useLanguage();
   const reduceMotion = useReducedMotion();
   const ar = language === 'ar';
+  // These quotes are static copy, not sourced from real riders, and must not be
+  // presented as verified. Render only when explicitly enabled (e.g. once the
+  // strings are replaced with real, attributable testimonials).
+  if (import.meta.env.VITE_SHOW_TESTIMONIALS !== 'true') {
+    return null;
+  }
   const testimonials = [
     {
       text: t('homeSections.testimonial1Text'),
@@ -145,18 +151,6 @@ export function TestimonialsSection() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span className="wasel-home-testimonial-name" style={{ fontSize: '0.92rem', fontWeight: 850 }}>
                       {item.name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        color: C.green,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 2,
-                      }}
-                    >
-                      ✓ {ar ? 'موثق' : 'Verified'}
                     </span>
                   </div>
                   <div className="wasel-home-testimonial-role" style={{ fontSize: '0.76rem', color: C.textMuted }}>

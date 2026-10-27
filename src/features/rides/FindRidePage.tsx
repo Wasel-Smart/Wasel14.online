@@ -167,7 +167,7 @@ export function FindRidePage() {
 
   const searchFromCoord = resolveCityCoord(from);
   const searchToCoord = resolveCityCoord(to);
-  // Live inventory from Supabase, merged with local posts and static seed.
+  // Live inventory from Supabase, merged with locally posted rides.
   const { rides: allAvailableRides, loading: inventoryLoading } = useRideInventory({ from, to, date, searched });
   const corridorRides = allAvailableRides.filter(ride => ride.from === from && ride.to === to);
   const nearbyCorridors = allAvailableRides
@@ -477,7 +477,7 @@ export function FindRidePage() {
           emoji={<Search size={24} />}
           title="Book a Ride"
           titleAr="احجز مشوار"
-          sub="Compare verified routes, live demand, and route-level price clarity."
+          sub="Compare routes, demand outlook, and route-level price clarity."
           action={{ label: 'Offer a ride', onClick: () => nav('/app/offer-ride') }}
         />
 
@@ -675,8 +675,8 @@ export function FindRidePage() {
                     </p>
                     <p style={{ color: DS.sub, fontSize: '0.8rem', margin: 0 }}>
                       {selectedSignal
-                        ? `${selectedSignal.liveSearches} people searching · ${selectedSignal.liveBookings} booked · ${selectedSignal.activeDemandAlerts} watching`
-                        : 'Select a route above to see live demand.'}
+                        ? `Your activity on this route: ${selectedSignal.liveSearches} searches · ${selectedSignal.liveBookings} bookings · ${selectedSignal.activeDemandAlerts} alerts`
+                        : 'Select a route above to see demand signals.'}
                     </p>
                   </div>
                   {selectedSignal && (
@@ -716,12 +716,8 @@ export function FindRidePage() {
                 {[
                   {
                     label: 'Available departures',
-                    value: selectedSignal
-                      ? `${selectedSignal.activeSupply} departures`
-                      : `${corridorRides.length} departures`,
-                    sub: selectedSignal
-                      ? `${selectedSignal.liveBookings} booked · ${selectedSignal.activeDemandAlerts} watching`
-                      : 'Live supply on this route',
+                    value: `${corridorRides.length} departures`,
+                    sub: 'Departures listed on this route',
                     tone: DS.cyan,
                   },
                   {
@@ -1024,7 +1020,7 @@ export function FindRidePage() {
                     ? [
                       selectedSignal.recommendedReason,
                       `Next wave: ${selectedSignal.nextWaveWindow} from ${selectedSignal.recommendedPickupPoint}.`,
-                      `Live feed: ${selectedSignal.productionSources.slice(0, 3).join(' | ')}.`,
+                      `Based on: ${selectedSignal.productionSources.slice(0, 3).join(' | ')}.`,
                     ]
                     : (corridorPlan?.intelligenceSignals ?? [
                       'Demand builds before departure.',
@@ -1081,9 +1077,9 @@ export function FindRidePage() {
                       <TrendingUp size={18} color={DS.gold} />
                     </div>
                     <div>
-                      <div style={{ color: C.text, fontWeight: 800 }}>Popular routes right now</div>
+                      <div style={{ color: C.text, fontWeight: 800 }}>Popular routes</div>
                       <div style={{ color: DS.muted, fontSize: '0.76rem', marginTop: 2 }}>
-                        Routes with strong live activity.
+                        Routes with the strongest demand outlook.
                       </div>
                     </div>
                   </div>

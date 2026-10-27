@@ -59,12 +59,13 @@ function extractEdgeRoutes(edgeSource: string): Map<string, Set<string>> {
   // Parse RouteDescriptor array
   const routeRegex = /id:\s*'([^']+)'[\s\S]*?test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,200}?)(?=\n\s*(?:id|handle|methods)\s*:)/g;
   for (const match of edgeSource.matchAll(routeRegex)) {
-    const _routeId = match[1];
     const testFn = match[2];
+    if (!testFn) { continue; }
     // Extract methods
     const methodsMatch = testFn.match(/methods:\s*\[([^\]]+)\]/);
-    const methods = methodsMatch
-      ? methodsMatch[1].split(',').map(m => m.trim().replace(/'/g, ''))
+    const methodsList = methodsMatch?.[1];
+    const methods = methodsList
+      ? methodsList.split(',').map(m => m.trim().replace(/'/g, ''))
       : ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
     // Extract path patterns
     const pathPatterns = extractPathPatterns(testFn);
@@ -84,11 +85,13 @@ function extractPathPatterns(testFn: string): string[] {
   const patterns: string[] = [];
   // Direct path matches: path === '/something'
   for (const m of testFn.matchAll(/path\s*===\s*'([^']+)'/g)) {
-    patterns.push(m[1]);
+    const [, exact] = m;
+    if (exact) { patterns.push(exact); }
   }
   // Prefix matches: path.startsWith('/something/')
   for (const m of testFn.matchAll(/path\.startsWith\(\s*'([^']+)'\s*\)/g)) {
-    patterns.push(m[1]);
+    const [, prefix] = m;
+    if (prefix) { patterns.push(prefix); }
   }
   // Regex patterns: /^\/something\/[^/]+$/
   for (const m of testFn.matchAll(/\/\\^\\\/([A-Za-z0-9_-]+)/g)) {
@@ -120,6 +123,7 @@ describe('OpenAPI schemas reference valid types', () => {
     const missing: string[] = [];
     for (const match of refMatches) {
       const schemaName = match[1];
+      if (!schemaName) { continue; }
       if (!schemas[schemaName]) {
         missing.push(schemaName);
       }

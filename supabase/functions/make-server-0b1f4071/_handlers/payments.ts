@@ -8,7 +8,7 @@ import {
     normalizePaymentAmount,
     stripe,
     toNumber,
-    toStripeMinorAmount,
+    toStripeMinorUnits,
     type getAdminClient,
 } from './shared.ts';
 
@@ -43,7 +43,7 @@ function deriveBookingAmountMinor ( booking: Record< string, unknown >, currency
     : toNumber( booking?.total_price ?? booking?.fare ?? booking?.amount ?? 0, 2 );
 
   if ( !Number.isFinite( major ) || major <= 0 ) {return null;}
-  return currencyLower === 'jod' ? Number( toStripeMinorAmount( major ) ) : Math.round( major * 100 );
+  return toStripeMinorUnits( major, currencyLower );
 }
 
 const MAX_METADATA_ENTRIES = 10;

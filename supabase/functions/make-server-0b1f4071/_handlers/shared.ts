@@ -353,12 +353,10 @@ create policy communication_deliveries_select_own
   to authenticated
   using (user_id in (select id from public.users where auth_user_id::text = auth.uid()::text));
 
+-- Client INSERT is intentionally not granted: rows are queued by the edge function
+-- (service role), which forces the destination to the caller's own verified contact.
+-- A client-writable queue let any signed-in user send SMS/email to any address.
 drop policy if exists communication_deliveries_insert_own on public.communication_deliveries;
-create policy communication_deliveries_insert_own
-  on public.communication_deliveries
-  for insert
-  to authenticated
-  with check (user_id in (select id from public.users where auth_user_id::text = auth.uid()::text));
 `;
 
 export const COMMUNICATIONS_OPERATIONS_SQL = `
@@ -1170,6 +1168,29 @@ export function toMoneyNumber ( value: unknown ): number {
  */
 export function toStripeMinorAmount ( amountJod: number ): string {
   return String( Math.round( amountJod * 100 ) * 10 );
+}
+
+// Stripe's smallest-unit exponent differs by currency. Charging a three-decimal
+// currency (KWD, BHD, OMR, TND, JOD) with the two-decimal x100 rule bills one tenth
+// of the intended amount, so card amounts must go through toStripeMinorUnits().
+const STRIPE_THREE_DECIMAL_CURRENCIES: ReadonlySet<string> = new Set( [ 'jod', 'kwd', 'bhd', 'omr', 'tnd' ] );
+const STRIPE_TWO_DECIMAL_CURRENCIES: ReadonlySet<string> = new Set( [
+  'usd', 'eur', 'gbp', 'aed', 'sar', 'egp', 'qar', 'mad',
+] );
+
+/**
+ * Converts a major-unit amount to the integer Stripe expects for `currency`.
+ * Three-decimal currencies are rounded to a multiple of 10 (Stripe rejects the
+ * last digit being non-zero); two-decimal currencies use x100. Returns null for a
+ * currency whose Stripe exponent is not known here (e.g. IQD), so a money path
+ * fails closed instead of guessing a unit.
+ */
+export function toStripeMinorUnits ( major: number, currency: string ): number | null {
+  const code = String( currency ?? '' ).trim().toLowerCase();
+  if ( !Number.isFinite( major ) || major <= 0 ) {return null;}
+  if ( STRIPE_THREE_DECIMAL_CURRENCIES.has( code ) ) {return Number( toStripeMinorAmount( major ) );}
+  if ( STRIPE_TWO_DECIMAL_CURRENCIES.has( code ) ) {return Math.round( major * 100 );}
+  return null;
 }
 
 export function buildCliqCheckoutUrl ( template: string, values: Record<string, string> ): string {
@@ -3053,10 +3074,24 @@ export async function finalizeBookingPayment ( args: {
   const row = booking as Record<string, unknown>;
   const bookingId = String( row.id ?? '' );
   const expectedCurrency = String( row.currency ?? 'jod' ).toLowerCase();
-  const major = toNumber( row.total_price ?? row.amount ?? row.fare ?? 0, 2 );
-  const expectedMinor = expectedCurrency === 'jod'
-    ? Number( toStripeMinorAmount( major ) )
-    : Math.round( major * 100 );
+  // Must mirror deriveBookingAmountMinor() in payments.ts exactly: the intent is
+  // created for per-seat price x seats when both are present, so the success
+  // webhook has to reconcile against the same figure or a legitimately charged
+  // booking is rejected as an amount mismatch and never marked paid.
+  const perSeat = toNumber( row.price_per_seat ?? 0, 2 );
+  const seats = toNumber( row.seats_requested ?? 0, 0 );
+  const major = perSeat > 0 && seats > 0
+    ? perSeat * seats
+    : toNumber( row.total_price ?? row.amount ?? row.fare ?? 0, 2 );
+  const expectedMinor = toStripeMinorUnits( major, expectedCurrency );
+  if ( expectedMinor === null ) {
+    console.warn( '[payments] payment_intent.succeeded for a currency card payments do not support', {
+      intentId,
+      bookingId,
+      expectedCurrency,
+    } );
+    return { applied: false, reason: 'unsupported_currency', bookingId };
+  }
 
   if ( currencyLower && currencyLower !== expectedCurrency ) {
     console.warn( '[payments] payment_intent.succeeded currency mismatch', { intentId, bookingId, paidCurrency: currencyLower, expectedCurrency } );

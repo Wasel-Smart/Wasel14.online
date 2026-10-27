@@ -60,8 +60,10 @@ function localizeSignalText(value: string) {
   if (getCurrentLang() !== 'ar') {return value;}
   return value
     .replace(/\band\b/g, 'و')
-    .replace(/live searches/g, 'عمليات بحث مباشرة')
-    .replace(/live bookings/g, 'حجوزات مباشرة')
+    .replace(/recent searches/g, 'عمليات بحث حديثة')
+    .replace(/bookings/g, 'حجوزات')
+    .replace(/demand alerts/g, 'تنبيهات طلب')
+    .replace(/route posts/g, 'مسارات منشورة')
     .replace(/package moves/g, 'حركة طرود');
 }
 
@@ -115,6 +117,9 @@ export function FindRideTripDetailModal({
     forecastDemandScore: signal?.forecastDemandScore,
   });
   const dialogRef = useRef<HTMLDivElement>(null);
+  const driverPhoneDigits = (ride.driver.phone ?? '').replace(/[^0-9]/g, '');
+  const hasDriverPhone = driverPhoneDigits.length >= 8;
+  const hasDriverRating = ride.driver.rating > 0;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -309,17 +314,28 @@ export function FindRideTripDetailModal({
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                    <Star size={13} fill={C.gold} color={C.gold} />
-                    <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.82rem' }}>
-                      {ride.driver.rating}
-                    </span>
-                    <span style={{ color: DS.muted, fontSize: '0.75rem' }}>
-                      | {ride.driver.trips} {tx('findRideTripDetailModal.trips')}</span>
+                    {hasDriverRating ? (
+                      <>
+                        <Star size={13} fill={C.gold} color={C.gold} />
+                        <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.82rem' }}>
+                          {ride.driver.rating}
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ color: DS.muted, fontSize: '0.78rem', fontWeight: 600 }}>
+                        {ar ? 'سائق جديد' : 'New driver'}
+                      </span>
+                    )}
+                    {ride.driver.trips > 0 && (
+                      <span style={{ color: DS.muted, fontSize: '0.75rem' }}>
+                        | {ride.driver.trips} {tx('findRideTripDetailModal.trips')}</span>
+                    )}
                   </div>
                 </div>
+                {hasDriverPhone && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <a
-                    href={`https://wa.me/${ride.driver.phone.replace(/[^0-9]/g, '')}`}
+                    href={`https://wa.me/${driverPhoneDigits}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -339,6 +355,7 @@ export function FindRideTripDetailModal({
                     </svg>
                   </a>
                 </div>
+                )}
               </div>
               <div
                 style={{
@@ -372,7 +389,7 @@ export function FindRideTripDetailModal({
                 },
                 {
                   icon: <Navigation size={14} />,
-                  label: signal ? (ar ? 'الطلب المباشر' : 'Live demand') : (ar ? 'المسافة' : 'Distance'),
+                  label: signal ? (ar ? 'توقع الطلب' : 'Demand outlook') : (ar ? 'المسافة' : 'Distance'),
                   val: signal ? `${signal.forecastDemandScore}/100` : `${ride.distance} ${ar ? 'كم' : 'km'}`,
                 },
               ].map(item => (
@@ -408,7 +425,7 @@ export function FindRideTripDetailModal({
                 }}
               >
                 <div style={{ color: C.text, fontWeight: 800, marginBottom: 10 }}>
-                  {tx('findRideTripDetailModal.production_route_proof')}</div>
+                  {ar ? 'نشاط المسار على جهازك' : 'Route activity on this device'}</div>
                 <div style={{ display: 'grid', gap: 8 }}>
                   {[
                     ar
@@ -709,9 +726,10 @@ export function FindRideTripDetailModal({
                         ? 'حجزك بحفظ المقعد وتفاصيل الصعود. إذا تغير المسار، واصل بحدثك والدعم بساعدك.'
                         : 'Your booking saves the seat and boarding details. If the route changes, Wasel updates you and support can help.'}
                 </div>
+                {hasDriverPhone && (
                 <div style={{ display: 'flex', gap: 8 }}>
                   <a
-                    href={`https://wa.me/${ride.driver.phone.replace(/[^0-9]/g, '')}`}
+                    href={`https://wa.me/${driverPhoneDigits}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -734,6 +752,7 @@ export function FindRideTripDetailModal({
                     WhatsApp
                   </a>
                 </div>
+                )}
               </div>
             </div>
           </div>

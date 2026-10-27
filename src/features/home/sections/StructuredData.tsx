@@ -9,25 +9,15 @@ const ORGANIZATION_SCHEMA = {
   alternateName: 'وصل',
   url: 'https://wasel14.online',
   logo: 'https://wasel14.online/brand/assets/logos/primary/logo-dark.png',
-  sameAs: [
-    'https://twitter.com/wasel14',
-    'https://instagram.com/wasel14',
-    'https://linkedin.com/company/wasel14',
-  ],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    telephone: '+962-6-123-4567',
-    contactType: 'customer service',
-    availableLanguage: ['Arabic', 'English'],
-    areaServed: 'JO',
-  },
+  // sameAs, telephone and foundingDate are intentionally omitted: they were
+  // placeholder values (a 123-4567 phone number, unverified social profiles, an
+  // invented founding date). Add them back only once they are real.
   address: {
     '@type': 'PostalAddress',
     addressCountry: 'JO',
     addressLocality: 'Amman',
     addressRegion: 'Amman Governorate',
   },
-  foundingDate: '2024-01-01',
   description: 'Wasel connects riders and drivers through shared routes to reduce travel cost across Jordan.',
 };
 
@@ -53,7 +43,7 @@ const SERVICE_SCHEMA = {
   '@type': 'Service',
   name: 'Wasel Mobility Platform',
   alternateName: 'منصة واصل للتنقل',
-  description: 'Intercity ridesharing, package delivery, and mobility services across Jordan',
+  description: 'Intercity shared rides and package delivery across Jordan',
   provider: {
     '@type': 'Organization',
     name: 'Wasel',
@@ -66,7 +56,6 @@ const SERVICE_SCHEMA = {
   availableChannel: {
     '@type': 'ServiceChannel',
     serviceUrl: 'https://wasel14.online',
-    servicePhone: '+962-6-123-4567',
     availableLanguage: ['Arabic', 'English'],
   },
   hasOfferCatalog: {
@@ -78,7 +67,7 @@ const SERVICE_SCHEMA = {
         itemOffered: {
           '@type': 'Service',
           name: 'Intercity Ridesharing',
-          description: 'Book trusted rides across Jordanian corridors',
+          description: 'Book seats on shared rides across Jordanian corridors',
         },
       },
       {
@@ -86,39 +75,7 @@ const SERVICE_SCHEMA = {
         itemOffered: {
           '@type': 'Service',
           name: 'Package Delivery',
-          description: 'Fast and reliable parcel delivery service',
-        },
-      },
-      {
-        '@type': 'Offer',
-        itemOffered: {
-          '@type': 'Service',
-          name: 'Freight Shipping',
-          description: 'Large cargo and freight transport',
-        },
-      },
-      {
-        '@type': 'Offer',
-        itemOffered: {
-          '@type': 'Service',
-          name: 'Shared Commute',
-          description: 'Shared daily rides for recurring routes',
-        },
-      },
-      {
-        '@type': 'Offer',
-        itemOffered: {
-          '@type': 'Service',
-          name: 'School Transport',
-          description: 'Safe school transportation',
-        },
-      },
-      {
-        '@type': 'Offer',
-        itemOffered: {
-          '@type': 'Service',
-          name: 'Luxury Rides',
-          description: 'Premium vehicles and chauffeurs',
+          description: 'Send parcels with drivers already travelling your route',
         },
       },
     ],
@@ -157,20 +114,20 @@ function createFAQSchema(ar: boolean) {
     {
       q: ar ? 'ما هي المدن التي يغطيها واصل؟' : 'Which cities does Wasel cover?',
       a: ar
-        ? 'وصل يغطي 12 مدينة في الأردن بما فيها عمّان، العقبة، إربد، الزرقاء، البحر الميت، والبتراء.'
-        : 'Wasel covers 12 cities in Jordan including Amman, Aqaba, Irbid, Zarqa, Dead Sea, and Petra.',
+        ? 'وصل يغطي أهم مسارات التنقل بين المدن في الأردن بما فيها عمّان، العقبة، إربد، الزرقاء، البحر الميت، والبتراء.'
+        : 'Wasel covers the main intercity corridors in Jordan including Amman, Aqaba, Irbid, Zarqa, Dead Sea, and Petra.',
     },
     {
       q: ar ? 'هل السائقين موثوقين؟' : 'Are drivers verified?',
       a: ar
-        ? 'نعم، جميع السائقين والركاب يتم التحقق منهم لضمان السلامة. واصل يطبق فحوصات ثقة صارمة.'
-        : 'Yes, all drivers and passengers are verified for safety. Wasel applies strict trust checks.',
+        ? 'يمكن للسائقين إكمال التحقق من هويتهم، وتظهر شارة «موثق» للمتحقق منهم فقط. يمكنك مراجعة ملف السائق قبل الحجز.'
+        : 'Drivers can verify their identity, and only verified drivers show a Verified badge. You can review a driver\'s profile before booking.',
     },
     {
       q: ar ? 'كيف أدفع؟' : 'How do I pay?',
       a: ar
-        ? 'وصل يدعم خيارات دفع متعددة وآمنة بما في ذلك المحفظة الرقمية والبطاقات.'
-        : 'Wasel supports multiple secure payment options including digital wallet and cards.',
+        ? 'يدعم واصل المحفظة الرقمية. خيارات الدفع الأخرى قيد الإضافة.'
+        : 'Wasel supports a digital wallet. Additional payment options are being added.',
     },
   ];
 

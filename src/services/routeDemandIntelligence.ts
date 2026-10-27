@@ -100,11 +100,11 @@ function summarizeProductionSources(args: {
   supply: number;
 }) {
   return [
-    `${args.searches} live searches`,
-    `${args.bookings} live bookings`,
+    `${args.searches} recent searches`,
+    `${args.bookings} bookings`,
     `${args.packages} package moves`,
-    `${args.alerts} active demand alerts`,
-    `${args.supply} active route posts`,
+    `${args.alerts} demand alerts`,
+    `${args.supply} route posts`,
   ];
 }
 
@@ -197,10 +197,10 @@ function computeSignal(
     0,
     bookings.reduce((sum, booking) => sum + Math.max(1, booking.seatsRequested || 1), 0),
   );
+  // No invented utilization: with no known seat inventory, report 0 rather
+  // than a made-up percentage derived from the corridor's fill target.
   const seatUtilizationPercent =
-    totalSeats > 0
-      ? clamp(Math.round((bookedSeats / totalSeats) * 100), 0, 100)
-      : corridor.fillTargetSeats * 18;
+    totalSeats > 0 ? clamp(Math.round((bookedSeats / totalSeats) * 100), 0, 100) : 0;
 
   const demandWeight =
     liveSearches * 1.4 + activeDemandAlerts * 2.2 + liveBookings * 2.8 + livePackages * 1.6;

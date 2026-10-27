@@ -50,6 +50,13 @@ type BackendWorkflowOptions<T> = {
   authMode?: BackendAuthMode;
   fallbackPolicy?: FallbackPolicy;
   edgeAvailable?: boolean;
+  /**
+   * Whether this call mutates data. Defaults to 'write' for the
+   * 'writes-if-enabled' policy and 'read' for everything else. Set it
+   * explicitly for mutating calls that use another policy, otherwise they
+   * are gated as reads.
+   */
+  operationType?: 'read' | 'write';
   edge: (context: BackendWorkflowContext) => Promise<T>;
   fallback?: (context: BackendWorkflowContext) => Promise<T>;
 };
@@ -236,11 +243,13 @@ export async function runBackendWorkflow<T>({
   authMode = 'none',
   fallbackPolicy = 'always',
   edgeAvailable = hasConfiguredEdgeTransport(authMode),
+  operationType: explicitOperationType,
   edge,
   fallback,
 }: BackendWorkflowOptions<T>): Promise<T> {
   const context = await resolveContext(authMode);
-  const operationType: 'read' | 'write' = fallbackPolicy === 'writes-if-enabled' ? 'write' : 'read';
+  const operationType: 'read' | 'write' =
+    explicitOperationType ?? (fallbackPolicy === 'writes-if-enabled' ? 'write' : 'read');
   const fallbackAllowed = Boolean(fallback) && resolveFallbackPolicy(fallbackPolicy, operationType);
 
   if (!edgeAvailable) {

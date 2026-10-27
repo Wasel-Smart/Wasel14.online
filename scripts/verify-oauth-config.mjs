@@ -178,19 +178,33 @@ async function checkLiveProviders(envVars) {
   const apiKey = envVars.VITE_SUPABASE_ANON_KEY || envVars.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
   if (!supabaseUrl || !apiKey) {
-    log('⚠️  VITE_SUPABASE_URL / anon key missing - skipping live check', 'yellow');
-    return true;
+    log('⚠️  VITE_SUPABASE_URL / anon key missing - live check SKIPPED', 'yellow');
+    return 'skipped';
   }
 
   try {
+    // sb_publishable_ keys are opaque, not JWTs: sending one as a Bearer token makes
+    // the gateway answer 401 even though the key is valid. Only legacy JWT keys may
+    // be sent in Authorization.
+    const headers = apiKey.startsWith('eyJ')
+      ? { apikey: apiKey, Authorization: `Bearer ${apiKey}` }
+      : { apikey: apiKey };
     const response = await fetch(`${supabaseUrl}/auth/v1/settings`, {
-      headers: { apikey: apiKey, Authorization: `Bearer ${apiKey}` },
+      headers,
       signal: AbortSignal.timeout(10_000),
     });
 
+    if (response.status === 401 || response.status === 403) {
+      // A rejected key means every sign-in against this project fails, so this is a
+      // real failure, not something to skip. (It used to be reported as a pass.)
+      log(`❌ Supabase rejected the configured public key (HTTP ${response.status}).`, 'red');
+      log('   Copy the Publishable key from Supabase → Project Settings → API Keys.', 'yellow');
+      return false;
+    }
+
     if (!response.ok) {
-      log(`⚠️  Auth settings returned HTTP ${response.status} - skipping live check`, 'yellow');
-      return true;
+      log(`⚠️  Auth settings returned HTTP ${response.status} - live check SKIPPED`, 'yellow');
+      return 'skipped';
     }
 
     const { external = {} } = await response.json();
@@ -205,8 +219,8 @@ async function checkLiveProviders(envVars) {
     }
     return allEnabled;
   } catch (error) {
-    log(`⚠️  Could not reach the Supabase auth service (${error.message})`, 'yellow');
-    return true;
+    log(`⚠️  Could not reach the Supabase auth service (${error.message}) - live check SKIPPED`, 'yellow');
+    return 'skipped';
   }
 }
 
@@ -304,6 +318,10 @@ function printSummary(results) {
 
   const allPassed = Object.values(results).every(r => r);
   for (const [check, passed] of Object.entries(results)) {
+    if (passed === 'skipped') {
+      log(`⚠️  ${check} (skipped - not verified)`, 'yellow');
+      continue;
+    }
     const status = passed ? '✅' : '❌';
     const color = passed ? 'green' : 'red';
     log(`${status} ${check}`, color);

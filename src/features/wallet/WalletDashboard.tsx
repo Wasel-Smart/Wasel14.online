@@ -40,6 +40,7 @@ export function WalletDashboard() {
     autoTopUpEnabled,
     autoTopUpThreshold,
     balanceVisible,
+    currentPinValue,
     fetchInsights,
     handleAutoTopUpToggle,
     handleClaimReward,
@@ -62,6 +63,7 @@ export function WalletDashboard() {
     setAutoTopUpAmount,
     setAutoTopUpThreshold,
     setBalanceVisible,
+    setCurrentPinValue,
     setPinValue,
     setSendAmount,
     setSendNote,
@@ -473,6 +475,8 @@ export function WalletDashboard() {
             balance={bal}
             isRTL={isRTL}
             pinValue={pinValue}
+            currentPinValue={currentPinValue}
+            setCurrentPinValue={setCurrentPinValue}
             sendAmount={sendAmount}
             sendNote={sendNote}
             sendRecipient={sendRecipient}
