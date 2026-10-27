@@ -86,17 +86,29 @@ class TelemetryCollector {
   // Start a trace span
   startSpan(name: string, attributes: Record<string, string | number | boolean> = {}): string {
     const spanId = `span-${crypto.randomUUID()}`;
-    const traceId = `trace-${crypto.randomUUID()}`;
+
+    // Propagate an existing traceId when the caller supplies one via attributes
+    // (e.g. from a BrokerMessage.traceId or a parent span). This keeps all
+    // child spans on the same distributed trace so Grafana Tempo / Jaeger can
+    // correlate them across the event bus boundary.
+    const callerTraceId = typeof attributes.traceId === 'string' ? attributes.traceId : null;
+    const traceId = callerTraceId ?? `trace-${crypto.randomUUID()}`;
+    const parentSpanId = typeof attributes.parentSpanId === 'string' ? attributes.parentSpanId : undefined;
+
+    // Strip propagation keys from stored attributes — they live on the span
+    // envelope itself and would be redundant (and confusing) inside attributes.
+    const { traceId: _t, parentSpanId: _p, ...spanAttributes } = attributes;
 
     this.traces.set(spanId, {
       traceId,
       spanId,
+      parentSpanId,
       name,
       startTime: Date.now(),
       attributes: {
         service: this.serviceName ?? 'wasel-web',
         environment: this.environmentOverride ?? runtimeEnvironment,
-        ...attributes,
+        ...spanAttributes,
       },
       status: 'ok',
     });
@@ -106,7 +118,7 @@ class TelemetryCollector {
         JSON.stringify(createStructuredLogEntry('info', `Span started: ${sanitizeLogMessage(name)}`, 'telemetry', {
           traceId,
           spanId,
-          parentSpanId: sanitizeLogMessage(attributes.parentSpanId),
+          parentSpanId: sanitizeLogMessage(parentSpanId),
         })),
       );
     }

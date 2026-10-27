@@ -11,22 +11,26 @@ interface WaselLogoProps {
   alt?: string;
 }
 
-// Primary brand lockup (logo-dark): the interlocking blue/orange/green
-// route mark with the bilingual wordmark.
 // SVG viewBox is 1929×341 → width = height × 1929/341.
-const LOGO_SVG = '/brand/assets/logos/primary/logo-dark.svg';
-const LOGO_PNG = '/brand/assets/logos/primary/logo-dark.png';
 const LOGO_W_RATIO = 1929 / 341;
 
-function BrandLockup({ size, framed = false }: { size: number; framed?: boolean }) {
+// Theme-aware asset paths. 'dark' variant = dark-coloured mark for light
+// backgrounds. 'light' variant = light-coloured mark for dark backgrounds.
+const LOGO_ASSETS: Record<'dark' | 'light', { svg: string; png: string }> = {
+  dark:  { svg: '/brand/assets/logos/primary/logo-dark.svg',  png: '/brand/assets/logos/primary/logo-dark.png'  },
+  light: { svg: '/brand/assets/logos/primary/logo-light.svg', png: '/brand/assets/logos/primary/logo-light.png' },
+};
+
+function BrandLockup({ size, theme = 'light', framed = false }: { size: number; theme?: 'dark' | 'light'; framed?: boolean }) {
   const h = Math.round(size);
   const w = Math.round(size * LOGO_W_RATIO);
+  const { svg, png } = LOGO_ASSETS[theme];
 
   return (
     <picture>
-      <source srcSet={LOGO_SVG} type="image/svg+xml" />
+      <source srcSet={svg} type="image/svg+xml" />
       <img
-        src={LOGO_PNG}
+        src={png}
         alt=""
         aria-hidden="true"
         width={w}
@@ -40,7 +44,7 @@ function BrandLockup({ size, framed = false }: { size: number; framed?: boolean 
           height: h,
           objectFit: 'contain',
           flexShrink: 0,
-          // Soft, low-alpha halo (brand guide: no heavy glow). Was 33% / 19% cyan.
+          // Soft, low-alpha halo (brand guide: no heavy glow).
           filter: framed
             ? `drop-shadow(0 6px 18px ${C.brandBlue}33) drop-shadow(0 2px 8px ${C.brandBlue}1A)`
             : undefined,
@@ -50,20 +54,22 @@ function BrandLockup({ size, framed = false }: { size: number; framed?: boolean 
   );
 }
 
-export function WaselLogo({
-  size = 36,
-  showWordmark = true,
-  style,
-  variant = 'full',
-  framed,
-  alt,
-}: WaselLogoProps) {
+export function WaselLogo(props: WaselLogoProps) {
+  const {
+    size = 36,
+    showWordmark = true,
+    style,
+    variant = 'full',
+    framed,
+    alt,
+  } = props;
   const language =
     typeof document !== 'undefined' && document.documentElement.lang === 'ar' ? 'ar' : 'en';
   const compact = variant === 'compact' || !showWordmark || size < 22;
-  // The lockup already carries the wordmark, so every variant renders it;
-  // compact spots simply scale the same artwork down.
   const lockupH = Math.max(compact ? 18 : 28, size);
+  // Default to 'light' (white mark) so it renders correctly on the dark app
+  // shell. Pass theme="dark" explicitly when placing on a light background.
+  const resolvedTheme = (props as WaselLogoProps).theme ?? 'light';
 
   return (
     <div
@@ -76,7 +82,7 @@ export function WaselLogo({
         ...style,
       }}
     >
-      <BrandLockup size={lockupH} framed={framed} />
+      <BrandLockup size={lockupH} theme={resolvedTheme} framed={framed} />
     </div>
   );
 }

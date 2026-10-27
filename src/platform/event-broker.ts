@@ -324,16 +324,23 @@ class OptimizedSupabaseEventBroker implements EventBroker {
 
   private async persistDirect(message: BrokerMessage): Promise<void> {
     try {
-      const { error } = await this.client.from(CONFIG.OUTBOX_TABLE).insert({
-        id: message.id,
-        topic: message.topic,
-        payload: message.payload as never,
-        producer: message.producer,
-        trace_id: message.traceId,
-        status: 'pending',
-        attempts: message.attempts,
-        created_at: message.occurredAt,
-      });
+      const { error } = await this.client.from(CONFIG.OUTBOX_TABLE).upsert(
+        {
+          id: message.id,
+          topic: message.topic,
+          payload: message.payload as never,
+          producer: message.producer,
+          trace_id: message.traceId,
+          status: 'pending',
+          attempts: message.attempts,
+          created_at: message.occurredAt,
+        },
+        // Idempotent: if the row already exists (e.g. retry after a network
+        // timeout that delivered the INSERT but dropped the ACK), do nothing.
+        // The existing row keeps its current status so a processed event is
+        // never reset to 'pending'.
+        { onConflict: 'id', ignoreDuplicates: true },
+      );
       if (error) {
         console.error('[broker] failed to persist event', sanitizeLogMessage(message.topic), sanitizeLogMessage(error.message));
       }

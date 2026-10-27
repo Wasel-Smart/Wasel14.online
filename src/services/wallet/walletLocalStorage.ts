@@ -248,9 +248,10 @@ export async function deletePaymentMethodLocal(
 
 export async function getTrustScoreLocal(
   userId: string,
-): Promise<{ totalTrips: number; cashRating: number; onTimePayments: number; deposit: number }> {
+): Promise<{ totalTrips: number; cashRating: number | null; onTimePayments: number | null; deposit: number }> {
   const wallet = await fetchWalletLocal(userId);
-  return { totalTrips: 0, cashRating: 5, onTimePayments: 98, deposit: wallet.balance };
+  // Offline fallback: nothing here is measured, so do not present invented scores.
+  return { totalTrips: 0, cashRating: null, onTimePayments: null, deposit: wallet.balance };
 }
 
 export function describeTransaction(row: TransactionRow): string {

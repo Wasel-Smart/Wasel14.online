@@ -43,8 +43,8 @@
   --destructive-foreground: #ffffff;
   --border: rgba(0, 229, 255, 0.16);
   --input: rgba(0, 229, 255, 0.08);
-  --ring: rgba(0, 229, 255, 0.35);
-  /* Solid focus colour: the 35% --ring is ~2.4:1 on ink, below the 3:1 non-text minimum */
+  /* Solid cyan ring — passes 3:1 non-text contrast on ink (#081D39). */
+  --ring: #00e5ff;
   --wasel-focus: #00e5ff;
 
   /* Header tokens */
@@ -353,7 +353,8 @@ input[type='submit'] {
   --destructive-foreground: #ffffff;
   --border: rgba(8, 29, 57, 0.14);
   --input: rgba(8, 29, 57, 0.05);
-  --ring: rgba(3, 105, 161, 0.4);
+  /* Solid blue ring — passes 3:1 non-text contrast on light surfaces. */
+  --ring: #0369a1;
   --wasel-focus: #0369a1;
 
   /* Glassmorphism — light mode: frosted white panels */
@@ -842,7 +843,7 @@ input[type='range']::-moz-range-thumb {
 .sidebar-section-label {
   padding: 0 14px;
   margin-bottom: 4px;
-  font-size: 0.6rem;
+  font-size: 0.8125rem;
   font-weight: var(--wasel-fw-bold);
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1330,53 +1331,20 @@ input[type='range']::-moz-range-thumb {
   }
 }
 
-/* Old animations (keep compatibility) */
+/* ai-pulse / neon-pulse — opacity-only per brand motion rules (no box-shadow animation). */
 @keyframes ai-pulse {
-
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 0 rgba(0, 229, 255, 0.25),
-      0 0 8px 1px rgba(0, 229, 255, 0.1);
-  }
-
-  50% {
-    box-shadow:
-      0 0 0 3px rgba(0, 229, 255, 0),
-      0 0 12px 3px rgba(0, 229, 255, 0.15);
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
 }
 
 @keyframes ai-pulse-orange {
-
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 0 rgba(255, 138, 11, 0.25),
-      0 0 8px 1px rgba(255, 138, 11, 0.1);
-  }
-
-  50% {
-    box-shadow:
-      0 0 0 3px rgba(255, 138, 11, 0),
-      0 0 12px 3px rgba(255, 138, 11, 0.15);
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
 }
 
 @keyframes neon-pulse {
-
-  0%,
-  100% {
-    box-shadow:
-      0 0 3px rgba(0, 229, 255, 0.15),
-      0 0 8px rgba(0, 229, 255, 0.06);
-  }
-
-  50% {
-    box-shadow:
-      0 0 6px rgba(0, 229, 255, 0.25),
-      0 0 12px rgba(0, 229, 255, 0.1);
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
 }
 
 @keyframes savings-shimmer {

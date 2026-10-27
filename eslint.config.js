@@ -17,6 +17,7 @@ export default tseslint.config(
       'mobile/**',
        'e2e',
        'service.ts',
+       'database.types.ts',
        'docs',
        'public',
        '*.config.js',

@@ -19,7 +19,7 @@ if (typeof document !== 'undefined' && !document.getElementById(CARD_STYLE_ID)) 
     .wcard-hover:hover {
       transform: translateY(-3px);
       box-shadow: 0 14px 32px rgba(8,29,57,0.32);
-      border-color: rgba(20,127,228,0.28) !important;
+      border-color: rgba(0,229,255,0.28) !important;
     }
     .wcard-hover:active {
       transform: translateY(-1px) scale(0.99);

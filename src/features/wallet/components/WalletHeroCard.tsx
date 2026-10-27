@@ -1,8 +1,7 @@
 import { ArrowUpRight, Clock, Eye, EyeOff, Gift, Plus, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Button } from '../../../components/ui/button';
-import { WaselColors } from '../../../tokens/wasel-tokens';
-import { C } from '../../../utils/wasel-ds';
+import { WaselButton } from '../../../components/wasel-ui/WaselButton';
+import { C, GRAD, TYPE, R } from '../../../utils/wasel-ds';
 
 type WalletHeroCardProps = {
   balance: number;
@@ -33,88 +32,110 @@ export function WalletHeroCard({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-xl p-6"
       style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: R.xxl,
+        padding: '24px',
         background: `linear-gradient(135deg, ${C.cardSolid} 0%, ${C.card2} 56%, ${C.bgAlt} 100%)`,
-        border: `1px solid ${WaselColors.teal}20`,
-        boxShadow: '0 14px 34px rgba(0,0,0,0.28)',
+        border: `1px solid ${C.border}`,
+        boxShadow: '0 14px 34px rgba(8,29,57,0.35)',
       }}
     >
       <div
         aria-hidden="true"
-        className="absolute inset-0"
         style={{
+          position: 'absolute',
+          inset: 0,
           background: `linear-gradient(120deg, ${C.cyanDim}, transparent 36%, ${C.elevated})`,
           pointerEvents: 'none',
         }}
       />
 
-      <div className="relative z-10">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-sm text-slate-400">{t.balance}</span>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: TYPE.size.sm, color: C.textMuted }}>{t.balance}</span>
           <button
             type="button"
             onClick={() => { void onToggleBalance(); }}
-            className="text-slate-400 transition-colors hover:text-white"
+            aria-label={balanceVisible ? 'Hide balance' : 'Show balance'}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: C.textMuted,
+              display: 'flex',
+              alignItems: 'center',
+              padding: 4,
+              borderRadius: R.sm,
+              minHeight: 44,
+              minWidth: 44,
+              justifyContent: 'center',
+            }}
           >
-            {balanceVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {balanceVisible
+              ? <Eye style={{ width: 16, height: 16 }} />
+              : <EyeOff style={{ width: 16, height: 16 }} />}
           </button>
         </div>
 
-        <div className="mb-4 flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-white tabular-nums">
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontSize: TYPE.size['4xl'], fontWeight: 700, color: C.text, fontVariantNumeric: 'tabular-nums' }}>
             {balanceVisible ? balance.toFixed(2) : t.maskedBalance}
           </span>
-          <span className="text-lg font-medium text-slate-400">{t.jod}</span>
+          <span style={{ fontSize: TYPE.size.lg, fontWeight: 500, color: C.textMuted }}>{t.jod}</span>
         </div>
 
-        <div className="mb-6 flex gap-4">
+        <div style={{ marginBottom: 24, display: 'flex', gap: 16 }}>
           {pendingBalance > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-yellow-400" />
-              <span className="text-xs text-yellow-400">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Clock style={{ width: 14, height: 14, color: C.gold }} />
+              <span style={{ fontSize: TYPE.size.xs, color: C.gold }}>
                 {t.pending}: {balanceVisible ? pendingBalance.toFixed(2) : t.maskedShort} {t.jod}
               </span>
             </div>
           )}
           {rewardsBalance > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Gift className="h-3.5 w-3.5 text-purple-400" />
-              <span className="text-xs text-purple-400">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Gift style={{ width: 14, height: 14, color: C.purple }} />
+              <span style={{ fontSize: TYPE.size.xs, color: C.purple }}>
                 {t.rewards}: {balanceVisible ? rewardsBalance.toFixed(2) : t.maskedShort} {t.jod}
               </span>
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <Button
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <WaselButton
+            variant="primary"
+            size="md"
             onClick={() => { void onShowTopUp(); }}
             disabled={!canTopUp}
-            className="h-12 rounded-xl text-sm font-semibold disabled:opacity-60"
-            style={{ background: WaselColors.teal }}
+            icon={<Plus style={{ width: 16, height: 16 }} />}
+            style={{ background: GRAD }}
           >
-            <Plus className="mr-1.5 h-4 w-4" />
             {t.addMoney}
-          </Button>
-          <Button
+          </WaselButton>
+          <WaselButton
+            variant="outline"
+            size="md"
             onClick={() => { void onShowWithdraw(); }}
-            variant="outline"
-            className="h-12 rounded-xl border-slate-600 text-sm font-semibold text-slate-200 hover:bg-slate-700/50"
+            icon={<ArrowUpRight style={{ width: 16, height: 16 }} />}
           >
-            <ArrowUpRight className="mr-1.5 h-4 w-4" />
             {t.withdraw}
-          </Button>
-          <Button
-            onClick={() => { void onShowSend(); }}
+          </WaselButton>
+          <WaselButton
             variant="outline"
-            className="h-12 rounded-xl border-slate-600 text-sm font-semibold text-slate-200 hover:bg-slate-700/50"
+            size="md"
+            onClick={() => { void onShowSend(); }}
+            icon={<Send style={{ width: 16, height: 16 }} />}
           >
-            <Send className="mr-1.5 h-4 w-4" />
             {t.sendMoney}
-          </Button>
+          </WaselButton>
         </div>
-        {!canTopUp ? <p className="mt-3 text-xs text-slate-400">{t.topUpUnavailableHint}</p> : null}
+        {!canTopUp
+          ? <p style={{ marginTop: 12, fontSize: TYPE.size.xs, color: C.textMuted }}>{t.topUpUnavailableHint}</p>
+          : null}
       </div>
     </motion.div>
   );

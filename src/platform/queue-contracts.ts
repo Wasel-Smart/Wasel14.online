@@ -95,7 +95,8 @@ export const EVENT_TYPE_TO_TOPIC: Partial<Record<DomainEventType, QueueTopic>> =
   RideRequested: 'rides.requested',
   DriverAssigned: 'rides.assigned',
   RideAccepted: 'rides.assigned',
-  RideStarted: 'rides.assigned',
+  // RideStarted intentionally omitted: in-progress state is a local lifecycle
+  // transition only; no worker action is needed beyond what DriverAssigned already triggered.
   RideCompleted: 'rides.completed',
   RideCancelled: 'rides.completed',
   PackageCreated: 'packages.created',

@@ -8,15 +8,17 @@ export const WaselColors = {
   space3: C.card2,
   space4: C.navyLight,
   cyan: C.cyan,
+  // Lighter cyan tint — correctly aliased to C.cyanDark (the lighter 66E0FF shade).
   cyanLight: C.cyanDark,
   gold: C.gold,
-  // Was mistakenly aliased to C.blueLight (a cyan). Brand orange-gradient midpoint.
   goldLight: '#FFB35C',
   green: C.green,
   greenDark: C.greenDark,
   lime: C.lime,
   teal: C.teal,
-  bronze: C.bronze,
+  // bronze is identical to gold (#FFBE5C). Prefer `gold` for new code.
+  /** @deprecated Use `gold` instead. */
+  bronze: C.gold,
   orange: C.orange,
   borderDark: C.borderFaint,
   navyBase: C.bg,
@@ -25,6 +27,7 @@ export const WaselColors = {
   textSecondary: C.textSub,
   textMuted: C.textMuted,
   success: C.success,
+  // warning maps to brandOrange (journey/CTA colour). Use `error` for error states.
   warning: C.warning,
   error: C.error,
   info: C.info,

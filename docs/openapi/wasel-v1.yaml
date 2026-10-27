@@ -1,4 +1,4 @@
-openapi: 3.1.0
+﻿openapi: 3.1.0
 info:
   title: Wasel Platform API
   version: 1.0.0
@@ -260,13 +260,6 @@ components:
               type: integer
             deadLetterCount:
               type: integer
-            outboxFailed:
-              type: integer
-            deadLetterByTopic:
-              type: object
-              description: Per-topic dead-letter message counts. Keys are queue topic names (e.g. rides.requested.dlq).
-              additionalProperties:
-                type: integer
     CreateTripRequest:
       type: object
       required: [from, to, date, time, seats, carModel]

@@ -169,6 +169,7 @@ export abstract class BaseWorker<T = unknown> {
     const spanId = telemetry.startSpan(`worker.${this.config.name}.process`, {
       topic: message.topic,
       messageId: message.id,
+      traceId: message.correlationId,
     });
 
     const startTime = Date.now();

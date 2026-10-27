@@ -293,7 +293,7 @@ export async function handleSetWalletPin ( request: Request, requestedUserId: st
     if ( error ) {throw new Error( error.message );}
     return json( { success: true, wallet: await loadWalletPayload( auth.admin, auth.canonicalUser.id ) } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'set-pin', error );
   }
 }
 
@@ -324,7 +324,7 @@ export async function handleVerifyWalletPin ( request: Request, requestedUserId:
     }
     return json( { verified } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'verify-pin', error );
   }
 }
 
@@ -348,7 +348,7 @@ export async function handleSetWalletAutoTopUp ( request: Request, requestedUser
     if ( error ) {throw new Error( error.message );}
     return json( await loadWalletPayload( auth.admin, auth.canonicalUser.id ) );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'auto-topup', error );
   }
 }
 
@@ -386,7 +386,7 @@ export async function handleAddWalletPaymentMethod ( request: Request, requested
     if ( error ) {throw new Error( error.message );}
     return json( data, 201 );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'add-payment-method', error );
   }
 }
 
@@ -457,7 +457,7 @@ export async function handleGetWalletTrustScore ( request: Request, requestedUse
   if ( 'error' in auth ) {return auth.error;}
 
   try {
-    const [ { data: wallet }, { data: driver }, { data: user, error: userError } ] = await Promise.all( [
+    const [ { data: wallet }, { data: driver }, { error: userError } ] = await Promise.all( [
       auth.admin.from( 'wallets' ).select( 'balance' ).eq( 'user_id', auth.canonicalUser.id ).maybeSingle(),
       auth.admin.from( 'drivers' ).select( 'driver_id' ).eq( 'user_id', auth.canonicalUser.id ).maybeSingle(),
       auth.admin.from( 'users' ).select( 'verification_level' ).eq( 'id', auth.canonicalUser.id ).maybeSingle(),
@@ -471,10 +471,12 @@ export async function handleGetWalletTrustScore ( request: Request, requestedUse
         .eq( 'driver_id', driver.driver_id );
       tripCount = toNumber( count, 0 );
     }
+    // cashRating and onTimePayments are not tracked anywhere yet. Report them as null
+    // (unknown) instead of inventing numbers that users would read as a real trust signal.
     return json( {
       totalTrips: tripCount,
-      cashRating: 5,
-      onTimePayments: user?.verification_level === 'level_0' ? 80 : 98,
+      cashRating: null,
+      onTimePayments: null,
       deposit: toNumber( wallet?.balance, 0 ),
     } );
   } catch ( error ) {
@@ -698,7 +700,8 @@ export async function handleWalletSubscribe ( request: Request, requestedUserId:
       },
     }, 202 );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 502 );
+    console.error( '[wallet] subscribe failed', error instanceof Error ? error.message : String( error ) );
+    return json( { error: 'Could not start subscription checkout. Please try again.' }, 502 );
   }
 }
 

@@ -14,33 +14,9 @@ This document outlines the rollback strategy for all Wasel database migrations.
 ## Migration Dependency Graph
 
 ```
-20260210_complete_schema.sql
-  └─> 20260223000000_production_schema.sql
-      └─> 20260224_additional_tables.sql
-      └─> 20260224_postgis_functions.sql
-      └─> 20260224_wasel_complete_schema.sql
-          └─> 20260224000000_production_backend_schema.sql
-              └─> 20260224000001_backup_configuration.sql
-                  └─> 20260302_regionalization_schema.sql
-                      └─> 20260310_security_performance_fixes.sql
-                          └─> 20260320000000_w_mobility_platform_complete.sql
-                              └─> 20260320000001_wasel_enhancements.sql
-                                  └─> 20260326080000_legacy_public_table_cutover.sql
-                                      └─> 20260327090000_production_operating_model.sql
-                                          └─> 20260327110000_notifications_runtime_contract.sql
-                                              └─> 20260401093000_database_hardening.sql
-                                                  └─> 20260401113000_unified_backend_contract.sql
-                                                      └─> 20260401133000_align_canonical_rls_policies.sql
-                                                          └─> 20260401143000_harden_rpc_execute_permissions.sql
-                                                              └─> 20260401183000_growth_and_demand_alerts.sql
-                                                                  └─> 20260401193000_referrals_and_growth_events.sql
-                                                                      └─> 20260401213000_expand_runtime_contract_tables.sql
-                                                                          └─> 20260401223000_communications_runtime_contract.sql
-                                                                              └─> 20260401233000_communication_delivery_operations.sql
-                                                                                  └─> 20260402000000_database_hardening_complete.sql
-                                                                                      └─> 20260402010000_gdpr_compliance_schema.sql
-                                                                                          └─> 20260511060011_new-migration.sql
-                                                                                              └─> 20260512000000_database_excellence_upgrade.sql
+20260210000000_baseline_schema.sql
+  └─> 20261018000000_lock_communication_delivery_client_inserts.sql
+      └─> 20261019000000_materialize_user_stats.sql
 ```
 
 ## Rollback Scripts Location

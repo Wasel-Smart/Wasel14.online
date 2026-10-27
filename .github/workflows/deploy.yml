@@ -96,12 +96,13 @@ jobs:
       - name: Check Supabase credentials
         id: creds
         run: |
+          # Fail hard. The frontend job needs this job to succeed, so a silent skip here
+          # would ship a new client against an old API and un-migrated database.
           if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
-            echo "::warning::SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD not set - backend deploy skipped. Migrations and edge functions were NOT deployed."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "::error::SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD are not set for this environment. Refusing to deploy the frontend without deploying the backend."
+            exit 1
           fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
       - name: Link project
         if: steps.creds.outputs.ready == 'true'
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
@@ -148,7 +149,7 @@ jobs:
       - name: Run smoke test
         run: |
           if [ -z "$BASE_URL" ]; then
-            echo "::warning::PRODUCTION_URL repository variable is not set - smoke test skipped."
-            exit 0
+            echo "::error::PRODUCTION_URL repository variable is not set - post-deploy smoke test cannot run."
+            exit 1
           fi
           npm run test:load:smoke

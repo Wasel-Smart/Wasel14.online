@@ -265,7 +265,7 @@ export async function deletePaymentMethodDirect(userId: string, methodId: string
 export async function getTrustScoreDirect(userId: string) {
   const db = getDb();
   const canonicalUserId = await resolveCanonicalUserId(userId);
-  const [{ data: user, error: userError }, { data: wallet }, { data: driver }] = await Promise.all([
+  const [{ error: userError }, { data: wallet }, { data: driver }] = await Promise.all([
     db.from('users').select('id, verification_level').eq('id', canonicalUserId).maybeSingle(),
     db.from('wallets').select('balance').eq('user_id', canonicalUserId).maybeSingle(),
     db.from('drivers').select('driver_id').eq('user_id', canonicalUserId).maybeSingle(),
@@ -281,10 +281,11 @@ export async function getTrustScoreDirect(userId: string) {
     tripCount = toNumber(count, 0);
   }
 
+  // cashRating and onTimePayments are not tracked yet: report unknown (null), never invented values.
   return {
     totalTrips: tripCount,
-    cashRating: 5,
-    onTimePayments: user?.verification_level === 'level_0' ? 80 : 98,
+    cashRating: null as number | null,
+    onTimePayments: null as number | null,
     deposit: toNumber(wallet?.balance, 0),
   };
 }

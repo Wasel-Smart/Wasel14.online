@@ -216,14 +216,16 @@ export const walletApi = {
     throw new Error('Secure wallet top-up is unavailable because the checkout backend is not configured. Deploy the wallet edge function and configure Stripe server secrets before adding funds.');
   },
 
-  async withdraw(userId: string, amount: number, bankAccount: string, method = 'bank_transfer', pin?: string) {
+  async withdraw(userId: string, amount: number, bankAccount: string, opts: { method?: string; pin?: string } = {}) {
+    const { method = 'bank_transfer', pin } = opts;
     return tryEdgeThenDirectForMoney(
       () => requestWalletJson(userId, '/withdraw', 'Withdraw wallet funds', { method: 'POST', body: { amount, bankAccount, method, ...(pin ? { pin } : {}) } }),
       () => withdrawWalletFundsDirect(userId, amount, bankAccount, method),
     );
   },
 
-  async sendMoney(userId: string, recipientId: string, amount: number, note?: string, pin?: string) {
+  async sendMoney(userId: string, recipientId: string, amount: number, opts: { note?: string; pin?: string } = {}) {
+    const { note, pin } = opts;
     return tryEdgeThenDirectForMoney(
       () => requestWalletJson<{ success: boolean; note?: string; wallet: WalletData }>(userId, '/send', 'Send wallet funds', { method: 'POST', body: { recipientId, amount, note, ...(pin ? { pin } : {}) } }),
       async () => ({ success: true, note, wallet: await transferWalletFundsDirect(userId, recipientId, amount) }),
@@ -342,14 +344,15 @@ export const walletApi = {
     );
   },
 
-  async pay(userId: string, amount: number, referenceType: string, referenceId?: string, metadata?: Record<string, unknown>) {
+  async pay(userId: string, amount: number, referenceType: string, opts: { referenceId?: string; metadata?: Record<string, unknown> } = {}) {
+    const { referenceId, metadata } = opts;
     return tryEdgeThenDirectForMoney(
       () => requestWalletJson(userId, '/pay', 'Wallet checkout payment', { method: 'POST', body: { amount, referenceType, referenceId, metadata } }),
-       () => payWithWalletDirect({ userId, amount, referenceType, referenceId, metadata }),
+      () => payWithWalletDirect({ userId, amount, referenceType, referenceId, metadata }),
     );
   },
 
-  async getTrustScore(userId: string): Promise<{ totalTrips: number; cashRating: number; onTimePayments: number; deposit: number }> {
+  async getTrustScore(userId: string): Promise<{ totalTrips: number; cashRating: number | null; onTimePayments: number | null; deposit: number }> {
     const directFn = async () => {
       if (canUseLocalWalletStorage()) {
         try { return await getTrustScoreDirect(userId); } catch { return getTrustScoreLocal(userId); }
