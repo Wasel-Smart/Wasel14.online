@@ -47,6 +47,19 @@ function stripeReportedPayment ( amountMinor: unknown, currency: unknown ) {
   };
 }
 
+// The signature is checked before this runs, so a body that still fails to parse
+// is a provider-side fault, not an attack. Answer 400 (the provider will not retry
+// a client error forever) rather than letting JSON.parse throw into the generic 500
+// handler, which providers treat as retryable and which pollutes error monitoring.
+function parseSignedJson ( rawPayload: string ): ReturnType<typeof JSON.parse> | null {
+  try {
+    const parsed = JSON.parse( rawPayload );
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 
 // eslint-disable-next-line complexity
 export async function handleStripeWebhook ( request: Request ) {
@@ -64,7 +77,10 @@ export async function handleStripeWebhook ( request: Request ) {
     return json( { error: 'Invalid Stripe signature.' }, 401 );
   }
 
-  const event = JSON.parse( rawPayload );
+  const event = parseSignedJson( rawPayload );
+  if ( !event ) {
+    return json( { error: 'Invalid request body' }, 400 );
+  }
   const admin = getAdminClient();
 
   if ( event?.type === 'checkout.session.completed' || event?.type === 'checkout.session.async_payment_succeeded' ) {
@@ -229,7 +245,10 @@ export async function handleCliqWebhook ( request: Request ) {
     return json( { error: 'Invalid CliQ signature.' }, 401 );
   }
 
-  const event = JSON.parse( rawPayload );
+  const event = parseSignedJson( rawPayload );
+  if ( !event ) {
+    return json( { error: 'Invalid request body' }, 400 );
+  }
   const eventObject = ( event?.data && typeof event.data === 'object' )
     ? event.data as Record<string, unknown>
     : event as Record<string, unknown>;
@@ -305,7 +324,10 @@ export async function handleSanadWebhook ( request: Request ) {
     return json( { error: 'Invalid Sanad signature.' }, 401 );
   }
 
-  const event = JSON.parse( rawPayload );
+  const event = parseSignedJson( rawPayload );
+  if ( !event ) {
+    return json( { error: 'Invalid request body' }, 400 );
+  }
   const eventObject = ( event?.data && typeof event.data === 'object' )
     ? event.data as Record<string, unknown>
     : event as Record<string, unknown>;

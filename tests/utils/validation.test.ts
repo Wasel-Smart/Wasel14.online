@@ -27,12 +27,12 @@ function isValid(schema: { safeParse: (v: unknown) => { success: boolean } }, va
 }
 
 function errorMessages(
-  schema: { safeParse: (v: unknown) => { success: boolean; error?: { errors: { message: string }[] } } },
+  schema: { safeParse: (v: unknown) => { success: boolean; error?: { issues: { message: string }[] } } },
   value: unknown,
 ): string[] {
   const result = schema.safeParse(value);
   if (result.success) {return [];}
-  return result.error?.errors.map(e => e.message) ?? [];
+  return result.error?.issues.map(e => e.message) ?? [];
 }
 
 // ── signInSchema ──────────────────────────────────────────────────────────────

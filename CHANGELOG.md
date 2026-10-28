@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Stripe, CliQ and Sanad webhooks now answer 400 (not a retryable 500) when a correctly signed body is not a JSON object; covered by new Deno tests
+- `/communications/admin/apply-migrations` and `/moderation/admin/apply-migrations` return 410 unless `ALLOW_RUNTIME_MIGRATIONS=true`; schema changes ship through `supabase db push`
+
+### Changed
+- Documentation now states the coverage gate CI actually enforces (12/15/19/18 ratchet) separately from the 75/80/85/85 target
+- `REVIEW_REPORT.md` no longer self-grades 9/10
+
 ### Added
 - Incremental release automation
 - Semantic versioning workflow
@@ -55,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bilingual profile fields (`full_name_ar`, `bio_ar`)
 
 **Infrastructure and quality**
-- Vite 6 + React 18 + TypeScript 5 + Supabase stack
+- Vite 6 + React 19 + TypeScript 5 + Supabase stack
 - Vitest unit test suite with coverage
 - Playwright end-to-end browser verification
 - k6 load smoke tests

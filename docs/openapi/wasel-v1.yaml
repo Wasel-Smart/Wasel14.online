@@ -147,6 +147,1209 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+  /v1/bookings/{bookingId}:
+    get:
+      summary: Get booking details
+      operationId: getBooking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      summary: Update booking status
+      operationId: updateBooking
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '200':
+          description: Booking updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+  /v1/ratings:
+    post:
+      summary: Submit a rating
+      operationId: submitRating
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '201':
+          description: Rating submitted
+  /v1/ratings/drivers/{driverId}:
+    get:
+      summary: Get driver ratings
+      operationId: getDriverRatings
+      parameters:
+        - name: driverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Driver ratings
+  /v1/ratings/bookings/{bookingId}/eligibility:
+    get:
+      summary: Check rating eligibility
+      operationId: checkRatingEligibility
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rating eligibility
+  /v1/reviews:
+    post:
+      summary: Submit a review
+      operationId: submitReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Booking'
+      responses:
+        '201':
+          description: Review submitted
+  /v1/notifications:
+    get:
+      summary: List notifications
+      operationId: listNotifications
+      responses:
+        '200':
+          description: Notification list
+    post:
+      summary: Send push notification
+      operationId: sendPushNotification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Push queued
+  /v1/notifications/{notificationId}/read:
+    patch:
+      summary: Mark notification read
+      operationId: markNotificationRead
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification marked read
+  /v1/notifications/send-push:
+    post:
+      summary: Send push notification
+      operationId: sendPush
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Push queued
+  /v1/notifications/push-pref:
+    post:
+      summary: Set push preference
+      operationId: setPushPreference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Preference updated
+    patch:
+      summary: Patch push preference
+      operationId: patchPushPreference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Preference patched
+  /v1/notifications/mark-all-read:
+    post:
+      summary: Mark all notifications read
+      operationId: markAllNotificationsRead
+      responses:
+        '200':
+          description: All notifications marked read
+  /v1/notifications/push-token:
+    post:
+      summary: Register push token
+      operationId: registerPushToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Push token registered
+  /v1/wallet/{userId}:
+    get:
+      summary: Get wallet
+      operationId: getWallet
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wallet data
+  /v1/wallet/{userId}/transactions:
+    get:
+      summary: List wallet transactions
+      operationId: listWalletTransactions
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction list
+  /v1/wallet/{userId}/insights:
+    get:
+      summary: Get wallet insights
+      operationId: getWalletInsights
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wallet insights
+  /v1/wallet/{userId}/withdraw:
+    post:
+      summary: Withdraw wallet funds
+      operationId: withdrawWallet
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Withdrawal processed
+  /v1/wallet/{userId}/send:
+    post:
+      summary: Send wallet funds
+      operationId: sendWalletFunds
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Transfer completed
+  /v1/wallet/{userId}/rewards:
+    get:
+      summary: List wallet rewards
+      operationId: listWalletRewards
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rewards list
+  /v1/wallet/{userId}/rewards/claim:
+    post:
+      summary: Claim wallet reward
+      operationId: claimWalletReward
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Reward claimed
+  /v1/wallet/{userId}/subscription:
+    get:
+      summary: Get wallet subscription
+      operationId: getWalletSubscription
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscription data
+  /v1/wallet/{userId}/top-up:
+    post:
+      summary: Top up wallet
+      operationId: topUpWallet
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Checkout started
+  /v1/wallet/{userId}/subscribe:
+    post:
+      summary: Subscribe to wallet plan
+      operationId: subscribeWallet
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Checkout started
+  /v1/wallet/{userId}/pin/set:
+    post:
+      summary: Set wallet PIN
+      operationId: setWalletPin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: PIN set
+    patch:
+      summary: Patch wallet PIN
+      operationId: patchWalletPin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: PIN patched
+  /v1/wallet/{userId}/pin/verify:
+    post:
+      summary: Verify wallet PIN
+      operationId: verifyWalletPin
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: PIN verified
+    patch:
+      summary: Patch wallet PIN verify
+      operationId: patchWalletPinVerify
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: PIN verify patched
+  /v1/wallet/{userId}/auto-topup:
+    post:
+      summary: Set auto top-up
+      operationId: setAutoTopUp
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Auto top-up updated
+  /v1/wallet/{userId}/payment-methods:
+    get:
+      summary: List payment methods
+      operationId: listPaymentMethods
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment methods list
+    post:
+      summary: Add payment method
+      operationId: addPaymentMethod
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Payment method added
+  /v1/wallet/{userId}/payment-methods/{methodId}:
+    delete:
+      summary: Delete payment method
+      operationId: deletePaymentMethod
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: methodId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment method deleted
+    patch:
+      summary: Set default payment method
+      operationId: setDefaultPaymentMethod
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: methodId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Default payment method set
+  /v1/wallet/{userId}/trust-score:
+    get:
+      summary: Get wallet trust score
+      operationId: getWalletTrustScore
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trust score
+  /v1/wallet/{userId}/pay:
+    post:
+      summary: Pay with wallet
+      operationId: payWithWallet
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Payment processed
+  /v1/mobility-os/live-rows:
+    get:
+      summary: Get mobility live rows
+      operationId: getMobilityLiveRows
+      responses:
+        '200':
+          description: Live rows
+  /v1/mobility-os/snapshot:
+    post:
+      summary: Get mobility snapshot
+      operationId: getMobilitySnapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Mobility snapshot
+    get:
+      summary: Get public mobility snapshot
+      operationId: getPublicMobilitySnapshot
+      responses:
+        '200':
+          description: Public mobility snapshot
+  /v1/mobility-os/booking/create:
+    post:
+      summary: Create mobility booking
+      operationId: createMobilityBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Mobility booking created
+  /v1/mobility-os/public-snapshot:
+    get:
+      summary: Get public mobility snapshot
+      operationId: getPublicMobilitySnapshot2
+      responses:
+        '200':
+          description: Public mobility snapshot
+  /v1/live-trip:
+    get:
+      summary: Get live trip
+      operationId: getLiveTrip
+      responses:
+        '200':
+          description: Live trip snapshot
+  /v1/active-trip:
+    get:
+      summary: Get active trip
+      operationId: getActiveTrip
+      responses:
+        '200':
+          description: Active trip
+    post:
+      summary: Set active trip
+      operationId: setActiveTrip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Active trip set
+    patch:
+      summary: Patch active trip
+      operationId: patchActiveTrip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Active trip patched
+    delete:
+      summary: Clear active trip
+      operationId: clearActiveTrip
+      responses:
+        '204':
+          description: Active trip cleared
+  /v1/chat/trips/{tripId}/messages:
+    get:
+      summary: Get chat messages
+      operationId: getChatMessages
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message list
+    post:
+      summary: Send chat message
+      operationId: sendChatMessage
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Message sent
+  /v1/chat/messages/read:
+    post:
+      summary: Mark chat messages read
+      operationId: markChatMessagesRead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Messages marked read
+  /v1/chat/trips/{tripId}/unread-count:
+    get:
+      summary: Get unread message count
+      operationId: getChatUnreadCount
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Unread count
+  /v1/trust/status:
+    get:
+      summary: Get trust status
+      operationId: getTrustStatus
+      responses:
+        '200':
+          description: Trust status
+  /v1/trust/phone/start:
+    post:
+      summary: Start phone verification
+      operationId: startPhoneVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Verification started
+  /v1/trust/phone/confirm:
+    post:
+      summary: Confirm phone verification
+      operationId: confirmPhoneVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Phone confirmed
+  /v1/trust/identity/submit:
+    post:
+      summary: Submit identity verification
+      operationId: submitIdentityVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Identity submitted
+  /v1/trust/driver-mode/enable:
+    post:
+      summary: Enable driver mode
+      operationId: enableDriverMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Driver mode enabled
+  /v1/trust/driver-documents/submit:
+    post:
+      summary: Submit driver documents
+      operationId: submitDriverDocuments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Documents submitted
+  /v1/auth/2fa/setup:
+    post:
+      summary: Setup 2FA
+      operationId: setup2FA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 2FA setup
+  /v1/auth/2fa/verify:
+    post:
+      summary: Verify 2FA
+      operationId: verify2FA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 2FA verified
+  /v1/auth/2fa/disable:
+    post:
+      summary: Disable 2FA
+      operationId: disable2FA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 2FA disabled
+  /v1/communications/preferences:
+    get:
+      summary: Get communication preferences
+      operationId: getCommunicationPreferences
+      responses:
+        '200':
+          description: Communication preferences
+    patch:
+      summary: Patch communication preferences
+      operationId: patchCommunicationPreferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Preferences patched
+  /v1/communications/deliver:
+    post:
+      summary: Queue communication deliveries
+      operationId: queueCommunicationDeliveries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Deliveries queued
+  /v1/communications/process:
+    post:
+      summary: Process communication queue
+      operationId: processCommunicationQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Queue processed
+  /v1/communications/admin/send-test:
+    post:
+      summary: Send test communication
+      operationId: sendTestCommunication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Test sent
+  /v1/communications/admin/provider-diagnostics:
+    get:
+      summary: Provider diagnostics
+      operationId: providerDiagnostics
+      responses:
+        '200':
+          description: Diagnostics
+  /v1/communications/admin/apply-migrations:
+    post:
+      summary: Apply communication migrations
+      operationId: applyCommunicationMigrations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Migrations applied
+  /v1/moderation/admin/apply-migrations:
+    post:
+      summary: Apply moderation migrations
+      operationId: applyModerationMigrations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Migrations applied
+  /v1/admin/drivers/pending:
+    get:
+      summary: List pending drivers
+      operationId: listPendingDrivers
+      responses:
+        '200':
+          description: Pending drivers
+  /v1/admin/users:
+    get:
+      summary: List users
+      operationId: listUsers
+      responses:
+        '200':
+          description: User list
+  /v1/admin/users/{userId}/status:
+    patch:
+      summary: Set user status
+      operationId: setUserStatus
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: User status updated
+  /v1/admin/disputes:
+    get:
+      summary: List disputes
+      operationId: listDisputes
+      responses:
+        '200':
+          description: Dispute list
+  /v1/admin/disputes/{disputeId}/resolve:
+    patch:
+      summary: Resolve dispute
+      operationId: resolveDispute
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Dispute resolved
+  /v1/admin/dashboard/metrics:
+    get:
+      summary: Get dashboard metrics
+      operationId: getDashboardMetrics
+      responses:
+        '200':
+          description: Dashboard metrics
+  /v1/auth/hooks/send-sms:
+    post:
+      summary: Send SMS via auth hook
+      operationId: sendSmsHook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: SMS sent
+  /v1/payment/create-intent:
+    post:
+      summary: Create payment intent
+      operationId: createPaymentIntent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Payment intent created
+  /v1/payment/refund:
+    post:
+      summary: Create refund
+      operationId: createRefund
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Refund created
+  /v1/events:
+    post:
+      summary: Ingest event
+      operationId: ingestEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Event accepted
+  /v1/corporate/organizations:
+    post:
+      summary: Create organization
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Organization created
+    get:
+      summary: List organizations
+      operationId: listOrganizations
+      responses:
+        '200':
+          description: Organization list
+  /v1/corporate/organizations/{orgId}:
+    get:
+      summary: Get organization
+      operationId: getOrganization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Organization details
+  /v1/corporate/organizations/{orgId}/members:
+    post:
+      summary: Add organization member
+      operationId: addOrganizationMember
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Member added
+  /v1/corporate/organizations/{orgId}/credits:
+    post:
+      summary: Add organization credits
+      operationId: addOrganizationCredits
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Credits added
+  /v1/corporate/invoices/generate:
+    post:
+      summary: Generate invoice
+      operationId: generateInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Invoice generated
+  /v1/corporate/{orgId}/invoices:
+    get:
+      summary: List organization invoices
+      operationId: listOrganizationInvoices
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice list
+  /v1/profile:
+    get:
+      summary: Get profile
+      operationId: getProfile
+      responses:
+        '200':
+          description: Profile data
+    post:
+      summary: Create profile
+      operationId: createProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Profile created
+    patch:
+      summary: Update profile
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Profile updated
+  /v1/profile/{userId}:
+    get:
+      summary: Get user profile
+      operationId: getUserProfile
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Profile data
+  /v1/cancellations/bookings:
+    post:
+      summary: Cancel booking
+      operationId: cancelBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Booking cancelled
+  /v1/cancellations/trips:
+    post:
+      summary: Cancel trip
+      operationId: cancelTrip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Trip cancelled
+  /v1/cancellations/bookings/{bookingId}/eligibility:
+    get:
+      summary: Check cancellation eligibility
+      operationId: checkCancellationEligibility
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cancellation eligibility
+  /v1/reports:
+    post:
+      summary: Submit report
+      operationId: submitReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Report submitted
 components:
   schemas:
     Metadata:

@@ -56,18 +56,22 @@ describe('OpenAPI contract matches edge function routes', () => {
 });
 function extractEdgeRoutes(edgeSource: string): Map<string, Set<string>> {
   const routes = new Map<string, Set<string>>();
-  // Parse RouteDescriptor array
-  const routeRegex = /id:\s*'([^']+)'[\s\S]*?test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,200}?)(?=\n\s*(?:id|handle|methods)\s*:)/g;
+
+  // Match route descriptors with or without an explicit methods array.
+  const routeRegex = /id:\s*'([^']+)'[\s\S]*?test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,300}?)(?=\n\s*(?:id|handle|methods)\s*:)/g;
+
   for (const match of edgeSource.matchAll(routeRegex)) {
     const testFn = match[2];
     if (!testFn) { continue; }
-    // Extract methods
+
+    // Try to extract explicit methods; default to all methods if absent.
     const methodsMatch = testFn.match(/methods:\s*\[([^\]]+)\]/);
     const methodsList = methodsMatch?.[1];
     const methods = methodsList
       ? methodsList.split(',').map(m => m.trim().replace(/'/g, ''))
       : ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-    // Extract path patterns
+
+    // Extract path patterns from the test function body.
     const pathPatterns = extractPathPatterns(testFn);
     for (const pattern of pathPatterns) {
       const normalized = pattern.replace(/^\/v1/, '');
@@ -79,28 +83,47 @@ function extractEdgeRoutes(edgeSource: string): Map<string, Set<string>> {
       }
     }
   }
+
+  // The /health endpoint is handled before resolveRoute(), not in ROUTES array.
+  if (!routes.has('/health')) {
+    routes.set('/health', new Set(['GET']));
+  }
+
   return routes;
 }
+
 function extractPathPatterns(testFn: string): string[] {
   const patterns: string[] = [];
+
   // Direct path matches: path === '/something'
   for (const m of testFn.matchAll(/path\s*===\s*'([^']+)'/g)) {
     const [, exact] = m;
     if (exact) { patterns.push(exact); }
   }
+
   // Prefix matches: path.startsWith('/something/')
   for (const m of testFn.matchAll(/path\.startsWith\(\s*'([^']+)'\s*\)/g)) {
     const [, prefix] = m;
-    if (prefix) { patterns.push(prefix); }
+    if (prefix) { patterns.push(prefix + '*'); }
   }
-  // Regex patterns: /^\/something\/[^/]+$/
-  for (const m of testFn.matchAll(/\/\\^\\\/([A-Za-z0-9_-]+)/g)) {
-    patterns.push(`/${m[1]}/:id`);
+
+  // Regex patterns: /^\/something\/[^/]+$/.test(path)  →  /something/:id
+  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\\\[\\^\\/\\\\]\\\\+\\\\$', 'g'))) {
+    const prefix = m[1].replace(/\\\//g, '/');
+    patterns.push(`/${prefix}/:id`);
   }
+
+  // Regex patterns: /^\/something\/$/.test(path)  →  /something
+  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\$', 'g'))) {
+    const prefix = m[1].replace(/\\\//g, '/');
+    patterns.push(`/${prefix}`);
+  }
+
   // Template literal paths: `/wallet/${userId}`
   for (const m of testFn.matchAll(/`(\/[A-Za-z0-9_/-]*)\${/g)) {
     patterns.push(m[1] + '/:param');
   }
+
   // parseWalletRoute and parseEntityRoute
   for (const _m of testFn.matchAll(/parseWalletRoute\(\s*path\s*\)/g)) {
     patterns.push('/wallet/:userId/:action?/:resourceId?');
@@ -108,6 +131,7 @@ function extractPathPatterns(testFn: string): string[] {
   for (const m of testFn.matchAll(/parseEntityRoute\(\s*path\s*,\s*'([^']+)'/g)) {
     patterns.push(`/${m[1]}/:id/:action?`);
   }
+
   return [...new Set(patterns)];
 }
 function pathsMatch(openApiPath: string, edgePath: string): boolean {

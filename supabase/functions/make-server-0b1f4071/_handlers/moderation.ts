@@ -12,6 +12,13 @@ export async function handleApplyModerationMigrations ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
   if ( accessError ) {return accessError;}
 
+  // Schema changes ship through `supabase db push` in the deploy pipeline. This
+  // route applies DDL from a live, internet-reachable function, so it stays off
+  // unless an operator deliberately opts in (local/dev bootstrap only).
+  if ( Deno.env.get( 'ALLOW_RUNTIME_MIGRATIONS' ) !== 'true' ) {
+    return json( { error: 'Runtime migrations are disabled. Apply migrations with `supabase db push`.' }, 410 );
+  }
+
   await executeSqlStatements( CONTENT_MODERATION_SQL );
 
   return json( {

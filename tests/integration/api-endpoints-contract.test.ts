@@ -207,23 +207,28 @@ function inferMethod(key: string): string {
 function extractEdgeHandlers(source: string): Map<string, { method: string; handler: string }> {
   const handlers = new Map<string, { method: string; handler: string }>();
 
-  const routeRegex = /id:\s*'([^']+)'[\s\S]*?methods:\s*\[([^\]]+)\][\s\S]*?handle:\s*\([^)]*\)\s*=>\s*([^\n]+)/g;
+  // Match route descriptors with or without an explicit methods array.
+  const routeRegex = /id:\s*'([^']+)'[\s\S]*?test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,300}?)(?=\n\s*(?:id|handle|methods)\s*:)/g;
 
   for (const match of source.matchAll(routeRegex)) {
-    const [, id, methodsRaw, handlerRaw] = match;
-    if (!id || !methodsRaw || !handlerRaw) { continue; }
-    const methods = methodsRaw.split(',').map(m => m.trim().replace(/'/g, ''));
-    const handler = handlerRaw.trim();
+    const [, id, testFn] = match;
+    if (!id || !testFn) { continue; }
 
-    // Extract path from test function (simplified)
+    // Try to extract explicit methods; default to all methods if absent.
+    const methodsMatch = testFn.match(/methods:\s*\[([^\]]+)\]/);
+    const methods = methodsMatch
+      ? methodsMatch[1].split(',').map(m => m.trim().replace(/'/g, ''))
+      : ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+    // Extract path patterns from the test function body.
     const routeSection = source.slice(source.indexOf(`id: '${id}'`));
-    const pathMatch = routeSection.match(/test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,200})/);
+    const pathMatch = routeSection.match(/test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,300})/);
     const pathBody = pathMatch?.[1];
     if (pathBody) {
       const paths = extractPathsFromTest(pathBody);
       for (const path of paths) {
         for (const method of methods) {
-          handlers.set(path, { method, handler });
+          handlers.set(path, { method, handler: id });
         }
       }
     }
@@ -235,19 +240,38 @@ function extractEdgeHandlers(source: string): Map<string, { method: string; hand
 function extractPathsFromTest(testFn: string): string[] {
   const paths: string[] = [];
 
+  // Direct path matches: path === '/something'
   for (const m of testFn.matchAll(/path\s*===\s*'([^']+)'/g)) {
     const [, direct] = m;
     if (direct) { paths.push(direct); }
   }
+
+  // Prefix matches: path.startsWith('/something/')
   for (const m of testFn.matchAll(/path\.startsWith\(\s*'([^']+)'\s*\)/g)) {
     paths.push(m[1] + '*');
   }
+
+  // Regex patterns: /^\/something\/[^/]+$/.test(path)  →  /something/:id
+  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\\\[\\^\\/\\\\]\\\\+\\\\$', 'g'))) {
+    const prefix = m[1].replace(/\\\//g, '/');
+    paths.push(`/${prefix}/:id`);
+  }
+
+  // Regex patterns: /^\/something\/$/.test(path)  →  /something
+  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\$', 'g'))) {
+    const prefix = m[1].replace(/\\\//g, '/');
+    paths.push(`/${prefix}`);
+  }
+
+  // Wallet route dispatcher
   if (/parseWalletRoute\(\s*path\s*\)/.test(testFn)) {
     paths.push('/wallet/:userId/:action?/:resourceId?');
   }
+
+  // Entity route dispatcher: parseEntityRoute(path, 'prefix')
   for (const m of testFn.matchAll(/parseEntityRoute\(\s*path\s*,\s*'([^']+)'/g)) {
     paths.push(`/${m[1]}/:id/:action?`);
   }
 
-  return paths;
+  return [...new Set(paths)];
 }

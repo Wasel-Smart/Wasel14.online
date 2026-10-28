@@ -265,7 +265,7 @@ describe( 'useWalletDashboardController', () => {
       } );
       await act( async () => { await result.current.handleWithdraw(); } );
 
-      expect( walletApiMocks.withdraw ).toHaveBeenCalledWith( 'user-1', 50, 'JO00BANK123', 'bank_transfer' );
+      expect( walletApiMocks.withdraw ).toHaveBeenCalledWith( 'user-1', 50, 'JO00BANK123', { method: 'bank_transfer' } );
       expect( result.current.withdrawAmount ).toBe( '' );
       expect( result.current.withdrawBank ).toBe( '' );
       expect( result.current.showWithdraw ).toBe( false );
@@ -298,7 +298,7 @@ describe( 'useWalletDashboardController', () => {
       } );
       await act( async () => { await result.current.handleWithdraw(); } );
 
-      expect( walletApiMocks.withdraw ).toHaveBeenCalledWith( 'user-1', 100, 'JO00BANK123', 'bank_transfer' );
+      expect( walletApiMocks.withdraw ).toHaveBeenCalledWith( 'user-1', 100, 'JO00BANK123', { method: 'bank_transfer' } );
     } );
   } );
 

@@ -91,6 +91,26 @@ Deno.test('handleStripeWebhook — 200 on valid signature with unknown event', a
   assertEquals(body.ignored, true);
 });
 
+Deno.test('handleStripeWebhook — 400 (not a retryable 500) when a correctly signed body is not JSON', async () => {
+  const payload = '{not json';
+  const sig = await signStripe(payload, STRIPE_SECRET);
+  const res = await handleStripeWebhook(
+    makeRequest('/payments/webhooks/stripe', payload, { 'stripe-signature': sig }),
+  );
+  assertEquals(res.status, 400);
+  await res.body?.cancel();
+});
+
+Deno.test('handleStripeWebhook — 400 when a correctly signed body is JSON but not an object', async () => {
+  const payload = 'null';
+  const sig = await signStripe(payload, STRIPE_SECRET);
+  const res = await handleStripeWebhook(
+    makeRequest('/payments/webhooks/stripe', payload, { 'stripe-signature': sig }),
+  );
+  assertEquals(res.status, 400);
+  await res.body?.cancel();
+});
+
 // ── CliQ ──────────────────────────────────────────────────────────────────────
 
 Deno.test('handleCliqWebhook — 401 on invalid signature', async () => {

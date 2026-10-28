@@ -168,7 +168,7 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
       const result = makeWallet({ balance: 75 });
       walletDirectMocks.withdrawWalletFundsDirect.mockResolvedValue(result);
 
-      const out = await walletApi.withdraw('user-123', 25, 'JO00BANK123', 'bank_transfer');
+      const out = await walletApi.withdraw('user-123', 25, 'JO00BANK123', { method: 'bank_transfer' });
 
       expect(walletDirectMocks.withdrawWalletFundsDirect).toHaveBeenCalledWith(
         'user-123', 25, 'JO00BANK123', 'bank_transfer',
@@ -191,7 +191,7 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
       const updatedWallet = makeWallet({ balance: 50 });
       walletDirectMocks.transferWalletFundsDirect.mockResolvedValue(updatedWallet);
 
-      const out = await walletApi.sendMoney('user-123', 'user-456', 30, 'lunch money');
+      const out = await walletApi.sendMoney('user-123', 'user-456', 30, { note: 'lunch money' });
 
       expect(walletDirectMocks.transferWalletFundsDirect).toHaveBeenCalledWith('user-123', 'user-456', 30);
       expect(out).toEqual({ success: true, note: 'lunch money', wallet: updatedWallet });
@@ -290,7 +290,7 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
       const paidWallet = makeWallet({ balance: 70 });
       walletDirectMocks.payWithWalletDirect.mockResolvedValue(paidWallet);
 
-      const out = await walletApi.pay('user-123', 30, 'ride_booking', 'trip-1', { note: 'fare' });
+      const out = await walletApi.pay('user-123', 30, 'ride_booking', { referenceId: 'trip-1', metadata: { note: 'fare' } });
 
       expect(walletDirectMocks.payWithWalletDirect).toHaveBeenCalledWith({
         userId: 'user-123', amount: 30, referenceType: 'ride_booking', referenceId: 'trip-1', metadata: { note: 'fare' },

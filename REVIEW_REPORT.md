@@ -1,8 +1,12 @@
 # Wasel Quality & Release-Readiness Review
 
 **Last verified:** 2026-10-02 (file-level review; nothing was executed)
-**Overall: 9/10.** All automated gaps are closed. Release is gated only by
-human-only credential rotation steps that no code change can complete.
+**Status: not release-ready.** An independent file-level review on 2026-10-28 scored the
+project 6.5/10 (the earlier self-grade of 9/10 here was not supported by the evidence).
+The code-level security work below is solid; the gaps are provider-side credential rotation
+(none confirmed), measured test coverage of ~14–21% against a 75/80/85/85 target, and
+observability env values that are still placeholders. Nothing here has been executed or
+measured by CI; treat every item as unverified until `npm run verify` is green.
 
 ---
 

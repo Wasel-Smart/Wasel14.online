@@ -355,6 +355,11 @@ export async function handleApplyCommunicationMigrations ( request: Request ) {
   const accessError = ensureRuntimeAdminAccess( request );
   if ( accessError ) {return accessError;}
 
+  // See handleApplyModerationMigrations: DDL from a live function is opt-in only.
+  if ( Deno.env.get( 'ALLOW_RUNTIME_MIGRATIONS' ) !== 'true' ) {
+    return json( { error: 'Runtime migrations are disabled. Apply migrations with `supabase db push`.' }, 410 );
+  }
+
   await executeSqlStatements( COMMUNICATIONS_RUNTIME_SQL );
   await executeSqlStatements( COMMUNICATIONS_OPERATIONS_SQL );
 

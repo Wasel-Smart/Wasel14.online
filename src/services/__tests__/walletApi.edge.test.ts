@@ -180,7 +180,7 @@ describe( 'walletApi — edge transport configured', () => {
   describe( 'withdraw / sendMoney / pin / reward — edge success paths', () => {
     it( 'withdraw posts to the edge withdraw endpoint and does not touch direct fallback', async () => {
       requestEdgeJsonMock.mockResolvedValue( { success: true } );
-      await walletApi.withdraw( 'user-123', 25, 'JO00BANK123', 'bank_transfer' );
+      await walletApi.withdraw( 'user-123', 25, 'JO00BANK123', { method: 'bank_transfer' } );
 
       expect( requestEdgeJsonMock ).toHaveBeenCalledWith( expect.objectContaining( {
         path: '/v1/wallet/user-123/withdraw',
