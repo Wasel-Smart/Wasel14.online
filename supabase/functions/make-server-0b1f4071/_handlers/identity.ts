@@ -4,9 +4,7 @@ import {
     authenticateAuthUser,
     ensureCanonicalUserForAuth,
     buildProfilePayload,
-    buildTrustStatus,
     parseEntityRoute,
-    submitSanadVerificationRequest,
 } from './shared.ts';
 
 import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
@@ -231,52 +229,6 @@ export async function handleTwoFactorDisable ( request: Request ) {
   return json( { disabled: true } );
 }
 
-export async function handleSubmitIdentityVerification ( request: Request ) {
-  const auth = await authenticateRequest( request );
-  if ( 'error' in auth ) {return auth.error;}
-
-  const body = await request.json().catch( () => ( {} ) );
-  const providerReference = String( body.providerReference ?? '' ).trim();
-  const documentReference = String( body.documentReference ?? '' ).trim() || null;
-  if ( providerReference.length < 4 ) {
-    return json( { error: 'Enter the Sanad reference before submitting verification.' }, 400 );
-  }
-
-  const latestStatus = await buildTrustStatus( auth );
-  if ( latestStatus?.steps.identity.state === 'in_progress' ) {
-    return json( { error: 'Identity verification is already under review.' }, 409 );
-  }
-
-  const { data, error } = await auth.admin.rpc( 'app_submit_sanad_verification', {
-    p_user_id: auth.canonicalUser.id,
-    p_provider_reference: providerReference,
-    p_document_reference: documentReference,
-  } );
-  if ( error ) {
-    return json( { error: error.message }, 500 );
-  }
-
-  let providerSubmission: Awaited<ReturnType<typeof submitSanadVerificationRequest>>;
-  try {
-    providerSubmission = await submitSanadVerificationRequest( {
-      userId: auth.canonicalUser.id,
-      providerReference,
-      documentReference,
-    } );
-  } catch ( submissionError ) {
-    return json( { error: submissionError instanceof Error ? submissionError.message : String( submissionError ) }, 502 );
-  }
-
-  return json(
-    {
-      submitted: true,
-      verificationId: String( data ?? '' ),
-      providerSubmitted: providerSubmission.submittedToProvider,
-    },
-    202,
-  );
-}
-
 export async function handleEnableDriverMode ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
@@ -321,15 +273,17 @@ export async function handleSubmitDriverDocuments ( request: Request ) {
     return json( { error: driverLookupError.message }, 500 );
   }
 
+  // Submitting documents moves the account to level_2 ("under review"). Only an
+  // operator approval reaches level_3, and a resubmission never downgrades an
+  // account that is already level_3.
+  const currentLevel = String( auth.canonicalUser.verification_level ?? 'level_0' );
+  const nextLevel = currentLevel === 'level_3' ? 'level_3' : 'level_2';
+
   const baseDriverPatch = {
     license_number: licenseNumber,
     driver_status: 'pending_approval',
     background_check_status: 'pending',
-    verification_level: String( auth.canonicalUser.verification_level ?? 'level_0' ),
-    sanad_identity_linked:
-      String( auth.canonicalUser.verification_level ?? 'level_0' ) === 'level_2' ||
-      String( auth.canonicalUser.verification_level ?? 'level_0' ) === 'level_3' ||
-      String( auth.canonicalUser.sanad_verified_status ?? 'unverified' ) === 'verified',
+    verification_level: nextLevel,
   };
 
   let driverId = String( existingDriver?.driver_id ?? '' );
@@ -356,18 +310,20 @@ export async function handleSubmitDriverDocuments ( request: Request ) {
     driverId = String( insertedDriver.driver_id ?? '' );
   }
 
-  const sanadStatus = String( auth.canonicalUser.sanad_verified_status ?? 'unverified' );
+  if ( nextLevel !== currentLevel ) {
+    const { error: levelError } = await auth.admin
+      .from( 'users' )
+      .update( { verification_level: nextLevel, updated_at: new Date().toISOString() } )
+      .eq( 'id', auth.canonicalUser.id );
+    if ( levelError ) {
+      return json( { error: levelError.message }, 500 );
+    }
+  }
+
   const { error: verificationError } = await auth.admin.from( 'verification_records' ).insert( {
     user_id: auth.canonicalUser.id,
-    sanad_status:
-      sanadStatus === 'verified' ||
-        sanadStatus === 'pending' ||
-        sanadStatus === 'rejected' ||
-        sanadStatus === 'expired'
-        ? sanadStatus
-        : 'unverified',
     document_status: 'pending',
-    verification_level: String( auth.canonicalUser.verification_level ?? 'level_0' ),
+    verification_level: nextLevel,
     provider_reference: 'driver_documents',
     document_reference: documentReference,
     failure_reason: null,
