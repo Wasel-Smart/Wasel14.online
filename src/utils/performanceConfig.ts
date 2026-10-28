@@ -47,7 +47,8 @@ export const PERFORMANCE_CONFIG = {
   },
 };
 
-// Apply global performance optimizations
+// Prevent layout thrashing with a single injected stylesheet.
+// content-visibility:auto defers off-screen rendering cost.
 export function applyGlobalOptimizations() {
   // Passive event listeners
   const passiveSupported = (() => {
@@ -75,37 +76,30 @@ export function applyGlobalOptimizations() {
     });
   }
 
-  // Prevent layout thrashing
   const style = document.createElement('style');
   style.textContent = `
     * {
       -webkit-overflow-scrolling: touch;
       -webkit-tap-highlight-color: transparent;
     }
-    
     body {
       overscroll-behavior-y: contain;
       scroll-behavior: smooth;
     }
-    
     .scroll-container {
       will-change: scroll-position;
       transform: translateZ(0);
       -webkit-transform: translateZ(0);
     }
-    
-    .animate-item {
-      will-change: transform, opacity;
-    }
-    
-    img {
+    .animate-item { will-change: transform, opacity; }
+    img { content-visibility: auto; }
+    /* Apply content-visibility to heavy off-screen page sections */
+    [data-cv-auto] {
       content-visibility: auto;
+      contain-intrinsic-size: auto 400px;
     }
-    
     @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
+      *, *::before, *::after {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
@@ -115,18 +109,20 @@ export function applyGlobalOptimizations() {
   `;
   document.head.appendChild(style);
 
-  // Optimize font loading
   if ('fonts' in document) {
     document.fonts.ready.then(() => {
       document.body.classList.add('fonts-loaded');
     });
   }
 
-  // Preconnect to critical origins
-  const origins = [publicSupabaseUrl, 'https://maps.googleapis.com', 'https://js.stripe.com'];
+  // Preconnect to critical origins — done here as a runtime fallback for
+  // browsers that ignore the <link rel="preconnect"> in index.html.
+  const origins = [publicSupabaseUrl];
 
   origins.forEach(origin => {
     if (!origin) {return;}
+    // Skip if already declared in the document head.
+    if (document.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {return;}
     const link = document.createElement('link');
     link.rel = 'preconnect';
     link.href = origin;

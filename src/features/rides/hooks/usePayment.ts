@@ -12,7 +12,7 @@ export function usePayment() {
         setPaymentError(null);
 
         try {
-            await walletApi.pay(userId, amount, 'ride_booking', bookingId, metadata);
+            await walletApi.pay(userId, amount, 'ride_booking', { referenceId: bookingId, metadata });
             return true;
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Payment could not be processed.';

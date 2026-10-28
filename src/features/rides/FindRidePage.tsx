@@ -372,11 +372,9 @@ export function FindRidePage() {
 
       if (booking.status === 'confirmed') {
         try {
-          await walletApi.pay(user.id, finalPrice, 'ride_booking', booking.id, {
-            rideId: ride.id,
-            from: ride.from,
-            to: ride.to,
-            seats: 1,
+          await walletApi.pay(user.id, finalPrice, 'ride_booking', {
+            referenceId: booking.id,
+            metadata: { rideId: ride.id, from: ride.from, to: ride.to, seats: 1 },
           });
         } catch (paymentError) {
           console.error('[Wallet] ride booking payment failed, cancelling booking:', paymentError);
@@ -390,11 +388,9 @@ export function FindRidePage() {
         }
       } else {
         walletApi
-          .pay(user.id, finalPrice, 'ride_booking', booking.id, {
-            rideId: ride.id,
-            from: ride.from,
-            to: ride.to,
-            seats: 1,
+          .pay(user.id, finalPrice, 'ride_booking', {
+            referenceId: booking.id,
+            metadata: { rideId: ride.id, from: ride.from, to: ride.to, seats: 1 },
           })
           .catch(err => {
             console.warn('[Wallet] deferred payment queued for driver-confirm flow:', err);

@@ -2452,13 +2452,53 @@ export async function markTopUpTransactionFailed (
   }
 }
 
-export async function finalizeTopUpTransaction (
-  transactionId: string,
-  externalReference: string,
-  providerPayload: unknown,
-  provider = 'stripe',
-  expected?: { amountJod?: number | null; currency?: string | null },
-) {
+interface FinalizeTopUpOptions {
+  transactionId: string;
+  externalReference: string;
+  providerPayload: unknown;
+  provider?: string;
+  expected?: { amountJod?: number | null; currency?: string | null };
+}
+
+function checkTopUpAmountValidity(
+  storedAmount: number,
+  expected: { amountJod?: number | null; currency?: string | null } | undefined,
+): { currencyMismatch: boolean; amountMismatch: boolean; amountUnverified: boolean } {
+  const paidAmount = expected?.amountJod;
+  const reportedCurrency = String( expected?.currency ?? '' ).trim();
+  const currencyMismatch = /^[a-z]{3}$/i.test( reportedCurrency ) && reportedCurrency.toLowerCase() !== 'jod';
+  const amountUnverified = !( typeof paidAmount === 'number' && Number.isFinite( paidAmount ) && paidAmount > 0 );
+  const amountMismatch = !amountUnverified && Math.abs( ( paidAmount as number ) - storedAmount ) > 0.0051;
+  return { currencyMismatch, amountMismatch, amountUnverified };
+}
+
+interface RecordTopUpMismatchOpts {
+  client: Client;
+  transactionId: string;
+  provider: string;
+  storedAmount: number;
+  expected: FinalizeTopUpOptions['expected'];
+  amountUnverified: boolean;
+}
+
+async function recordTopUpMismatch( opts: RecordTopUpMismatchOpts ): Promise<void> {
+  const { client, transactionId, provider, storedAmount, expected, amountUnverified } = opts;
+  console.error( '[wallet] top-up amount/currency mismatch, wallet not credited', {
+    transactionId, provider, storedAmount,
+    paidAmount: expected?.amountJod ?? null,
+    currency: String( expected?.currency ?? '' ).trim() || null,
+  } );
+  await client.queryObject(
+    'update public.transactions set metadata = coalesce(metadata, \'{}\'::jsonb) || $1::jsonb, updated_at = timezone(\'utc\', now()) where transaction_id = $2',
+    [
+      JSON.stringify( { amount_mismatch: { provider, storedAmount, paidAmount: expected?.amountJod ?? null, currency: String( expected?.currency ?? '' ).trim() || null, reason: amountUnverified ? 'amount_unverified' : 'amount_mismatch' } } ),
+      transactionId,
+    ],
+  );
+}
+
+export async function finalizeTopUpTransaction ( opts: FinalizeTopUpOptions ) {
+  const { transactionId, externalReference, providerPayload, provider = 'stripe', expected } = opts;
   if ( !SUPABASE_DB_URL ) {
     throw new Error( 'SUPABASE_DB_URL is not configured' );
   }
@@ -2493,29 +2533,11 @@ export async function finalizeTopUpTransaction (
     // amount as a plain query parameter, so the webhook is the only trustworthy source.
     // The 0.0051 tolerance absorbs the 3-decimal -> 2-decimal rounding of legacy rows.
     const storedAmount = Number( transaction.amount );
-    const paidAmount = expected?.amountJod;
-    const reportedCurrency = String( expected?.currency ?? '' ).trim();
-    const currencyMismatch = /^[a-z]{3}$/i.test( reportedCurrency ) && reportedCurrency.toLowerCase() !== 'jod';
-    const amountMismatch =
-      typeof paidAmount === 'number' && Number.isFinite( paidAmount ) &&
-      Math.abs( paidAmount - storedAmount ) > 0.0051;
-    if ( currencyMismatch || amountMismatch ) {
-      console.error( '[wallet] top-up amount/currency mismatch, wallet not credited', {
-        transactionId,
-        provider,
-        storedAmount,
-        paidAmount: paidAmount ?? null,
-        currency: reportedCurrency || null,
-      } );
-      await client.queryObject(
-        'update public.transactions set metadata = coalesce(metadata, \'{}\'::jsonb) || $1::jsonb, updated_at = timezone(\'utc\', now()) where transaction_id = $2',
-        [
-          JSON.stringify( { amount_mismatch: { provider, storedAmount, paidAmount: paidAmount ?? null, currency: reportedCurrency || null } } ),
-          transactionId,
-        ],
-      );
+    const { currencyMismatch, amountMismatch, amountUnverified } = checkTopUpAmountValidity( storedAmount, expected );
+    if ( currencyMismatch || amountMismatch || amountUnverified ) {
+      await recordTopUpMismatch( { client, transactionId, provider, storedAmount, expected, amountUnverified } );
       await client.queryArray( 'commit' );
-      return { applied: false, reason: 'amount_mismatch' };
+      return { applied: false, reason: amountUnverified ? 'amount_unverified' : 'amount_mismatch' };
     }
 
     await client.queryObject(

@@ -100,37 +100,44 @@ type ActionBarProps = {
   onOpenBooking: () => void;
 };
 
+function getActionBarStrings(ar: boolean, soldOut: boolean, hasBooking: boolean, opts: { bookingStatus: ActionBarProps['bookingStatus']; signal: ActionBarProps['signal'] }) {
+  const { bookingStatus, signal } = opts;
+  if (hasBooking) {
+    const isPending = bookingStatus === 'pending_driver';
+    return {
+      statusText: isPending ? (ar ? 'تم إرسال الطلب' : 'Request sent') : (ar ? 'تم تأكيد المقعد' : 'Seat confirmed'),
+      btnText: ar ? 'افتح في رحلاتي' : 'Open in My Trips',
+      statusColor: isPending ? DS.gold : DS.green,
+      btnBg: isPending ? DS.gradGold : DS.gradG,
+      btnShadow: isPending ? DS.gold : DS.green,
+    };
+  }
+  if (soldOut) {
+    return {
+      statusText: ar ? 'بديل الباص متاح' : 'Bus fallback available',
+      btnText: ar ? 'ممتلئ' : 'Sold out',
+      statusColor: DS.gold, btnBg: C.elevated, btnShadow: C.elevated,
+    };
+  }
+  return {
+    statusText: signal ? (ar ? `وقت الذروة ${localizeSignalText(signal.nextWaveWindow)}` : `Busy window ${signal.nextWaveWindow}`) : (ar ? 'جاهز للحجز' : 'Ready to reserve'),
+    btnText: ar ? 'عرض التفاصيل' : 'View details',
+    statusColor: DS.muted, btnBg: DS.gradC, btnShadow: DS.cyan,
+  };
+}
+
 function RideActionBar({ ar, soldOut, hasBooking, bookingStatus, signal, onOpen, onOpenBooking }: ActionBarProps) {
-  const statusColor = hasBooking
-    ? bookingStatus === 'pending_driver' ? DS.gold : DS.green
-    : soldOut ? DS.gold : DS.muted;
-  const btnBg = hasBooking
-    ? bookingStatus === 'pending_driver' ? DS.gradGold : DS.gradG
-    : soldOut ? C.elevated : DS.gradC;
-  const btnShadow = hasBooking
-    ? bookingStatus === 'pending_driver' ? DS.gold : DS.green
-    : soldOut ? C.elevated : DS.cyan;
-  const statusText = hasBooking
-    ? bookingStatus === 'pending_driver'
-      ? ar ? 'تم إرسال الطلب' : 'Request sent'
-      : ar ? 'تم تأكيد المقعد' : 'Seat confirmed'
-    : soldOut
-      ? ar ? 'بديل الباص متاح' : 'Bus fallback available'
-      : signal
-        ? ar ? `وقت الذروة ${localizeSignalText(signal.nextWaveWindow)}` : `Busy window ${signal.nextWaveWindow}`
-        : ar ? 'جاهز للحجز' : 'Ready to reserve';
-  const btnText = hasBooking
-    ? ar ? 'افتح في رحلاتي' : 'Open in My Trips'
-    : soldOut
-      ? ar ? 'ممتلئ' : 'Sold out'
-      : ar ? 'عرض التفاصيل' : 'View details';
+  const { statusText, btnText, statusColor, btnBg, btnShadow } = getActionBarStrings(ar, soldOut, hasBooking, { bookingStatus, signal });
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
       <span style={{ color: statusColor, fontSize: '0.75rem' }}>{statusText}</span>
       <button
         onClick={(event: React.MouseEvent) => {
           event.stopPropagation();
-          if (hasBooking) { onOpenBooking(); return; }
+          if (hasBooking) {
+            onOpenBooking();
+            return;
+          }
           onOpen();
         }}
         className="sp-book-btn"
@@ -145,6 +152,78 @@ function RideActionBar({ ar, soldOut, hasBooking, bookingStatus, signal, onOpen,
       >
         {btnText}
       </button>
+    </div>
+  );
+}
+
+type DriverHeaderProps = { ride: Ride; ar: boolean; priceQuote: ReturnType<typeof getMovementPriceQuote> };
+
+function DriverHeader({ ride, ar, priceQuote }: DriverHeaderProps) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div style={{ width: 44, height: 44, borderRadius: r(12), background: DS.gradC, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: C.text, fontSize: '0.95rem' }}>
+            {ride.driver.avatar}
+          </div>
+          {ride.driver.verified && (
+            <div style={{ position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: DS.cyan, border: `2px solid ${DS.card}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle2 size={9} color={C.text} />
+            </div>
+          )}
+        </div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: C.text, fontSize: '0.92rem' }}>{ride.driver.name}</span>
+            {ride.driver.verified && (
+              <span style={{ ...pill(DS.green), fontSize: '0.8125rem' }}>{tx('verification.verified')}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+            {ride.driver.rating > 0 ? (
+              <><Star size={11} fill={C.gold} color={C.gold} /><span style={{ color: C.gold, fontWeight: 700, fontSize: '0.8125rem' }}>{ride.driver.rating}</span></>
+            ) : (
+              <span style={{ color: DS.muted, fontWeight: 600, fontSize: '0.8125rem' }}>{ar ? 'سائق جديد' : 'New driver'}</span>
+            )}
+            {ride.driver.trips > 0 && (
+              <span style={{ color: DS.muted, fontSize: '0.8125rem' }}>| {ride.driver.trips} {tx('findRideCard.trips')}</span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div style={{ textAlign: 'end' }}>
+        <div style={{ color: DS.cyan, fontWeight: 900, fontSize: '1.7rem', lineHeight: 1 }}>{priceQuote.finalPriceJod}</div>
+        <div style={{ color: DS.muted, fontSize: '0.8125rem', fontWeight: 600, marginTop: 2 }}>{tx('findRideCard.jod_seat')}</div>
+        {priceQuote.discountJod > 0 ? (
+          <div style={{ color: DS.green, fontSize: '0.8125rem', fontWeight: 700, marginTop: 5 }}>
+            {tx('common.save')}{priceQuote.discountJod} {tx('findRideCard.jod_from')}{priceQuote.basePriceJod}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+type RouteRowProps = { ride: Ride };
+
+function RouteRow({ ride }: RouteRowProps) {
+  return (
+    <div style={{ background: C.overlay, borderRadius: r(14), padding: '14px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 800, color: C.text, fontSize: '0.92rem' }}>{cityLabel(ride.from)}</div>
+        <div style={{ color: DS.muted, fontSize: '0.8125rem', marginTop: 1 }}>
+          <Clock size={10} style={{ display: 'inline', marginRight: 3 }} />{ride.time}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: DS.green, boxShadow: `0 0 8px ${DS.green}60` }} />
+        <div style={{ width: 1, height: 22, background: `linear-gradient(180deg,${DS.green},${DS.cyan})` }} />
+        <div style={{ width: 7, height: 7, borderRadius: '50%', background: DS.cyan, boxShadow: `0 0 8px ${DS.cyan}60` }} />
+        <span style={{ color: DS.muted, fontSize: '0.8125rem', fontWeight: 600, marginTop: 2 }}>{durationLabel(ride.duration)}</span>
+      </div>
+      <div style={{ flex: 1, textAlign: 'end' }}>
+        <div style={{ fontWeight: 800, color: C.text, fontSize: '0.92rem' }}>{cityLabel(ride.to)}</div>
+        <div style={{ color: DS.muted, fontSize: '0.8125rem', marginTop: 1 }}>{ride.distance} {tx('findRideCard.km')}</div>
+      </div>
     </div>
   );
 }
@@ -242,157 +321,8 @@ export const FindRideCard = React.memo(({
     >
       <div style={{ height: 2, background: DS.gradC }} />
       <div className="sp-ride-card-body" style={{ padding: '20px 24px' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: r(12),
-                  background: DS.gradC,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 900,
-                  color: C.text,
-                  fontSize: '0.95rem',
-                }}
-              >
-                {ride.driver.avatar}
-              </div>
-              {ride.driver.verified && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: -2,
-                    right: -2,
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    background: DS.cyan,
-                    border: `2px solid ${DS.card}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <CheckCircle2 size={9} color={C.text} />
-                </div>
-              )}
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontWeight: 800, color: C.text, fontSize: '0.92rem' }}>
-                  {ride.driver.name}
-                </span>
-                {ride.driver.verified && (
-                  <span style={{ ...pill(DS.green), fontSize: '0.8125rem' }}>{tx('verification.verified')}</span>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                {ride.driver.rating > 0 ? (
-                  <>
-                    <Star size={11} fill={C.gold} color={C.gold} />
-                    <span style={{ color: C.gold, fontWeight: 700, fontSize: '0.8125rem' }}>
-                      {ride.driver.rating}
-                    </span>
-                  </>
-                ) : (
-                  <span style={{ color: DS.muted, fontWeight: 600, fontSize: '0.8125rem' }}>
-                    {ar ? 'سائق جديد' : 'New driver'}
-                  </span>
-                )}
-                {ride.driver.trips > 0 && (
-                  <span style={{ color: DS.muted, fontSize: '0.8125rem' }}>
-                    | {ride.driver.trips} {tx('findRideCard.trips')}</span>
-                )}
-              </div>
-            </div>
-          </div>
-          <div style={{ textAlign: 'end' }}>
-            <div style={{ color: DS.cyan, fontWeight: 900, fontSize: '1.7rem', lineHeight: 1 }}>
-              {priceQuote.finalPriceJod}
-            </div>
-            <div style={{ color: DS.muted, fontSize: '0.8125rem', fontWeight: 600, marginTop: 2 }}>
-              {tx('findRideCard.jod_seat')}</div>
-            {priceQuote.discountJod > 0 ? (
-              <div style={{ color: DS.green, fontSize: '0.8125rem', fontWeight: 700, marginTop: 5 }}>
-                {tx('common.save')}{priceQuote.discountJod} {tx('findRideCard.jod_from')}{priceQuote.basePriceJod}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: C.overlay,
-            borderRadius: r(14),
-            padding: '14px 18px',
-            marginBottom: 14,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, color: C.text, fontSize: '0.92rem' }}>{cityLabel(ride.from)}</div>
-            <div style={{ color: DS.muted, fontSize: '0.8125rem', marginTop: 1 }}>
-              <Clock size={10} style={{ display: 'inline', marginRight: 3 }} />
-              {ride.time}
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 3,
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: DS.green,
-                boxShadow: `0 0 8px ${DS.green}60`,
-              }}
-            />
-            <div
-              style={{
-                width: 1,
-                height: 22,
-                background: `linear-gradient(180deg,${DS.green},${DS.cyan})`,
-              }}
-            />
-            <div
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: DS.cyan,
-                boxShadow: `0 0 8px ${DS.cyan}60`,
-              }}
-            />
-            <span style={{ color: DS.muted, fontSize: '0.8125rem', fontWeight: 600, marginTop: 2 }}>
-              {durationLabel(ride.duration)}
-            </span>
-          </div>
-          <div style={{ flex: 1, textAlign: 'end' }}>
-            <div style={{ fontWeight: 800, color: C.text, fontSize: '0.92rem' }}>{cityLabel(ride.to)}</div>
-            <div style={{ color: DS.muted, fontSize: '0.8125rem', marginTop: 1 }}>
-              {ride.distance} {tx('findRideCard.km')}</div>
-          </div>
-        </div>
+        <DriverHeader ride={ride} ar={ar} priceQuote={priceQuote} />
+        <RouteRow ride={ride} />
 
         <CorridorBlock ar={ar} ride={ride} signal={signal} corridorPlan={corridorPlan} />
 

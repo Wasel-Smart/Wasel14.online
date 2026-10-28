@@ -12,6 +12,9 @@ body,
    theme-color meta so first paint never flashes an off-brand shade. */
 html {
   background: #081d39;
+  /* Contain paint to the viewport — prevents off-screen content from
+     triggering layout recalculations during scroll. */
+  contain: paint;
 }
 
 body {
@@ -20,10 +23,25 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent momentum scroll from causing layout shifts on iOS. */
+  overscroll-behavior-y: contain;
 }
 
 #root {
   width: 100%;
+  /* Isolate the stacking context so composited layers don't bleed. */
+  isolation: isolate;
+}
+
+/* Ensure images never cause layout shifts by reserving their space. */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Reset will-change after animations complete to free GPU memory. */
+.animation-done {
+  will-change: auto;
 }
 
 @keyframes wasel-spin {

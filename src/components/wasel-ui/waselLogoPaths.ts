@@ -6,8 +6,8 @@
  */
 
 /** Full bilingual lockup (Arabic + English wordmark + route mark). */
-export const LOGO_VIEWBOX = '109 152 1929 341';
-export const LOGO_ASPECT = 1929 / 341;
+export const LOGO_VIEWBOX = '0 0 1673 940';
+export const LOGO_ASPECT = 1673 / 940;
 
 /** Route mark only (no wordmark): the three interlocking strokes + nodes. */
 export const MARK_VIEWBOX = '745 158 490 330';

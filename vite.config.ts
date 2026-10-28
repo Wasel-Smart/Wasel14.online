@@ -47,13 +47,13 @@ export default defineConfig(({ mode }) => ({
   },
 
   build: {
-    target: 'es2020',
+    target: 'es2022',
     outDir: 'dist',
     sourcemap: 'hidden',
     minify: 'esbuild',
     cssCodeSplit: true,
     reportCompressedSize: true,
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 400,
     rollupOptions: {
       output: {
         // NOTE: there is intentionally NO `manualChunks` here.
@@ -69,7 +69,7 @@ export default defineConfig(({ mode }) => ({
         // Rollup's default chunking does not produce that cycle and keeps
         // three.js / react-three-fiber inside the lazy globe chunk.
         compact: true,
-        experimentalMinChunkSize: 10000,
+        experimentalMinChunkSize: 15000,
         assetFileNames: (assetInfo) => {
           if (assetInfo.name?.endsWith('.css')) return 'assets/css/[name]-[hash][extname]';
           if (
@@ -85,6 +85,15 @@ export default defineConfig(({ mode }) => ({
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
       },
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false,
+      },
+    },
+    esbuildOptions: {
+      legalComments: 'none',
+      treeShaking: true,
     },
   },
 
@@ -149,10 +158,11 @@ export default defineConfig(({ mode }) => ({
       'motion/react',
       'recharts',
       'leaflet',
-      'three',
-      '@react-three/fiber',
-      '@react-three/drei',
       'zod',
     ],
+    // three.js + react-three are only loaded lazily on the globe section.
+    // Keeping them out of the pre-bundle prevents ~1.2 MB from entering the
+    // eager dependency graph. They must NOT appear in `include` above.
+    exclude: ['@react-three/fiber', '@react-three/drei', 'three'],
   },
 }));

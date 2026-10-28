@@ -245,9 +245,9 @@ export function useWalletDashboardController() {
     try {
       // The server enforces the PIN; it is only sent when the wallet has one.
       if (pinRequired) {
-        await walletApi.withdraw(effectiveUserId, amt, withdrawBank, withdrawMethod, pinValue);
+        await walletApi.withdraw(effectiveUserId, amt, withdrawBank, { method: withdrawMethod, pin: pinValue });
       } else {
-        await walletApi.withdraw(effectiveUserId, amt, withdrawBank, withdrawMethod);
+        await walletApi.withdraw(effectiveUserId, amt, withdrawBank, { method: withdrawMethod });
       }
       toast.success((t.withdrawnSuccess ?? 'JOD {amount} withdrawn successfully').replace('{amount}', String(amt)));
       setShowWithdraw(false);
@@ -275,9 +275,9 @@ export function useWalletDashboardController() {
     setActionLoading(true);
     try {
       if (pinRequired) {
-        await walletApi.sendMoney(effectiveUserId, sendRecipient, amt, sendNote || undefined, pinValue);
+        await walletApi.sendMoney(effectiveUserId, sendRecipient, amt, { note: sendNote || undefined, pin: pinValue });
       } else {
-        await walletApi.sendMoney(effectiveUserId, sendRecipient, amt, sendNote || undefined);
+        await walletApi.sendMoney(effectiveUserId, sendRecipient, amt, { note: sendNote || undefined });
       }
       toast.success((t.sentSuccess ?? 'JOD {amount} sent successfully').replace('{amount}', String(amt)));
       setShowSend(false);

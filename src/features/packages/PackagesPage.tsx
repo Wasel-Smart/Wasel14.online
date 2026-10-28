@@ -188,11 +188,14 @@ export function PackagesPage() {
 
       if (user?.id) {
         try {
-          await walletApi.pay(user.id, priceResult.price, 'package_delivery', created.id, {
-            trackingId: created.trackingId,
-            from: created.from,
-            to: created.to,
-            weight: pkg.weight,
+          await walletApi.pay(user.id, priceResult.price, 'package_delivery', {
+            referenceId: created.id,
+            metadata: {
+              trackingId: created.trackingId,
+              from: created.from,
+              to: created.to,
+              weight: pkg.weight,
+            },
           });
         } catch (paymentError) {
           console.error('[Wallet] package payment failed:', paymentError);

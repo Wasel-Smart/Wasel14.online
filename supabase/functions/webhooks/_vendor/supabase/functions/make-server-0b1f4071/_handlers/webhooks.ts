@@ -251,8 +251,9 @@ export async function handleCliqWebhook ( request: Request ) {
   if ( isSuccessfulProviderStatus( status ) ) {
     // Reconcile against what the provider says was paid. The checkout URL carries
     // the amount as a plain query parameter, so the signed webhook is the only
-    // trustworthy source. If the provider omits the amount, the finalizer skips the
-    // amount check (unchanged behaviour). VERIFY against the CliQ sandbox payload
+    // trustworthy source. If the provider omits the amount, the finalizer now FAILS
+    // CLOSED: the row stays pending and is held as `amount_unverified` for manual
+    // review rather than being credited on trust. VERIFY against the CliQ sandbox payload
     // that `amount` is in JOD major units (the checkout URL uses toFixed(3) JOD);
     // if it is sent in fils, legitimate credits would be held as amount_mismatch.
     const reportedAmount = Number( firstStringValue( eventObject, [ 'amount', 'paidAmount', 'paid_amount', 'amountPaid' ] ) );

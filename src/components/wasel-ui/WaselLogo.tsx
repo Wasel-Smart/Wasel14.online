@@ -11,8 +11,8 @@ interface WaselLogoProps {
   alt?: string;
 }
 
-// SVG viewBox is 1929×341 → width = height × 1929/341.
-const LOGO_W_RATIO = 1929 / 341;
+// SVG viewBox is 1673×940 → width = height × 1673/940.
+const LOGO_W_RATIO = 1673 / 940;
 
 // Theme-aware asset paths. 'dark' variant = dark-coloured mark for light
 // backgrounds. 'light' variant = light-coloured mark for dark backgrounds.

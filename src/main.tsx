@@ -321,6 +321,15 @@ if ( environmentIsValid ) {
         initializeCsrfProtection();
         initializeSessionManagement();
 
+        // Wire up performance observers (long tasks, layout shifts, memory).
+        const { initPerformanceMonitoring: initPerfObserver } = await import( './utils/performanceObserver' );
+        initPerfObserver();
+
+        // Wire up Web Vitals tracking.
+        const { initPerformanceMonitoring: initWebVitals, detectLongTasks } = await import( './utils/performance' );
+        initWebVitals();
+        detectLongTasks();
+
         verifyBackendConnection()
           .then( result => {
             if ( result.connected ) {

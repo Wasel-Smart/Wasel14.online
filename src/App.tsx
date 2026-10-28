@@ -13,7 +13,6 @@ import { validateRuntimeConfiguration } from './utils/env';
 import { DEFAULT_QUERY_OPTIONS } from './utils/performance/cacheStrategy';
 import { waselRouter } from './router';
 import { initSentry, logger as monitoringLogger, trackDomainEvent } from './utils/monitoring';
-import { initPerformanceMonitoring } from './utils/performance';
 import { warmUpServer } from './services/core';
 import { domainEventBus } from './platform/event-bus';
 
@@ -99,7 +98,6 @@ function AppRuntimeCoordinator() {
 
             try {
               void initSentry();
-              initPerformanceMonitoring();
 
               validation.issues.forEach(issue => {
                 if (issue.severity === 'error') {

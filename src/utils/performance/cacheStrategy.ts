@@ -18,27 +18,27 @@
 
 export const STALE_TIMES = {
   // Real-time data — refresh aggressively
-  TRIP_SEARCH: 30_000, // 30s — seats change fast
-  PACKAGE_LISTINGS: 60_000, // 1min
-  ADMIN_DASHBOARDS: 15_000, // 15s — operational monitoring
-  BOOKING_STATUS: 20_000, // 20s — time-sensitive
+  TRIP_SEARCH: 30_000,       // 30s — seats change fast
+  PACKAGE_LISTINGS: 60_000,  // 1min
+  ADMIN_DASHBOARDS: 15_000,  // 15s — operational monitoring
+  BOOKING_STATUS: 20_000,    // 20s — time-sensitive
 
   // Semi-static data — moderate refresh
-  USER_PROFILE: 5 * 60_000, // 5min
-  MY_TRIPS: 2 * 60_000, // 2min
-  MY_PACKAGES: 2 * 60_000, // 2min
-  NOTIFICATIONS: 60_000, // 1min
-  WALLET_BALANCE: 60_000, // 1min
-  TRIP_DETAILS: 2 * 60_000, // 2min
+  USER_PROFILE: 5 * 60_000,  // 5min
+  MY_TRIPS: 2 * 60_000,      // 2min
+  MY_PACKAGES: 2 * 60_000,   // 2min
+  NOTIFICATIONS: 60_000,     // 1min
+  WALLET_BALANCE: 60_000,    // 1min
+  TRIP_DETAILS: 2 * 60_000,  // 2min
 
   // Stable data — refresh infrequently
-  POPULAR_ROUTES: 24 * 60 * 60_000, // 24h
-  PRAYER_TIMES: 24 * 60 * 60_000, // 24h
-  EXCHANGE_RATES: 60 * 60_000, // 1h
-  COUNTRY_CONFIG: 24 * 60 * 60_000, // 24h
-  SUBSCRIPTION_PLANS: 60 * 60_000, // 1h
-  REGION_CONFIG: 24 * 60 * 60_000, // 24h
-  TRUST_SCORE: 10 * 60_000, // 10min
+  POPULAR_ROUTES: 24 * 60 * 60_000,   // 24h
+  PRAYER_TIMES: 24 * 60 * 60_000,     // 24h
+  EXCHANGE_RATES: 60 * 60_000,        // 1h
+  COUNTRY_CONFIG: 24 * 60 * 60_000,   // 24h
+  SUBSCRIPTION_PLANS: 60 * 60_000,    // 1h
+  REGION_CONFIG: 24 * 60 * 60_000,    // 24h
+  TRUST_SCORE: 10 * 60_000,           // 10min
 } as const;
 
 // ─── GC Times (ms — how long data stays in cache after becoming unused) ───────
@@ -264,8 +264,14 @@ export const DEFAULT_QUERY_OPTIONS = {
     gcTime: GC_TIMES.DEFAULT,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    refetchOnMount: false,
     retry: RETRY_CONFIG.READ.retry,
     retryDelay: RETRY_CONFIG.READ.retryDelay,
+    // Structural sharing avoids re-renders when the data reference changes
+    // but the value is deeply equal — critical for list pages.
+    structuralSharing: true,
+    // Never throw in render — let the error boundary handle it.
+    throwOnError: false,
   },
   mutations: {
     retry: RETRY_CONFIG.CRITICAL.retry,
