@@ -14,13 +14,15 @@ import { normalizePhone, isValidE164Phone } from '../shared/validation/phone';
 // ── Reusable field validators ─────────────────────────────────────────────────
 
 const emailField = z
-  .string({ required_error: 'Email is required' })
+  .string({ message: 'Email is required' })
+  .min(1, 'Email is required')
   .email('Please enter a valid email address')
   .toLowerCase()
   .trim();
 
 const passwordField = z
-  .string({ required_error: 'Password is required' })
+  .string({ message: 'Password is required' })
+  .min(1, 'Password is required')
   .min(8, 'Password must be at least 8 characters')
   .max(128, 'Password is too long')
   .regex(/[A-Z]/, 'Password must include an uppercase letter')
@@ -47,7 +49,8 @@ const phoneField = z
   .or(z.literal(''));
 
 const nameField = z
-  .string({ required_error: 'Name is required' })
+  .string({ message: 'Name is required' })
+  .min(1, 'Name is required')
   .min(2, 'Name must be at least 2 characters')
   .max(80, 'Name is too long')
   .trim();

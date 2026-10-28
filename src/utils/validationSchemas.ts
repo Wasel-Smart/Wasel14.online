@@ -298,7 +298,7 @@ export function validate<T>(schema: z.ZodSchema<T>, data: unknown): ValidationRe
   }
 
   const errors: Record<string, string[]> = {};
-  result.error.errors.forEach(error => {
+  result.error.issues.forEach(error => {
     const path = error.path.join('.');
     const messages = errors[path] ?? [];
     errors[path] = messages;
@@ -313,7 +313,7 @@ export function validateField<T>(schema: z.ZodSchema<T>, data: unknown): string 
   if (result.success) {
     return null;
   }
-  return result.error.errors[0]?.message || 'Invalid input';
+  return result.error.issues[0]?.message || 'Invalid input';
 }
 
 // Export all schemas as a registry
