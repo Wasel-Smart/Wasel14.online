@@ -90,9 +90,10 @@ const sizeStyles: Record<
   ButtonSize,
   { height: string; padding: string; fontSize: string; borderRadius: string }
 > = {
-  sm: { height: '36px', padding: '0 14px', fontSize: TYPE.size.sm, borderRadius: R.lg },
-  md: { height: '46px', padding: '0 20px', fontSize: TYPE.size.base, borderRadius: R.xl },
-  lg: { height: '54px', padding: '0 28px', fontSize: TYPE.size.md, borderRadius: R.xl },
+  // Touch-target floor: sm >= 44px (WCAG 2.5.5 / Apple HIG), md/lg >= 48px (brand standard).
+  sm: { height: '44px', padding: '0 16px', fontSize: TYPE.size.sm, borderRadius: R.lg },
+  md: { height: '48px', padding: '0 20px', fontSize: TYPE.size.base, borderRadius: R.xl },
+  lg: { height: '56px', padding: '0 28px', fontSize: TYPE.size.md, borderRadius: R.xl },
 };
 
 export function WaselButton ( {

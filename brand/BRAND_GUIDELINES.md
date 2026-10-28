@@ -1,4 +1,5 @@
 # Wasel Brand Guidelines
+> **Superseded.** The canonical brand document is `docs/BRAND_GUIDELINES.md`. This v1.0 file is kept for history only.
 
 ## 1. Brand Overview
 

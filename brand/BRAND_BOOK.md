@@ -1,4 +1,5 @@
 # Wasel Brand Book
+> **Superseded in part.** `docs/BRAND_GUIDELINES.md` is the canonical brand document. Where this file disagrees (token names, motion durations 150/200/280ms, font weights capped at 800, contrast figures), the canonical document and `src/utils/wasel-ds.ts` win.
 **واصل** — Visual Identity System v2.0
 
 ---
@@ -41,7 +42,7 @@ The Wasel color system is built on three functional colors that map directly to 
 **Orbit Cyan (#00E5FF)**
 - The brand's signature — represents motion, air, digital flow
 - Use for: Primary buttons, active states, links, focus rings, data visualization
-- **Never** use as background fill (too luminous for large areas)
+- **Never** use as a large background fill; it is acceptable as the fill of primary buttons and small accents (text on it is always ink)
 - Minimum text on cyan: `#081D39` (ink) at 4.8:1 ratio
 - Minimum icon on cyan: `#081D39` at 3:1 ratio
 
@@ -54,13 +55,13 @@ The Wasel color system is built on three functional colors that map directly to 
 **Motion Lime (#72C70D)**
 - The confirmation — represents growth, arrival, positive outcome
 - Use for: Success states, "arrived" confirmations, eco-friendly messaging
-- Text on lime: `#081D39` at 4.6:1 ratio (AA compliant)
+- Text on lime: `#081D39` at 7.9:1 ratio (AAA compliant)
 - Gradient partner: pairs with cyan for "eco-tech" feel
 
 **Journey Ember (#FF8A0B)**
 - The energy — represents warmth, urgency, human connection
 - Use for: Urgent CTAs, time-sensitive alerts, premium features
-- Text on ember: `#FFFFFF` at 3.2:1 ratio (AA large text compliant)
+- Text on ember: `#081D39` ink at 7.1:1 (AAA). **Never white** (2.4:1 fails)
 - Gradient partner: pairs with cyan for "warm tech" feel
 
 ### Extended Palette — Supporting Cast
@@ -90,11 +91,12 @@ Gradients are directional — they imply movement. All gradients flow top-left t
 
 | Foreground | Background | Ratio | WCAG |
 |------------|-----------|-------|------|
-| `#F8FBFF` | `#081D39` | 15.2:1 | AAA |
-| `#00E5FF` | `#081D39` | 8.4:1 | AAA |
-| `#72C70D` | `#081D39` | 4.6:1 | AA |
-| `#FF8A0B` | `#FFFFFF` | 3.2:1 | AA Large |
-| `#95B2C9` | `#081D39` | 4.8:1 | AA |
+| `#F8FBFF` | `#081D39` | 16.3:1 | AAA |
+| `#00E5FF` | `#081D39` | 11.0:1 | AAA |
+| `#72C70D` | `#081D39` | 7.9:1 | AAA |
+| `#081D39` | `#FF8A0B` | 7.1:1 | AAA |
+| `#FFFFFF` | `#FF8A0B` | 2.4:1 | Fails — do not use |
+| `#95B2C9` | `#081D39` | 7.6:1 | AAA |
 
 ---
 
@@ -332,8 +334,8 @@ Wasel motion uses custom cubic-bezier curves that feel organic, not mechanical.
 | Primary | `BTN.PRIMARY` | Main CTAs | `GRAD-PRIMARY` | `#081D39` |
 | Secondary | `BTN.SECONDARY` | Secondary actions | `rgba(0,229,255,0.12)` | `#00E5FF` |
 | Ghost | `BTN.GHOST` | Tertiary actions | transparent | `#00E5FF` |
-| Gold | `BTN.GOLD` | Premium features | `GRAD-EMBER` | `#FFFFFF` |
-| Danger | `BTN.DANGER` | Destructive actions | `#FF7C8B` | `#FFFFFF` |
+| Gold | `BTN.GOLD` | Premium features | `GRAD-EMBER` | `#081D39` |
+| Danger | `BTN.DANGER` | Destructive actions | `rgba(255,124,139,0.14)` | `#FF7C8B` |
 
 ### Card System
 

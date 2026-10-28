@@ -28,7 +28,10 @@ function BrandLockup({ size, theme = 'light', framed = false }: { size: number; 
 
   return (
     <picture>
-      <source srcSet={svg} type="image/svg+xml" />
+      {/* The light (dark-surface) lockup is PNG-only until a true vector with a white
+          wordmark exists: the legacy logo-light.svg embeds the ink wordmark and would
+          be invisible on #081D39. */}
+      {theme === 'dark' && <source srcSet={svg} type="image/svg+xml" />}
       <img
         src={png}
         alt=""

@@ -113,7 +113,6 @@ export interface CanonicalUserRow {
   full_name: string | null;
   role: string | null;
   verification_level: string | null;
-  sanad_verified_status: string | null;
   phone_verified_at: string | null;
   profile_status: string | null;
   updated_at: string | null;
@@ -143,13 +142,12 @@ export type AuthResult = AuthFailure | AuthSuccess;
 
 /** Column list used by every canonical-user lookup; kept next to the type. */
 const CANONICAL_USER_COLUMNS =
-  'id, auth_user_id, email, phone_number, full_name, role, verification_level, sanad_verified_status, phone_verified_at, profile_status, updated_at';
+  'id, auth_user_id, email, phone_number, full_name, role, verification_level, phone_verified_at, profile_status, updated_at';
 
 // â”€â”€ Domain limits and messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// A pending identity or driver-document review that never resolves would leave
-// the trust surface permanently in limbo, so stale pending rows are failed
-// closed after this many hours.
-export const IDENTITY_PENDING_TIMEOUT_HOURS = 72;
+// A pending driver-document review that never resolves would leave the trust
+// surface permanently in limbo, so stale pending rows are failed closed after
+// this many hours.
 export const DRIVER_DOCUMENT_TIMEOUT_HOURS = 72;
 
 // Phone OTP lifetime and the message returned when a number is already bound to
@@ -232,11 +230,6 @@ export const CLIQ_API_KEY = Deno.env.get( 'CLIQ_API_KEY' ) ?? Deno.env.get( 'JOP
 export const CLIQ_WEBHOOK_SECRET = Deno.env.get( 'CLIQ_WEBHOOK_SECRET' ) ?? Deno.env.get( 'JOPACC_WEBHOOK_SECRET' ) ?? '';
 export const CLIQ_CHECKOUT_URL_TEMPLATE = Deno.env.get( 'CLIQ_CHECKOUT_URL_TEMPLATE' ) ?? Deno.env.get( 'JOPACC_CHECKOUT_URL_TEMPLATE' ) ?? '';
 export const CLIQ_CHECKOUT_ENDPOINT = Deno.env.get( 'CLIQ_CHECKOUT_ENDPOINT' ) ?? '/payments';
-export const SANAD_API_BASE_URL = ( Deno.env.get( 'SANAD_API_BASE_URL' ) ?? '' ).replace( /\/$/, '' );
-export const SANAD_CLIENT_ID = Deno.env.get( 'SANAD_CLIENT_ID' ) ?? '';
-export const SANAD_CLIENT_SECRET = Deno.env.get( 'SANAD_CLIENT_SECRET' ) ?? '';
-export const SANAD_WEBHOOK_SECRET = Deno.env.get( 'SANAD_WEBHOOK_SECRET' ) ?? '';
-export const SANAD_VERIFICATION_ENDPOINT = Deno.env.get( 'SANAD_VERIFICATION_ENDPOINT' ) ?? '/identity/verifications';
 export const STRIPE_WASEL_PLUS_PRICE_ID = Deno.env.get( 'STRIPE_WASEL_PLUS_PRICE_ID' ) ?? '';
 // The Supabase CLI and dashboard refuse secret names that start with SUPABASE_, so the
 // hook secret is read from SEND_SMS_HOOK_SECRET first. The old name is kept as a fallback
@@ -251,7 +244,7 @@ export const RUNTIME_ADMIN_ENABLED = isRuntimeAdminEnabled( Deno.env.get( 'ENABL
 export const SERVICE_NAME = 'make-server-0b1f4071';
 
 export const responseBaseHeaders = {
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-csrf-token, x-communication-worker-secret, stripe-signature, x-cliq-signature, x-cliq-timestamp, x-sanad-signature, x-sanad-timestamp, x-merchant-signature, x-merchant-timestamp',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-csrf-token, x-communication-worker-secret, stripe-signature, x-cliq-signature, x-cliq-timestamp, x-merchant-signature, x-merchant-timestamp',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'Cache-Control': 'no-store',
   'Referrer-Policy': 'no-referrer',
@@ -537,7 +530,6 @@ export function isOriginAllowed ( request: Request ): boolean {
 export const WEBHOOK_PATH_PREFIXES = [
   '/stripe/webhook',
   '/cliq/webhook',
-  '/sanad/webhook',
   '/communications/webhook',
   // Canonical routes registered in index.ts. The legacy prefixes above are kept
   // for backward compatibility, but these are the paths providers actually call;
@@ -973,7 +965,6 @@ export async function ensureDriverForUser ( admin: ReturnType<typeof getAdminCli
       user_id: user.id,
       driver_status: 'pending_approval',
       verification_level: user.verification_level ?? 'level_0',
-      sanad_identity_linked: false,
     } )
     .select( '*' )
     .single();
@@ -987,12 +978,14 @@ export function isApprovedDriver (
   emailConfirmed: boolean,
 ): boolean {
   const role = String( user.role ?? 'passenger' );
-  const verificationLevel = String( driver.verification_level ?? user.verification_level ?? 'level_0' );
+  // Approval is an operator decision on the submitted driver documents, so the
+  // driver status is the source of truth. The approval handler also lifts the
+  // account to level_3, but a missed level sync must never lock out an approved
+  // driver.
   return (
     ( role === 'driver' || role === 'both' ) &&
     Boolean( user.phone_verified_at ) &&
     emailConfirmed &&
-    verificationLevel === 'level_3' &&
     String( driver.driver_status ?? '' ) === 'approved' &&
     [ 'approved', 'verified' ].includes( String( driver.background_check_status ?? '' ) )
   );
@@ -1017,10 +1010,11 @@ export async function buildProfilePayload ( admin: ReturnType<typeof getAdminCli
       tripCount = 0;
     }
   }
+  // "Verified" means an approved driver: phone and email are confirmed and an
+  // operator has cleared the submitted driver documents.
   const verified =
-    verification?.sanad_status === 'verified' ||
-    user.sanad_verified_status === 'verified' ||
-    driver?.sanad_identity_linked === true;
+    String( driver?.driver_status ?? '' ) === 'approved' ||
+    String( user.verification_level ?? '' ) === 'level_3';
 
   return {
     id: String( user.auth_user_id ?? user.id ),
@@ -1038,7 +1032,6 @@ export async function buildProfilePayload ( admin: ReturnType<typeof getAdminCli
     verified,
     id_verified: verified,
     is_verified: verified,
-    sanad_verified: verified,
     // Ratings are sourced from the persisted profile/driver record when present,
     // never faked. Missing ratings resolve to 0 (no rating yet).
     rating: toNumber( user.rating, 0 ),
@@ -1069,7 +1062,7 @@ export function mapTripRow ( row: Record<string, unknown>, driverProfile?: Recor
       id: String( driverProfile?.id ?? row.driver_id ?? 'driver' ),
       name: String( driverProfile?.full_name ?? driverProfile?.email ?? 'Wasel Driver' ),
       rating: toNumber( driverProfile?.rating, 0 ),
-      verified: Boolean( driverProfile?.verified ?? driverProfile?.sanad_verified ?? false ),
+      verified: Boolean( driverProfile?.verified ?? false ),
     },
   };
 }
@@ -1447,7 +1440,17 @@ export function computeTrustStepSummary ( steps: Record<string, { id: string; st
   const completed = all.filter( s => s.state === 'completed' ).length;
   const failed = all.filter( s => s.state === 'failed' ).length;
   const inProgress = all.filter( s => s.state === 'in_progress' ).length;
-  return { totalSteps: all.length, completedSteps: completed, failedSteps: failed, inProgressSteps: inProgress };
+  // The Trust Center reads nextStepId / blockedSteps directly from this payload.
+  const ordered = [ steps.phone, steps.email, steps.driverDocuments, steps.walletStanding ].filter( Boolean );
+  return {
+    totalSteps: all.length,
+    completedSteps: completed,
+    failedSteps: failed,
+    inProgressSteps: inProgress,
+    nextStepId: ordered.find( s => s.state !== 'completed' )?.id ?? null,
+    blockedSteps: all.filter( s => s.state === 'failed' ).map( s => s.id ),
+    reviewHistory: [] as unknown[],
+  };
 }
 
 // eslint-disable-next-line max-params
@@ -1455,7 +1458,7 @@ export function buildTrustStep ( id: string, state: string, detail: string, meta
   failureReason?: string | null;
   updatedAt?: string | null;
 } ) {
-  return { id, state, detail, ...meta, failureReason: options?.failureReason ?? null, updatedAt: options?.updatedAt ?? null };
+  return { id, state, detail, ...meta, meta, failureReason: options?.failureReason ?? null, updatedAt: options?.updatedAt ?? null };
 }
 
 // eslint-disable-next-line max-lines-per-function, complexity
@@ -1470,7 +1473,7 @@ export async function buildTrustStatus (
     auth.admin
       .from( 'verification_records' )
       .select(
-        'verification_id, sanad_status, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at',
+        'verification_id, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at',
       )
       .eq( 'user_id', auth.canonicalUser.id )
       .order( 'verification_timestamp', { ascending: false } )
@@ -1479,7 +1482,7 @@ export async function buildTrustStatus (
     auth.admin
       .from( 'drivers' )
       .select(
-        'driver_id, license_number, driver_status, verification_level, sanad_identity_linked, background_check_status, created_at, updated_at',
+        'driver_id, license_number, driver_status, verification_level, background_check_status, created_at, updated_at',
       )
       .eq( 'user_id', auth.canonicalUser.id )
       .maybeSingle(),
@@ -1516,77 +1519,6 @@ export async function buildTrustStatus (
   const emailAddress = auth.authUser.email ?? auth.canonicalUser.email ?? null;
   const emailVerified = Boolean( auth.authUser.email_confirmed_at );
   const phoneVerified = Boolean( auth.canonicalUser.phone_verified_at );
-
-  const identityUpdatedAt =
-    String(
-      verification?.updated_at ??
-      verification?.verification_timestamp ??
-      auth.canonicalUser.updated_at ??
-      '',
-    ) || null;
-  const staleIdentity =
-    verification?.sanad_status === 'pending' &&
-    isOlderThanHours( identityUpdatedAt, IDENTITY_PENDING_TIMEOUT_HOURS );
-  const identityFailureReason =
-    staleIdentity
-      ? 'Sanad verification timed out. Submit the request again.'
-      : verification?.failure_reason ?? null;
-  const identity =
-    verification?.sanad_status === 'verified' ||
-      verificationLevel === 'level_2' ||
-      verificationLevel === 'level_3'
-      ? buildTrustStep(
-        'identity',
-        'completed',
-        'Identity verification is complete.',
-        {
-          providerReference: verification?.provider_reference ?? null,
-          documentReference: verification?.document_reference ?? null,
-        },
-        {
-          updatedAt: identityUpdatedAt,
-        },
-      )
-      : verification?.sanad_status === 'rejected' ||
-        verification?.sanad_status === 'expired' ||
-        staleIdentity
-        ? buildTrustStep(
-          'identity',
-          'failed',
-          'Identity verification did not complete.',
-          {
-            providerReference: verification?.provider_reference ?? null,
-            documentReference: verification?.document_reference ?? null,
-          },
-          {
-            failureReason:
-              identityFailureReason ??
-              'Sanad verification was rejected. Review the reason and try again.',
-            updatedAt: identityUpdatedAt,
-          },
-        )
-        : verification?.sanad_status === 'pending'
-          ? buildTrustStep(
-            'identity',
-            'in_progress',
-            'Sanad verification is under review.',
-            {
-              providerReference: verification?.provider_reference ?? null,
-              documentReference: verification?.document_reference ?? null,
-            },
-            {
-              updatedAt: identityUpdatedAt,
-            },
-          )
-          : buildTrustStep(
-            'identity',
-            'not_started',
-            'Submit Sanad verification to continue.',
-            {
-              providerReference: null,
-              documentReference: null,
-            },
-          );
 
   const email = buildTrustStep(
     'email',
@@ -1780,7 +1712,6 @@ export async function buildTrustStatus (
         );
 
   const steps = {
-    identity,
     email,
     phone,
     driverDocuments,
@@ -2920,56 +2851,6 @@ export function normalizePaymentAmount ( value: unknown ): number | null {
   const amount = Math.round( value );
   if ( amount < 50 || amount > MAX_PAYMENT_AMOUNT_MINOR ) {return null;}
   return amount;
-}
-
-export async function submitSanadVerificationRequest ( input: {
-  userId: string;
-  providerReference: string;
-  documentReference: string | null;
-} ): Promise<{ ok: boolean; error?: string; submittedToProvider: boolean }> {
-  if ( !SANAD_API_BASE_URL || !SANAD_CLIENT_ID || !SANAD_CLIENT_SECRET ) {
-    return { ok: false, error: 'Sanad verification is not configured', submittedToProvider: false };
-  }
-  // Validate SANAD_API_BASE_URL is HTTPS and within the allowed Sanad domain (SSRF guard).
-  let parsedBase: URL;
-  try {
-    parsedBase = new URL( SANAD_API_BASE_URL );
-  } catch {
-    return { ok: false, error: 'Sanad API URL is invalid', submittedToProvider: false };
-  }
-  if ( parsedBase.protocol !== 'https:' ) {
-    return { ok: false, error: 'Sanad API URL must use HTTPS', submittedToProvider: false };
-  }
-  const allowedSanadHosts = [ 'api.sanad.jo', 'sandbox.sanad.jo' ];
-  if ( !allowedSanadHosts.includes( parsedBase.hostname ) ) {
-    return { ok: false, error: 'Sanad API URL is not within the allowed domain', submittedToProvider: false };
-  }
-  // Construct the endpoint path from the validated base URL only â€” no user input enters the URL.
-  const endpointPath = SANAD_VERIFICATION_ENDPOINT.startsWith( '/' ) ? SANAD_VERIFICATION_ENDPOINT : `/${ SANAD_VERIFICATION_ENDPOINT }`;
-  const safeUrl = `${ parsedBase.origin }${ endpointPath }`;
-  // Sanitize all body values â€” strip control characters before serializing.
-  const safeUserId = String( input.userId ).replace( /[^\w-]/g, '' );
-  const safeProviderRef = String( input.providerReference ).replace( /[^\w-]/g, '' );
-  const safeDocRef = input.documentReference ? String( input.documentReference ).replace( /[^\w-]/g, '' ) : null;
-  // This is a server-to-server JSON POST. The body is never reflected into HTML. nosec CWE-79
-  const response = await fetch( safeUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Client-ID': SANAD_CLIENT_ID,
-      'X-Client-Secret': SANAD_CLIENT_SECRET,
-    },
-    body: JSON.stringify( {
-      user_id: safeUserId,
-      provider_reference: safeProviderRef,
-      document_reference: safeDocRef,
-    } ),
-  } );
-  if ( !response.ok ) {
-    const body = await response.json().catch( () => ( {} ) );
-    return { ok: false, error: String( body?.message ?? `Sanad API error ${ response.status }` ), submittedToProvider: false };
-  }
-  return { ok: true, submittedToProvider: true };
 }
 
 export async function assertTripParticipant ( admin: ReturnType<typeof getAdminClient>, tripId: string, userId: string ) {
