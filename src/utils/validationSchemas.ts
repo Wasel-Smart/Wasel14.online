@@ -33,7 +33,7 @@ const errorMessages = {
 // ============================================================================
 
 export const emailSchema = z
-  .string({ required_error: errorMessages.required })
+  .string({ message: errorMessages.required })
   .min(1, errorMessages.required)
   .email(errorMessages.invalidEmail)
   .max(255, errorMessages.stringTooLong)
@@ -41,23 +41,27 @@ export const emailSchema = z
   .trim();
 
 export const credentialSchema = z
-  .string({ required_error: errorMessages.required })
+  .string({ message: errorMessages.required })
+  .min(1, errorMessages.required)
   .min(8, errorMessages.credentialTooShort)
   .max(128, errorMessages.stringTooLong)
   .regex(/^(?=.*[A-Za-z])(?=.*\d)/, errorMessages.credentialTooWeak);
 
 export const phoneSchema = z
-  .string({ required_error: errorMessages.required })
+  .string({ message: errorMessages.required })
+  .min(1, errorMessages.required)
   .regex(phoneRegex, errorMessages.invalidPhone)
   .trim();
 
 export const jordanPhoneSchema = z
-  .string({ required_error: errorMessages.required })
+  .string({ message: errorMessages.required })
+  .min(1, errorMessages.required)
   .regex(jordanPhoneRegex, errorMessages.invalidJordanPhone)
   .trim();
 
 export const nameSchema = z
-  .string({ required_error: errorMessages.required })
+  .string({ message: errorMessages.required })
+  .min(1, errorMessages.required)
   .min(2, errorMessages.stringTooShort)
   .max(100, errorMessages.stringTooLong)
   .trim();
@@ -108,7 +112,7 @@ export const profileUpdateSchema = z.object({
 // ============================================================================
 
 export const amountSchema = z
-  .number({ required_error: errorMessages.required })
+  .number({ message: errorMessages.required })
   .positive(errorMessages.amountTooLow)
   .max(10000, errorMessages.amountTooHigh)
   .multipleOf(0.01);

@@ -68,7 +68,7 @@ export const signUpSchema = z
     fullName: nameField,
     email: emailField,
     password: passwordField,
-    confirmPassword: z.string({ required_error: 'Please confirm your password' }),
+    confirmPassword: z.string({ message: 'Please confirm your password' }).min(1, 'Please confirm your password'),
     phone: phoneField,
   })
   .refine(data => data.password === data.confirmPassword, {
@@ -126,13 +126,13 @@ export type SupportedCity = (typeof ALL_CITIES)[number];
 
 export const offerRideSchema = z
   .object({
-    origin: z.enum(ALL_CITIES, { required_error: 'Please select a departure city' }),
-    destination: z.enum(ALL_CITIES, { required_error: 'Please select a destination city' }),
-    departureDate: z.string({ required_error: 'Departure date is required' }),
-    departureTime: z.string({ required_error: 'Departure time is required' }),
-    seats: z.number({ required_error: 'Number of seats is required' }).int().min(1).max(7),
+    origin: z.enum(ALL_CITIES, { message: 'Please select a departure city' }),
+    destination: z.enum(ALL_CITIES, { message: 'Please select a destination city' }),
+    departureDate: z.string({ message: 'Departure date is required' }).min(1, 'Departure date is required'),
+    departureTime: z.string({ message: 'Departure time is required' }).min(1, 'Departure time is required'),
+    seats: z.number({ message: 'Number of seats is required' }).int().min(1).max(7),
     pricePerSeat: z
-      .number({ required_error: 'Price is required' })
+      .number({ message: 'Price is required' })
       .positive('Price must be greater than 0')
       .max(500, 'Price seems too high'),
     notes: z.string().max(500, 'Notes too long').optional(),
@@ -147,9 +147,9 @@ export type OfferRideFields = z.infer<typeof offerRideSchema>;
 
 export const findRideSchema = z
   .object({
-    origin: z.enum(ALL_CITIES, { required_error: 'Please select a departure city' }),
-    destination: z.enum(ALL_CITIES, { required_error: 'Please select a destination city' }),
-    date: z.string({ required_error: 'Date is required' }),
+    origin: z.enum(ALL_CITIES, { message: 'Please select a departure city' }),
+    destination: z.enum(ALL_CITIES, { message: 'Please select a destination city' }),
+    date: z.string({ message: 'Date is required' }).min(1, 'Date is required'),
     passengers: z.number().int().min(1).max(7).default(1),
   })
   .refine(data => data.origin !== data.destination, {
@@ -204,7 +204,7 @@ export type ChangePasswordFields = z.infer<typeof changePasswordSchema>;
 
 export const topUpSchema = z.object({
   amount: z
-    .number({ required_error: 'Amount is required' })
+    .number({ message: 'Amount is required' })
     .positive('Amount must be positive')
     .max(500, 'Maximum top-up is JOD 500 per transaction'),
   paymentMethod: z.enum(['card', 'cliq', 'cash_agent']).default('card'),
