@@ -11,8 +11,10 @@ interface WaselLogoProps {
   alt?: string;
 }
 
-// SVG viewBox is 1673×940 → width = height × 1673/940.
-const LOGO_W_RATIO = 1673 / 940;
+// Full lockup (symbol + wordmark) is 995×360 → width = height × 995/360.
+// Symbol-only mark is 514×360 → width = height × 514/360.
+const LOGO_W_RATIO = 995 / 360;
+const SYMBOL_W_RATIO = 514 / 360;
 
 // Theme-aware asset paths. 'dark' variant = dark-coloured mark for light
 // backgrounds. 'light' variant = light-coloured mark for dark backgrounds.
@@ -21,17 +23,34 @@ const LOGO_ASSETS: Record<'dark' | 'light', { svg: string; png: string }> = {
   light: { svg: '/brand/assets/logos/primary/logo-light.svg', png: '/brand/assets/logos/primary/logo-light.png' },
 };
 
-function BrandLockup({ size, theme = 'light', framed = false }: { size: number; theme?: 'dark' | 'light'; framed?: boolean }) {
+// Symbol-only mark (transparent background). Its colours read on light and dark surfaces,
+// so one asset serves both themes.
+const SYMBOL_ASSET = {
+  svg: '/brand/assets/logos/symbols/symbol-default.svg',
+  png: '/brand/assets/logos/symbols/symbol-default.png',
+};
+
+function BrandLockup({
+  size,
+  theme = 'light',
+  framed = false,
+  compact = false,
+}: {
+  size: number;
+  theme?: 'dark' | 'light';
+  framed?: boolean;
+  compact?: boolean;
+}) {
   const h = Math.round(size);
-  const w = Math.round(size * LOGO_W_RATIO);
-  const { svg, png } = LOGO_ASSETS[theme];
+  const w = Math.round(size * (compact ? SYMBOL_W_RATIO : LOGO_W_RATIO));
+  const { svg, png } = compact ? SYMBOL_ASSET : LOGO_ASSETS[theme];
 
   return (
     <picture>
       {/* The light (dark-surface) lockup is PNG-only until a true vector with a white
           wordmark exists: the legacy logo-light.svg embeds the ink wordmark and would
           be invisible on #081D39. */}
-      {theme === 'dark' && <source srcSet={svg} type="image/svg+xml" />}
+      {(compact || theme === 'dark') && <source srcSet={svg} type="image/svg+xml" />}
       <img
         src={png}
         alt=""
@@ -85,7 +104,7 @@ export function WaselLogo(props: WaselLogoProps) {
         ...style,
       }}
     >
-      <BrandLockup size={lockupH} theme={resolvedTheme} framed={framed} />
+      <BrandLockup size={lockupH} theme={resolvedTheme} framed={framed} compact={compact} />
     </div>
   );
 }

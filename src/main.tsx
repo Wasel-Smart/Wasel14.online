@@ -12,6 +12,7 @@ import { verifyBackendConnection, startHealthCheckMonitoring } from './utils/hea
 import { clearMasterKey } from './utils/encryption';
 import { installBenignRuntimeErrorFilter } from './components/system/ErrorBoundary';
 import { scheduleIdleTask } from './utils/performance';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 
 const LOCAL_DEV_RESET_KEY = 'wasel-local-dev-cache-reset';
 
@@ -318,6 +319,11 @@ if ( environmentIsValid ) {
         // when VITE_SENTRY_DSN is set, so this is safe to call unconditionally.
         const { initSentry } = await import( './utils/monitoring' );
         void initSentry();
+        try {
+          injectSpeedInsights();
+        } catch {
+          // non-fatal
+        }
         initializeCsrfProtection();
         initializeSessionManagement();
 

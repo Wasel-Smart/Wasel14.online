@@ -59,21 +59,10 @@ export async function initObservability(): Promise<void> {
  * Returns a summary of which observability signals are active.
  * Useful for the /health endpoint and the ops dashboard.
  */
-export function getObservabilityStatus(): {
-  sentry: boolean;
-  appInsights: boolean;
-  otlp: boolean;
-} {
-  const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined;
-  const cs = import.meta.env.VITE_APP_INSIGHTS_CONNECTION_STRING as string | undefined;
-  const otlp = import.meta.env.VITE_OTEL_EXPORTER_OTLP_ENDPOINT as string | undefined;
-
-  const isPlaceholder = (v?: string) =>
-    !v || v.includes('PASTE_YOUR') || v.includes('placeholder') || v.includes('SET_REAL');
-
-  return {
-    sentry: !isPlaceholder(dsn),
-    appInsights: !isPlaceholder(cs) && Boolean(cs?.includes('InstrumentationKey=')),
-    otlp: !isPlaceholder(otlp),
-  };
+export function isPlaceholder(v?: string) {
+  if (!v) { return true; }
+  const s = v.trim();
+  if (s === '') { return true; }
+  const lower = s.toLowerCase();
+  return lower.includes('paste_your') || lower.includes('<set_real') || lower.includes('set_real') || lower.includes('example.com') || lower.includes('placeholder') || lower.includes('your_dsn');
 }

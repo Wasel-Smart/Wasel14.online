@@ -65,7 +65,10 @@ export async function initSentry(): Promise<void> {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   const environment = import.meta.env.MODE;
 
-  if (!dsn) {
+  const isPlaceholder = (v?: string) =>
+    !v || v.trim() === '' || /paste_your|<set_real|set_real|example\.com|placeholder/i.test(v);
+
+  if (isPlaceholder(dsn)) {
     if (import.meta.env.DEV) {
       writeConsole('warning', 'Sentry DSN is not configured; remote error capture is disabled.');
     }

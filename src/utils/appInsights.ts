@@ -13,9 +13,6 @@ import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 
 let appInsights: ApplicationInsights | null = null;
 
-// Unfilled template values shipped in .env/.env.production and in the Vercel
-// project. Initialising the SDK with one of these still patches XMLHttpRequest
-// and fetch, so the app looks "instrumented" while every beacon fails.
 const PLACEHOLDER_MARKERS = [
     'paste_your',
     '_here',
@@ -24,6 +21,8 @@ const PLACEHOLDER_MARKERS = [
     'your_connection_string',
     'your_instrumentation_key',
     'example.com',
+    '<set_real',
+    'set_real',
 ];
 
 /**
@@ -50,7 +49,11 @@ function isUsableInstrumentationKey(value: string | undefined): value is string 
     const normalized = value.trim();
     if (!normalized) { return false; }
 
-    return !PLACEHOLDER_MARKERS.some(marker => normalized.toLowerCase().includes(marker));
+    const lower = normalized.toLowerCase();
+    if (PLACEHOLDER_MARKERS.some(marker => lower.includes(marker))) { return false; }
+
+    // Azure instrumentation keys are UUIDs
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized);
 }
 
 export function initializeAppInsights(): void {
