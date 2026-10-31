@@ -51,6 +51,7 @@ vi.mock('../../utils/env', () => ({
 import { authAPI, redactAuthErrorText } from '../auth';
 import { getAuthDetails } from '../core';
 import { updateDirectProfile } from '../directSupabase';
+import { runBackendWorkflow } from '../backendWorkflow';
 
 // ── redactAuthErrorText ───────────────────────────────────────────────────────
 
@@ -213,14 +214,13 @@ describe('authAPI.getProfile', () => {
 
 describe('authAPI.updateProfile', () => {
   it('returns success:true with profile on success', async () => {
-    vi.mocked(updateDirectProfile).mockResolvedValueOnce({ id: 'user-1', full_name: 'Updated' });
+    vi.mocked(runBackendWorkflow).mockResolvedValueOnce({ id: 'user-1', full_name: 'Updated' });
     const result = await authAPI.updateProfile({ full_name: 'Updated' });
     expect(result.success).toBe(true);
     expect(result.profile).toBeDefined();
   });
 
   it('returns success:false with error message on failure', async () => {
-    const { runBackendWorkflow } = await import('../backendWorkflow');
     vi.mocked(runBackendWorkflow).mockRejectedValueOnce(new Error('DB error'));
     const result = await authAPI.updateProfile({ full_name: 'X' });
     expect(result.success).toBe(false);

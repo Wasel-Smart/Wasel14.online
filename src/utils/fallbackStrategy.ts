@@ -114,12 +114,6 @@ export function validateFallbackConfig(): { valid: boolean; warnings: string[] }
     );
   }
 
-  if (!isProd && config.mode === 'disabled') {
-    warnings.push(
-      'Development mode with fallback disabled may cause failures if edge functions are unavailable.',
-    );
-  }
-
   return {
     valid: warnings.length === 0,
     warnings,
