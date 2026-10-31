@@ -57,7 +57,7 @@ export async function handleRequestDataExport ( request: Request ) {
 
   const requestedAt = Date.now();
   const [ profile, bookings, packages, transactions, consents ] = await Promise.all( [
-    auth.admin.from( 'users' ).select( '*' ).eq( 'id', userId ).maybeSingle(),
+    auth.admin.from( 'users' ).select( 'id, auth_user_id, email, phone_number, full_name, role, verification_level, phone_verified_at, profile_status, updated_at' ).eq( 'id', userId ).maybeSingle(),
     auth.admin.from( 'ride_bookings' ).select( '*' ).eq( 'passenger_id', userId ),
     auth.admin.from( 'packages' ).select( '*' ).eq( 'sender_id', userId ),
     auth.admin.from( 'wallet_transactions' ).select( '*' ).eq( 'user_id', userId ),

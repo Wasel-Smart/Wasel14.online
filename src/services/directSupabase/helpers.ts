@@ -55,10 +55,11 @@ export function mapProfileFromContext(
   context: UserContext,
   stats?: { tripCount?: number; rating?: number },
 ): RawProfile {
-  const sanadVerified =
-    context.verification?.sanad_status === 'verified' ||
-    context.user.sanad_verified_status === 'verified' ||
-    context.driver?.sanad_identity_linked === true;
+  // "Verified" means an approved driver: an operator has cleared the submitted
+  // driver documents. There is no third-party identity provider in this flow.
+  const verifiedDriver =
+    context.driver?.driver_status === 'approved' ||
+    resolveVerificationLevel(context) === 'level_3';
   const walletBalance = toNumber(context.wallet?.balance, 0);
   const tripCount = toNumber(stats?.tripCount, 0);
   const rating = toNumber(stats?.rating, 5);
@@ -78,10 +79,9 @@ export function mapProfileFromContext(
     rating_as_driver: rating,
     total_trips: tripCount,
     trip_count: tripCount,
-    verified: sanadVerified,
-    id_verified: sanadVerified,
-    is_verified: sanadVerified,
-    sanad_verified: sanadVerified,
+    verified: verifiedDriver,
+    id_verified: verifiedDriver,
+    is_verified: verifiedDriver,
     verification_level: resolveVerificationLevel(context),
     wallet_status: context.wallet?.wallet_status ?? 'active',
     avatar_url: context.user.avatar_url ?? null,
@@ -146,7 +146,6 @@ function mapTripDriver(driverProfile?: RawProfile | null): TripSearchResult['dri
     verified: Boolean(
       driverProfile?.id_verified ??
       driverProfile?.is_verified ??
-      driverProfile?.sanad_verified ??
       driverProfile?.verified ??
       false,
     ),

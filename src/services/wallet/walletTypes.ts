@@ -9,7 +9,9 @@ export type WalletRow = {
   auto_top_up_amount?: number | string | null;
   auto_top_up_threshold?: number | string | null;
   pin_hash?: string | null;
+  pin_set?: boolean | null;
   created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type TransactionRow = {
@@ -28,6 +30,8 @@ export type PaymentMethodRow = {
   method_type?: string | null;
   provider?: string | null;
   token_reference?: string | null;
+  provider_reference?: string | null;
+  last_four?: string | null;
   is_default?: boolean | null;
   status?: string | null;
   created_at?: string | null;

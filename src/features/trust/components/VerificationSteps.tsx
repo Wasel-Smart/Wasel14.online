@@ -4,7 +4,6 @@ import type { TrustStepState } from '../../../services/trustCenterModel';
 export type { TrustStepState } from '../../../services/trustCenterModel';
 
 export const VERIFICATION_STEP_ORDER = [
-  'identity',
   'email',
   'phone',
   'driverDocuments',

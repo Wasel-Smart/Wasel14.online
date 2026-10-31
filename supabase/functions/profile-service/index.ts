@@ -67,7 +67,7 @@ async function authenticateRequest(request: Request) {
 
   const { data: byAuthUser, error: byAuthError } = await admin
     .from('users')
-    .select('id, auth_user_id, email, phone_number, full_name, role, verification_level, sanad_verified_status, phone_verified_at, profile_status, updated_at')
+    .select('id, auth_user_id, email, phone_number, full_name, role, verification_level, phone_verified_at, profile_status, updated_at')
     .eq('auth_user_id', authData.user.id)
     .maybeSingle();
 
@@ -77,7 +77,7 @@ async function authenticateRequest(request: Request) {
   if (!canonicalUser) {
     const fallback = await admin
       .from('users')
-      .select('id, auth_user_id, email, phone_number, full_name, role, verification_level, sanad_verified_status, phone_verified_at, profile_status, updated_at')
+      .select('id, auth_user_id, email, phone_number, full_name, role, verification_level, phone_verified_at, profile_status, updated_at')
       .eq('id', authData.user.id)
       .maybeSingle();
     canonicalUser = fallback.data;
@@ -96,10 +96,12 @@ function toNumber(value: unknown, fallback = 0): number {
 // eslint-disable-next-line complexity
 async function buildProfilePayload(admin: ReturnType<typeof getAdminClient>, user: Record<string, unknown>) {
   const { data: wallet } = await admin.from('wallets').select('balance, wallet_status').eq('user_id', String(user.id)).maybeSingle();
-  const { data: verification } = await admin.from('verification_records').select('sanad_status, verification_level').eq('user_id', String(user.id)).order('updated_at', { ascending: false }).limit(1).maybeSingle();
-  const { data: driver } = await admin.from('drivers').select('driver_id, rating, sanad_identity_linked, verification_level').eq('user_id', String(user.id)).maybeSingle();
+  const { data: verification } = await admin.from('verification_records').select('verification_level').eq('user_id', String(user.id)).order('updated_at', { ascending: false }).limit(1).maybeSingle();
+  const { data: driver } = await admin.from('drivers').select('driver_id, rating, driver_status, verification_level').eq('user_id', String(user.id)).maybeSingle();
 
-  const verified = verification?.sanad_status === 'verified' || user.sanad_verified_status === 'verified' || driver?.sanad_identity_linked === true;
+  // "Verified" means an approved driver: phone and email are confirmed and an
+  // operator has cleared the submitted driver documents.
+  const verified = String(driver?.driver_status ?? '') === 'approved' || String(user.verification_level ?? '') === 'level_3';
 
   return {
     id: String(user.auth_user_id ?? user.id),

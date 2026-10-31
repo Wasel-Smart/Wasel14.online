@@ -224,8 +224,16 @@ export const walletApi = {
     );
   },
 
-  async sendMoney(userId: string, recipientId: string, amount: number, opts: { note?: string; pin?: string } = {}) {
-    const { note, pin } = opts;
+  async sendMoney(userId: string, recipientId: string, amount: number, optsOrNote?: { note?: string; pin?: string } | string, maybePin?: string) {
+    let note: string | undefined;
+    let pin: string | undefined;
+    if (typeof optsOrNote === 'string') {
+      note = optsOrNote;
+      pin = maybePin;
+    } else if (optsOrNote && typeof optsOrNote === 'object') {
+      note = optsOrNote.note;
+      pin = optsOrNote.pin;
+    }
     return tryEdgeThenDirectForMoney(
       () => requestWalletJson<{ success: boolean; note?: string; wallet: WalletData }>(userId, '/send', 'Send wallet funds', { method: 'POST', body: { recipientId, amount, note, ...(pin ? { pin } : {}) } }),
       async () => ({ success: true, note, wallet: await transferWalletFundsDirect(userId, recipientId, amount) }),

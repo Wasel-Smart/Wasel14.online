@@ -94,7 +94,7 @@ function mapTripRow ( row: Record<string, unknown>, driverProfile?: Record<strin
       id: String( driverProfile?.id ?? row.driver_id ?? 'driver' ),
       name: String( driverProfile?.full_name ?? driverProfile?.email ?? 'Wasel Driver' ),
       rating: toNumber( driverProfile?.rating, 0 ),
-      verified: Boolean( driverProfile?.verified ?? driverProfile?.sanad_verified ?? false ),
+      verified: Boolean( driverProfile?.verified ?? false ),
     },
   };
 }
@@ -102,11 +102,11 @@ function mapTripRow ( row: Record<string, unknown>, driverProfile?: Record<strin
 async function fetchDriverProfiles ( admin: ReturnType<typeof getAdminClient>, driverIds: string[] ): Promise<Record<string, Record<string, unknown>>> {
   const uniqueIds = Array.from( new Set( driverIds.filter( Boolean ) ) );
   if ( uniqueIds.length === 0 ) {return {};}
-  const { data: drivers } = await admin.from( 'drivers' ).select( 'driver_id, user_id, rating, sanad_identity_linked' ).in( 'driver_id', uniqueIds );
+  const { data: drivers } = await admin.from( 'drivers' ).select( 'driver_id, user_id, rating, driver_status' ).in( 'driver_id', uniqueIds );
   const driverRows = Array.isArray( drivers ) ? drivers : [];
   const userIds = driverRows.map( ( d: Record<string, unknown> ) => String( d.user_id ?? '' ) );
   if ( userIds.length === 0 ) {return {};}
-  const { data: users } = await admin.from( 'users' ).select( 'id, auth_user_id, full_name, email, rating, sanad_verified_status' ).in( 'id', userIds );
+  const { data: users } = await admin.from( 'users' ).select( 'id, auth_user_id, full_name, email, rating, verification_level' ).in( 'id', userIds );
   const usersById = new Map<string, Record<string, unknown>>();
   ( Array.isArray( users ) ? users : [] ).forEach( ( u: Record<string, unknown> ) => usersById.set( String( u.id ), u ) );
   const result: Record<string, Record<string, unknown>> = {};
@@ -118,7 +118,7 @@ async function fetchDriverProfiles ( admin: ReturnType<typeof getAdminClient>, d
         full_name: user.full_name ?? null,
         email: user.email ?? null,
         rating: toNumber( driver.rating ?? user.rating, 0 ),
-        verified: Boolean( user.sanad_verified_status === 'verified' || driver.sanad_identity_linked ),
+        verified: String( driver.driver_status ?? '' ) === 'approved' || String( user.verification_level ?? '' ) === 'level_3',
       };
     }
   }
@@ -139,7 +139,6 @@ async function ensureDriverForUser ( admin: ReturnType<typeof getAdminClient>, u
     user_id: user.id,
     driver_status: 'pending_approval',
     verification_level: user.verification_level ?? 'level_0',
-    sanad_identity_linked: false,
   } ).select( '*' ).single();
   if ( error ) {throw error;}
   return data;

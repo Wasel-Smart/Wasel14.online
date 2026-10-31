@@ -7,7 +7,6 @@ import {
   enableDirectTrustDriverMode,
   startDirectTrustPhoneVerification,
   submitDirectTrustDriverDocuments,
-  submitDirectTrustIdentityVerification,
 } from './directSupabase';
 import { buildFallbackTrustCenterStatus, type ReviewHistoryItem, type TrustCenterStatus } from './trustCenterModel';
 
@@ -41,11 +40,6 @@ export interface StartPhoneVerificationPayload {
 
 export interface ConfirmPhoneVerificationPayload {
   code: string;
-}
-
-export interface IdentityVerificationPayload {
-  providerReference: string;
-  documentReference?: string;
 }
 
 export interface DriverDocumentsPayload {
@@ -164,32 +158,6 @@ export async function confirmTrustPhoneVerification ( payload: ConfirmPhoneVerif
     fallback: async () => {
       const userId = await getTrustUserId();
       return confirmDirectTrustPhoneVerification( userId, payload.code );
-    },
-  } );
-
-  return response;
-}
-
-export async function submitTrustIdentityVerification ( payload: IdentityVerificationPayload ) {
-  const response = await runBackendWorkflow<{
-    submitted: boolean;
-    verificationId: string;
-  }>( {
-    operation: 'Identity verification submission',
-    authMode: 'required',
-    fallbackPolicy: 'writes-if-enabled',
-    edge: context =>
-      requestEdgeJson( {
-        path: '/v1/trust/identity/submit',
-        method: 'POST',
-        body: payload,
-        authMode: 'required',
-        context,
-        operation: 'Identity verification submission',
-      } ),
-    fallback: async () => {
-      const userId = await getTrustUserId();
-      return submitDirectTrustIdentityVerification( userId, payload );
     },
   } );
 

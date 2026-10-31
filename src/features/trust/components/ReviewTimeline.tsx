@@ -48,7 +48,6 @@ export function ReviewTimeline({ items, t }: { items: ReviewHistoryItem[]; t: (k
     <div style={{ display: 'grid', gap: SPACE[3] }}>
       {items.map((item) => {
         const style = statusStyle(item.status);
-        const isDriver = item.type === 'driver_documents';
 
         return (
           <div
@@ -83,11 +82,11 @@ export function ReviewTimeline({ items, t }: { items: ReviewHistoryItem[]; t: (k
                   fontFamily: F,
                 }}
               >
-                {isDriver ? t('trustCenterExpanded.driverDocuments') : t('trustCenterExpanded.identity')}
+                {t('trustCenterExpanded.driverDocuments')}
               </div>
-              {item.providerReference && (
+              {item.documentReference && (
                 <div style={{ color: C.textMuted, fontSize: TYPE.size.xs, fontFamily: F }}>
-                  {t('trustCenterExpanded.sanadReference')}: {item.providerReference}
+                  {t('trustCenterExpanded.documentReference')}: {item.documentReference}
                 </div>
               )}
               {item.failureReason && (

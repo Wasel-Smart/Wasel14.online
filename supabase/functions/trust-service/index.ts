@@ -5,7 +5,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '
 const APP_BASE_URL = (Deno.env.get('APP_BASE_URL') ?? 'https://wasel14.online').replace(/\/$/, '');
 const ADDITIONAL_ALLOWED_ORIGINS = Deno.env.get('ALLOWED_ORIGINS') ?? '';
 const ALLOW_LOCAL_ORIGINS = Deno.env.get('ALLOW_LOCAL_ORIGINS') === 'true';
-const IDENTITY_PENDING_TIMEOUT_HOURS = 24;
 const DRIVER_DOCUMENT_TIMEOUT_HOURS = 72;
 
 const responseBaseHeaders = {
@@ -80,7 +79,7 @@ function isOlderThanHours(isoValue: string | null | undefined, hours: number): b
 }
 
 function computeTrustStepSummary(steps: Record<string, { id: string; state: string }>) {
-  const orderedSteps = [steps.phone, steps.email, steps.identity, steps.driverDocuments, steps.walletStanding];
+  const orderedSteps = [steps.phone, steps.email, steps.driverDocuments, steps.walletStanding];
   const completedSteps = orderedSteps.filter((step) => step.state === 'completed').length;
   return {
     completedSteps, totalSteps: orderedSteps.length,
@@ -94,23 +93,24 @@ async function buildReviewHistory(auth: Awaited<ReturnType<typeof authenticateRe
 
   const { data, error } = await auth.admin
     .from('verification_records')
-    .select('verification_id, sanad_status, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at')
+    .select('verification_id, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at')
     .eq('user_id', auth.canonicalUser.id)
+    .not('document_status', 'is', null)
     .order('verification_timestamp', { ascending: false })
     .limit(20);
 
   if (error) {throw new Error('Review history lookup failed');}
 
   const items = (data ?? []).map((row: Record<string, unknown>) => {
-    const status = row.sanad_status === 'verified' || row.document_status === 'verified'
+    const status = row.document_status === 'verified'
       ? 'approved'
-      : row.sanad_status === 'rejected' || row.document_status === 'rejected'
+      : row.document_status === 'rejected'
         ? 'rejected'
         : 'pending';
 
     return {
       id: row.verification_id,
-      type: row.document_status ? 'driver_documents' : 'identity' as const,
+      type: 'driver_documents' as const,
       status,
       submittedAt: row.verification_timestamp,
       reviewedAt: row.updated_at ?? null,
@@ -133,8 +133,8 @@ async function buildTrustStatus(auth: Awaited<ReturnType<typeof authenticateRequ
   if ('error' in auth) {return null;}
 
   const [verificationResult, driverResult, walletResult, otpResult] = await Promise.all([
-    auth.admin.from('verification_records').select('verification_id, sanad_status, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at').eq('user_id', auth.canonicalUser.id).order('verification_timestamp', { ascending: false }).limit(1).maybeSingle(),
-    auth.admin.from('drivers').select('driver_id, license_number, driver_status, verification_level, sanad_identity_linked, background_check_status, created_at, updated_at').eq('user_id', auth.canonicalUser.id).maybeSingle(),
+    auth.admin.from('verification_records').select('verification_id, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at').eq('user_id', auth.canonicalUser.id).order('verification_timestamp', { ascending: false }).limit(1).maybeSingle(),
+    auth.admin.from('drivers').select('driver_id, license_number, driver_status, verification_level, background_check_status, created_at, updated_at').eq('user_id', auth.canonicalUser.id).maybeSingle(),
     auth.admin.from('wallets').select('wallet_id, wallet_status, updated_at').eq('user_id', auth.canonicalUser.id).maybeSingle(),
     auth.admin.from('otp_sessions').select('otp_session_id, phone_number, attempts, max_attempts, expires_at, consumed_at, created_at').eq('user_id', auth.canonicalUser.id).eq('purpose', 'driver_action').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
@@ -153,18 +153,6 @@ async function buildTrustStatus(auth: Awaited<ReturnType<typeof authenticateRequ
   const emailAddress = auth.authUser.email ?? auth.canonicalUser.email ?? null;
   const emailVerified = Boolean(auth.authUser.email_confirmed_at);
   const phoneVerified = Boolean(auth.canonicalUser.phone_verified_at);
-
-  const identityUpdatedAt = String(verification?.updated_at ?? verification?.verification_timestamp ?? auth.canonicalUser.updated_at ?? '') || null;
-  const staleIdentity = verification?.sanad_status === 'pending' && isOlderThanHours(identityUpdatedAt, IDENTITY_PENDING_TIMEOUT_HOURS);
-  const identityFailureReason = staleIdentity ? 'Sanad verification timed out. Submit the request again.' : verification?.failure_reason ?? null;
-
-  const identity = verification?.sanad_status === 'verified' || verificationLevel === 'level_2' || verificationLevel === 'level_3'
-    ? buildTrustStep('identity', 'completed', 'Identity verification is complete.', { providerReference: verification?.provider_reference ?? null, documentReference: verification?.document_reference ?? null }, { updatedAt: identityUpdatedAt })
-    : verification?.sanad_status === 'rejected' || verification?.sanad_status === 'expired' || staleIdentity
-      ? buildTrustStep('identity', 'failed', 'Identity verification did not complete.', { providerReference: verification?.provider_reference ?? null, documentReference: verification?.document_reference ?? null }, { failureReason: identityFailureReason ?? 'Sanad verification was rejected. Review the reason and try again.', updatedAt: identityUpdatedAt })
-      : verification?.sanad_status === 'pending'
-        ? buildTrustStep('identity', 'in_progress', 'Sanad verification is under review.', { providerReference: verification?.provider_reference ?? null, documentReference: verification?.document_reference ?? null }, { updatedAt: identityUpdatedAt })
-        : buildTrustStep('identity', 'not_started', 'Submit Sanad verification to continue.', { providerReference: null, documentReference: null });
 
   const email = buildTrustStep('email', emailVerified ? 'completed' : emailAddress ? 'in_progress' : 'not_started',
     emailVerified ? 'Email is verified.' : emailAddress ? 'Email confirmation is still required.' : 'Add an email address to continue.', { email: emailAddress });
@@ -197,7 +185,7 @@ async function buildTrustStatus(auth: Awaited<ReturnType<typeof authenticateRequ
       ? buildTrustStep('wallet_standing', 'in_progress', 'Wallet standing is limited and may block some actions.', { walletStatus: 'limited' }, { updatedAt: wallet?.updated_at ?? null })
       : buildTrustStep('wallet_standing', 'failed', walletStatus === 'unavailable' ? 'Wallet is not provisioned yet.' : `Wallet standing is ${walletStatus}.`, { walletStatus: walletStatus === 'frozen' || walletStatus === 'closed' ? walletStatus : 'unavailable' }, { failureReason: walletStatus === 'closed' ? 'Wallet is closed and must be restored before payouts can continue.' : walletStatus === 'frozen' ? 'Wallet is frozen and needs review before payouts can continue.' : 'Wallet provisioning is missing for this account.', updatedAt: wallet?.updated_at ?? null });
 
-  const steps = { identity, email, phone, driverDocuments, walletStanding };
+  const steps = { email, phone, driverDocuments, walletStanding };
   const summary = computeTrustStepSummary(steps);
 
   return { fetchedAt: new Date().toISOString(), verificationLevel, ...summary, steps };

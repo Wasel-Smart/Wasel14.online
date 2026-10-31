@@ -145,7 +145,7 @@ export async function getLatestVerificationRecord(
   const { data, error } = await db
     .from('verification_records')
     .select(
-      'sanad_status, document_status, verification_level, verification_timestamp, failure_reason, updated_at',
+      'document_status, verification_level, verification_timestamp, failure_reason, updated_at',
     )
     .eq('user_id', canonicalUserId)
     .order('verification_timestamp', { ascending: false })

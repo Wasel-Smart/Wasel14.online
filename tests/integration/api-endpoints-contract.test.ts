@@ -216,7 +216,7 @@ function extractEdgeHandlers(source: string): Map<string, { method: string; hand
 
     // Try to extract explicit methods; default to all methods if absent.
     const methodsMatch = testFn.match(/methods:\s*\[([^\]]+)\]/);
-    const methods = methodsMatch
+    const methods = methodsMatch?.[1]
       ? methodsMatch[1].split(',').map(m => m.trim().replace(/'/g, ''))
       : ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -242,25 +242,26 @@ function extractPathsFromTest(testFn: string): string[] {
 
   // Direct path matches: path === '/something'
   for (const m of testFn.matchAll(/path\s*===\s*'([^']+)'/g)) {
-    const [, direct] = m;
+    const direct = m[1];
     if (direct) { paths.push(direct); }
   }
 
   // Prefix matches: path.startsWith('/something/')
   for (const m of testFn.matchAll(/path\.startsWith\(\s*'([^']+)'\s*\)/g)) {
-    paths.push(m[1] + '*');
+    const prefix = m[1];
+    if (prefix) { paths.push(prefix + '*'); }
   }
 
   // Regex patterns: /^\/something\/[^/]+$/.test(path)  →  /something/:id
   for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\\\[\\^\\/\\\\]\\\\+\\\\$', 'g'))) {
-    const prefix = m[1].replace(/\\\//g, '/');
-    paths.push(`/${prefix}/:id`);
+    const prefix = m[1]?.replace(/\\\//g, '/');
+    if (prefix) { paths.push(`/${prefix}/:id`); }
   }
 
   // Regex patterns: /^\/something\/$/.test(path)  →  /something
   for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\$', 'g'))) {
-    const prefix = m[1].replace(/\\\//g, '/');
-    paths.push(`/${prefix}`);
+    const prefix = m[1]?.replace(/\\\//g, '/');
+    if (prefix) { paths.push(`/${prefix}`); }
   }
 
   // Wallet route dispatcher

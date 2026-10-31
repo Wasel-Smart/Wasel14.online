@@ -38,7 +38,10 @@ async function createBooking ( request: Request, auth: BookingAuth ): Promise<Re
   const body = await request.json().catch( () => ( {} ) );
   const tripId = String( body.trip_id ?? '' );
   const seatsRequested = Math.max( 1, toNumber( body.seats_requested, 1 ) );
-  const status = String( body.status ?? body.booking_status ?? 'confirmed' );
+  // Booking state is server-owned. A client may only ask for a pending booking;
+  // confirmation comes from the trip's own driver (see updateBooking).
+  const requestedStatus = String( body.status ?? body.booking_status ?? '' );
+  const status = requestedStatus === 'pending' ? 'pending' : 'pending_driver';
 
   // Booking creation runs inside app_create_ride_booking so the trip row is
   // locked for the whole operation. The previous read-then-write sequence let
@@ -76,24 +79,21 @@ async function assignAvailableDriver (
   auth: BookingAuth,
   tripId: string,
   bookingId: string,
-  status: string,
+  _status: string,
 ): Promise<void> {
-  const { data: driver } = await auth.admin
-    .from( 'drivers' )
-    .select( 'driver_id, user_id' )
-    .in( 'driver_status', [ 'online', 'approved', 'busy' ] )
-    .limit( 1 )
+  // Link the booking to the driver who posted the trip. The old code picked the
+  // first online driver in the table, overwrote trips.driver_id with them and
+  // marked the booking confirmed, so any passenger could reassign any trip.
+  const { data: trip } = await auth.admin
+    .from( 'trips' )
+    .select( 'driver_id' )
+    .eq( 'trip_id', tripId )
     .maybeSingle();
 
-  if ( driver && status !== 'pending_driver' ) {
-    await auth.admin
-      .from( 'trips' )
-      .update( { driver_id: driver.driver_id, trip_status: 'booked' } )
-      .eq( 'trip_id', tripId );
-
+  if ( trip?.driver_id ) {
     await auth.admin
       .from( 'bookings' )
-      .update( { driver_id: driver.driver_id, confirmed_by_driver: true } )
+      .update( { driver_id: trip.driver_id } )
       .eq( 'booking_id', bookingId );
   }
 }
@@ -122,7 +122,15 @@ async function isTripDriver (
     .select( 'driver_id' )
     .eq( 'trip_id', tripId )
     .maybeSingle();
-  return tripRow?.driver_id === userId;
+  if ( !tripRow?.driver_id ) {return false;}
+  // trips.driver_id is a drivers.driver_id, not a users.id, so resolve the caller's
+  // driver record before comparing.
+  const { data: driverRow } = await auth.admin
+    .from( 'drivers' )
+    .select( 'driver_id' )
+    .eq( 'user_id', userId )
+    .maybeSingle();
+  return Boolean( driverRow?.driver_id ) && driverRow?.driver_id === tripRow.driver_id;
 }
 
 function normalizeBookingStatusUpdate ( rawStatus: unknown ): string {
@@ -148,6 +156,14 @@ async function updateBooking ( request: Request, auth: BookingAuth, bookingId: s
     return json( { error: 'Not authorized to update this booking.' }, 403 );
   }
   const status = normalizeBookingStatusUpdate( body.status );
+  // A passenger may only cancel their own booking. Confirming, starting or
+  // completing a ride is for the trip's driver (or staff with rides:assign).
+  const allowedStatuses = ( isDriver || canManage )
+    ? [ 'confirmed', 'cancelled', 'in_progress', 'completed' ]
+    : [ 'cancelled' ];
+  if ( !allowedStatuses.includes( status ) ) {
+    return json( { error: 'This status change is not permitted for your account.' }, 403 );
+  }
   const { data, error } = await auth.admin
     .from( 'bookings' )
     .update( {
@@ -177,12 +193,12 @@ export async function handleSubmitRating ( request: Request ) {
 
   const { admin, canonicalUser } = auth;
   const bookingId = String( body.bookingId ?? '' );
-  const tripId = String( body.tripId ?? '' );
-  const driverId = String( body.driverId ?? '' );
+  const tripIdBody = String( body.tripId ?? '' );
+  const driverIdBody = String( body.driverId ?? '' );
 
   const { data: booking, error: bookingError } = await admin
     .from( 'bookings' )
-    .select( 'id, user_id, status' )
+    .select( 'id, user_id, status, trip_id, driver_id, trips(driver_id)' )
     .eq( 'id', bookingId )
     .maybeSingle();
 
@@ -190,6 +206,16 @@ export async function handleSubmitRating ( request: Request ) {
   if ( !booking ) {return json( { error: 'Booking not found' }, 404 );}
   if ( !canModerateRatings && booking.user_id !== canonicalUser.id ) {return json( { error: 'Unauthorized' }, 403 );}
   if ( booking.status !== 'completed' ) {return json( { error: 'Can only rate completed trips' }, 409 );}
+
+  const tripId = String( booking.trip_id ?? tripIdBody ?? '' );
+  const bookingRow = booking as unknown as { trips?: { driver_id: string | null } | { driver_id: string | null }[] | null; driver_id?: string | null };
+  const driverId = String(
+    bookingRow.driver_id ??
+    ( Array.isArray( bookingRow.trips ) ? bookingRow.trips[0]?.driver_id : bookingRow.trips?.driver_id ) ??
+    driverIdBody ??
+    ''
+  );
+  if ( !tripId || !driverId ) {return json( { error: 'Unable to resolve trip or driver for rating' }, 400 );}
 
   const { data: existingRating, error: existingError } = await admin
     .from( 'ratings' )

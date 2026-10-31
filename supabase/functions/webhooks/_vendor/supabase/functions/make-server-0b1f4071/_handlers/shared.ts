@@ -2376,7 +2376,8 @@ export async function markTopUpTransactionFailed (
       metadata,
       updated_at: now,
     } )
-    .eq( 'transaction_id', transactionId );
+    .eq( 'transaction_id', transactionId )
+    .neq( 'transaction_status', 'posted' );
 
   if ( error ) {
     throw new Error( error.message );
@@ -2440,8 +2441,8 @@ export async function finalizeTopUpTransaction ( opts: FinalizeTopUpOptions ) {
   try {
     await client.queryArray( 'begin' );
 
-    const transactionResult = await client.queryObject<{ wallet_id: string; amount: number; transaction_status: string; metadata: unknown }>(
-      'select wallet_id, amount, transaction_status, metadata from public.transactions where transaction_id = $1 for update',
+    const transactionResult = await client.queryObject<{ wallet_id: string; amount: number; transaction_status: string; metadata: unknown; transaction_type?: string; direction?: string }>(
+      'select wallet_id, amount, transaction_status, metadata, transaction_type, direction from public.transactions where transaction_id = $1 for update',
       [ transactionId ],
     );
 
@@ -2453,6 +2454,14 @@ export async function finalizeTopUpTransaction ( opts: FinalizeTopUpOptions ) {
     if ( transaction.transaction_status === 'posted' ) {
       await client.queryArray( 'commit' );
       return { applied: false, reason: 'already_posted' };
+    }
+
+    // Only credit add_funds/credit top-ups. Never credit debits or other transaction types.
+    const txType = String( transaction.transaction_type ?? '' ).toLowerCase();
+    const direction = String( transaction.direction ?? '' ).toLowerCase();
+    if ( txType !== 'add_funds' || direction !== 'credit' ) {
+      await client.queryArray( 'rollback' ).catch( () => undefined );
+      throw new Error( 'Invalid top-up transaction type or direction' );
     }
 
     // A signed "paid" event means real money arrived, so a row that an earlier failure

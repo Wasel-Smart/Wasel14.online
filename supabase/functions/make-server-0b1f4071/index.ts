@@ -37,13 +37,12 @@ import {
   handleSetPushPreference,
 } from './_handlers/notifications.ts';
 import { handleSubmitReview } from './_handlers/reviews.ts';
-import { handleStripeWebhook, handleCliqWebhook, handleSanadWebhook, handleResendWebhook, handleTwilioWebhook, handleSendSmsHook } from './_handlers/webhooks.ts';
+import { handleStripeWebhook, handleCliqWebhook, handleResendWebhook, handleTwilioWebhook, handleSendSmsHook } from './_handlers/webhooks.ts';
 
 import {
   handleEnableDriverMode,
   handleProfileRequest,
   handleSubmitDriverDocuments,
-  handleSubmitIdentityVerification,
   handleTwoFactorDisable,
   handleTwoFactorSetup,
   handleTwoFactorVerify,
@@ -390,12 +389,6 @@ const ROUTES: RouteDescriptor[] = [
     handle: ( request ) => handleConfirmPhoneVerification( request ),
   },
   {
-    id: 'trust-identity-submit',
-    methods: [ 'POST' ],
-    test: ( path ) => path === '/trust/identity/submit',
-    handle: ( request ) => handleSubmitIdentityVerification( request ),
-  },
-  {
     id: 'trust-driver-mode-enable',
     methods: [ 'POST' ],
     test: ( path ) => path === '/trust/driver-mode/enable',
@@ -532,12 +525,6 @@ const ROUTES: RouteDescriptor[] = [
     methods: [ 'POST' ],
     test: ( path ) => path === '/payments/webhooks/cliq',
     handle: ( request ) => handleCliqWebhook( request ),
-  },
-  {
-    id: 'trust-webhook-sanad',
-    methods: [ 'POST' ],
-    test: ( path ) => path === '/trust/webhooks/sanad',
-    handle: ( request ) => handleSanadWebhook( request ),
   },
   {
     id: 'communications-webhook-resend',

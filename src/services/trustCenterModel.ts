@@ -1,4 +1,4 @@
-export type TrustStepId = 'identity' | 'email' | 'phone' | 'driver_documents' | 'wallet_standing';
+export type TrustStepId = 'email' | 'phone' | 'driver_documents' | 'wallet_standing';
 
 export type TrustStepState = 'not_started' | 'in_progress' | 'completed' | 'failed';
 
@@ -9,11 +9,6 @@ export interface TrustStepStatus<TMeta = Record<string, unknown>> {
   failureReason: string | null;
   updatedAt: string | null;
   meta: TMeta;
-}
-
-export interface IdentityStepMeta {
-  providerReference: string | null;
-  documentReference: string | null;
 }
 
 export interface EmailStepMeta {
@@ -36,7 +31,7 @@ export interface WalletStandingStepMeta {
 
 export interface ReviewHistoryItem {
   id: string;
-  type: 'identity' | 'driver_documents';
+  type: 'driver_documents';
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string;
   reviewedAt: string | null;
@@ -54,7 +49,6 @@ export interface TrustCenterStatus {
   blockedSteps: TrustStepId[];
   reviewHistory: ReviewHistoryItem[];
   steps: {
-    identity: TrustStepStatus<IdentityStepMeta>;
     email: TrustStepStatus<EmailStepMeta>;
     phone: TrustStepStatus<PhoneStepMeta>;
     driverDocuments: TrustStepStatus<DriverDocumentsStepMeta>;
@@ -65,13 +59,12 @@ export interface TrustCenterStatus {
 type FallbackTrustUser = {
   role: 'rider' | 'driver' | 'both' | 'admin';
   verificationLevel: string;
+  driverStatus?: string;
   email?: string;
   emailVerified: boolean;
   phone?: string;
   phoneVerified: boolean;
   walletStatus: 'active' | 'limited' | 'frozen' | 'closed' | 'unavailable';
-  sanadVerified?: boolean;
-  verified?: boolean;
 };
 
 function buildStatus<TMeta>(
@@ -88,26 +81,6 @@ function buildStatus<TMeta>(
     updatedAt: options.updatedAt ?? null,
     meta,
   };
-}
-
-function buildIdentityStep(user: FallbackTrustUser, verificationLevel: string): TrustStepStatus<IdentityStepMeta> {
-  const identityComplete =
-    Boolean(user.sanadVerified || user.verified) ||
-    verificationLevel === 'level_2' ||
-    verificationLevel === 'level_3';
-
-  const meta: IdentityStepMeta = { providerReference: null, documentReference: null };
-
-  if (identityComplete) {
-    return buildStatus('identity', 'completed', meta, { detail: 'Identity verification is complete.' });
-  }
-
-  const state = verificationLevel === 'level_1' ? 'in_progress' : 'not_started';
-  const detail =
-    verificationLevel === 'level_1'
-      ? 'Identity verification is still in progress.'
-      : 'Submit Sanad verification to continue.';
-  return buildStatus('identity', state, meta, { detail });
 }
 
 function buildEmailStep(user: FallbackTrustUser): TrustStepStatus<EmailStepMeta> {
@@ -143,18 +116,18 @@ function buildDriverDocsStep(
     });
   }
 
-  if (verificationLevel === 'level_3') {
+  if (verificationLevel === 'level_3' || user.driverStatus === 'approved') {
     return buildStatus('driver_documents', 'completed', meta, {
       detail: 'Driver documents are approved.',
     });
   }
 
-  const state = verificationLevel === 'level_2' ? 'in_progress' : 'not_started';
-  const detail =
-    verificationLevel === 'level_2'
+  const inReview = verificationLevel === 'level_2' || user.driverStatus === 'pending_approval';
+  return buildStatus('driver_documents', inReview ? 'in_progress' : 'not_started', meta, {
+    detail: inReview
       ? 'Driver documents are waiting for final review.'
-      : 'Submit driver license and compliance documents.';
-  return buildStatus('driver_documents', state, meta, { detail });
+      : 'Submit driver license and compliance documents.',
+  });
 }
 
 function buildWalletStep(user: FallbackTrustUser): TrustCenterStatus['steps']['walletStanding'] {
@@ -194,13 +167,7 @@ function resolveWalletStatusValue(
 }
 
 function pickNextStepId(steps: TrustCenterStatus['steps']): TrustCenterStatus['nextStepId'] {
-  const ordered = [
-    steps.phone,
-    steps.email,
-    steps.identity,
-    steps.driverDocuments,
-    steps.walletStanding,
-  ];
+  const ordered = [steps.phone, steps.email, steps.driverDocuments, steps.walletStanding];
   const next = ordered.find(step => step.state !== 'completed');
   return next?.id ?? null;
 }
@@ -209,7 +176,6 @@ export function buildFallbackTrustCenterStatus(user: FallbackTrustUser): TrustCe
   const verificationLevel = String(user.verificationLevel ?? 'level_0');
 
   const steps = {
-    identity: buildIdentityStep(user, verificationLevel),
     email: buildEmailStep(user),
     phone: buildPhoneStep(user),
     driverDocuments: buildDriverDocsStep(user, verificationLevel),

@@ -109,14 +109,16 @@ function extractPathPatterns(testFn: string): string[] {
 
   // Regex patterns: /^\/something\/[^/]+$/.test(path)  →  /something/:id
   for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\\\[\\^\\/\\\\]\\\\+\\\\$', 'g'))) {
-    const prefix = m[1].replace(/\\\//g, '/');
-    patterns.push(`/${prefix}/:id`);
+    const prefix = m[1];
+    if (!prefix) { continue; }
+    patterns.push(`/${prefix.replace(/\\\//g, '/')}/:id`);
   }
 
   // Regex patterns: /^\/something\/$/.test(path)  →  /something
   for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\$', 'g'))) {
-    const prefix = m[1].replace(/\\\//g, '/');
-    patterns.push(`/${prefix}`);
+    const prefix = m[1];
+    if (!prefix) { continue; }
+    patterns.push(`/${prefix.replace(/\\\//g, '/')}`);
   }
 
   // Template literal paths: `/wallet/${userId}`

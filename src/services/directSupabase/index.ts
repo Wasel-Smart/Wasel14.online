@@ -72,7 +72,7 @@ export {
   upsertDirectUserSettings,
 } from './accountAndSupport.js';
 
-export { enableDirectTrustDriverMode, submitDirectTrustDriverDocuments, submitDirectTrustIdentityVerification, startDirectTrustPhoneVerification, confirmDirectTrustPhoneVerification } from './trust.js';
+export { enableDirectTrustDriverMode, submitDirectTrustDriverDocuments, startDirectTrustPhoneVerification, confirmDirectTrustPhoneVerification } from './trust.js';
 
 // Price calculator — canonical implementation lives in src/shared/pricing/priceCalculator.ts.
 // This re-export preserves the existing API for all current importers.

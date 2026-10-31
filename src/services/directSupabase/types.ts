@@ -23,7 +23,6 @@ export type RawProfile = {
   id_verified?: boolean | null;
   is_verified?: boolean | null;
   verified?: boolean | null;
-  sanad_verified?: boolean | null;
   verification_level?: string | null;
   wallet_status?: string | null;
   avatar_url?: string | null;
@@ -40,7 +39,6 @@ export type UserRow = {
   phone_number?: string | null;
   role?: string | null;
   verification_level?: string | null;
-  sanad_verified_status?: string | null;
   phone_verified_at?: string | null;
   avatar_url?: string | null;
   two_factor_enabled?: boolean | null;
@@ -56,7 +54,6 @@ export type DriverRow = {
   user_id: string;
   driver_status?: string | null;
   verification_level?: string | null;
-  sanad_identity_linked?: boolean | null;
   created_at?: string | null;
 };
 
@@ -198,7 +195,6 @@ export type RawDemandAlert = {
 };
 
 export type RawVerificationRecord = {
-  sanad_status?: string | null;
   document_status?: string | null;
   verification_level?: string | null;
   verification_timestamp?: string | null;

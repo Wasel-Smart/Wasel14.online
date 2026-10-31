@@ -63,9 +63,7 @@ export default function DriverPage() {
     { label: t('driverPageExpanded.packageAddon'), ready: readiness.canCarryPackages },
     {
       label: t('driverPageExpanded.earnings'),
-      ready:
-        user.emailVerified &&
-        (user.verificationLevel === 'level_2' || user.verificationLevel === 'level_3'),
+      ready: user.emailVerified && user.phoneVerified,
     },
   ];
 

@@ -1,11 +1,9 @@
-﻿openapi: 3.1.0
+openapi: 3.1.0
 info:
   title: Wasel Platform API
   version: 1.0.0
-  description: >
-    Versioned API contract for the Wasel mobility platform.
-    All endpoints are prefixed with /v1 and served by the
-    Supabase Edge Function at /functions/v1/make-server-0b1f4071.
+  description: |
+    Versioned API contract for the Wasel mobility platform. All endpoints are prefixed with /v1 and served by the Supabase Edge Function at /functions/v1/make-server-0b1f4071.
 servers:
   - url: https://wasel14.online/functions/v1/make-server-0b1f4071
 paths:
@@ -1364,9 +1362,11 @@ components:
           format: date-time
         version:
           type: string
+      required: []
     ErrorPayload:
       type: object
-      required: [message]
+      required:
+        - message
       properties:
         message:
           type: string
@@ -1382,7 +1382,11 @@ components:
           $ref: '#/components/schemas/Metadata'
     Trip:
       type: object
-      required: [trip_id, origin_city, destination_city, departure_time]
+      required:
+        - trip_id
+        - origin_city
+        - destination_city
+        - departure_time
       properties:
         trip_id:
           type: string
@@ -1403,7 +1407,10 @@ components:
           type: boolean
     Booking:
       type: object
-      required: [booking_id, trip_id, passenger_id]
+      required:
+        - booking_id
+        - trip_id
+        - passenger_id
       properties:
         booking_id:
           type: string
@@ -1419,7 +1426,10 @@ components:
           type: number
     Package:
       type: object
-      required: [package_id, tracking_number, sender_id]
+      required:
+        - package_id
+        - tracking_number
+        - sender_id
       properties:
         package_id:
           type: string
@@ -1437,7 +1447,9 @@ components:
           type: number
     HealthResponse:
       type: object
-      required: [status, service]
+      required:
+        - status
+        - service
       properties:
         status:
           type: string
@@ -1465,7 +1477,13 @@ components:
               type: integer
     CreateTripRequest:
       type: object
-      required: [from, to, date, time, seats, carModel]
+      required:
+        - from
+        - to
+        - date
+        - time
+        - seats
+        - carModel
       properties:
         from:
           type: string
@@ -1484,12 +1502,18 @@ components:
           type: boolean
         packageCapacity:
           type: string
-          enum: [none, small, medium, large]
+          enum:
+            - none
+            - small
+            - medium
+            - large
         note:
           type: string
     CreateBookingRequest:
       type: object
-      required: [trip_id, seats_requested]
+      required:
+        - trip_id
+        - seats_requested
       properties:
         trip_id:
           type: string
@@ -1505,7 +1529,12 @@ components:
           type: string
     CreatePackageRequest:
       type: object
-      required: [receiver_name, receiver_phone, origin_name, destination_name, size]
+      required:
+        - receiver_name
+        - receiver_phone
+        - origin_name
+        - destination_name
+        - size
       properties:
         receiver_name:
           type: string
@@ -1531,7 +1560,10 @@ components:
               type: number
         size:
           type: string
-          enum: [small, medium, large]
+          enum:
+            - small
+            - medium
+            - large
         weight:
           type: number
         description:
@@ -1544,10 +1576,193 @@ components:
       allOf:
         - $ref: '#/components/schemas/EnvelopeBase'
         - type: object
-          required: [success, error]
+          required:
+            - success
+            - error
           properties:
             success:
               type: boolean
               const: false
             error:
               $ref: '#/components/schemas/ErrorPayload'
+      required: []
+  /v1/gdpr/consents:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: consentsEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/gdpr/data-exports:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: dataexportsEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/gdpr/deletions:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: deletionsEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/gdpr/deletions/cancel:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: cancelEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/payments/webhooks/stripe:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: stripeEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/payments/webhooks/cliq:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: cliqEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/trust/webhooks/sanad:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: sanadEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/communications/webhooks/resend:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: resendEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/communications/webhooks/twilio:
+    post:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: twilioEndpoint
+      responses:
+        '200':
+          description: OK
+  /v1/gdpr/consents/{id}:
+    get:
+      tags:
+        - API
+      summary: API endpoint
+      operationId: getGdprConsent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /v1/wallet/{userId}/{action}:
+    get:
+      tags:
+        - Wallet
+      operationId: walletAction2
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    post:
+      tags:
+        - Wallet
+      operationId: walletAction3
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /v1/wallet/{userId}/{action}/{resourceId}:
+    get:
+      tags:
+        - Wallet
+      operationId: walletAction4
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+    post:
+      tags:
+        - Wallet
+      operationId: walletAction5
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK

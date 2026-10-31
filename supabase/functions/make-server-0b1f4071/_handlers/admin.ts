@@ -307,7 +307,7 @@ export async function handleAdminListPendingDrivers ( request: Request ) {
   const { data, error } = await admin
     .from ( 'drivers' )
     .select (
-      'driver_id, user_id, driver_status, verification_level, sanad_identity_linked, background_check_status, created_at, updated_at',
+      'driver_id, user_id, driver_status, verification_level, background_check_status, created_at, updated_at',
     )
     .eq ( 'driver_status', 'pending_approval' )
     .order ( 'created_at', { ascending: false } );
@@ -329,13 +329,37 @@ export async function handleAdminApproveDriver ( request: Request, driverId: str
   }
 
   const admin = getAdminClient ();
+  const now = new Date ().toISOString ();
+  // Approval is the single operator decision that clears a driver: it marks the
+  // driver approved, records the document review as verified, and lifts the
+  // account to level_3 so every gate that reads the level agrees with the status.
   const { data, error } = await admin
     .from ( 'drivers' )
-    .update ( { driver_status: 'approved', updated_at: new Date ().toISOString () } )
+    .update ( {
+      driver_status: 'approved',
+      background_check_status: 'verified',
+      verification_level: 'level_3',
+      updated_at: now,
+    } )
     .eq ( 'driver_id', driverId )
     .select ( '*' )
     .single ();
 
   if ( error ) {return json ( { error: error.message }, 500 );}
+
+  if ( data?.user_id ) {
+    const { error: userError } = await admin
+      .from ( 'users' )
+      .update ( { verification_level: 'level_3', updated_at: now } )
+      .eq ( 'id', data.user_id );
+    if ( userError ) {return json ( { error: userError.message }, 500 );}
+
+    await admin
+      .from ( 'verification_records' )
+      .update ( { document_status: 'verified', verification_level: 'level_3', failure_reason: null, updated_at: now } )
+      .eq ( 'user_id', data.user_id )
+      .eq ( 'document_status', 'pending' );
+  }
+
   return json ( { driver: data } );
 }

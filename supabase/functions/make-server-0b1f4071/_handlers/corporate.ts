@@ -1,4 +1,5 @@
 import { json, authenticateRequest, type AdminClient } from './shared.ts';
+import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
 
 async function getUserOrganization ( supabase: AdminClient, userId: string ) {
   const { data: member } = await supabase
@@ -149,15 +150,17 @@ export async function handleAddCredits ( request: Request, path: string ) {
   const body = await request.json().catch( () => ( {} ) );
   const { amount, currency, expiresAt } = body;
 
-  if ( !amount || amount <= 0 ) {
+  if ( !Number.isFinite( Number( amount ) ) || Number( amount ) <= 0 ) {
     return json( { error: 'amount must be positive' }, 400 );
   }
 
   const supabase = auth.admin;
 
-  const membership = await getUserOrganization( supabase, auth.canonicalUser.id );
-  if ( !membership || membership.organization_id !== orgId || membership.role !== 'admin' ) {
-    return json( { error: 'Forbidden: only organization admins can add credits' }, 403 );
+  // Credits are money. Only platform staff may grant them, after the payment has
+  // been confirmed out-of-band. An organization's own admin (anyone can create an
+  // organization) must never be able to mint their own balance.
+  if ( !hasPermission( resolveAccessRole( auth.canonicalUser.role ), 'config:write' ) ) {
+    return json( { error: 'Forbidden: credits can only be granted by platform staff' }, 403 );
   }
 
   const { data: credit, error } = await supabase

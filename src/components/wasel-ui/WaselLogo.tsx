@@ -11,22 +11,23 @@ interface WaselLogoProps {
   alt?: string;
 }
 
-// Full lockup (symbol + wordmark) is 995×360 → width = height × 995/360.
-// Symbol-only mark is 514×360 → width = height × 514/360.
-const LOGO_W_RATIO = 995 / 360;
-const SYMBOL_W_RATIO = 514 / 360;
+// Full lockup (symbol + wordmark) is 512×185 → width = height × 512/185.
+// Symbol-only "W" mark (apply-new-logo.mjs crops it with 4px padding) is 273×193.
+const LOGO_W_RATIO = 512 / 185;
+const SYMBOL_W_RATIO = 273 / 193;
 
-// Theme-aware asset paths. 'dark' variant = dark-coloured mark for light
-// backgrounds. 'light' variant = light-coloured mark for dark backgrounds.
-const LOGO_ASSETS: Record<'dark' | 'light', { svg: string; png: string }> = {
-  dark:  { svg: '/brand/assets/logos/primary/logo-dark.svg',  png: '/brand/assets/logos/primary/logo-dark.png'  },
-  light: { svg: '/brand/assets/logos/primary/logo-light.svg', png: '/brand/assets/logos/primary/logo-light.png' },
+// Theme-aware asset paths. 'dark' variant = ink wordmark for light backgrounds.
+// 'light' variant = white wordmark for dark backgrounds. Both are generated from
+// brand/assets/logos/primary/logo-light-512.webp by `node scripts/apply-new-logo.mjs`.
+const LOGO_ASSETS: Record<'dark' | 'light', { webp: string; png: string }> = {
+  dark:  { webp: '/brand/assets/logos/primary/logo-dark.webp',  png: '/brand/assets/logos/primary/logo-dark.png'  },
+  light: { webp: '/brand/assets/logos/primary/logo-light.webp', png: '/brand/assets/logos/primary/logo-light.png' },
 };
 
 // Symbol-only mark (transparent background). Its colours read on light and dark surfaces,
 // so one asset serves both themes.
 const SYMBOL_ASSET = {
-  svg: '/brand/assets/logos/symbols/symbol-default.svg',
+  webp: '/brand/assets/logos/symbols/symbol-default.webp',
   png: '/brand/assets/logos/symbols/symbol-default.png',
 };
 
@@ -43,14 +44,11 @@ function BrandLockup({
 }) {
   const h = Math.round(size);
   const w = Math.round(size * (compact ? SYMBOL_W_RATIO : LOGO_W_RATIO));
-  const { svg, png } = compact ? SYMBOL_ASSET : LOGO_ASSETS[theme];
+  const { webp, png } = compact ? SYMBOL_ASSET : LOGO_ASSETS[theme];
 
   return (
     <picture>
-      {/* The light (dark-surface) lockup is PNG-only until a true vector with a white
-          wordmark exists: the legacy logo-light.svg embeds the ink wordmark and would
-          be invisible on #081D39. */}
-      {(compact || theme === 'dark') && <source srcSet={svg} type="image/svg+xml" />}
+      <source srcSet={webp} type="image/webp" />
       <img
         src={png}
         alt=""

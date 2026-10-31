@@ -90,7 +90,11 @@ export async function handleProfileRequest ( request: Request, path: string ) {
     }
   }
 
-  const { data: nextUser, error } = await auth.admin.from( 'users' ).select( '*' ).eq( 'id', user.id ).single();
+  const { data: nextUser, error } = await auth.admin
+    .from( 'users' )
+    .select( 'id, auth_user_id, email, phone_number, full_name, role, verification_level, phone_verified_at, profile_status, updated_at, avatar_url, created_at' )
+    .eq( 'id', user.id )
+    .single();
   if ( error ) {return json( { error: error.message }, 500 );}
   return json( await buildProfilePayload( auth.admin, nextUser ) );
 }

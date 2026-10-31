@@ -22,6 +22,14 @@ function verificationRank ( level?: string ): number {
   }
 }
 
+// A driver is cleared once an operator has approved the submitted driver
+// documents. The status is the source of truth; level_3 is set at the same time
+// and is accepted as an equivalent so an out-of-sync profile never locks out an
+// approved driver.
+function isDriverCleared(user: Pick<WaselUser, 'verificationLevel' | 'driverStatus'>): boolean {
+  return user.driverStatus === 'approved' || verificationRank(user.verificationLevel) >= 3;
+}
+
 function evaluateOfferRide(user: Pick<WaselUser, 'role' | 'phoneVerified' | 'emailVerified' | 'verificationLevel' | 'driverStatus'>): TrustGateResult {
   if (user.role !== 'driver' && user.role !== 'both') {
     return { allowed: false, reason: 'Turn on Driver mode first.', recommendation: 'Open Driver to start.' };
@@ -29,19 +37,17 @@ function evaluateOfferRide(user: Pick<WaselUser, 'role' | 'phoneVerified' | 'ema
   if (!user.phoneVerified || !user.emailVerified) {
     return { allowed: false, reason: 'Verify phone and email.', recommendation: 'Finish checks in Trust Center.' };
   }
-  const level = verificationRank(user.verificationLevel);
-  if (level < 3 || user.driverStatus !== 'approved') {
+  if (!isDriverCleared(user)) {
     return { allowed: false, reason: 'Driver approval is required before publishing rides.', recommendation: 'Submit your driver documents and wait for final approval.' };
   }
   return { allowed: true, reason: null, recommendation: null };
 }
 
-function evaluateCarryPackages(user: Pick<WaselUser, 'role' | 'trustScore' | 'verificationLevel'>): TrustGateResult {
+function evaluateCarryPackages(user: Pick<WaselUser, 'role' | 'trustScore' | 'verificationLevel' | 'driverStatus'>): TrustGateResult {
   if (user.role !== 'driver' && user.role !== 'both') {
     return { allowed: false, reason: 'Turn on Driver mode first.', recommendation: 'Complete driver setup.' };
   }
-  const level = verificationRank(user.verificationLevel);
-  if (level < 3 || user.trustScore < 70) {
+  if (!isDriverCleared(user) || user.trustScore < 70) {
     return { allowed: false, reason: 'Packages need full trust approval.', recommendation: 'Reach full driver verification first.' };
   }
   return { allowed: true, reason: null, recommendation: null };

@@ -7,12 +7,6 @@ function isDriverRole ( role?: string | null ): boolean {
   return role === 'driver' || role === 'both';
 }
 
-function currentSanadStatus ( value?: string | null ) {
-  return value === 'verified' || value === 'pending' || value === 'rejected' || value === 'expired'
-    ? value
-    : 'unverified';
-}
-
 function generateOtpCode (): string {
   const buf = new Uint32Array( 1 );
   crypto.getRandomValues( buf );
@@ -52,41 +46,6 @@ interface OtpSessionRow {
   expires_at: string;
   consumed_at: string | null;
   created_at: string;
-}
-
-export async function submitDirectTrustIdentityVerification (
-  userId: string,
-  input: { providerReference: string; documentReference?: string },
-) {
-  const context = await buildUserContext( userId );
-  const db = getDb();
-
-  const providerReference = input.providerReference.trim();
-  if ( providerReference.length < 4 ) {
-    throw new Error( 'Enter a valid identity provider reference before submitting.' );
-  }
-
-  const { error: verificationError } = await db.from( 'verification_records' ).insert( {
-    user_id: context.user.id,
-    sanad_status: 'pending',
-    document_status: 'pending',
-    verification_level: context.user.verification_level ?? 'level_1',
-    provider_reference: providerReference,
-    document_reference: input.documentReference?.trim() || null,
-    failure_reason: null,
-  } );
-  if ( verificationError ) { throw verificationError; }
-
-  const { error: userError } = await db
-    .from( 'users' )
-    .update( { verification_level: 'level_1' } )
-    .eq( 'id', context.user.id );
-  if ( userError ) { throw userError; }
-
-  return {
-    submitted: true,
-    verificationId: `${ context.user.id }-identity-${ Date.now() }`,
-  };
 }
 
 const otpStartTimestamps = new Map<string, number>();
@@ -273,15 +232,15 @@ export async function submitDirectTrustDriverDocuments (
   }
 
   const db = getDb();
+  // Submitting documents moves the account to level_2 ("under review"). Only an
+  // operator approval reaches level_3, and a resubmission never downgrades it.
+  const currentLevel = String( context.user.verification_level ?? 'level_0' );
+  const nextLevel = currentLevel === 'level_3' ? 'level_3' : 'level_2';
   const driverPatch = {
     license_number: licenseNumber,
     driver_status: 'pending_approval',
     background_check_status: 'pending',
-    verification_level: context.user.verification_level ?? 'level_0',
-    sanad_identity_linked:
-      context.user.verification_level === 'level_2' ||
-      context.user.verification_level === 'level_3' ||
-      context.user.sanad_verified_status === 'verified',
+    verification_level: nextLevel,
   };
 
   let driver = context.driver as DriverRow | null;
@@ -304,11 +263,18 @@ export async function submitDirectTrustDriverDocuments (
     driver = data as DriverRow;
   }
 
+  if ( nextLevel !== currentLevel ) {
+    const { error: levelError } = await db
+      .from( 'users' )
+      .update( { verification_level: nextLevel } )
+      .eq( 'id', context.user.id );
+    if ( levelError ) { throw levelError; }
+  }
+
   const { error: verificationError } = await db.from( 'verification_records' ).insert( {
     user_id: context.user.id,
-    sanad_status: currentSanadStatus( context.user.sanad_verified_status ),
     document_status: 'pending',
-    verification_level: context.user.verification_level ?? 'level_0',
+    verification_level: nextLevel,
     provider_reference: 'driver_documents',
     document_reference: input.documentReference?.trim() || null,
     failure_reason: null,

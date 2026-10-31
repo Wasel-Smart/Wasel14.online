@@ -5,7 +5,6 @@ import {
     deliveryEnv,
     constantTimeEquals,
     CLIQ_WEBHOOK_SECRET,
-    SANAD_WEBHOOK_SECRET,
     STRIPE_WEBHOOK_SECRET,
     fetchStripeSubscription,
     finalizeTopUpTransaction,
@@ -300,91 +299,6 @@ export async function handleCliqWebhook ( request: Request ) {
   } );
 
   return json( { received: true, transactionId, pending: true } );
-}
-
-// eslint-disable-next-line complexity
-export async function handleSanadWebhook ( request: Request ) {
-  if ( !SANAD_WEBHOOK_SECRET ) {
-    return json( { error: 'Sanad webhook secret is not configured.' }, 503 );
-  }
-
-  const rawPayload = await request.text();
-  const signatureOk = await verifyProviderWebhookSignature( {
-    payload: rawPayload,
-    secret: SANAD_WEBHOOK_SECRET,
-    signature: request.headers.get( 'x-sanad-signature' ) ?? request.headers.get( 'x-merchant-signature' ),
-    timestamp: request.headers.get( 'x-sanad-timestamp' ) ?? request.headers.get( 'x-merchant-timestamp' ),
-  } );
-
-  if ( !signatureOk ) {
-    return json( { error: 'Invalid Sanad signature.' }, 401 );
-  }
-
-  const event = parseSignedJson( rawPayload );
-  if ( !event ) {
-    return json( { error: 'Invalid request body' }, 400 );
-  }
-  const eventObject = ( event?.data && typeof event.data === 'object' )
-    ? event.data as Record<string, unknown>
-    : event as Record<string, unknown>;
-  const providerReference = firstStringValue( eventObject, [ 'providerReference', 'provider_reference', 'reference', 'sessionId', 'session_id', 'id' ] );
-  const status = eventObject.status ?? eventObject.verificationStatus ?? eventObject.state ?? event?.type;
-  if ( !providerReference ) {
-    return json( { received: true, ignored: true, reason: 'missing_provider_reference' } );
-  }
-
-  const admin = getAdminClient();
-  const verified = isSuccessfulProviderStatus( status );
-  const failed = isFailedProviderStatus( status );
-  // `pending` is the state already written when the request was submitted. A late
-  // or replayed non-terminal callback must not overwrite a verified/rejected
-  // record (it used to reset verified users back to level_1).
-  if ( !verified && !failed ) {
-    return json( { received: true, providerReference, ignored: true, reason: 'non_terminal_status' } );
-  }
-  const sanadStatus = verified ? 'verified' : failed ? 'rejected' : 'pending';
-  const verificationLevel = verified ? 'level_2' : 'level_1';
-  const failureReason = failed
-    ? firstStringValue( eventObject, [ 'failureReason', 'failure_reason', 'reason', 'message' ] ) || 'Sanad verification rejected'
-    : null;
-
-  const { data: records, error: recordError } = await admin
-    .from( 'verification_records' )
-    .update( {
-      sanad_status: sanadStatus,
-      verification_level: verificationLevel,
-      failure_reason: failureReason,
-      updated_at: new Date().toISOString(),
-    } )
-    .eq( 'provider_reference', providerReference )
-    // Only a `pending` record may transition to a terminal status. This makes a
-    // replayed or stale signed callback harmless: a `verified` or `rejected`
-    // verification (a `completed` state) can no longer be overwritten to
-    // `rejected` by an old callback, which previously reset verified users back
-    // to level_1.
-    .eq( 'sanad_status', 'pending' )
-    // level_3 (approved driver) already implies verified identity; a Sanad
-    // callback must never lower it to level_2 or level_1.
-    .neq( 'verification_level', 'level_3' )
-    .select( 'user_id' );
-
-  if ( recordError ) {
-    return json( { error: recordError.message }, 500 );
-  }
-
-  const userIds = [ ...new Set( ( records ?? [] ).map( ( record: Record<string, unknown> ) => String( record.user_id ) ).filter( Boolean ) ) ];
-  for ( const userId of userIds ) {
-    await admin
-      .from( 'users' )
-      .update( {
-        sanad_verified_status: sanadStatus,
-        verification_level: verificationLevel,
-        updated_at: new Date().toISOString(),
-      } )
-      .eq( 'id', userId );
-  }
-
-  return json( { received: true, providerReference, sanadStatus, updatedUsers: userIds.length } );
 }
 
 export async function handleResendWebhook ( request: Request ) {

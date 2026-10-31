@@ -1,7 +1,7 @@
 /**
  * Webhooks function — verify_jwt = false
  *
- * Serves all inbound provider callbacks: Stripe, CliQ, Sanad, Resend, Twilio,
+ * Serves all inbound provider callbacks: Stripe, CliQ, Resend, Twilio,
  * and the Supabase Send-SMS auth hook. None of these callers send a Supabase
  * JWT, so this function runs without JWT verification. Every handler verifies
  * its own provider signature before touching any data.
@@ -9,7 +9,6 @@
  * Routes:
  *   POST /payments/webhooks/stripe
  *   POST /payments/webhooks/cliq
- *   POST /trust/webhooks/sanad
  *   POST /communications/webhooks/resend
  *   POST /communications/webhooks/twilio
  *   POST /auth/hooks/send-sms
@@ -25,7 +24,6 @@ import {
 import {
   handleStripeWebhook,
   handleCliqWebhook,
-  handleSanadWebhook,
   handleResendWebhook,
   handleTwilioWebhook,
   handleSendSmsHook,
@@ -48,7 +46,6 @@ Deno.serve(async (request: Request) => {
     if (request.method === 'POST') {
       if (path === '/payments/webhooks/stripe') {return await handleStripeWebhook(request);}
       if (path === '/payments/webhooks/cliq')   {return await handleCliqWebhook(request);}
-      if (path === '/trust/webhooks/sanad')      {return await handleSanadWebhook(request);}
       if (path === '/communications/webhooks/resend') {return await handleResendWebhook(request);}
       if (path === '/communications/webhooks/twilio') {return await handleTwilioWebhook(request);}
       if (path === '/auth/hooks/send-sms')       {return await handleSendSmsHook(request);}

@@ -75,7 +75,7 @@ function buildWalletPayload(
     total_spent: Number(totalSpent.toFixed(2)),
     total_deposited: Number(totalDeposited.toFixed(2)),
     currency: currencyFromWallet(wallet),
-    pinSet: Boolean(wallet?.pin_hash),
+    pinSet: Boolean((wallet as any)?.pin_set ?? (wallet as any)?.pin_hash),
     autoTopUp: Boolean(wallet?.auto_top_up_enabled),
     transactions: normalizedTransactions,
     activeEscrows: [],
@@ -96,7 +96,11 @@ export async function resolveCanonicalUserId(userKey: string): Promise<string> {
 
 async function findWalletByUserId(userId: string): Promise<WalletRow | null> {
   const db = getDb();
-  const { data, error } = await db.from('wallets').select('*').eq('user_id', userId).maybeSingle();
+  const { data, error } = await db
+    .from('wallets')
+    .select('wallet_id, user_id, balance, pending_balance, wallet_status, currency_code, created_at, updated_at, auto_top_up_enabled, auto_top_up_amount, auto_top_up_threshold, pin_set')
+    .eq('user_id', userId)
+    .maybeSingle();
   if (error) {throw error;}
   return (data as WalletRow | null) ?? null;
 }
@@ -118,14 +122,14 @@ export async function fetchWalletDirect(userId: string): Promise<WalletData> {
 
   const { data: transactions, error: txError } = await db
     .from('transactions')
-    .select('*')
+    .select('transaction_id, wallet_id, user_id, transaction_type, transaction_status, direction, amount, reference_type, reference_id, metadata, created_at')
     .eq('wallet_id', wallet.wallet_id)
     .order('created_at', { ascending: false });
   if (txError) {throw txError;}
 
   const { data: paymentMethods } = await db
     .from('payment_methods')
-    .select('*')
+    .select('id, payment_method_id, method_type, provider, last_four, is_default, status, created_at, updated_at')
     .eq('user_id', walletUserId)
     .order('is_default', { ascending: false })
     .order('created_at', { ascending: false });
@@ -227,13 +231,12 @@ export async function addPaymentMethodDirect(userId: string, method: PaymentMeth
     .from('payment_methods')
     .insert({
       user_id: userId,
-      provider: method.provider,
       method_type: normalizePaymentMethod(method.type),
-      token_reference: String(method.token_reference ?? method.last4 ?? `pm-${Date.now()}`),
+      provider: method.provider,
+      last_four: method.last4 ?? null,
       is_default: Boolean(method.is_default),
-      status: 'active',
     })
-    .select('*')
+    .select('id, payment_method_id, method_type, provider, last_four, is_default, status, created_at, updated_at')
     .single();
   if (error) {throw error;}
   return data;
