@@ -25,36 +25,14 @@ import {
 // OAuth/email-link completion will silently fail to find the verifier.
 const AUTH_COOKIE_NAME = 'wasel-auth-token';
 
-function isPlaceholderValue(value: string | undefined): boolean {
-  if (!value) {return true;}
-
-  const normalized = value.trim().toLowerCase();
-  return (
-    normalized.length === 0 ||
-    normalized.includes('your-project.supabase.co') ||
-    normalized.includes('your-anon-key') ||
-    normalized.includes('your-anon-key-here') ||
-    normalized.includes('replace_with') ||
-    normalized.includes('example.com') ||
-    // Unfilled .env template markers, e.g. "PASTE_YOUR_SB_PUBLISHABLE_KEY_HERE".
-    normalized.includes('paste_your') ||
-    normalized.includes('_here') ||
-    normalized.includes('your_sb_') ||
-    normalized.includes('your_supabase_') ||
-    normalized.includes('set_local_dev_value') ||
-    normalized.includes('set_in_secret_manager')
-  );
-}
-
 // ── Credentials ───────────────────────────────────────────────────────────────
+// Placeholder detection is owned by info.tsx (pickConfiguredUrl / pickConfiguredKey).
+// hasSupabasePublicConfig is only true when both URL and key passed those checks.
 export const supabaseUrl = publicSupabaseUrl;
 
 export const supabaseAnonKey = publicAnonKey;
 
-export const isSupabaseConfigured =
-  hasSupabasePublicConfig &&
-  !isPlaceholderValue(supabaseUrl) &&
-  !isPlaceholderValue(supabaseAnonKey);
+export const isSupabaseConfigured = hasSupabasePublicConfig;
 
 /**
  * Supabase disabled legacy anon/service_role JWT keys in September 2026. A

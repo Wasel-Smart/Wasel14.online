@@ -101,13 +101,13 @@ export default defineConfig( {
         'src/mobilityGraph.ts',
       ],
       thresholds: {
-        // Ratchet: measured 14.3 / 17.6 / 21.1 / 20.3 (Oct 2026). Floors sit just under
-        // today's numbers so the gate is passable AND blocks regressions. Raise these
+        // Ratchet: measured 14.3 / 17.6 / 21.1 / 20.3 (Oct 2026). Floors set at
+        // measured values so any regression fails CI immediately. Raise these
         // whenever coverage improves; ci.yml reads the same values.
-        branches: 12,
-        functions: 15,
-        lines: 19,
-        statements: 18,
+        branches: 14,
+        functions: 17,
+        lines: 21,
+        statements: 20,
       },
     },
   },

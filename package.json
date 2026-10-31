@@ -80,7 +80,7 @@
     "edge:sync:check": "node scripts/prepare-edge-bundles.mjs --check",
     "edge:graph": "node scripts/check-edge-module-graph.mjs",
     "edge:types": "node scripts/check-edge-types.mjs",
-    "edge:deploy": "npm run edge:sync && npm run edge:graph && npm run edge:types && supabase functions deploy make-server-0b1f4071 --project-ref zexlxabdcsjefptmjhuq"
+    "edge:deploy": "npm run edge:sync && npm run edge:graph && npm run edge:types && supabase functions deploy $EDGE_FUNCTION_NAME --project-ref $SUPABASE_PROJECT_REF"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
@@ -150,7 +150,7 @@
   "devDependencies": {
     "@axe-core/cli": "^4.7.3",
     "@eslint/js": "^10.0.1",
-    "@lhci/cli": "^0.5.0",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.44.1",
     "@tailwindcss/vite": "^4.1.4",
     "@testing-library/dom": "^10.4.1",
@@ -179,7 +179,7 @@
     "postcss": "^8.4.38",
     "prettier": "^3.9.8",
     "rollup-plugin-visualizer": "^7.0.1",
-    "standard-version": "^4.2.0",
+    "standard-version": "^9.5.0",
     "supabase": "^2.120.0",
     "tailwindcss": "^4.1.4",
     "typescript": "5.9.3",
