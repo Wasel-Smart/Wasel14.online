@@ -1106,7 +1106,7 @@ export async function fetchDriverProfiles (
 
   const userIds = driverRows.map( ( driver: Record<string, unknown> ) => String( driver.user_id ?? '' ) );
   if ( userIds.length > 0 ) {
-    const { data: users } = await admin.from( 'users' ).select( '*' ).in( 'id', userIds );
+    const { data: users } = await admin.from( 'users' ).select( 'id, full_name, email, phone_number, role' ).in( 'id', userIds );
     ( Array.isArray( users ) ? users : [] ).forEach( ( user: Record<string, unknown> ) => {
       usersById.set( String( user.id ), user );
     } );
