@@ -40,10 +40,13 @@ function parseEnvFile(file) {
   return out;
 }
 
-// Same precedence Vite uses for a production build; real environment variables win.
-const fileEnv = ['.env.production.local', '.env.local', '.env.production', '.env']
+// Same precedence Vite uses for a production build (lowest -> highest: .env, .env.local,
+// .env.production, .env.production.local); real environment variables win over all of them.
+// The previous order let .env.local beat .env.production, so this check validated a different
+// key than the one Vite actually inlined into the bundle.
+const fileEnv = ['.env', '.env.local', '.env.production', '.env.production.local']
   .map(parseEnvFile)
-  .reduce((acc, next) => ({ ...next, ...acc }), {});
+  .reduce((acc, next) => ({ ...acc, ...next }), {});
 const readVar = (name) => (process.env[name] ?? fileEnv[name] ?? '').trim();
 
 const mask = (value) => `${value.slice(0, 12)}… (len ${value.length})`;
@@ -60,6 +63,18 @@ async function main() {
   if (!url || keys.length === 0) {
     console.warn('[supabase-key] VITE_SUPABASE_URL or a public key is not set; nothing to verify');
     return IS_PRODUCTION_BUILD ? 1 : 0;
+  }
+
+  // A template placeholder (sb_publishable_YOUR_PUBLISHABLE_KEY_HERE) passes every prefix check
+  // and then fails at runtime with "Unregistered API key". Refuse to build with one.
+  const placeholders = keys.filter((entry) => /YOUR_[A-Z_]*HERE/i.test(entry.value));
+  if (placeholders.length > 0) {
+    for (const { name } of placeholders) {
+      console.error(`[supabase-key] ${name} is still the template placeholder.`);
+    }
+    console.error('  Put the real Publishable key in .env.production.local (gitignored) or set it in the environment, then rebuild.');
+    console.error('  Skip only for throwaway builds: SKIP_SUPABASE_KEY_CHECK=1');
+    return 1;
   }
 
   let failed = false;

@@ -14,49 +14,49 @@
   "categories": ["travel", "navigation", "transportation"],
   "icons": [
     {
-      "src": "/icon-192.webp",
+      "src": "/icon-192.webp?v=20261031",
       "sizes": "192x192",
       "type": "image/webp",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.webp",
+      "src": "/icon-512.webp?v=20261031",
       "sizes": "512x512",
       "type": "image/webp",
       "purpose": "any"
     },
     {
-      "src": "/icon-192.png",
+      "src": "/icon-192.png?v=20261031",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/icon-512.png?v=20261031",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable-192.webp",
+      "src": "/icon-maskable-192.webp?v=20261031",
       "sizes": "192x192",
       "type": "image/webp",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-maskable-512.webp",
+      "src": "/icon-maskable-512.webp?v=20261031",
       "sizes": "512x512",
       "type": "image/webp",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-maskable-192.png",
+      "src": "/icon-maskable-192.png?v=20261031",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icon-maskable-512.png",
+      "src": "/icon-maskable-512.png?v=20261031",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

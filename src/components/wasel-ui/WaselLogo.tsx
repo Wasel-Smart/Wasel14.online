@@ -19,16 +19,20 @@ const SYMBOL_W_RATIO = 273 / 193;
 // Theme-aware asset paths. 'dark' variant = ink wordmark for light backgrounds.
 // 'light' variant = white wordmark for dark backgrounds. Both are generated from
 // brand/assets/logos/primary/logo-light-512.webp by `node scripts/apply-new-logo.mjs`.
+// Bump when the artwork changes. Brand files keep stable names, and browsers/CDNs that cached the
+// previous logo would otherwise keep showing it.
+const ASSET_V = '?v=20261031';
+
 const LOGO_ASSETS: Record<'dark' | 'light', { webp: string; png: string }> = {
-  dark:  { webp: '/brand/assets/logos/primary/logo-dark.webp',  png: '/brand/assets/logos/primary/logo-dark.png'  },
-  light: { webp: '/brand/assets/logos/primary/logo-light.webp', png: '/brand/assets/logos/primary/logo-light.png' },
+  dark:  { webp: `/brand/assets/logos/primary/logo-dark.webp${ASSET_V}`,  png: `/brand/assets/logos/primary/logo-dark.png${ASSET_V}`  },
+  light: { webp: `/brand/assets/logos/primary/logo-light.webp${ASSET_V}`, png: `/brand/assets/logos/primary/logo-light.png${ASSET_V}` },
 };
 
 // Symbol-only mark (transparent background). Its colours read on light and dark surfaces,
 // so one asset serves both themes.
 const SYMBOL_ASSET = {
-  webp: '/brand/assets/logos/symbols/symbol-default.webp',
-  png: '/brand/assets/logos/symbols/symbol-default.png',
+  webp: `/brand/assets/logos/symbols/symbol-default.webp${ASSET_V}`,
+  png: `/brand/assets/logos/symbols/symbol-default.png${ASSET_V}`,
 };
 
 function BrandLockup({
