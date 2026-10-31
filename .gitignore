@@ -286,6 +286,13 @@ mobile/android/**/.gradle/
 # ---- Legacy config ----
 vitest.config.mjs
 
+# ---- Throwaway debug snippets in the repo root (some are UTF-16 from PowerShell `>` and break eslint) ----
+/extract*.js
+/extract*.cjs
+/extract*.mjs
+/diagnose-report.log
+/npm-ci.log
+
 # ---- Local write-test / ephemeral output ----
 # (covered above under root-level scratch)
 #
