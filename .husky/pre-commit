@@ -1,6 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ---- Secret pattern guard ----
+# Block commits that introduce real credentials matching known patterns.
+# Catches: Supabase keys, Google API keys, OAuth client IDs with real project refs.
+STAGED=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+if [ -n "$STAGED" ]; then
+  # Supabase publishable/anon keys (sb_publishable_...)
+  if git diff --cached -- $STAGED | grep -qE 'sb_publishable_[A-Za-z0-9_-]{20,}'; then
+    echo "[pre-commit] ERROR: Supabase key detected in staged changes. Remove it before committing."
+    exit 1
+  fi
+  # Google API keys (AIza...)
+  if git diff --cached -- $STAGED | grep -qE 'AIza[0-9A-Za-z_-]{35}'; then
+    echo "[pre-commit] ERROR: Google API key detected in staged changes. Remove it before committing."
+    exit 1
+  fi
+  # Supabase project ref URLs (*.supabase.co with a real project ref)
+  if git diff --cached -- $STAGED | grep -qE 'https://[a-z]{20}\.supabase\.co'; then
+    echo "[pre-commit] ERROR: Supabase project URL detected in staged changes. Use a placeholder instead."
+    exit 1
+  fi
+fi
+
 # Run lint-staged: only lints and type-checks files staged for this commit.
 # Full test suite runs in CI (on push/PR), not on every local commit.
 npx lint-staged

@@ -292,6 +292,14 @@ vitest.config.mjs
 /extract*.mjs
 /diagnose-report.log
 /npm-ci.log
+/make_white.py
+/probe-auth.mjs
+/probe-screenshot.png
+/ts-files.txt
+/otlpextract*.txt
+/*.py
+/probe-*.mjs
+/probe-*.png
 
 # ---- Local write-test / ephemeral output ----
 # (covered above under root-level scratch)
