@@ -24,10 +24,12 @@ Required env vars — copy `.env.example` and fill in:
 
 ```bash
 VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
+VITE_SUPABASE_PUBLISHABLE_KEY=   # must start with sb_publishable_ (legacy eyJ... JWT keys are rejected in production)
 VITE_EDGE_FUNCTION_NAME=make-server-0b1f4071
 VITE_APP_URL=https://www.wasel14.online
 ```
+
+`VITE_*` values are inlined at build time. Changing them in Vercel requires a redeploy. Never put the Postgres connection string or any service-role key in a `VITE_*` variable.
 
 See [docs/WIRING_ARCHITECTURE.md](docs/WIRING_ARCHITECTURE.md) for the full environment reference.
 
@@ -47,7 +49,7 @@ See [docs/WIRING_ARCHITECTURE.md](docs/WIRING_ARCHITECTURE.md) for the full envi
 
 ### Runtime shape
 
-The production runtime is a **React SPA (Vercel) + Supabase Edge Function (Deno)**. The internal contracts reflect full microservice boundaries, but the current deployment model uses a single edge function for operational simplicity. The Kubernetes manifests under `infra/k8s-draft/` represent the target scale-out topology.
+The production runtime is a **React SPA (Vercel) + Supabase Edge Functions (Deno)**. The internal contracts reflect full microservice boundaries. In practice the main API runs as one edge function (`make-server-0b1f4071`) alongside specialised functions (payments, wallet, trips, matching and outbox workers, webhooks) under `supabase/functions/`. The Kubernetes manifests under `infra/k8s-draft/` represent the target scale-out topology.
 
 ```mermaid
 flowchart TB
@@ -266,7 +268,7 @@ SLO targets and error-budget rules: [docs/reliability-slos.md](docs/reliability-
 | Load — production | k6 | `npm run test:load:production` |
 | Contract | Vitest | `npm run test:unit -- tests/unit/queue-contracts.test.ts` |
 
-Coverage gate (enforced in `vitest.config.ts` and `ci.yml`): branches 12%, functions 15%, lines 19%, statements 18%. These are ratchet floors set just under measured coverage (~14–21%, Oct 2026); they only ever go up. The long-term target in `ENGINEERING_STANDARDS.md` is 75/80/85/85, and the money, auth and permission paths (wallet, payments, bookings, RBAC) are raised first.
+Coverage gate (enforced in `vitest.config.ts` and `ci.yml`): branches 14%, functions 17%, lines 21%, statements 20%. These are ratchet floors set at measured coverage (14.3 / 17.6 / 21.1 / 20.3, Oct 2026); they only ever go up. The long-term target in `ENGINEERING_STANDARDS.md` is 75/80/85/85, and the money, auth and permission paths (wallet, payments, bookings, RBAC) are raised first.
 Full testing guide: [docs/testing.md](docs/testing.md)
 
 ---
@@ -301,7 +303,7 @@ infra/
   k8s-draft/       # Kubernetes manifests (target scale-out topology)
   redis/           # Redis config
 mobile/
-  src/             # React Native (Expo SDK 51) mobile client
+  src/             # React Native (Expo SDK 55) mobile client
 docs/              # Architecture, API contract, runbooks, SLOs, security
 tests/             # Unit, integration, E2E, load
 ```

@@ -301,6 +301,18 @@ vitest.config.mjs
 /probe-*.mjs
 /probe-*.png
 
+# ---- Root-level err/out debug capture files (PowerShell redirect artifacts) ----
+/err.txt
+/err[0-9]*.txt
+/out.txt
+/out[0-9]*.txt
+
+# ---- Windows shortcut files ----
+*.lnk
+
+# ---- Committed tarballs (should never be in source control) ----
+/*.tgz
+
 # ---- Local write-test / ephemeral output ----
 # (covered above under root-level scratch)
 #

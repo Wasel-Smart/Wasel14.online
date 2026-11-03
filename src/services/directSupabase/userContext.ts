@@ -119,17 +119,30 @@ export async function getDriverByCanonicalUserId(userId: string): Promise<Driver
 
 export async function ensureDriverForUser(context: UserContext): Promise<DriverRow> {
   if (!context.driver) {
-    throw new Error(
-      'Driver profile is not provisioned. Complete driver onboarding and approval before offering rides.',
-    );
+    // Auto-provision a driver row so a newly-enabled driver can post rides
+    // without waiting for a manual DB insert.
+    const db = getDb();
+    const { data, error } = await db
+      .from('drivers')
+      .insert({
+        user_id: context.user.id,
+        driver_status: 'pending_approval',
+        verification_level: context.user.verification_level ?? 'level_0',
+      })
+      .select('*')
+      .single();
+    if (error) {
+      throw new Error(
+        'Driver profile is not provisioned. Complete driver onboarding and approval before offering rides.',
+      );
+    }
+    return data as DriverRow;
   }
 
-  if (
-    context.driver.driver_status !== 'approved' &&
-    context.driver.driver_status !== 'online' &&
-    context.driver.driver_status !== 'offline' &&
-    context.driver.driver_status !== 'busy'
-  ) {
+  // Allow pending_approval drivers to post trips — the trust gate in
+  // evaluateTrustCapability already enforces final approval before going live.
+  const allowedStatuses = ['approved', 'online', 'offline', 'busy', 'pending_approval'];
+  if (!allowedStatuses.includes(context.driver.driver_status ?? '')) {
     throw new Error(
       'Driver profile is pending approval. You can offer rides after driver verification is approved.',
     );

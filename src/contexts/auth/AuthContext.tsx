@@ -515,6 +515,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (updates.phoneVerified !== undefined) {profileUpdates.phone_verified = updates.phoneVerified;}
       if (updates.twoFactorEnabled !== undefined) {profileUpdates.two_factor_enabled = updates.twoFactorEnabled;}
       if (updates.driverStatus !== undefined) {profileUpdates.driver_status = updates.driverStatus;}
+      if (updates.role !== undefined) {profileUpdates.role = updates.role;}
 
       optimisticRef.current = { ...(optimisticRef.current ?? {}), ...updates };
       setWaselUser(prev => (prev ? applyUserUpdates(prev, updates) : prev));

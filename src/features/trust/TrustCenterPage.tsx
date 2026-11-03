@@ -181,6 +181,7 @@ export default function TrustCenterPage () {
   const [ reviewHistory, setReviewHistory ] = useState<ReviewHistoryItem[]>( [] );
   const [ onboardingDismissed, setOnboardingDismissed ] = useState( false );
   const [ pendingSync, setPendingSync ] = useState( false );
+  const [ driverActionError, setDriverActionError ] = useState<string | null>( null );
   const previousStatusRef = useRef<TrustCenterStatus | null>( null );
 
   const fallbackStatus = useMemo(
@@ -315,6 +316,7 @@ export default function TrustCenterPage () {
   const runAction = async ( key: string, work: () => Promise<void>, optimisticPatch?: ( current: TrustCenterStatus ) => TrustCenterStatus ) => {
     setActionKey( key );
     setPendingSync( true );
+    if ( key.startsWith( 'driver-' ) ) { setDriverActionError( null ); }
     const previous = previousStatusRef.current;
     if ( optimisticPatch && previous ) {
       const optimistic = optimisticPatch( previous );
@@ -330,6 +332,9 @@ export default function TrustCenterPage () {
         previousStatusRef.current = previous;
       }
       toast.error( toErrorMessage( error ) );
+      // Keep the failure visible inside the card: a toast alone is easy to miss, which
+      // made a failed driver action look like "nothing happened".
+      if ( key.startsWith( 'driver-' ) ) { setDriverActionError( toErrorMessage( error ) ); }
     } finally {
       setActionKey( null );
       setPendingSync( false );
@@ -404,23 +409,37 @@ export default function TrustCenterPage () {
     }, ( current ) => applyOptimisticStepUpdate( current, 'phone', 'completed' ) );
   };
 
+  // A profile refresh that fails AFTER the server accepted the change must not roll
+  // the UI back and report the whole action as failed.
+  const safeRefreshProfile = async () => {
+    try {
+      await refreshProfile();
+    } catch ( error ) {
+      console.warn( '[Trust Center] profile refresh failed after a successful action:', error );
+    }
+  };
+
   const handleEnableDriverMode = async () => {
-    setConfirmState( {
-      open: true,
-      title: t( 'trustCenterExpanded.enableDriverMode' ),
-      description:
-        t( 'trustCenterExpanded.driverModeHelpBody' ),
-      onConfirm: async () => {
-        setConfirmState( prev => ( { ...prev, open: false } ) );
-        await runAction( 'driver-mode', async () => {
-          await enableTrustDriverMode();
-          updateUser( { role: 'driver' } );
-          await refreshProfile();
-          await reloadTrustStatus( true );
-          toast.success( t( 'trustCenterExpanded.enableDriverMode' ) + ' ' + t( 'trustCenterExpanded.capabilityReady' ) );
-        } );
-      },
+    if ( actionKey === 'driver-mode' ) { return; }
+    await runAction( 'driver-mode', async () => {
+      await enableTrustDriverMode();
+      updateUser( { role: 'driver' } );
+      await safeRefreshProfile();
+      await reloadTrustStatus( true );
+      window.setTimeout( () => {
+        documentsRef.current?.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+        document.getElementById( 'driver-license' )?.focus();
+      }, 200 );
     } );
+  };
+
+  const handleDriverBadgeClick = () => {
+    if ( user.role !== 'driver' && user.role !== 'both' ) {
+      void handleEnableDriverMode();
+      return;
+    }
+    documentsRef.current?.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+    document.getElementById( 'driver-license' )?.focus();
   };
 
   const handleSubmitDriverDocuments = async () => {
@@ -442,9 +461,9 @@ export default function TrustCenterPage () {
             licenseNumber: licenseNumber.trim(),
             documentReference: driverDocumentReference.trim() || undefined,
           } );
-          updateUser( { verificationLevel: 'level_2' } );
+          updateUser( { verificationLevel: 'level_2', driverStatus: 'pending_approval' } );
           await reloadTrustStatus( true );
-          await refreshProfile();
+          await safeRefreshProfile();
           await loadReviewHistory();
           toast.success( t( 'trustCenterExpanded.submitDocuments' ) );
         }, ( current ) => applyOptimisticStepUpdate( current, 'driver_documents', 'in_progress' ) );
@@ -1028,6 +1047,7 @@ export default function TrustCenterPage () {
                         driverStep?.detail ?? t( 'trustCenterExpanded.driverDocumentsTitle' )
                       }
                       state={ driverStep?.state ?? 'not_started' }
+                      onBadgeClick={ driverStep?.state === 'completed' ? undefined : handleDriverBadgeClick }
                       badgeLabel={ getStepBadge( driverStep?.state ?? 'not_started', t ).label }
                       icon={
                         <FileCheck
@@ -1040,7 +1060,10 @@ export default function TrustCenterPage () {
                         { driverStep?.failureReason ? (
                           <FailureNotice message={ driverStep.failureReason } />
                         ) : null }
-                        { driverStep?.meta.role === 'rider' ? (
+                        { driverActionError ? (
+                          <FailureNotice message={ driverActionError } />
+                        ) : null }
+                        { user.role !== 'driver' && user.role !== 'both' ? (
                           <TrustActionRow
                             primary={
                               <WaselButton

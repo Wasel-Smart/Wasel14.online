@@ -46,8 +46,6 @@ function formatJod(value: number) {
 
 function nextStepLabel(stepId: TrustStepId | null, ar: boolean) {
   switch (stepId) {
-    case 'identity':
-      return ar ? 'الهوية' : 'Identity';
     case 'email':
       return ar ? 'البريد الإلكتروني' : 'Email';
     case 'phone':
@@ -142,95 +140,95 @@ export function AppCommandCenter() {
   const dailyCorridor = membership.dailyRoute;
   const walletHealth =
     user.walletStatus === 'active'
-      ? { label: ar ? 'نشطة' : 'Active', accent: C.green }
+      ? { label: ar ? 'Ù†Ø´Ø·Ø©' : 'Active', accent: C.green }
       : user.walletStatus === 'limited'
-        ? { label: ar ? 'محدودة' : 'Limited', accent: C.gold }
-        : { label: ar ? 'تحتاج مراجعة' : 'Needs review', accent: C.red };
+        ? { label: ar ? 'Ù…Ø­Ø¯ÙˆØ¯Ø©' : 'Limited', accent: C.gold }
+        : { label: ar ? 'ØªØ­ØªØ§Ø¬ Ù…Ø±Ø§Ø¬Ø¹Ø©' : 'Needs review', accent: C.red };
 
   let nextAction: ActionCard;
   if (trustNeedsAction) {
     nextAction = {
       accent: trustStatus?.blockedSteps.length ? C.red : C.gold,
-      title: ar ? 'أكمل جاهزية الثقة أولاً' : 'Complete trust readiness first',
+      title: ar ? 'Ø£ÙƒÙ…Ù„ Ø¬Ø§Ù‡Ø²ÙŠØ© Ø§Ù„Ø«Ù‚Ø© Ø£ÙˆÙ„Ø§Ù‹' : 'Complete trust readiness first',
       detail: trustStatus?.blockedSteps.length
         ? ar
-          ? 'هناك خطوة محظورة تؤثر على السائق أو المحفظة أو العمليات الحساسة.'
+          ? 'Ù‡Ù†Ø§Ùƒ Ø®Ø·ÙˆØ© Ù…Ø­Ø¸ÙˆØ±Ø© ØªØ¤Ø«Ø± Ø¹Ù„Ù‰ Ø§Ù„Ø³Ø§Ø¦Ù‚ Ø£Ùˆ Ø§Ù„Ù…Ø­ÙØ¸Ø© Ø£Ùˆ Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª Ø§Ù„Ø­Ø³Ø§Ø³Ø©.'
           : 'A blocked trust step is affecting driver, wallet, or sensitive operations.'
         : ar
-          ? `تبقى ${trustRemaining} خطوات قبل فتح كل قدرات الحساب بوضوح.`
+          ? `ØªØ¨Ù‚Ù‰ ${trustRemaining} Ø®Ø·ÙˆØ§Øª Ù‚Ø¨Ù„ ÙØªØ­ ÙƒÙ„ Ù‚Ø¯Ø±Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨ Ø¨ÙˆØ¶ÙˆØ­.`
           : `${trustRemaining} checks remain before the account is fully unlocked.`,
-      cta: ar ? 'افتح مركز الثقة' : 'Open trust center',
+      cta: ar ? 'Ø§ÙØªØ­ Ù…Ø±ÙƒØ² Ø§Ù„Ø«Ù‚Ø©' : 'Open trust center',
       path: '/app/trust',
     };
   } else if (totalAttention > 0) {
     nextAction = {
       accent: C.gold,
-      title: ar ? 'هناك عناصر تحتاج متابعة' : 'There are items that need attention',
+      title: ar ? 'Ù‡Ù†Ø§Ùƒ Ø¹Ù†Ø§ØµØ± ØªØ­ØªØ§Ø¬ Ù…ØªØ§Ø¨Ø¹Ø©' : 'There are items that need attention',
       detail: ar
-        ? `${totalAttention} عناصر تحتاج قراراً أو دعماً أو مطابقة أفضل.`
+        ? `${totalAttention} Ø¹Ù†Ø§ØµØ± ØªØ­ØªØ§Ø¬ Ù‚Ø±Ø§Ø±Ø§Ù‹ Ø£Ùˆ Ø¯Ø¹Ù…Ø§Ù‹ Ø£Ùˆ Ù…Ø·Ø§Ø¨Ù‚Ø© Ø£ÙØ¶Ù„.`
         : `${totalAttention} items currently need a decision, support, or a better match.`,
-      cta: ar ? 'راجع العناصر المعلقة' : 'Review pending items',
+      cta: ar ? 'Ø±Ø§Ø¬Ø¹ Ø§Ù„Ø¹Ù†Ø§ØµØ± Ø§Ù„Ù…Ø¹Ù„Ù‚Ø©' : 'Review pending items',
       path: '/app/my-trips?filter=attention',
     };
   } else if (totalActive > 0) {
     nextAction = {
       accent: C.cyan,
-      title: ar ? 'حركتك الحالية ما زالت جارية' : 'Your current movement is still live',
+      title: ar ? 'Ø­Ø±ÙƒØªÙƒ Ø§Ù„Ø­Ø§Ù„ÙŠØ© Ù…Ø§ Ø²Ø§Ù„Øª Ø¬Ø§Ø±ÙŠØ©' : 'Your current movement is still live',
       detail: ar
-        ? `${totalActive} عناصر نشطة بين الرحلات والطرود والباص.`
+        ? `${totalActive} Ø¹Ù†Ø§ØµØ± Ù†Ø´Ø·Ø© Ø¨ÙŠÙ† Ø§Ù„Ø±Ø­Ù„Ø§Øª ÙˆØ§Ù„Ø·Ø±ÙˆØ¯ ÙˆØ§Ù„Ø¨Ø§Øµ.`
         : `${totalActive} active items are moving across rides, parcels, and buses.`,
-      cta: ar ? 'افتح الرحلات' : 'Open my trips',
+      cta: ar ? 'Ø§ÙØªØ­ Ø§Ù„Ø±Ø­Ù„Ø§Øª' : 'Open my trips',
       path: '/app/my-trips',
     };
   } else {
     nextAction = {
       accent: C.green,
-      title: ar ? 'أعد فتح الممر الأقرب لك' : 'Reopen your most likely corridor',
+      title: ar ? 'Ø£Ø¹Ø¯ ÙØªØ­ Ø§Ù„Ù…Ù…Ø± Ø§Ù„Ø£Ù‚Ø±Ø¨ Ù„Ùƒ' : 'Reopen your most likely corridor',
       detail: dailyCorridor
         ? ar
-          ? `${dailyCorridor.label} يبقى أفضل نقطة بداية سريعة الآن.`
+          ? `${dailyCorridor.label} ÙŠØ¨Ù‚Ù‰ Ø£ÙØ¶Ù„ Ù†Ù‚Ø·Ø© Ø¨Ø¯Ø§ÙŠØ© Ø³Ø±ÙŠØ¹Ø© Ø§Ù„Ø¢Ù†.`
           : `${dailyCorridor.label} remains the fastest corridor to reopen right now.`
         : ar
-          ? 'ابدأ من مسار حي ثم قرر بين الركوب أو العرض أو الطرود أو الباص.'
+          ? 'Ø§Ø¨Ø¯Ø£ Ù…Ù† Ù…Ø³Ø§Ø± Ø­ÙŠ Ø«Ù… Ù‚Ø±Ø± Ø¨ÙŠÙ† Ø§Ù„Ø±ÙƒÙˆØ¨ Ø£Ùˆ Ø§Ù„Ø¹Ø±Ø¶ Ø£Ùˆ Ø§Ù„Ø·Ø±ÙˆØ¯ Ø£Ùˆ Ø§Ù„Ø¨Ø§Øµ.'
           : 'Start from a live corridor, then choose rides, supply, parcels, or bus.',
-      cta: ar ? 'ابحث في هذا الممر' : 'Search this corridor',
+      cta: ar ? 'Ø§Ø¨Ø­Ø« ÙÙŠ Ù‡Ø°Ø§ Ø§Ù„Ù…Ù…Ø±' : 'Search this corridor',
       path: corridorPath(dailyCorridor?.from, dailyCorridor?.to),
     };
   }
 
   const metrics = [
     metricCard(
-      ar ? 'حركة نشطة' : 'Active movement',
+      ar ? 'Ø­Ø±ÙƒØ© Ù†Ø´Ø·Ø©' : 'Active movement',
       `${totalActive}`,
-      ar ? 'رحلات وطرود وباصات جارية الآن.' : 'Trips, parcels, and buses currently in motion.',
+      ar ? 'Ø±Ø­Ù„Ø§Øª ÙˆØ·Ø±ÙˆØ¯ ÙˆØ¨Ø§ØµØ§Øª Ø¬Ø§Ø±ÙŠØ© Ø§Ù„Ø¢Ù†.' : 'Trips, parcels, and buses currently in motion.',
       C.cyan,
       Clock3,
     ),
     metricCard(
-      ar ? 'تحتاج متابعة' : 'Needs attention',
+      ar ? 'ØªØ­ØªØ§Ø¬ Ù…ØªØ§Ø¨Ø¹Ø©' : 'Needs attention',
       `${totalAttention}`,
       ar
-        ? 'عناصر تنتظر موافقة أو دعماً أو حلاً.'
+        ? 'Ø¹Ù†Ø§ØµØ± ØªÙ†ØªØ¸Ø± Ù…ÙˆØ§ÙÙ‚Ø© Ø£Ùˆ Ø¯Ø¹Ù…Ø§Ù‹ Ø£Ùˆ Ø­Ù„Ø§Ù‹.'
         : 'Items waiting on approval, support, or resolution.',
       totalAttention > 0 ? C.gold : C.green,
       AlertTriangle,
     ),
     metricCard(
-      ar ? 'رصيد المحفظة' : 'Wallet balance',
+      ar ? 'Ø±ØµÙŠØ¯ Ø§Ù„Ù…Ø­ÙØ¸Ø©' : 'Wallet balance',
       formatJod(user.balance ?? 0),
-      ar ? `حالة المحفظة: ${walletHealth.label}` : `Wallet status: ${walletHealth.label}`,
+      ar ? `Ø­Ø§Ù„Ø© Ø§Ù„Ù…Ø­ÙØ¸Ø©: ${walletHealth.label}` : `Wallet status: ${walletHealth.label}`,
       walletHealth.accent,
       Wallet,
     ),
     metricCard(
-      ar ? 'درجة الثقة' : 'Trust readiness',
+      ar ? 'Ø¯Ø±Ø¬Ø© Ø§Ù„Ø«Ù‚Ø©' : 'Trust readiness',
       trustStatus ? `${trustStatus.completedSteps}/${trustStatus.totalSteps}` : '0/5',
       trustStatus?.nextStepId
         ? ar
-          ? `الخطوة التالية: ${nextStepLabel(trustStatus.nextStepId, ar)}`
+          ? `Ø§Ù„Ø®Ø·ÙˆØ© Ø§Ù„ØªØ§Ù„ÙŠØ©: ${nextStepLabel(trustStatus.nextStepId, ar)}`
           : `Next step: ${nextStepLabel(trustStatus.nextStepId, ar)}`
         : ar
-          ? 'كل الخطوات الأساسية محسومة.'
+          ? 'ÙƒÙ„ Ø§Ù„Ø®Ø·ÙˆØ§Øª Ø§Ù„Ø£Ø³Ø§Ø³ÙŠØ© Ù…Ø­Ø³ÙˆÙ…Ø©.'
           : 'All core trust checks are resolved.',
       trustNeedsAction ? nextAction.accent : C.green,
       Shield,
@@ -239,23 +237,23 @@ export function AppCommandCenter() {
 
   const guidedFlows = [
     {
-      label: ar ? 'ابحث عن رحلة' : 'Book',
-      detail: ar ? 'ابدأ من المسار' : 'Route, seats, fare',
+      label: ar ? 'Ø§Ø¨Ø­Ø« Ø¹Ù† Ø±Ø­Ù„Ø©' : 'Book',
+      detail: ar ? 'Ø§Ø¨Ø¯Ø£ Ù…Ù† Ø§Ù„Ù…Ø³Ø§Ø±' : 'Route, seats, fare',
       accent: C.cyan,
     },
     {
-      label: ar ? 'اعرض رحلة' : 'Request',
-      detail: ar ? 'أرسل السياق' : 'Approver context',
+      label: ar ? 'Ø§Ø¹Ø±Ø¶ Ø±Ø­Ù„Ø©' : 'Request',
+      detail: ar ? 'Ø£Ø±Ø³Ù„ Ø§Ù„Ø³ÙŠØ§Ù‚' : 'Approver context',
       accent: C.green,
     },
     {
-      label: ar ? 'افتح الرحلات' : 'Approve',
-      detail: ar ? 'راجع المعلق' : 'Pending decisions',
+      label: ar ? 'Ø§ÙØªØ­ Ø§Ù„Ø±Ø­Ù„Ø§Øª' : 'Approve',
+      detail: ar ? 'Ø±Ø§Ø¬Ø¹ Ø§Ù„Ù…Ø¹Ù„Ù‚' : 'Pending decisions',
       accent: C.gold,
     },
     {
-      label: ar ? 'افتح المحفظة' : 'Manage',
-      detail: ar ? 'تتبع الحركة' : 'Trips and supply',
+      label: ar ? 'Ø§ÙØªØ­ Ø§Ù„Ù…Ø­ÙØ¸Ø©' : 'Manage',
+      detail: ar ? 'ØªØªØ¨Ø¹ Ø§Ù„Ø­Ø±ÙƒØ©' : 'Trips and supply',
       accent: C.cyan,
     },
   ];
@@ -307,7 +305,7 @@ export function AppCommandCenter() {
               }}
             >
               <Sparkles size={14} />
-              {ar ? 'مركز قيادة واصل' : 'Wasel Command Deck'}
+              {ar ? 'Ù…Ø±ÙƒØ² Ù‚ÙŠØ§Ø¯Ø© ÙˆØ§ØµÙ„' : 'Wasel Command Deck'}
             </div>
             <h2
               style={{
@@ -454,7 +452,7 @@ export function AppCommandCenter() {
                   letterSpacing: TYPE.letterSpacing.wider,
                 }}
               >
-                {ar ? 'إعادة فتح السياق' : 'Context to reopen'}
+                {ar ? 'Ø¥Ø¹Ø§Ø¯Ø© ÙØªØ­ Ø§Ù„Ø³ÙŠØ§Ù‚' : 'Context to reopen'}
               </div>
               <div
                 style={{
@@ -466,7 +464,7 @@ export function AppCommandCenter() {
                 }}
               >
                 {dailyCorridor?.label ??
-                  (ar ? 'ابدأ من أي ممر حي' : 'Start from any live corridor')}
+                  (ar ? 'Ø§Ø¨Ø¯Ø£ Ù…Ù† Ø£ÙŠ Ù…Ù…Ø± Ø­ÙŠ' : 'Start from any live corridor')}
               </div>
               <div
                 style={{
@@ -478,10 +476,10 @@ export function AppCommandCenter() {
               >
                 {dailyCorridor
                   ? ar
-                    ? `${dailyCorridor.sharedPriceJod} JOD للمقعد المشترك · توفير ${dailyCorridor.savingsPercent}% · ${dailyCorridor.autoGroupWindow}`
-                    : `${dailyCorridor.sharedPriceJod} JOD shared fare · ${dailyCorridor.savingsPercent}% savings · ${dailyCorridor.autoGroupWindow}`
+                    ? `${dailyCorridor.sharedPriceJod} JOD Ù„Ù„Ù…Ù‚Ø¹Ø¯ Ø§Ù„Ù…Ø´ØªØ±Ùƒ Â· ØªÙˆÙÙŠØ± ${dailyCorridor.savingsPercent}% Â· ${dailyCorridor.autoGroupWindow}`
+                    : `${dailyCorridor.sharedPriceJod} JOD shared fare Â· ${dailyCorridor.savingsPercent}% savings Â· ${dailyCorridor.autoGroupWindow}`
                   : ar
-                    ? 'اختر ممر الرحلة أولاً ثم اترك بقية القرار يتبعه.'
+                    ? 'Ø§Ø®ØªØ± Ù…Ù…Ø± Ø§Ù„Ø±Ø­Ù„Ø© Ø£ÙˆÙ„Ø§Ù‹ Ø«Ù… Ø§ØªØ±Ùƒ Ø¨Ù‚ÙŠØ© Ø§Ù„Ù‚Ø±Ø§Ø± ÙŠØªØ¨Ø¹Ù‡.'
                     : 'Choose the route first, then let the rest of the decision follow.'}
               </div>
             </div>
@@ -504,7 +502,7 @@ export function AppCommandCenter() {
                 <div
                   style={{ color: C.gold, fontSize: TYPE.size.xs, fontWeight: TYPE.weight.bold }}
                 >
-                  {ar ? 'الرصيد والتجديد' : 'Balance and continuity'}
+                  {ar ? 'Ø§Ù„Ø±ØµÙŠØ¯ ÙˆØ§Ù„ØªØ¬Ø¯ÙŠØ¯' : 'Balance and continuity'}
                 </div>
                 <div style={{ marginTop: 6, color: C.textFull, fontWeight: TYPE.weight.ultra }}>
                   {formatJod(user.balance ?? 0)}
@@ -512,10 +510,10 @@ export function AppCommandCenter() {
                 <div style={{ marginTop: 6, color: C.soft, fontSize: TYPE.size.sm }}>
                   {membership.plusActive
                     ? ar
-                      ? 'واصل بلس فعالة على هذا الحساب.'
+                      ? 'ÙˆØ§ØµÙ„ Ø¨Ù„Ø³ ÙØ¹Ø§Ù„Ø© Ø¹Ù„Ù‰ Ù‡Ø°Ø§ Ø§Ù„Ø­Ø³Ø§Ø¨.'
                       : 'Wasel Plus is active on this account.'
                     : ar
-                      ? 'يمكن تفعيل بلس من المحفظة عند الحاجة.'
+                      ? 'ÙŠÙ…ÙƒÙ† ØªÙØ¹ÙŠÙ„ Ø¨Ù„Ø³ Ù…Ù† Ø§Ù„Ù…Ø­ÙØ¸Ø© Ø¹Ù†Ø¯ Ø§Ù„Ø­Ø§Ø¬Ø©.'
                       : 'Plus can be activated from Wallet when needed.'}
                 </div>
               </div>
@@ -534,22 +532,22 @@ export function AppCommandCenter() {
                     fontWeight: TYPE.weight.bold,
                   }}
                 >
-                  {ar ? 'الثقة التشغيلية' : 'Operational trust'}
+                  {ar ? 'Ø§Ù„Ø«Ù‚Ø© Ø§Ù„ØªØ´ØºÙŠÙ„ÙŠØ©' : 'Operational trust'}
                 </div>
                 <div style={{ marginTop: 6, color: C.textFull, fontWeight: TYPE.weight.ultra }}>
                   {trustStatus?.nextStepId
                     ? nextStepLabel(trustStatus.nextStepId, ar)
                     : ar
-                      ? 'جاهز'
+                      ? 'Ø¬Ø§Ù‡Ø²'
                       : 'Ready'}
                 </div>
                 <div style={{ marginTop: 6, color: C.soft, fontSize: TYPE.size.sm }}>
                   {trustNeedsAction
                     ? ar
-                      ? 'أكمل هذه الخطوة قبل توسيع العرض أو المدفوعات.'
+                      ? 'Ø£ÙƒÙ…Ù„ Ù‡Ø°Ù‡ Ø§Ù„Ø®Ø·ÙˆØ© Ù‚Ø¨Ù„ ØªÙˆØ³ÙŠØ¹ Ø§Ù„Ø¹Ø±Ø¶ Ø£Ùˆ Ø§Ù„Ù…Ø¯ÙÙˆØ¹Ø§Øª.'
                       : 'Resolve this step before expanding supply or payouts.'
                     : ar
-                      ? 'جاهز للرحلات الحساسة والمحفظة والمدفوعات.'
+                      ? 'Ø¬Ø§Ù‡Ø² Ù„Ù„Ø±Ø­Ù„Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø³Ø© ÙˆØ§Ù„Ù…Ø­ÙØ¸Ø© ÙˆØ§Ù„Ù…Ø¯ÙÙˆØ¹Ø§Øª.'
                       : 'Ready for sensitive flows, wallet actions, and payouts.'}
                 </div>
               </div>

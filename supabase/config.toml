@@ -1,13 +1,31 @@
-# For detailed configuration reference documentation, visit:
-# https://supabase.com/docs/guides/local-development/cli/config
+
+# ============================================================
+# WASEL - SUPABASE PRODUCTION-ORIENTED CONFIGURATION
+# PostgreSQL 17 | React/Vite | Mobile | Edge Functions
+# ============================================================
+
 project_id = "wasel"
+
+# ============================================================
+# API
+# ============================================================
 
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "api", "graphql_public", "stripe", "pgmq_public"]
-extra_search_path = ["public", "extensions", "realtime", "supabase_migrations", "stripe", "vault", "auth", "storage", "api"]
+
+# Expose only schemas intentionally required by the Data API.
+# public and storage are included by Supabase.
+schemas = ["public"]
+
+extra_search_path = ["public", "extensions"]
+
+# Keep pagination enabled in application queries.
 max_rows = 1000
+
+# ============================================================
+# DATABASE
+# ============================================================
 
 [db]
 port = 54322
@@ -21,60 +39,99 @@ enabled = true
 enabled = true
 sql_paths = ["./seeds/*.sql"]
 
+# ============================================================
+# REALTIME
+# ============================================================
+
 [realtime]
 enabled = true
+
+# ============================================================
+# STUDIO
+# ============================================================
 
 [studio]
 enabled = true
 port = 54323
 api_url = "http://127.0.0.1"
 
+# ============================================================
+# EMAIL TESTING
+# ============================================================
+
 [inbucket]
 enabled = true
 port = 54324
+
+# ============================================================
+# STORAGE
+# ============================================================
 
 [storage]
 enabled = true
 file_size_limit = "50MiB"
 
+# S3-compatible API disabled unless an application dependency
+# explicitly requires S3 protocol access.
 [storage.s3_protocol]
-enabled = true
+enabled = false
+
+# ============================================================
+# AUTHENTICATION
+# ============================================================
 
 [auth]
 enabled = true
+
+# Canonical production domain.
 site_url = "https://www.wasel14.online"
+
+# Explicit redirect allowlist.
+# Avoid broad production wildcards.
 additional_redirect_urls = [
-  # Explicit production callbacks (also add these in Dashboard -> Authentication ->
-  # URL Configuration -> Redirect URLs; `supabase config push` syncs this list).
   "https://www.wasel14.online/app/auth/callback",
   "https://wasel14.online/app/auth/callback",
+
   "https://www.wasel14.online/api/auth/callback",
   "https://wasel14.online/api/auth/callback",
-  "https://wasel14.online/**",
-  "https://www.wasel14.online/**",
-  "http://localhost:3000/**",
-  "http://127.0.0.1:3000/**",
-  "http://localhost:5173/**",
-  "http://127.0.0.1:5173/**",
-  "http://localhost:4173/**",
-  "http://127.0.0.1:4173/**",
-  "wasel://auth/callback",
+
+  "http://localhost:3000/app/auth/callback",
+  "http://127.0.0.1:3000/app/auth/callback",
+
+  "http://localhost:5173/app/auth/callback",
+  "http://127.0.0.1:5173/app/auth/callback",
+
+  "http://localhost:4173/app/auth/callback",
+  "http://127.0.0.1:4173/app/auth/callback",
+
+  "wasel://auth/callback"
 ]
+
+# JWT lifetime: 1 hour.
 jwt_expiry = 3600
+
+# Refresh token security.
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
-enable_manual_linking = true
+
+# Disable manual anonymous account linking unless explicitly required.
+enable_manual_linking = false
+
+# Public registration.
 enable_signup = true
-# Anonymous users receive the `authenticated` role, which would satisfy any RLS
-# policy written as `to authenticated`. Keep off unless a guest flow needs it AND
-# every policy also checks `(auth.jwt() ->> 'is_anonymous')::boolean is not true`.
+
+# Anonymous sessions disabled.
 enable_anonymous_sign_ins = false
+
+# Password security.
 minimum_password_length = 12
 password_requirements = "lower_upper_letters_digits_symbols"
 
+# ============================================================
+# MULTI-FACTOR AUTHENTICATION
+# ============================================================
+
 [auth.mfa.totp]
-# Authenticator-app MFA. Enrollment is on so users (and especially drivers/admins)
-# can opt in; the app shows it only when VITE_ENABLE_TWO_FACTOR_AUTH is enabled.
 enroll_enabled = true
 verify_enabled = true
 
@@ -82,28 +139,43 @@ verify_enabled = true
 enroll_enabled = false
 verify_enabled = false
 
+# ============================================================
+# EMAIL AUTHENTICATION
+# ============================================================
+
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
 secure_password_change = true
+
+# OTP throttling.
 max_frequency = "1m0s"
+
+# Eight-digit verification codes.
 otp_length = 8
-otp_expiry = 3600
+
+# OTP expires after 10 minutes.
+otp_expiry = 600
+
+# ============================================================
+# SMS AUTHENTICATION
+# ============================================================
 
 [auth.sms]
-# Phone signup stays OFF in this config: no SMS provider (Twilio / Twilio Verify /
-# send_sms hook) is enabled below, so the CLI would disable it anyway and print
-# "WARN: no SMS provider is enabled". To use phone login, enable ONE provider
-# below first, then set this back to true.
 enable_signup = false
 enable_confirmations = false
 template = "Your code is {{ .Code }}"
-max_frequency = "5s"
+max_frequency = "30s"
 
+# SMS hook disabled until a provider is configured.
 [auth.hook.send_sms]
 enabled = false
 uri = "https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/auth/hooks/send-sms"
+
+# ============================================================
+# TWILIO SMS
+# ============================================================
 
 [auth.sms.twilio]
 enabled = false
@@ -116,56 +188,103 @@ enabled = false
 account_sid = ""
 message_service_sid = ""
 auth_token = ""
+
+# ============================================================
+# GOOGLE OAUTH
+# ============================================================
+
 [auth.external.google]
-# Google and Facebook are enabled on the linked project (verified against
-# /auth/v1/settings), and both sign-in methods ship in the app. Credentials stay
-# empty here on purpose: they live in the Supabase dashboard, so this file must
-# not carry secrets or claim the providers are off.
 enabled = true
+
+# Supply these through the CLI environment.
 client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_GOOGLE_CLIENT_SECRET)"
-redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"
+
+# Supabase hosted OAuth callback.
+# Override for local development using the CLI environment.
+redirect_uri = "env(SUPABASE_AUTH_REDIRECT_URI)"
+
 skip_nonce_check = false
-email_optional = true
+email_optional = false
+
+# ============================================================
+# FACEBOOK OAUTH
+# ============================================================
+
 [auth.external.facebook]
 enabled = true
+
 client_id = "env(SUPABASE_AUTH_FACEBOOK_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET)"
-redirect_uri = "https://zexlxabdcsjefptmjhuq.supabase.co/auth/v1/callback"
+
+redirect_uri = "env(SUPABASE_AUTH_REDIRECT_URI)"
+
 skip_nonce_check = false
-email_optional = true
-# Wallet logins are not a shipped sign-in method; leave disabled to shrink the
-# attack surface. Mirror this in the dashboard (Auth -> Sign In / Providers).
+email_optional = false
+
+# ============================================================
+# WEB3 AUTHENTICATION
+# ============================================================
+
 [auth.web3.solana]
 enabled = false
 
 [auth.web3.ethereum]
 enabled = false
 
-# make-server-0b1f4071 exposes one intentionally-public, unauthenticated
-# route: GET /health (liveness probe used by uptime monitors and the frontend
-# before any session exists). With verify_jwt = true the Edge gateway rejected
-# that request with 401 (publishable keys are not JWTs), and the 401 response
-# carried no CORS headers, so browsers blocked it. Setting verify_jwt = false
-# lets /health through; every protected route re-authenticates itself via
-# authenticateRequest() (bearer JWT validated through the admin client).
-# Webhook-only routes are served by the dedicated `webhooks` function below.
+# ============================================================
+# EDGE FUNCTION SECURITY
+# ============================================================
+
+# Main application API.
+#
+# Gateway JWT verification is disabled because /health must be
+# publicly accessible. Every other protected route MUST perform
+# independent JWT authentication and authorization.
+#
+# OPTIONS requests must be handled with proper CORS responses.
+
 [functions.make-server-0b1f4071]
 verify_jwt = false
 
-# stripe-payments-v2 validates its own bearer token via requireAuthenticatedUser().
-# verify_jwt = false is required so the function can serve OPTIONS preflight
-# requests and return 410 on the deprecated /webhook path without a JWT.
+# ============================================================
+# STRIPE PAYMENTS
+# ============================================================
+
+# Function performs its own JWT authentication.
+# Webhook processing belongs to the dedicated webhooks function.
+
 [functions.stripe-payments-v2]
 verify_jwt = false
 
-# Webhook-only function: no JWT required. Each handler verifies its own
-# provider signature (HMAC/Stripe-Signature/Standard Webhooks).
+# ============================================================
+# WEBHOOKS
+# ============================================================
+
+# External providers cannot be expected to send Supabase JWTs.
+# Every handler must verify the actual provider signature.
+#
+# Stripe: Stripe-Signature.
+# Other providers: their respective signing mechanisms.
+#
+# Enforce replay protection and event idempotency.
+
 [functions.webhooks]
 verify_jwt = false
 
-[functions.outbox-worker]
-verify_jwt = false
+# ============================================================
+# OUTBOX WORKER
+# ============================================================
 
-# [functions.outbox-worker.cron]
-# schedule = "* * * * *"
+# Gateway JWT verification enabled.
+#
+# Internal scheduler must send a valid Supabase JWT.
+# Worker must ALSO enforce its internal authorization rules.
+# Never expose service-role credentials to browser/mobile clients.
+
+[functions.outbox-worker]
+verify_jwt = true
+
+# ============================================================
+# END OF WASEL CONFIGURATION
+# ============================================================

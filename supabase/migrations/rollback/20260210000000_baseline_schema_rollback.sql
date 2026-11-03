@@ -1,506 +1,120 @@
 -- ============================================================================
--- WASEL PLATFORM - CONSOLIDATED BASELINE ROLLBACK
--- Rollback for: 20260210000000_baseline_schema.sql
+-- ROLLBACK: 20260210000000_baseline_schema.sql
+-- Drops every object created by the baseline in reverse dependency order.
+-- Run ONLY on a fresh dev/staging database — never on production without a
+-- prior pg_dump backup.
 -- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20261017_rls_price_and_view_hardening_rollback.sql
--- ============================================================================
-
--- Rollback for 20261017000000_rls_price_and_view_hardening.sql
--- Removes the booking pricing guard and restores the KV policies from
--- 20260310000000_security_performance_fixes.sql. The two views are recreated by
--- re-running PART 4 of that file (CREATE OR REPLACE VIEW ... without the WHERE filter).
--- NOTE: restoring the original KV policies re-opens the anonymous write exposure;
--- only do this to recover from an outage, then re-apply the hardening migration.
-
-DROP TRIGGER IF EXISTS a_bookings_pricing_guard ON public.bookings;
-DROP FUNCTION IF EXISTS public.guard_booking_pricing();
-
-DO $$
-BEGIN
-  IF to_regclass('public.kv_store_0b1f4071') IS NOT NULL THEN
-    DROP POLICY IF EXISTS "Authenticated can read shared KV data" ON public.kv_store_0b1f4071;
-    DROP POLICY IF EXISTS "Users can read their own KV data" ON public.kv_store_0b1f4071;
-    DROP POLICY IF EXISTS "Users can write their own user KV data" ON public.kv_store_0b1f4071;
-
-    CREATE POLICY "Users can access their own KV data" ON public.kv_store_0b1f4071 FOR ALL
-      USING (
-        key LIKE 'user:' || auth.uid()::TEXT || ':%' OR
-        key LIKE 'profile:' || auth.uid()::TEXT OR
-        key LIKE 'wallet:' || auth.uid()::TEXT || ':%' OR
-        key LIKE 'notification:' || auth.uid()::TEXT || ':%'
-      );
-
-    CREATE POLICY "System can access shared KV data" ON public.kv_store_0b1f4071 FOR ALL
-      USING (
-        key LIKE 'system:%' OR key LIKE 'trip:%' OR key LIKE 'package:%' OR
-        key LIKE 'route:%' OR key LIKE 'cache:%' OR key LIKE 'config:%'
-      );
-  END IF;
-END $$;
-
-
--- ============================================================================
--- SECTION ROLLBACK: 20260310_security_performance_fixes_rollback.sql
--- ============================================================================
-
--- Rollback for 20260310_security_performance_fixes.sql
--- Generated: 2026-06-14T05:55:54.932Z
--- CRITICAL: Review and customize this rollback before using in production
 
 BEGIN;
 
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260310_security_performance_fixes.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
+-- Publications
+ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS public.messages;
+ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS public.notifications;
+ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS public.trips;
+ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS public.driver_locations;
+ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS public.typing_indicators;
 
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
+-- Materialized view
+DROP MATERIALIZED VIEW IF EXISTS public.trip_search_cache CASCADE;
 
--- ALTER TABLE rollback statements (customize as needed)
--- ALTER TABLE [table_name] DROP COLUMN IF EXISTS [column_name];
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
--- DELETE FROM statements (customize as needed)
--- DELETE FROM [table_name] WHERE [conditions];
+-- Views
+DROP VIEW IF EXISTS public.active_trips_with_driver CASCADE;
+DROP VIEW IF EXISTS public.backup_status CASCADE;
 
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260310_security_performance_fixes.sql completed at %', NOW();
-END $$;
+-- Triggers on auth.users
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
-COMMIT;
+-- Tables (leaf → root dependency order)
+DROP TABLE IF EXISTS public.config_audit_log           CASCADE;
+DROP TABLE IF EXISTS public.user_regional_preferences  CASCADE;
+DROP TABLE IF EXISTS public.country_feature_flags      CASCADE;
+DROP TABLE IF EXISTS public.country_services           CASCADE;
+DROP TABLE IF EXISTS public.pricing_zones              CASCADE;
+DROP TABLE IF EXISTS public.route_restrictions         CASCADE;
+DROP TABLE IF EXISTS public.service_zones              CASCADE;
+DROP TABLE IF EXISTS public.country_configs            CASCADE;
+DROP TABLE IF EXISTS public.exchange_rates             CASCADE;
+DROP TABLE IF EXISTS public.currencies                 CASCADE;
+DROP TABLE IF EXISTS public.countries                  CASCADE;
+DROP TABLE IF EXISTS public.health_checks              CASCADE;
+DROP TABLE IF EXISTS public.system_alerts              CASCADE;
+DROP TABLE IF EXISTS public.error_logs                 CASCADE;
+DROP TABLE IF EXISTS public.api_logs                   CASCADE;
+DROP TABLE IF EXISTS public.driver_status_history      CASCADE;
+DROP TABLE IF EXISTS public.trip_analytics             CASCADE;
+DROP TABLE IF EXISTS public.driver_payouts             CASCADE;
+DROP TABLE IF EXISTS public.business_accounts          CASCADE;
+DROP TABLE IF EXISTS public.student_verifications      CASCADE;
+DROP TABLE IF EXISTS public.universities               CASCADE;
+DROP TABLE IF EXISTS public.campaigns                  CASCADE;
+DROP TABLE IF EXISTS public.devices                    CASCADE;
+DROP TABLE IF EXISTS public.safety_incidents           CASCADE;
+DROP TABLE IF EXISTS public.audit_logs                 CASCADE;
+DROP TABLE IF EXISTS public.backup_logs                CASCADE;
+DROP TABLE IF EXISTS public.profile_change_history     CASCADE;
+DROP TABLE IF EXISTS public.analytics_events           CASCADE;
+DROP TABLE IF EXISTS public.disputes                   CASCADE;
+DROP TABLE IF EXISTS public.promo_code_usage           CASCADE;
+DROP TABLE IF EXISTS public.promo_codes                CASCADE;
+DROP TABLE IF EXISTS public.loyalty_transactions       CASCADE;
+DROP TABLE IF EXISTS public.loyalty_points             CASCADE;
+DROP TABLE IF EXISTS public.push_tokens                CASCADE;
+DROP TABLE IF EXISTS public.fcm_tokens                 CASCADE;
+DROP TABLE IF EXISTS public.driver_locations           CASCADE;
+DROP TABLE IF EXISTS public.driver_documents           CASCADE;
+DROP TABLE IF EXISTS public.reported_content           CASCADE;
+DROP TABLE IF EXISTS public.favorites                  CASCADE;
+DROP TABLE IF EXISTS public.transactions               CASCADE;
+DROP TABLE IF EXISTS public.ratings                    CASCADE;
+DROP TABLE IF EXISTS public.reviews                    CASCADE;
+DROP TABLE IF EXISTS public.notifications              CASCADE;
+DROP TABLE IF EXISTS public.typing_indicators          CASCADE;
+DROP TABLE IF EXISTS public.messages                   CASCADE;
+DROP TABLE IF EXISTS public.conversations              CASCADE;
+DROP TABLE IF EXISTS public.processed_stripe_events    CASCADE;
+DROP TABLE IF EXISTS public.subscriptions              CASCADE;
+DROP TABLE IF EXISTS public.wallet_transactions        CASCADE;
+DROP TABLE IF EXISTS public.wallets                    CASCADE;
+DROP TABLE IF EXISTS public.payments                   CASCADE;
+DROP TABLE IF EXISTS public.bookings                   CASCADE;
+DROP TABLE IF EXISTS public.trips                      CASCADE;
+DROP TABLE IF EXISTS public.vehicles                   CASCADE;
+DROP TABLE IF EXISTS public.drivers                    CASCADE;
+DROP TABLE IF EXISTS public.profiles                   CASCADE;
 
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
+-- Functions
+DROP FUNCTION IF EXISTS public.refresh_trip_search_cache()                                                CASCADE;
+DROP FUNCTION IF EXISTS public.cleanup_old_profile_changes()                                              CASCADE;
+DROP FUNCTION IF EXISTS public.verify_backup_integrity()                                                  CASCADE;
+DROP FUNCTION IF EXISTS public.update_countries_updated_at()                                              CASCADE;
+DROP FUNCTION IF EXISTS public.log_profile_change()                                                       CASCADE;
+DROP FUNCTION IF EXISTS public.update_wallet_balance()                                                    CASCADE;
+DROP FUNCTION IF EXISTS public.update_profile_rating()                                                    CASCADE;
+DROP FUNCTION IF EXISTS public.update_user_trip_stats()                                                   CASCADE;
+DROP FUNCTION IF EXISTS public.check_no_self_booking()                                                    CASCADE;
+DROP FUNCTION IF EXISTS public.update_trip_seats_after_booking()                                          CASCADE;
+DROP FUNCTION IF EXISTS public.handle_new_user()                                                          CASCADE;
+DROP FUNCTION IF EXISTS public.update_updated_at_column()                                                 CASCADE;
 
--- ============================================================================
--- SECTION ROLLBACK: 20260302_regionalization_schema_rollback.sql
--- ============================================================================
+-- Enums
+DROP TYPE IF EXISTS public.message_type         CASCADE;
+DROP TYPE IF EXISTS public.notification_type    CASCADE;
+DROP TYPE IF EXISTS public.payment_method_type  CASCADE;
+DROP TYPE IF EXISTS public.payment_status       CASCADE;
+DROP TYPE IF EXISTS public.booking_status       CASCADE;
+DROP TYPE IF EXISTS public.trip_status          CASCADE;
+DROP TYPE IF EXISTS public.trip_type            CASCADE;
 
--- Rollback for 20260302_regionalization_schema.sql
--- Generated: 2026-06-14T05:55:54.926Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260302_regionalization_schema.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP TABLE statements (customize as needed)
--- DROP TABLE IF EXISTS [table_name] CASCADE;
--- ALTER TABLE rollback statements (customize as needed)
--- ALTER TABLE [table_name] DROP COLUMN IF EXISTS [column_name];
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
--- DELETE FROM statements (customize as needed)
--- DELETE FROM [table_name] WHERE [conditions];
-
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260302_regionalization_schema.sql completed at %', NOW();
-END $$;
-
-COMMIT;
-
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20260224_wasel_complete_schema_rollback.sql
--- ============================================================================
-
--- Rollback for 20260224_wasel_complete_schema.sql
--- Generated: 2026-06-14T05:55:54.922Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260224_wasel_complete_schema.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP TABLE statements (customize as needed)
--- DROP TABLE IF EXISTS [table_name] CASCADE;
--- ALTER TABLE rollback statements (customize as needed)
--- ALTER TABLE [table_name] DROP COLUMN IF EXISTS [column_name];
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
--- DELETE FROM statements (customize as needed)
--- DELETE FROM [table_name] WHERE [conditions];
-
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260224_wasel_complete_schema.sql completed at %', NOW();
-END $$;
+-- Extensions (only drop if safe — comment out if shared with other projects)
+-- DROP EXTENSION IF EXISTS "postgis";
+-- DROP EXTENSION IF EXISTS "pg_trgm";
+-- DROP EXTENSION IF EXISTS "pg_stat_statements";
+-- DROP EXTENSION IF EXISTS "pgcrypto";
+-- DROP EXTENSION IF EXISTS "uuid-ossp";
 
 COMMIT;
 
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20260224_postgis_functions_rollback.sql
--- ============================================================================
-
--- Rollback for 20260224_postgis_functions.sql
--- Generated: 2026-06-14T05:55:54.918Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260224_postgis_functions.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
--- DELETE FROM statements (customize as needed)
--- DELETE FROM [table_name] WHERE [conditions];
-
--- Verify rollback completed successfully
 DO $$
 BEGIN
-  RAISE NOTICE 'Rollback for 20260224_postgis_functions.sql completed at %', NOW();
+  RAISE NOTICE '✅ Baseline schema rollback complete';
 END $$;
-
-COMMIT;
-
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20260224000002_additional_tables_rollback.sql
--- ============================================================================
-
--- Rollback for 20260224000002_additional_tables.sql
--- Generated: 2026-06-14T05:55:54.915Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260224000002_additional_tables.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP TABLE statements (customize as needed)
--- DROP TABLE IF EXISTS [table_name] CASCADE;
--- ALTER TABLE rollback statements (customize as needed)
--- ALTER TABLE [table_name] DROP COLUMN IF EXISTS [column_name];
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
--- DELETE FROM statements (customize as needed)
--- DELETE FROM [table_name] WHERE [conditions];
-
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260224000002_additional_tables.sql completed at %', NOW();
-END $$;
-
-COMMIT;
-
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20260224000001_backup_configuration_rollback.sql
--- ============================================================================
-
--- Rollback for 20260224000001_backup_configuration.sql
--- Generated: 2026-06-14T05:55:54.913Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260224000001_backup_configuration.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP TABLE statements (customize as needed)
--- DROP TABLE IF EXISTS [table_name] CASCADE;
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
--- DELETE FROM statements (customize as needed)
--- DELETE FROM [table_name] WHERE [conditions];
-
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260224000001_backup_configuration.sql completed at %', NOW();
-END $$;
-
-COMMIT;
-
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20260224000000_production_backend_schema_rollback.sql
--- ============================================================================
-
--- Rollback for 20260224000000_production_backend_schema.sql
--- Generated: 2026-06-14T05:55:54.895Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260224000000_production_backend_schema.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP TABLE statements (customize as needed)
--- DROP TABLE IF EXISTS [table_name] CASCADE;
--- ALTER TABLE rollback statements (customize as needed)
--- ALTER TABLE [table_name] DROP COLUMN IF EXISTS [column_name];
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
-
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260224000000_production_backend_schema.sql completed at %', NOW();
-END $$;
-
-COMMIT;
-
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20260223000000_production_schema_rollback.sql
--- ============================================================================
-
--- Rollback for 20260223000000_production_schema.sql
--- Generated: 2026-06-14T05:55:54.884Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260223000000_production_schema.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP TABLE statements (customize as needed)
--- DROP TABLE IF EXISTS [table_name] CASCADE;
--- ALTER TABLE rollback statements (customize as needed)
--- ALTER TABLE [table_name] DROP COLUMN IF EXISTS [column_name];
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
-
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260223000000_production_schema.sql completed at %', NOW();
-END $$;
-
-COMMIT;
-
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-
--- ============================================================================
--- SECTION ROLLBACK: 20260210_complete_schema_rollback.sql
--- ============================================================================
-
--- Rollback for 20260210_complete_schema.sql
--- Generated: 2026-06-14T05:55:54.878Z
--- CRITICAL: Review and customize this rollback before using in production
-
-BEGIN;
-
--- ============================================================================
--- ROLLBACK INSTRUCTIONS
--- ============================================================================
--- This rollback script reverses the changes made by 20260210_complete_schema.sql
--- 
--- BEFORE EXECUTING:
--- 1. Create a backup: pg_dump -Fc wasel > backup_$(date +%Y%m%d_%H%M%S).dump
--- 2. Test on staging environment first
--- 3. Verify data integrity after rollback
--- 4. Update application if schema changes affect code
--- ============================================================================
-
--- BACKUP CRITICAL DATA (uncomment if needed)
--- CREATE TABLE IF NOT EXISTS rollback_backup_$(date +%Y%m%d) AS 
--- SELECT * FROM [table_name] WHERE [conditions];
-
--- DROP TABLE statements (customize as needed)
--- DROP TABLE IF EXISTS [table_name] CASCADE;
--- ALTER TABLE rollback statements (customize as needed)
--- ALTER TABLE [table_name] DROP COLUMN IF EXISTS [column_name];
--- DROP INDEX statements (customize as needed)
--- DROP INDEX IF EXISTS [index_name];
-
--- Verify rollback completed successfully
-DO $$
-BEGIN
-  RAISE NOTICE 'Rollback for 20260210_complete_schema.sql completed at %', NOW();
-END $$;
-
-COMMIT;
-
--- ============================================================================
--- POST-ROLLBACK CHECKLIST
--- ============================================================================
--- [ ] Verify application functionality
--- [ ] Check data integrity
--- [ ] Run performance tests
--- [ ] Update documentation
--- [ ] Notify team of rollback completion
--- ============================================================================
-

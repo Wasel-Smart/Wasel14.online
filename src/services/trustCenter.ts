@@ -171,7 +171,8 @@ export async function enableTrustDriverMode () {
   }>( {
     operation: 'Driver mode enablement',
     authMode: 'required',
-    fallbackPolicy: 'writes-if-enabled',
+    fallbackPolicy: 'always',
+    operationType: 'write',
     edge: context =>
       requestEdgeJson( {
         path: '/v1/trust/driver-mode/enable',
@@ -193,7 +194,8 @@ export async function submitTrustDriverDocuments ( payload: DriverDocumentsPaylo
   }>( {
     operation: 'Driver documents submission',
     authMode: 'required',
-    fallbackPolicy: 'writes-if-enabled',
+    fallbackPolicy: 'always',
+    operationType: 'write',
     edge: context =>
       requestEdgeJson( {
         path: '/v1/trust/driver-documents/submit',

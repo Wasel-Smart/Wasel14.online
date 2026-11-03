@@ -100,8 +100,8 @@ export const EVENT_TYPE_TO_TOPIC: Partial<Record<DomainEventType, QueueTopic>> =
   RideCompleted: 'rides.completed',
   RideCancelled: 'rides.completed',
   PackageCreated: 'packages.created',
-  PackageAssigned: 'packages.created',
-  PackagePickedUp: 'packages.created',
+  // PackageAssigned: no dedicated topic — package-worker handles via packages.created lifecycle
+  // PackagePickedUp: no dedicated topic — in-transit state transition only; no worker action needed
   PackageDelivered: 'packages.delivered',
   PackageLocationUpdated: 'packages.location-updated',
   PaymentAuthorized: 'payments.authorized',

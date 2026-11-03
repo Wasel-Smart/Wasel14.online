@@ -11,6 +11,7 @@ export function StepCard({
   children,
   footer,
   badgeLabel,
+  onBadgeClick,
 }: {
   title: string;
   subtitle: string;
@@ -19,9 +20,26 @@ export function StepCard({
   children?: ReactNode;
   footer?: ReactNode;
   badgeLabel?: string;
+  /** When set, the status badge becomes a real button (e.g. "Not started" starts the step). */
+  onBadgeClick?: () => void;
   t?: (key: string) => string;
 }) {
   const accent = stateAccent(state);
+  const badge = (
+    <StatusBadge
+      label={
+        badgeLabel ??
+          (state === 'completed'
+            ? 'Completed'
+            : state === 'in_progress'
+              ? 'In progress'
+              : state === 'failed'
+                ? 'Failed'
+                : 'Not started')
+      }
+      accent={accent}
+    />
+  );
 
   return (
     <div
@@ -64,19 +82,29 @@ export function StepCard({
             {subtitle}
           </div>
         </div>
-        <StatusBadge
-          label={
-            badgeLabel ??
-              (state === 'completed'
-                ? 'Completed'
-                : state === 'in_progress'
-                  ? 'In progress'
-                  : state === 'failed'
-                    ? 'Failed'
-                    : 'Not started')
-          }
-          accent={accent}
-        />
+        {onBadgeClick ? (
+          <button
+            type="button"
+            onClick={onBadgeClick}
+            aria-label={badgeLabel ?? title}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              margin: 0,
+              cursor: 'pointer',
+              font: 'inherit',
+              color: 'inherit',
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            {badge}
+          </button>
+        ) : (
+          badge
+        )}
       </div>
       {children}
       {footer}

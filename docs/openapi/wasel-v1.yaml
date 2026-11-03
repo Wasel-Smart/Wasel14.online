@@ -9,131 +9,49 @@ servers:
 paths:
   /v1/trips:
     get:
-      summary: Search available trips
-      operationId: searchTrips
-      parameters:
-        - name: from
-          in: query
-          schema:
-            type: string
-        - name: to
-          in: query
-          schema:
-            type: string
-        - name: date
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: seats
-          in: query
-          schema:
-            type: integer
+      tags:
+        - API
+      operationId: getTrips
       responses:
         '200':
-          description: Trip search results
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Trip'
+          description: ok
     post:
-      summary: Create a new trip
-      operationId: createTrip
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateTripRequest'
-      responses:
-        '201':
-          description: Trip created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Trip'
-  /v1/trips/{tripId}:
-    get:
-      summary: Get trip details
-      operationId: getTrip
-      parameters:
-        - name: tripId
-          in: path
-          required: true
-          schema:
-            type: string
+      tags:
+        - API
+      operationId: postTrips
       responses:
         '200':
-          description: Trip details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Trip'
-        '404':
-          description: Trip not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ok
   /v1/bookings:
-    post:
-      summary: Create a booking
-      operationId: createBooking
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateBookingRequest'
-      responses:
-        '201':
-          description: Booking created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-  /v1/packages:
-    post:
-      summary: Create a package delivery request
-      operationId: createPackage
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreatePackageRequest'
-      responses:
-        '201':
-          description: Package created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Package'
-  /v1/packages/{packageId}:
     get:
-      summary: Get package details
-      operationId: getPackage
-      parameters:
-        - name: packageId
-          in: path
-          required: true
-          schema:
-            type: string
+      tags:
+        - API
+      operationId: getBookings
       responses:
         '200':
-          description: Package details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Package'
-        '404':
-          description: Package not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
+          description: ok
+    post:
+      tags:
+        - API
+      operationId: postBookings
+      responses:
+        '200':
+          description: ok
+  /v1/packages:
+    get:
+      tags:
+        - API
+      operationId: getPackages
+      responses:
+        '200':
+          description: ok
+    post:
+      tags:
+        - API
+      operationId: postPackages
+      responses:
+        '200':
+          description: ok
   /v1/health:
     get:
       summary: Health check
@@ -147,8 +65,9 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
   /v1/bookings/{bookingId}:
     get:
-      summary: Get booking details
-      operationId: getBooking
+      tags:
+        - API
+      operationId: getBookingById
       parameters:
         - name: bookingId
           in: path
@@ -157,39 +76,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Booking details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
-        '404':
-          description: Booking not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-    put:
-      summary: Update booking status
-      operationId: updateBooking
-      parameters:
-        - name: bookingId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Booking'
-      responses:
-        '200':
-          description: Booking updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Booking'
+          description: ok
   /v1/ratings:
     post:
       summary: Submit a rating
@@ -274,6 +161,14 @@ paths:
       responses:
         '200':
           description: Notification marked read
+    get:
+      tags:
+        - API
+      summary: x
+      operationId: v1notificationsnotificationIdread
+      responses:
+        '200':
+          description: ok
   /v1/notifications/send-push:
     post:
       summary: Send push notification
@@ -657,6 +552,14 @@ paths:
       responses:
         '200':
           description: Default payment method set
+    get:
+      tags:
+        - API
+      summary: x
+      operationId: v1walletuserIdpaymentmethodsmethodId
+      responses:
+        '200':
+          description: ok
   /v1/wallet/{userId}/trust-score:
     get:
       summary: Get wallet trust score
@@ -1071,6 +974,14 @@ paths:
       responses:
         '200':
           description: User status updated
+    get:
+      tags:
+        - API
+      summary: x
+      operationId: v1adminusersuserIdstatus
+      responses:
+        '200':
+          description: ok
   /v1/admin/disputes:
     get:
       summary: List disputes
@@ -1097,6 +1008,14 @@ paths:
       responses:
         '200':
           description: Dispute resolved
+    get:
+      tags:
+        - API
+      summary: x
+      operationId: v1admindisputesdisputeIdresolve
+      responses:
+        '200':
+          description: ok
   /v1/admin/dashboard/metrics:
     get:
       summary: Get dashboard metrics
@@ -1348,6 +1267,158 @@ paths:
       responses:
         '201':
           description: Report submitted
+  /v1/gdpr/consents:
+    post:
+      tags:
+        - GDPR
+      summary: x
+      operationId: recordConsent
+      responses:
+        '200':
+          description: ok
+  /v1/gdpr/data-exports:
+    post:
+      tags:
+        - GDPR
+      summary: x
+      operationId: requestDataExport
+      responses:
+        '200':
+          description: ok
+  /v1/gdpr/deletions:
+    post:
+      tags:
+        - GDPR
+      summary: x
+      operationId: requestDeletion
+      responses:
+        '200':
+          description: ok
+  /v1/gdpr/deletions/cancel:
+    post:
+      tags:
+        - GDPR
+      summary: x
+      operationId: cancelDeletion
+      responses:
+        '200':
+          description: ok
+  /v1/payments/webhooks/stripe:
+    post:
+      tags:
+        - Payments
+      summary: x
+      operationId: stripeWebhook
+      responses:
+        '200':
+          description: ok
+  /v1/payments/webhooks/cliq:
+    post:
+      tags:
+        - Payments
+      summary: x
+      operationId: cliqWebhook
+      responses:
+        '200':
+          description: ok
+  /v1/trust/webhooks/sanad:
+    post:
+      tags:
+        - Trust
+      summary: x
+      operationId: sanadWebhook
+      responses:
+        '200':
+          description: ok
+  /v1/communications/webhooks/resend:
+    post:
+      tags:
+        - Communications
+      summary: x
+      operationId: resendWebhook
+      responses:
+        '200':
+          description: ok
+  /v1/communications/webhooks/twilio:
+    post:
+      tags:
+        - Communications
+      summary: x
+      operationId: twilioWebhook
+      responses:
+        '200':
+          description: ok
+  /v1/wallet/{userId}/{action}/{resourceId}:
+    get:
+      tags:
+        - Wallet
+      summary: x
+      operationId: wallet1
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ok
+    post:
+      tags:
+        - Wallet
+      summary: x
+      operationId: wallet2
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ok
+  /v1/trips/{tripId}:
+    get:
+      tags:
+        - API
+      operationId: getTripById
+      parameters:
+        - name: tripId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ok
+  /packages/*:
+    get:
+      tags:
+        - API
+      operationId: packagesStarX
+      responses:
+        '200':
+          description: ok
 components:
   schemas:
     Metadata:

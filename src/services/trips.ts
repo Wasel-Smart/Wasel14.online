@@ -52,7 +52,8 @@ export const tripsAPI = {
     return runBackendWorkflow( {
       operation: 'Trip creation',
       authMode: 'required',
-      fallbackPolicy: 'writes-if-enabled',
+      fallbackPolicy: 'always',
+      operationType: 'write',
       fallback: ( { userId } ) => createDirectTrip( userId ?? '', tripData ),
       edge: context =>
         requestEdgeJson<TripSearchResult>( {
@@ -130,7 +131,8 @@ export const tripsAPI = {
     return runBackendWorkflow( {
       operation: 'Trip update',
       authMode: 'required',
-      fallbackPolicy: 'writes-if-enabled',
+      fallbackPolicy: 'always',
+      operationType: 'write',
       fallback: () => updateDirectTrip( tripId, updates ),
       edge: context =>
         requestEdgeJson<TripSearchResult>( {
@@ -148,7 +150,8 @@ export const tripsAPI = {
     return runBackendWorkflow( {
       operation: 'Trip deletion',
       authMode: 'required',
-      fallbackPolicy: 'writes-if-enabled',
+      fallbackPolicy: 'always',
+      operationType: 'write',
       fallback: () => deleteDirectTrip( tripId ),
       edge: context =>
         requestEdgeJson<{ success: boolean }>( {
@@ -165,7 +168,8 @@ export const tripsAPI = {
     return runBackendWorkflow( {
       operation: 'Trip publishing',
       authMode: 'required',
-      fallbackPolicy: 'writes-if-enabled',
+      fallbackPolicy: 'always',
+      operationType: 'write',
       fallback: async () => {
         await updateDirectTrip( tripId, { status: 'active' } );
         return { success: true };

@@ -1,5 +1,9 @@
 import type { WaselUser } from '../contexts/LocalAuth';
-import { evaluateTrustCapability } from './trustRules';
+import {
+  evaluateTrustCapability,
+  hasSubmittedDriverDocuments,
+  isDriverCleared,
+} from './trustRules';
 
 export type DriverReadinessStep = {
   id: 'account_role' | 'phone' | 'email' | 'driver_documents' | 'driver_clearance';
@@ -24,24 +28,12 @@ function hasDriverRole(user: WaselUser | null | undefined): boolean {
   return user?.role === 'driver' || user?.role === 'both';
 }
 
-function isDriverCleared(user: WaselUser): boolean {
-  return user.driverStatus === 'approved' || user.verificationLevel === 'level_3';
-}
-
-function hasSubmittedDriverDocuments(user: WaselUser): boolean {
-  return (
-    isDriverCleared(user) ||
-    user.verificationLevel === 'level_2' ||
-    user.driverStatus === 'pending_approval'
-  );
-}
-
 function buildSteps(user: WaselUser | null | undefined): DriverReadinessStep[] {
   return [
     {
       id: 'account_role',
       label: 'Driver role enabled',
-      description: 'Turn on Driver mode.',
+      description: 'Turn on Driver mode in Trust Center.',
       complete: hasDriverRole(user),
     },
     {
@@ -126,9 +118,9 @@ export function getDriverReadinessSummary(
     return {
       status: 'pending_review',
       headline: 'Final review in progress',
-      detail: 'Your documents are submitted. Final driver clearance is next.',
+      detail: 'Your documents are submitted. You can publish rides as soon as an operator approves them.',
       steps,
-      canOfferRide: false,
+      canOfferRide: offerRideGate.allowed,
       canCarryPackages: false,
     };
   }

@@ -12,6 +12,7 @@ import {
   ensureBookingEligibility,
   getWalletByCanonicalUserId,
   toNumber,
+  mapCanonicalRole,
 } from './helpers.js';
 import { buildUserContext, ensureDriverForUser, getLatestVerificationRecord } from './userContext';
 import { recordDirectGrowthEvent } from './growth.js';
@@ -142,7 +143,7 @@ export async function updateDirectProfile(userId: string, updates: Record<string
   ) {
     userPatch.phone_verified_at = null;
   }
-  if (typeof updates.role === 'string') {userPatch.role = updates.role;}
+  if (typeof updates.role === 'string') {userPatch.role = mapCanonicalRole(updates.role) ?? updates.role;}
   if (typeof updates.verification_level === 'string')
     {userPatch.verification_level = updates.verification_level;}
   if (typeof updates.avatar_url === 'string') {userPatch.avatar_url = updates.avatar_url;}

@@ -237,6 +237,22 @@ export async function handleEnableDriverMode ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
 
+  const currentRole = String( auth.canonicalUser.role ?? 'passenger' ).toLowerCase();
+
+  // Idempotent: a second tap (or a 'both' account) must not rewrite the role.
+  if ( currentRole === 'driver' || currentRole === 'both' ) {
+    return json( { enabled: true, role: currentRole } );
+  }
+
+  // This endpoint used to overwrite ANY role with 'driver', silently demoting an
+  // admin or operator who pressed it and locking them out of the console.
+  if ( currentRole === 'admin' || currentRole === 'operator' ) {
+    return json(
+      { error: 'Staff accounts cannot switch to Driver mode. Use a separate rider account to drive.' },
+      409,
+    );
+  }
+
   const { error } = await auth.admin
     .from( 'users' )
     .update( {
@@ -257,7 +273,8 @@ export async function handleSubmitDriverDocuments ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
 
-  if ( String( auth.canonicalUser.role ?? 'passenger' ) !== 'driver' ) {
+  const submitterRole = String( auth.canonicalUser.role ?? 'passenger' ).toLowerCase();
+  if ( submitterRole !== 'driver' && submitterRole !== 'both' ) {
     return json( { error: 'Enable Driver mode before submitting driver documents.' }, 400 );
   }
 

@@ -25,16 +25,7 @@ Example: `20260401120000_add_driver_rating_column.sql`
 
 | # | File | Description | Status |
 |---|------|-------------|--------|
-| 01 | `20260210_complete_schema.sql` | Initial complete schema for core tables | Applied |
-| 02 | `20260223000000_production_schema.sql` | Production hardening and RLS policies | Applied |
-| 03 | `20260224_additional_tables.sql` | Package tracking and wallet transactions | Applied |
-| 04 | `20260224_postgis_functions.sql` | PostGIS spatial functions for route matching | Applied |
-| 05 | `20260224_wasel_complete_schema.sql` | Consolidated schema snapshot for reference | Applied |
-| 06 | `20260224000000_production_backend_schema.sql` | Backend service layer tables | Applied |
-| 07 | `20260224000001_backup_configuration.sql` | Backup schedules and retention configuration | Applied |
-| 08 | `20260302_regionalization_schema.sql` | Region, corridor, and zone tables | Applied |
-| 09 | `20260310_security_performance_fixes.sql` | Security and indexing fixes | Applied |
-| 10 | `20260320000000_w_mobility_platform_complete.sql` | Mobility OS, Raje3, and corporate accounts | Applied |
+| 01 | `20260210000000_baseline_schema.sql` | **Canonical baseline** — single clean definition of all core tables, enums, functions, triggers, RLS, and grants. Replaces 14 overlapping source migrations with no duplicate table definitions and no conflicting column names. | Applied |
 | 11 | `20260326080000_legacy_public_table_cutover.sql` | Preserve conflicting legacy public tables before canonical runtime tables are created | Ready |
 | 12 | `20260327090000_production_operating_model.sql` | Operating model, pricing, and service workflows | Ready |
 | 13 | `20260327110000_notifications_runtime_contract.sql` | Canonical notifications runtime table aligned with current app usage | Ready |
@@ -165,10 +156,12 @@ jobs:
 
 ---
 
-## Overlapping Files
+## Schema Design Notes
 
-Several files from `20260224` share the same date prefix because multiple schema areas were developed in parallel.
-Future migrations must use full `YYYYMMDDHHMMSS` timestamps to avoid collisions.
+- The `trips` table carries both the carpool column set (`from_location`, `to_location`, `departure_date DATE`, `departure_time TIME`) and the on-demand column set (`origin`, `destination`, `departure_timestamptz TIMESTAMPTZ`). Both sets are populated by their respective service paths; neither is removed to preserve backward compatibility with existing queries.
+- All `updated_at` triggers use a single `update_updated_at_column()` function — no duplicate definitions.
+- `GRANT` statements are explicit per-table. The previous `GRANT ... ON ALL TABLES IN SCHEMA public TO authenticated` has been removed.
+- Future migrations must use full `YYYYMMDDHHMMSS` timestamps to avoid collisions.
 
 ---
 

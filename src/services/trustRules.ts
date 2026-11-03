@@ -22,12 +22,38 @@ function verificationRank ( level?: string ): number {
   }
 }
 
-// A driver is cleared once an operator has approved the submitted driver
-// documents. The status is the source of truth; level_3 is set at the same time
-// and is accepted as an equivalent so an out-of-sync profile never locks out an
-// approved driver.
-function isDriverCleared(user: Pick<WaselUser, 'verificationLevel' | 'driverStatus'>): boolean {
-  return user.driverStatus === 'approved' || verificationRank(user.verificationLevel) >= 3;
+// Driver statuses the backend uses once an operator has cleared the account.
+// `offline` / `online` / `busy` are the live availability states of an approved
+// driver, so they must count as cleared exactly like `approved` does.
+const CLEARED_DRIVER_STATUSES = new Set(['approved', 'online', 'offline', 'busy']);
+
+/**
+ * A driver is cleared once an operator has approved the submitted driver
+ * documents. The backend driver status is the source of truth (it is what
+ * `POST /trips` enforces), so a known status always wins: a `pending_approval`
+ * or `rejected` driver is NOT cleared even if a stale level_3 is cached.
+ * level_3 is only trusted as an equivalent when the status is unknown, so a
+ * profile that has no status field never locks out an approved driver.
+ */
+export function isDriverCleared(
+  user: Pick<WaselUser, 'verificationLevel' | 'driverStatus'>,
+): boolean {
+  const status = typeof user.driverStatus === 'string' ? user.driverStatus.trim() : '';
+  if (status) {
+    return CLEARED_DRIVER_STATUSES.has(status);
+  }
+  return verificationRank(user.verificationLevel) >= 3;
+}
+
+/** True once the driver has sent documents that are waiting for (or past) review. */
+export function hasSubmittedDriverDocuments(
+  user: Pick<WaselUser, 'verificationLevel' | 'driverStatus'>,
+): boolean {
+  return (
+    isDriverCleared(user) ||
+    user.driverStatus === 'pending_approval' ||
+    verificationRank(user.verificationLevel) >= 2
+  );
 }
 
 function evaluateOfferRide(user: Pick<WaselUser, 'role' | 'phoneVerified' | 'emailVerified' | 'verificationLevel' | 'driverStatus'>): TrustGateResult {
@@ -37,8 +63,12 @@ function evaluateOfferRide(user: Pick<WaselUser, 'role' | 'phoneVerified' | 'ema
   if (!user.phoneVerified || !user.emailVerified) {
     return { allowed: false, reason: 'Verify phone and email.', recommendation: 'Finish checks in Trust Center.' };
   }
-  if (!isDriverCleared(user)) {
-    return { allowed: false, reason: 'Driver approval is required before publishing rides.', recommendation: 'Submit your driver documents and wait for final approval.' };
+  if (!hasSubmittedDriverDocuments(user)) {
+    return {
+      allowed: false,
+      reason: 'Submit your driver documents first.',
+      recommendation: 'Add your license in Trust Center to start the review.',
+    };
   }
   return { allowed: true, reason: null, recommendation: null };
 }

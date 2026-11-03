@@ -29,6 +29,23 @@ describe('queue contract topology', () => {
       expect(knownTopics.has(topic as QueueTopic), `${event} maps to unknown topic ${topic}`).toBe(true);
     }
   });
+
+  it('package lifecycle events without a dedicated topic are not mapped', () => {
+    // PackageAssigned and PackagePickedUp have no dedicated queue topic.
+    // They must NOT be routed to packages.created (wrong semantic).
+    expect(EVENT_TYPE_TO_TOPIC).not.toHaveProperty('PackageAssigned');
+    expect(EVENT_TYPE_TO_TOPIC).not.toHaveProperty('PackagePickedUp');
+  });
+
+  it('in-progress ride state transition is not mapped to a queue topic', () => {
+    // RideStarted is a local lifecycle transition only — no worker action needed.
+    expect(EVENT_TYPE_TO_TOPIC).not.toHaveProperty('RideStarted');
+  });
+
+  it('payment events map to their correct semantic topics', () => {
+    expect(EVENT_TYPE_TO_TOPIC.PaymentAuthorized).toBe('payments.authorized');
+    expect(EVENT_TYPE_TO_TOPIC.PaymentCaptured).toBe('payments.captured');
+  });
 });
 
 describe('service topology contract', () => {
