@@ -89,6 +89,8 @@ async function main() {
   for (const { name, value } of keys) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
+    // unref() so this timer never prevents the process from exiting naturally
+    if (typeof timer.unref === 'function') { timer.unref(); }
     try {
       const response = await fetch(`${url}/auth/v1/settings`, {
         headers: { apikey: value },
@@ -113,4 +115,10 @@ async function main() {
   return failed ? 1 : 0;
 }
 
-main().then((code) => process.exit(code));
+main().then((code) => {
+  // On success let the process exit naturally (no pending handles = clean exit).
+  // On failure force-exit so the build stops, but defer one tick so libuv can
+  // drain the AbortController internal handle first (Windows assertion fix).
+  if (code === 0) { return; }
+  setImmediate(() => process.exit(code));
+});

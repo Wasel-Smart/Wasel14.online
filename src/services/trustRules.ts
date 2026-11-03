@@ -70,6 +70,13 @@ function evaluateOfferRide(user: Pick<WaselUser, 'role' | 'phoneVerified' | 'ema
       recommendation: 'Add your license in Trust Center to start the review.',
     };
   }
+  if (!isDriverCleared(user)) {
+    return {
+      allowed: false,
+      reason: 'Driver approval is pending. You can post rides once an operator approves your documents.',
+      recommendation: 'Check back after your documents are reviewed.',
+    };
+  }
   return { allowed: true, reason: null, recommendation: null };
 }
 

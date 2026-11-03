@@ -107,9 +107,13 @@ function resolveFallbackPolicy(
 ): boolean {
   switch (policy ?? 'always') {
     case 'always':
-      // 'always' means: use the fallback whenever the edge is unavailable or
-      // fails, regardless of env config. isFallbackAllowed() is an env gate
-      // for 'writes-if-enabled' only — it must not block 'always' calls.
+      // 'always' with an explicit write operationType is still gated by the
+      // env write-fallback flag so production deployments can lock down direct
+      // DB writes. 'always' without an explicit operationType (inferred 'read')
+      // always falls back — that is the legacy behaviour tests rely on.
+      if (operationType === 'write') {
+        return isFallbackAllowed('write');
+      }
       return true;
     case 'writes-if-enabled':
       return operationType === 'write' && isFallbackAllowed('write');

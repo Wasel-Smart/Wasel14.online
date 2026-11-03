@@ -75,15 +75,11 @@ export function initializeAppInsights(): void {
     }
 
     try {
-        appInsights = new ApplicationInsights({
+        const instance = new ApplicationInsights({
             config: {
                 ...(usableConnectionString ? { connectionString: usableConnectionString } : { instrumentationKey: usableInstrumentationKey }),
                 enableAutoRouteTracking: true,
                 enableAjaxErrorStatusText: true,
-                // The SDK otherwise injects `request-id` and `traceparent` on every
-                // cross-origin fetch. Supabase Edge Functions reject preflights
-                // containing headers outside their allowlist, which turned every
-                // auth and profile call into a network failure.
                 disableAjaxTracking: true,
                 distributedTracingMode: DistributedTracingModes.AI,
                 maxAjaxCallsPerView: 500,
@@ -93,8 +89,9 @@ export function initializeAppInsights(): void {
             },
         });
 
-        appInsights.loadAppInsights();
-        appInsights.trackPageView();
+        instance.loadAppInsights();
+        instance.trackPageView();
+        appInsights = instance;
 
         // Wire real Web Vitals into App Insights as custom metrics.
         onCLS(({ value }) => appInsights?.trackMetric({ name: 'web_vital_CLS', average: value }));

@@ -34,7 +34,7 @@ vi.mock('@/services/auth', () => ({
     signIn: vi.fn(),
     signUp: vi.fn(),
     signOut: vi.fn(),
-    updateProfile: vi.fn(),
+    updateProfile: vi.fn().mockResolvedValue({ success: true }),
     createProfile: vi.fn(),
   },
 }));
@@ -82,6 +82,12 @@ function renderProvider() {
 // ── Setup ─────────────────────────────────────────────────────────────────────
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
+  localStorage.removeItem('wasel_user_session');
+
+  // Restore default mock returns cleared by vi.clearAllMocks()
+  vi.mocked(getSupabaseClient).mockReturnValue(mockSupabaseClient as never);
+  vi.mocked(loadProfileFromBackend).mockResolvedValue(null);
 
   // Default: onAuthStateChange fires INITIAL_SESSION with no session
   mockOnAuthStateChange.mockImplementation((cb: (event: string, session: null) => void) => {
@@ -126,14 +132,17 @@ describe('AuthProvider — initialization', () => {
 
     // Patch import.meta.env for this test
     const originalEnv = import.meta.env.VITE_E2E_LOCAL_AUTH;
-    Object.defineProperty(import.meta.env, 'VITE_E2E_LOCAL_AUTH', { value: 'true', configurable: true });
+    vi.stubEnv('VITE_E2E_LOCAL_AUTH', 'true');
 
     renderProvider();
     await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
     expect(screen.getByTestId('user').textContent).toBe('e2e@wasel.jo');
 
     // Restore
-    Object.defineProperty(import.meta.env, 'VITE_E2E_LOCAL_AUTH', { value: originalEnv, configurable: true });
+    vi.unstubAllEnvs();
+    if (originalEnv !== undefined) {
+      vi.stubEnv('VITE_E2E_LOCAL_AUTH', originalEnv);
+    }
     localStorage.removeItem('wasel_user_session');
   });
 
