@@ -119,7 +119,8 @@ export async function startTrustPhoneVerification ( payload: StartPhoneVerificat
   }>( {
     operation: 'Phone verification start',
     authMode: 'required',
-    fallbackPolicy: 'writes-if-enabled',
+    fallbackPolicy: 'always',
+    operationType: 'write',
     edge: context =>
       requestEdgeJson( {
         path: '/v1/trust/phone/start',
@@ -145,7 +146,8 @@ export async function confirmTrustPhoneVerification ( payload: ConfirmPhoneVerif
   }>( {
     operation: 'Phone verification confirmation',
     authMode: 'required',
-    fallbackPolicy: 'writes-if-enabled',
+    fallbackPolicy: 'always',
+    operationType: 'write',
     edge: context =>
       requestEdgeJson( {
         path: '/v1/trust/phone/confirm',

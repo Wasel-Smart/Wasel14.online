@@ -427,6 +427,7 @@ export const authAPI = {
         operation: 'Profile update',
         authMode: 'required',
         fallbackPolicy: 'always',
+        operationType: 'write',
         fallback: ({ userId }) => updateDirectProfile(userId ?? '', updates),
         edge: context =>
           requestEdgeJson<Record<string, unknown>>({

@@ -107,7 +107,10 @@ function resolveFallbackPolicy(
 ): boolean {
   switch (policy ?? 'always') {
     case 'always':
-      return isFallbackAllowed(operationType);
+      // 'always' means: use the fallback whenever the edge is unavailable or
+      // fails, regardless of env config. isFallbackAllowed() is an env gate
+      // for 'writes-if-enabled' only — it must not block 'always' calls.
+      return true;
     case 'writes-if-enabled':
       return operationType === 'write' && isFallbackAllowed('write');
     case 'never':
