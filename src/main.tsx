@@ -5,14 +5,13 @@ import './index.css';
 import { getStartupConfigurationError, getObservabilityWarnings } from './utils/runtimeConfigGuard';
 import { sanitizeLogMessage } from './utils/sanitization';
 import { safeStorageGetItem, safeStorageRemoveItem, safeStorageSetItem } from './utils/browserStorage';
-import { initializeAppInsights } from './utils/appInsights';
+import { ANALYTICS_CONSENT_CHANGED, hasAnalyticsConsent } from './utils/analyticsConsent';
 import { initializeCsrfProtection } from './utils/csrf';
 import { initializeSessionManagement } from './utils/session';
 import { verifyBackendConnection, startHealthCheckMonitoring } from './utils/healthCheck';
 import { clearMasterKey } from './utils/encryption';
 import { installBenignRuntimeErrorFilter } from './components/system/ErrorBoundary';
 import { scheduleIdleTask } from './utils/performance';
-import { injectSpeedInsights } from '@vercel/speed-insights';
 
 const LOCAL_DEV_RESET_KEY = 'wasel-local-dev-cache-reset';
 
@@ -314,16 +313,23 @@ if ( environmentIsValid ) {
   void scheduleIdle( () => {
     void ( async () => {
       try {
-        initializeAppInsights();
+        let analyticsInitialized = false;
+        const initializeConsentBasedAnalytics = () => {
+          if ( analyticsInitialized || !hasAnalyticsConsent() ) { return; }
+          analyticsInitialized = true;
+          void import( './utils/appInsights' )
+            .then( module => module.initializeAppInsights() )
+            .catch( () => { /* Analytics must not disrupt core application flows. */ } );
+          void import( '@vercel/speed-insights' )
+            .then( module => module.injectSpeedInsights() )
+            .catch( () => { /* Analytics must not disrupt core application flows. */ } );
+        };
+        initializeConsentBasedAnalytics();
+        window.addEventListener( ANALYTICS_CONSENT_CHANGED, initializeConsentBasedAnalytics );
         // Sentry is loaded lazily inside initSentry() — only downloads the SDK
         // when VITE_SENTRY_DSN is set, so this is safe to call unconditionally.
         const { initSentry } = await import( './utils/monitoring' );
         void initSentry();
-        try {
-          injectSpeedInsights();
-        } catch {
-          // non-fatal
-        }
         initializeCsrfProtection();
         initializeSessionManagement();
 

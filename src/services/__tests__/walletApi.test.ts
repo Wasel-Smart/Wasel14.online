@@ -102,7 +102,7 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
 
       expect(walletDirectMocks.fetchWalletDirect).toHaveBeenCalledWith('user-123');
       expect(wallet.transactions[0]!.description).toBe(
-        '&lt;script&gt;alert(1)&lt;/script&gt;',
+        '&lt;script&gt;alert(1)&lt;&#x2F;script&gt;',
       );
     });
 

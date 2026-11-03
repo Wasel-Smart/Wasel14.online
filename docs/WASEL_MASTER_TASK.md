@@ -7,13 +7,11 @@ database authorization, payments, backend, end-to-end tests, performance/accessi
 
 Evidence levels used below:
 
-- **READ**: confirmed by reading the code or migrations in this repo. Not executed.
-- **EDITED**: a fix was written. Not compiled or tested (the auditing session had read/write file
-  access only, no shell on this machine).
-- **TO RUN**: needs a command from "Verification to run" before it counts as done.
+- **READ**: confirmed by code or migration inspection.
+- **EDITED**: a change was written; check later verification records for execution status.
+- **TO RUN**: needs the listed live or production check before it counts as done.
 
-Nothing here is marked closed. `REVIEW_REPORT.md` claims 9.2/10; the evidence below does not support
-that score (see Tier 0).
+This audit is historical and partially superseded by the 2026-11-03 local verification summarized in `REVIEW_REPORT.md`. Live database and provider checks remain open.
 
 ## Tier 0 - build and deploy
 
@@ -38,7 +36,7 @@ under OneDrive and `SECURITY_AUDIT_FINDINGS.md` already records interrupted inst
 |---|---|---|
 | S1 | Credential rotation (Stripe, Twilio, Resend, SendGrid, Supabase service role, OAuth, Vercel, worker secrets) and git-history purge of the committed Google service-account key are still listed as pending in `REVIEW_REPORT.md`. Only the owner can do these. `.env*`, `.env.production` and `vercel-env-variables.txt` sit in the working folder; they were not opened. | OPEN, human action |
 | S2 | Earlier audit items verified against current code: A1 module link (index imports and `webhooks.ts` exports now match), A2 (`verify_jwt = false`, webhooks in their own function), B1 refund needs `payments:refund`, B3 reserved metadata keys and user-scoped idempotency, B4 anonymous and web3 sign-in off. | READ: closed in code; deploy state TO RUN |
-| S3 | Twilio webhook signs `url.origin + url.pathname`. Twilio signs the exact URL it was configured with, and the edge runtime path omits `/functions/v1`, so this likely rejects every genuine callback. Resend and Twilio also fall back to a query-string token, which downgrades the signature check. | OPEN, TO RUN (live callback) |
+| S3 | Twilio callbacks require the provider signature and reject URL-token fallback. The exact provider callback URL still needs a live check. | CODE FIXED; LIVE CALLBACK UNVERIFIED |
 | S4 | `supabase-js@2` is imported unpinned from esm.sh; the Stripe SDK is 12.12.0 with `apiVersion` 2024-11-20 while raw Stripe calls use 2026-02-25.clover. | OPEN |
 
 ## Tier 2 - database authorization
@@ -47,22 +45,22 @@ under OneDrive and `SECURITY_AUDIT_FINDINGS.md` already records interrupted inst
 |---|---|---|
 | A1 | `20260720054123` grants `anon` SELECT on `public.drivers` (rows carry `license_number`, `background_check_status`). Safe only if RLS blocks anon; the later PII view targets `driver_profiles`, a different table. | OPEN, TO RUN with the anon key |
 | A2 | `app_submit_sanad_verification(p_user_id ...)` is SECURITY DEFINER, granted to `authenticated`, with no check that `p_user_id` is the caller. | OPEN, verify against `20261001120000` |
-| A3 | `bookings` is addressed with two column sets: `booking_id`/`passenger_id` (booking create, list, PUT, payment status) and `id`/`user_id` (rating, cancel, cancel-eligibility, `assertTripParticipant` used for chat). One set may not exist. Check `information_schema.columns`. | OPEN, TO RUN |
+| A3 | Booking, rating, payment, review, moderation, chat participant, and live-trip queries were aligned to canonical `booking_id`/`passenger_id`/`booking_status` columns. Verify against linked `information_schema.columns` after migration reconciliation. | CODE FIXED; LIVE SCHEMA VERIFY OPEN |
 
 ## Tier 3 - payments and transaction integrity
 
 | ID | Finding | State |
 |---|---|---|
-| P1 | **Every ride booking was rejected.** The handler calls `app_create_ride_booking` with the service-role client; the function required `auth.uid()` and `p_passenger_id = auth.uid()`, and a service-role JWT has no `sub`. `20260720062017` also removed `authenticated` EXECUTE. | READ. EDITED: `supabase/migrations/20261011000000_fix_ride_booking_service_role_and_fare.sql` (SQL parsed by the PostgreSQL parser, with a negative control). Not applied. TO RUN |
+| P1 | Added `app_create_ride_booking` as a service-role-only atomic reservation RPC; it verifies phone state, prices from the locked trip, allocates contiguous seats, and reserves capacity. Local migration only; verify/apply after history reconciliation. | CODE + MIGRATION ADDED; LIVE BOOKING E2E OPEN |
 | P2 | The same function stored the fare as whatever was passed in (the handler passes 0), so bookings had `amount = total_price = 0`. The new function derives the fare from the locked trip row and fails closed if no price column is found. | EDITED, TO RUN |
 | P3 | `finalizeTopUpTransaction` credited any pending row named by a provider callback, including debits. Now requires `add_funds` + `credit`. | EDITED (`shared.ts`) |
 | P4 | `markTopUpTransactionFailed` could overwrite a `posted` row (check-then-write race). Update is now guarded with `neq posted`. | EDITED (`shared.ts`) |
 | P5 | `PUT /bookings/:id` wrote any string; a passenger could confirm or complete their own booking. Now restricted to the enum, terminal states are frozen, passengers can only cancel. | EDITED (`bookings.ts`) |
 | P6 | CliQ webhook credits the stored amount but never compares the amount/currency the provider reports. The checkout URL carries `amount` and `transactionId` as parameters. Add a strict match once the CliQ payload field names are confirmed. | OPEN |
-| P7 | Stripe webhook handles checkout sessions, subscriptions and `payment_failed`, but not `payment_intent.succeeded`. `/payment/create-intent` therefore collects money with no server-side record. Confirm whether any UI uses it. | OPEN |
-| P8 | `POST /bookings` then picks an arbitrary online driver (`limit 1`, not scoped to the trip) and overwrites `trips.driver_id` with `drivers.driver_id`, while `app_update_booking_status` compares `trips.driver_id` to `auth.uid()`. Decide the id space, then remove or scope this block. | OPEN, needs owner decision |
-| P9 | Cancel (`/cancellations/bookings`) writes `status` only (not `booking_status`), never returns seats, does not enforce the 1-hour rule, and only flags `refundRequired`. PUT cancel also skips seat release. Route both through `app_update_booking_status` (needs an actor parameter for service role). | OPEN |
-| P10 | Rating: `driverId` and `tripId` come from the client, and the notification goes to any `user_id` supplied. Derive both from the booking. | OPEN |
+| P7 | Stripe webhook handles `payment_intent.succeeded` and reconciles amount/currency before recording a booking payment. Live settlement remains unverified. | CODE FIXED; LIVE PAYMENT UNVERIFIED |
+| P8 | Removed arbitrary post-create driver assignment; creation now uses the new serialized RPC and trip-owned driver mapping. Local migration only pending schema reconciliation and live tests. | CODE + MIGRATION ADDED; LIVE VERIFY OPEN |
+| P9 | Both cancellation routes now call an atomic service-role RPC migration that enforces ownership/cutoff, records reason, and releases seats. Local only; migration not applied and refund execution remains separate. | CODE + MIGRATION ADDED; DEPLOY/REFUND OPEN |
+| P10 | Ratings derive trip/driver from the canonical booking, resolve driver user ID for notifications, and use an aggregate summary RPC. Local only until migration reconciliation/application. | CODE + MIGRATION ADDED |
 | P11 | Amount bounds are currency-agnostic (50 to 5,000,000 minor units) and three-decimal currencies (JOD, KWD, BHD, OMR) are not forced to multiples of 10 for create-intent. | OPEN |
 
 ## Tier 4 - backend and jobs
@@ -106,4 +104,4 @@ price times seats.
 
 ## Score
 
-Not certified. Static review only; no build, test, or deployment was run.
+Local verification on 2026-11-03 is recorded in `REVIEW_REPORT.md`: production build, lint, TypeScript, 2,072 tests, route/security/env checks, Deno edge types, and API contracts passed. Coverage was 23.69% statements. Linked schema lint passed, but migrations are divergent and pending; production booking/payment and provider callback flows remain unverified. Not certified for production release.

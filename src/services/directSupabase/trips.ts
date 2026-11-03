@@ -8,15 +8,11 @@ import {
   buildTripNotes,
   normalizePackageCapacity,
   normalizeTripStatus,
-  normalizeBookingStatus,
-  ensureBookingEligibility,
   getWalletByCanonicalUserId,
   toNumber,
   mapCanonicalRole,
 } from './helpers.js';
 import { buildUserContext, ensureDriverForUser, getLatestVerificationRecord } from './userContext';
-import { recordDirectGrowthEvent } from './growth.js';
-import { processReferralConversionForPassenger } from './referrals.js';
 import type {
   DriverRow,
   RawBooking,
@@ -322,7 +318,7 @@ export async function deleteDirectTrip(tripId: string): Promise<{ success: boole
 
 // ── Booking operations ────────────────────────────────────────────────────────
 
-export async function createDirectBooking(input: {
+export async function createDirectBooking(_input: {
   tripId: string;
   userId: string;
   seatsRequested: number;
@@ -331,102 +327,7 @@ export async function createDirectBooking(input: {
   metadata?: Record<string, unknown>;
   bookingStatus?: string;
 }) {
-  const db = getDb();
-  const passenger = await buildUserContext(input.userId);
-  ensureBookingEligibility(mapProfileFromContext(passenger));
-
-  const { data: trip, error: tripError } = await db
-    .from('trips')
-    .select('trip_id, available_seats, price_per_seat, trip_status')
-    .eq('trip_id', input.tripId)
-    .single();
-  if (tripError) {throw tripError;}
-
-  const availableSeats = toNumber(trip?.available_seats, 0);
-  if (availableSeats < input.seatsRequested) {throw new Error('Not enough seats available');}
-
-  const { data: existingSeats } = await db
-    .from('bookings')
-    .select('seat_number')
-    .eq('trip_id', input.tripId)
-    .neq('booking_status', 'cancelled');
-
-  const usedSeats = new Set(
-    (Array.isArray(existingSeats) ? existingSeats : []).map((item: RawBooking) =>
-      toNumber(item.seat_number, 0),
-    ),
-  );
-  const resolvedSeatNumber =
-    toNumber(input.metadata?.seat_number, 0) ||
-    Array.from(
-      { length: Math.max(availableSeats + usedSeats.size + 1, 100) },
-      (_, i) => i + 1,
-    ).find(s => !usedSeats.has(s)) ||
-    1;
-
-  const pricePerSeat = toNumber(trip?.price_per_seat, 0);
-  const totalPrice = toNumber(input.metadata?.total_price, pricePerSeat * input.seatsRequested);
-
-  const { data, error } = await db
-    .from('bookings')
-    .insert({
-      trip_id: input.tripId,
-      passenger_id: passenger.user.id,
-      seat_number: resolvedSeatNumber,
-      booking_status: input.bookingStatus ?? 'confirmed',
-      status: input.bookingStatus ?? 'confirmed',
-      confirmed_by_driver: input.bookingStatus === 'pending_driver' ? false : true,
-      amount: totalPrice,
-    })
-    .select('*')
-    .single();
-  if (error) {throw error;}
-
-  await recordDirectGrowthEvent({
-    userId: input.userId,
-    eventName: 'ride_booking_created',
-    funnelStage: input.bookingStatus === 'pending_driver' ? 'selected' : 'booked',
-    serviceType: 'ride',
-    from: input.pickup,
-    to: input.dropoff,
-    valueJod: totalPrice,
-    metadata: {
-      tripId: input.tripId,
-      bookingStatus: input.bookingStatus ?? 'confirmed',
-      seatsRequested: input.seatsRequested,
-    },
-  }).catch(() => {});
-
-  if (input.bookingStatus !== 'pending_driver') {
-    await processReferralConversionForPassenger(passenger.user.id).catch(() => {});
-  }
-
-  await db
-    .from('trips')
-    .update({
-      available_seats:
-        input.bookingStatus === 'pending_driver'
-          ? availableSeats
-          : Math.max(availableSeats - input.seatsRequested, 0),
-      trip_status:
-        input.bookingStatus === 'pending_driver'
-          ? (trip?.trip_status ?? 'open')
-          : availableSeats - input.seatsRequested <= 0
-            ? 'booked'
-            : (trip?.trip_status ?? 'open'),
-    })
-    .eq('trip_id', input.tripId);
-
-  return {
-    booking: mapBookingRow({
-      ...(data as RawBooking),
-      pickup_location: input.pickup ?? null,
-      dropoff_location: input.dropoff ?? null,
-      seats_requested: input.seatsRequested,
-      price_per_seat: pricePerSeat,
-      total_price: totalPrice,
-    }),
-  };
+  throw new Error('Booking creation requires the authenticated edge API; direct database writes are disabled.');
 }
 
 export async function getDirectUserBookings(userId: string) {
@@ -453,86 +354,10 @@ export async function getDirectTripBookings(tripId: string) {
 }
 
 export async function updateDirectBookingStatus(
-  bookingId: string,
-  status: 'accepted' | 'rejected' | 'cancelled',
+  _bookingId: string,
+  _status: 'accepted' | 'rejected' | 'cancelled',
 ) {
-  const db = getDb();
-  const mappedStatus = normalizeBookingStatus(status);
-
-  const { data: existing, error: existingError } = await db
-    .from('bookings')
-    .select('*')
-    .eq('booking_id', bookingId)
-    .single();
-  if (existingError) {throw existingError;}
-
-  const bookingRow = existing as RawBooking;
-  const { data, error } = await db
-    .from('bookings')
-    .update({
-      booking_status: mappedStatus,
-      status: mappedStatus,
-      confirmed_by_driver: mappedStatus === 'confirmed',
-    })
-    .eq('booking_id', bookingId)
-    .select('*')
-    .single();
-  if (error) {throw error;}
-
-  const tripId = bookingRow.trip_id;
-  if (!tripId) {throw new Error('Booking is missing a trip id.');}
-
-  const { data: trip } = await db
-    .from('trips')
-    .select('trip_id, available_seats, trip_status')
-    .eq('trip_id', tripId)
-    .maybeSingle();
-
-  const availableSeats = toNumber((trip as TripRow | null)?.available_seats, 0);
-  const seatsRequested = Math.max(1, toNumber(bookingRow.seats_requested, 1));
-
-  if (mappedStatus === 'confirmed' && bookingRow.booking_status === 'pending_driver' && trip) {
-    await db
-      .from('trips')
-      .update({
-        available_seats: Math.max(availableSeats - seatsRequested, 0),
-        trip_status:
-          availableSeats - seatsRequested <= 0
-            ? 'booked'
-            : ((trip as TripRow).trip_status ?? 'open'),
-      })
-      .eq('trip_id', tripId);
-    if (bookingRow.passenger_id) {
-      await processReferralConversionForPassenger(String(bookingRow.passenger_id)).catch(() => {});
-    }
-  }
-
-  if (
-    (mappedStatus === 'cancelled' || mappedStatus === 'rejected') &&
-    bookingRow.booking_status === 'confirmed' &&
-    trip
-  ) {
-    await db
-      .from('trips')
-      .update({ available_seats: availableSeats + seatsRequested, trip_status: 'open' })
-      .eq('trip_id', tripId);
-  }
-
-  await recordDirectGrowthEvent({
-    userId: String(bookingRow.passenger_id ?? ''),
-    eventName: 'ride_booking_status_updated',
-    funnelStage: mappedStatus === 'confirmed' ? 'booked' : mappedStatus,
-    serviceType: 'ride',
-    valueJod: toNumber(bookingRow.amount, 0),
-    metadata: {
-      bookingId,
-      tripId: bookingRow.trip_id,
-      previousStatus: bookingRow.booking_status ?? bookingRow.status ?? null,
-      nextStatus: mappedStatus,
-    },
-  }).catch(() => {});
-
-  return mapBookingRow(data as RawBooking);
+  throw new Error('Booking status changes require the authenticated edge API; direct database writes are disabled.');
 }
 
 export async function getDirectDriverBookings(userId: string) {

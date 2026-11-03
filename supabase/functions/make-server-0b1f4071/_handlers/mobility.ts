@@ -165,7 +165,7 @@ export async function handleGetMobilityLiveRows ( request: Request ) {
         .in( 'trip_status', [ 'open', 'booked', 'in_progress' ] ),
       auth.admin
         .from( 'bookings' )
-        .select( 'trip_id, seats_requested, booking_status, status' )
+        .select( 'trip_id, seats_requested, booking_status' )
         .in( 'booking_status', [ 'confirmed', 'pending_driver' ] )
         .order( 'created_at', { ascending: false } ),
       auth.admin

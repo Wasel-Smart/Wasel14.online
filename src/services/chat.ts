@@ -1,10 +1,6 @@
 import { supabase } from '@/utils/supabase/client';
+import { apiGet, apiPost } from '@/utils/api';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-
-type MessageReadRow = {
-  id: string;
-  read_by: string[] | null;
-};
 
 export interface Message {
   id: string;
@@ -33,113 +29,29 @@ class ChatService {
   private channels: Map<string, RealtimeChannel> = new Map();
 
   async sendMessage(request: SendMessageRequest): Promise<Message> {
-    if (!supabase) {throw new Error('Supabase not configured');}
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      throw new Error('Not authenticated');
-    }
-
-    const { data: trip } = await supabase
-      .from('trips')
-      .select('driver_id')
-      .eq('id', request.tripId)
-      .single();
-
-    const { data: booking } = await supabase
-      .from('bookings')
-      .select('passenger_id')
-      .eq('trip_id', request.tripId)
-      .eq('passenger_id', user.id)
-      .single();
-
-    if (!trip && !booking) {
-      throw new Error('Not authorized to send messages in this trip');
-    }
-
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        trip_id: request.tripId,
-        sender_id: user.id,
+    const response = await apiPost<{ message: Message }>(
+      `/v1/chat/trips/${encodeURIComponent(request.tripId)}/messages`,
+      {
         content: request.content,
-        type: request.type || 'text',
-        metadata: request.metadata || {},
-        read_by: [user.id],
-      })
-      .select(
-        'id, trip_id, sender_id, content, type, metadata, read_by, created_at, sender:profiles(id, full_name, avatar_url)',
-      )
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return data as unknown as Message;
+        type: request.type ?? 'text',
+        metadata: request.metadata ?? {},
+      },
+    );
+    return response.message;
   }
 
   async getMessages(tripId: string, limit = 50): Promise<Message[]> {
-    if (!supabase) {throw new Error('Supabase not configured');}
-    const { data, error } = await supabase
-      .from('messages')
-      .select(
-        'id, trip_id, sender_id, content, type, metadata, read_by, created_at, sender:profiles(id, full_name, avatar_url)',
-      )
-      .eq('trip_id', tripId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      throw error;
-    }
-
-    return (data as unknown as Message[]).reverse();
+    const response = await apiGet<{ messages: Message[] }>(
+      `/v1/chat/trips/${encodeURIComponent(tripId)}/messages`,
+      { limit: Math.min(100, Math.max(1, Math.floor(limit))) },
+    );
+    return Array.isArray(response.messages) ? response.messages : [];
   }
 
   async markAsRead(messageIds: string[]): Promise<void> {
-    if (!supabase) {throw new Error('Supabase not configured');}
-    const sb = supabase;
-    const {
-      data: { user },
-    } = await sb.auth.getUser();
-
-    if (!user) {
-      throw new Error('Not authenticated');
-    }
-
-    if (messageIds.length === 0) {return;}
-
-    const { data: messages, error } = await supabase
-      .from('messages')
-      .select('id, read_by')
-      .in('id', messageIds);
-
-    if (error || !messages) {return;}
-
-    const messageRows = (messages ?? []) as MessageReadRow[];
-    const messagesToUpdate = messageRows.filter(
-      message => !(message.read_by ?? []).includes(user.id),
-    );
-
-    if (messagesToUpdate.length === 0) {return;}
-
-    const BATCH_SIZE = 10;
-    for (let i = 0; i < messagesToUpdate.length; i += BATCH_SIZE) {
-      const batch = messagesToUpdate.slice(i, i + BATCH_SIZE);
-      await Promise.all(
-        batch.map(message =>
-          sb
-            .from('messages')
-            .update({
-              read_by: [...(message.read_by ?? []), user.id],
-            })
-            .eq('id', message.id),
-        ),
-      );
-    }
+    const ids = [...new Set(messageIds.map(String).filter(Boolean))].slice(0, 100);
+    if (!ids.length) {return;}
+    await apiPost('/v1/chat/messages/read', { messageIds: ids });
   }
 
   subscribeToTrip(
@@ -173,17 +85,9 @@ class ChatService {
         },
         async (payload: { new: { id: string } }) => {
           try {
-            const { data } = await sb
-              .from('messages')
-              .select(
-                'id, trip_id, sender_id, content, type, metadata, read_by, created_at, sender:profiles(id, full_name, avatar_url)',
-              )
-              .eq('id', payload.new.id)
-              .single();
-
-            if (data) {
-              onMessage(data as unknown as Message);
-            }
+            const messages = await this.getMessages(tripId, 100);
+            const message = messages.find(item => item.id === payload.new.id);
+            if (message) {onMessage(message);}
           } catch {
             // Non-fatal: message fetch failed after realtime insert.
           }
@@ -204,22 +108,10 @@ class ChatService {
   }
 
   async getUnreadCount(tripId: string): Promise<number> {
-    if (!supabase) {throw new Error('Supabase not configured');}
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return 0;
-    }
-
-    const { count } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('trip_id', tripId)
-      .not('read_by', 'cs', `{${user.id}}`);
-
-    return count || 0;
+    const response = await apiGet<{ count: number }>(
+      `/v1/chat/trips/${encodeURIComponent(tripId)}/unread-count`,
+    );
+    return Math.max(0, Number(response.count) || 0);
   }
 }
 

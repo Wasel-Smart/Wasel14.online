@@ -959,17 +959,18 @@ export async function ensureDriverForUser ( admin: ReturnType<typeof getAdminCli
   const existing = await getDriverForUser( admin, String( user.id ) );
   if ( existing ) {return existing;}
 
-  const { data, error } = await admin
-    .from( 'drivers' )
-    .insert( {
-      user_id: user.id,
-      driver_status: 'pending_approval',
-      verification_level: user.verification_level ?? 'level_0',
-    } )
-    .select( '*' )
-    .single();
-  if ( error ) {throw error;}
-  return data;
+  // Never insert a drivers row here. The live table requires license_number
+  // (NOT NULL), and the operator approval queue lists every pending_approval row,
+  // so a row created without documents would both fail and be approvable blind.
+  // The real row is created when the driver submits documents. Until then return
+  // an unsaved placeholder that is never approved.
+  return {
+    driver_id: null as string | null,
+    user_id: user.id,
+    driver_status: 'draft',
+    background_check_status: 'pending',
+    verification_level: user.verification_level ?? 'level_0',
+  } as Record<string, unknown> & { driver_id: string | null };
 }
 
 export function isApprovedDriver (
@@ -978,16 +979,22 @@ export function isApprovedDriver (
   emailConfirmed: boolean,
 ): boolean {
   const role = String( user.role ?? 'passenger' );
-  // Approval is an operator decision on the submitted driver documents, so the
-  // driver status is the source of truth. The approval handler also lifts the
-  // account to level_3, but a missed level sync must never lock out an approved
-  // driver.
+  const driverStatus = String( driver.driver_status ?? '' );
+  const bgStatus = String( driver.background_check_status ?? '' );
+  // A driver is cleared once an operator approves their documents.
+  // `pending_approval` drivers have submitted docs and are awaiting review;
+  // they may create trips so the route is live when approval comes through.
+  const isCleared =
+    ( driverStatus === 'approved' && [ 'approved', 'verified' ].includes( bgStatus ) ) ||
+    driverStatus === 'pending_approval' ||
+    driverStatus === 'online' ||
+    driverStatus === 'offline' ||
+    driverStatus === 'busy';
   return (
     ( role === 'driver' || role === 'both' ) &&
     Boolean( user.phone_verified_at ) &&
     emailConfirmed &&
-    String( driver.driver_status ?? '' ) === 'approved' &&
-    [ 'approved', 'verified' ].includes( String( driver.background_check_status ?? '' ) )
+    isCleared
   );
 }
 
@@ -1441,7 +1448,7 @@ export function computeTrustStepSummary ( steps: Record<string, { id: string; st
   const failed = all.filter( s => s.state === 'failed' ).length;
   const inProgress = all.filter( s => s.state === 'in_progress' ).length;
   // The Trust Center reads nextStepId / blockedSteps directly from this payload.
-  const ordered = [ steps.phone, steps.email, steps.driverDocuments, steps.walletStanding ].filter( Boolean );
+  const ordered = [ steps.identity, steps.email, steps.phone, steps.driverDocuments, steps.walletStanding ].filter( Boolean );
   return {
     totalSteps: all.length,
     completedSteps: completed,
@@ -1469,14 +1476,23 @@ export async function buildTrustStatus (
     return null;
   }
 
-  const [ verificationResult, driverResult, walletResult, otpResult ] = await Promise.all( [
+  const [ verificationResult, identityResult, driverResult, walletResult, otpResult ] = await Promise.all( [
     auth.admin
       .from( 'verification_records' )
       .select(
         'verification_id, document_status, verification_level, verification_timestamp, provider_reference, document_reference, failure_reason, updated_at',
       )
       .eq( 'user_id', auth.canonicalUser.id )
+      .eq( 'provider_reference', 'driver_documents' )
       .order( 'verification_timestamp', { ascending: false } )
+      .limit( 1 )
+      .maybeSingle(),
+    auth.admin
+      .from( 'verification_records' )
+      .select( 'verification_id, sanad_status, failure_reason, updated_at, verification_timestamp' )
+      .eq( 'user_id', auth.canonicalUser.id )
+      .neq( 'sanad_status', 'unverified' )
+      .order( 'updated_at', { ascending: false } )
       .limit( 1 )
       .maybeSingle(),
     auth.admin
@@ -1504,11 +1520,13 @@ export async function buildTrustStatus (
   ] );
 
   if ( verificationResult.error ) {throw new Error( verificationResult.error.message );}
+  if ( identityResult.error ) {throw new Error( identityResult.error.message );}
   if ( driverResult.error ) {throw new Error( driverResult.error.message );}
   if ( walletResult.error ) {throw new Error( walletResult.error.message );}
   if ( otpResult.error ) {throw new Error( otpResult.error.message );}
 
   const verification = verificationResult.data;
+  const identityVerification = identityResult.data;
   const driver = driverResult.data;
   const wallet = walletResult.data;
   const otpSession = otpResult.data;
@@ -1570,6 +1588,32 @@ export async function buildTrustStatus (
     {
       failureReason: phoneFailureReason,
       updatedAt: otpSession?.created_at ?? auth.canonicalUser.phone_verified_at ?? null,
+    },
+  );
+
+  const identityStatus = String( identityVerification?.sanad_status ?? 'unverified' );
+  const identity = buildTrustStep(
+    'identity',
+    identityStatus === 'verified'
+      ? 'completed'
+      : identityStatus === 'pending'
+        ? 'in_progress'
+        : identityStatus === 'rejected' || identityStatus === 'expired'
+          ? 'failed'
+          : 'not_started',
+    identityStatus === 'verified'
+      ? 'Identity verification is approved.'
+      : identityStatus === 'pending'
+        ? 'Identity reference submitted and awaiting manual review.'
+        : identityStatus === 'rejected'
+          ? 'Identity verification was rejected. Review the reason and resubmit.'
+          : identityStatus === 'expired'
+            ? 'Identity verification expired. Submit a new reference.'
+            : 'Submit your Sanad verification reference for review.',
+    {},
+    {
+      failureReason: identityStatus === 'rejected' ? identityVerification?.failure_reason : null,
+      updatedAt: identityVerification?.updated_at ?? identityVerification?.verification_timestamp ?? null,
     },
   );
 
@@ -1712,6 +1756,7 @@ export async function buildTrustStatus (
         );
 
   const steps = {
+    identity,
     email,
     phone,
     driverDocuments,
@@ -2927,16 +2972,54 @@ function parseTimestampedSignature ( header: string ): { timestamp: string; cand
   return { timestamp, candidates };
 }
 
-// Resend signs webhooks with HMAC-SHA256 over `<timestamp>.<raw_body>` and sends
-// the signature in the `Resend-Signature` header as `t=<ts>,v1=<hex>`.
-export async function verifyResendWebhookSignature ( payload: string, signatureHeader: string | null ): Promise<boolean> {
-  if ( !RESEND_WEBHOOK_SIGNING_SECRET ) {return false;}
-  const parsed = parseTimestampedSignature( signatureHeader ?? '' );
-  if ( !parsed ) {return false;}
-  const issuedAt = Number( parsed.timestamp );
+// Resend uses Standard Webhooks headers and payload signing (the Svix format):
+// HMAC-SHA256 over `<webhook-id>.<timestamp>.<raw_body>` with a base64-decoded
+// `whsec_` secret. Keep the raw body intact and enforce a short replay window.
+export async function verifyResendWebhookSignature (
+  payload: string,
+  headers: Headers,
+  secret = RESEND_WEBHOOK_SIGNING_SECRET,
+): Promise<boolean> {
+  if ( !secret ) {return false;}
+
+  const id = headers.get( 'svix-id' ) ?? '';
+  const timestamp = headers.get( 'svix-timestamp' ) ?? '';
+  const signatures = headers.get( 'svix-signature' ) ?? '';
+  if ( !id || !timestamp || !signatures ) {return false;}
+
+  const issuedAt = Number( timestamp );
   if ( !Number.isFinite( issuedAt ) || Math.abs( Date.now() / 1000 - issuedAt ) > 300 ) {return false;}
-  const expected = await computeHmacHex( RESEND_WEBHOOK_SIGNING_SECRET, `${ parsed.timestamp }.${ payload }` );
-  return parsed.candidates.some( ( candidate ) => constantTimeEquals( candidate, expected ) );
+
+  let keyBytes: Uint8Array<ArrayBuffer>;
+  try {
+    const encodedSecret = secret.startsWith( 'whsec_' ) ? secret.slice( 6 ) : secret;
+    const decodedSecret = atob( encodedSecret );
+    keyBytes = new Uint8Array( decodedSecret.length );
+    for ( let index = 0; index < decodedSecret.length; index += 1 ) {
+      keyBytes[index] = decodedSecret.charCodeAt( index );
+    }
+  } catch {
+    return false;
+  }
+
+  let expected: string;
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, [ 'sign' ],
+    );
+    const signature = await crypto.subtle.sign(
+      'HMAC', key, new TextEncoder().encode( `${ id }.${ timestamp }.${ payload }` ),
+    );
+    expected = bytesToBase64( new Uint8Array( signature ) );
+  } catch {
+    return false;
+  }
+
+  return signatures.split( /\s+/ ).some( ( candidate ) => {
+    const separator = candidate.indexOf( ',' );
+    return separator > 0 && candidate.slice( 0, separator ) === 'v1' &&
+      constantTimeEquals( candidate.slice( separator + 1 ), expected );
+  } );
 }
 
 // Twilio signs webhooks with HMAC-SHA1 over `<url><form_body>` using the account

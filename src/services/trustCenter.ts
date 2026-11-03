@@ -183,7 +183,10 @@ export async function enableTrustDriverMode () {
         context,
         operation: 'Driver mode enablement',
       } ),
-    fallback: context => enableDirectTrustDriverMode( context.userId ?? '' ),
+    fallback: async context => {
+      const userId = context.userId ?? ( await getTrustUserId() );
+      return enableDirectTrustDriverMode( userId );
+    },
   } );
 
   return response;

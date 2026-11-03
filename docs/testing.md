@@ -9,7 +9,11 @@ Wasel uses a three-layer testing strategy:
 | E2E | Playwright | User journeys, browser verification | `npm run test:e2e` |
 | Load | k6 | Performance under load | `npm run test:load:smoke` |
 
-## Coverage Requirements
+## Coverage Floors and Targets
+
+CI currently enforces ratchet floors of 14% branches, 17% functions, 21% lines,
+and 20% statements. Those floors prevent coverage from regressing but are not a
+claim that the test suite is comprehensive. The long-term targets are higher:
 
 ```
 Branches:   75%
@@ -19,6 +23,11 @@ Statements: 85%
 ```
 
 Run with coverage: `npm run test:unit -- --coverage`
+
+Coverage output is evidence about executed code paths, not proof that behavior is
+correct. Prioritize additional tests for authentication, authorization, payment
+settlement, wallet ledger invariants, and driver approval before raising the CI
+floors. Never lower the floors to make a failing change pass.
 
 ## Writing Tests
 

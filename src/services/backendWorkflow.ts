@@ -9,7 +9,7 @@ import {
 import { isCircuitBreakerOpenError } from '../utils/circuitBreaker';
 
 export type BackendAuthMode = 'none' | 'public' | 'required';
-export type FallbackPolicy = 'always' | 'writes-if-enabled' | 'never';
+export type FallbackPolicy = 'always' | 'writes-if-enabled' | 'authenticated-rpc' | 'never';
 
 export interface BackendWorkflowContext {
   token?: string;
@@ -106,6 +106,10 @@ function resolveFallbackPolicy(
   operationType: 'read' | 'write',
 ): boolean {
   switch (policy ?? 'always') {
+    case 'authenticated-rpc':
+      // This policy is only for narrowly scoped RPCs that enforce caller
+      // identity and authorization in the database; it never enables table writes.
+      return operationType === 'write';
     case 'always':
       // 'always' with an explicit write operationType is still gated by the
       // env write-fallback flag so production deployments can lock down direct
@@ -256,7 +260,10 @@ export async function runBackendWorkflow<T>({
 }: BackendWorkflowOptions<T>): Promise<T> {
   const context = await resolveContext(authMode);
   const operationType: 'read' | 'write' =
-    explicitOperationType ?? (fallbackPolicy === 'writes-if-enabled' ? 'write' : 'read');
+    explicitOperationType ??
+    (fallbackPolicy === 'writes-if-enabled' || fallbackPolicy === 'authenticated-rpc'
+      ? 'write'
+      : 'read');
   const fallbackAllowed = Boolean(fallback) && resolveFallbackPolicy(fallbackPolicy, operationType);
 
   if (!edgeAvailable) {

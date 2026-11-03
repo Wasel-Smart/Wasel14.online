@@ -622,6 +622,11 @@ export interface Database {
     };
 
     Functions: {
+      app_enable_driver_mode: {
+        Args: {};
+        Returns: Json;
+      };
+
       match_alert_atomic: {
         Args: {
           p_alert_id: string;

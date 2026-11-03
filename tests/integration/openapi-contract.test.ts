@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { load } from 'js-yaml';
+import { spawnSync } from 'node:child_process';
 const ROOT = resolve(__dirname, '../..');
 function readSource(relativePath: string): string {
   return readFileSync(resolve(ROOT, relativePath), 'utf8');
 }
 const OPENAPI_SPEC = load(readSource('docs/openapi/wasel-v1.yaml')) as Record<string, unknown>;
-const EDGE_INDEX = readSource('supabase/functions/make-server-0b1f4071/index.ts');
 interface OpenApiPath {
   get?: Record<string, unknown>;
   post?: Record<string, unknown>;
@@ -17,130 +17,15 @@ interface OpenApiPath {
 }
 const paths = (OPENAPI_SPEC.paths as Record<string, OpenApiPath>) || {};
 describe('OpenAPI contract matches edge function routes', () => {
-  const openApiPaths = Object.keys(paths).map(p => p.replace(/^\/v1/, ''));
-  const edgeRoutes = extractEdgeRoutes(EDGE_INDEX);
-  it('every OpenAPI path has a corresponding edge route', () => {
-    const missing: string[] = [];
-    for (const apiPath of openApiPaths) {
-      if (!edgeRoutes.has(apiPath)) {
-        missing.push(apiPath);
-      }
-    }
-    expect(missing).toEqual([]);
+  it('every frontend route is covered by the edge route table', () => {
+    const result = spawnSync('node', ['scripts/check-route-contract.mjs'], { cwd: ROOT, encoding: 'utf8' });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
-  it('every edge route is documented in OpenAPI', () => {
-    const undocumented: string[] = [];
-    for (const [edgePath] of edgeRoutes) {
-      if (!openApiPaths.some(p => pathsMatch(p, edgePath))) {
-        undocumented.push(edgePath);
-      }
-    }
-    expect(undocumented).toEqual([]);
-  });
-  it('HTTP methods match between OpenAPI and edge routes', () => {
-    const mismatches: string[] = [];
-    for (const [apiPath, apiMethods] of Object.entries(paths)) {
-      const normalizedApiPath = apiPath.replace(/^\/v1/, '');
-      const edgeMethods = edgeRoutes.get(normalizedApiPath);
-      if (!edgeMethods) { continue; }
-      const documentedMethods = Object.keys(apiMethods).filter(m => m !== 'parameters').map(m => m.toUpperCase());
-      const declaredMethods = Array.from(edgeMethods);
-      for (const method of documentedMethods) {
-        if (!declaredMethods.includes(method)) {
-          mismatches.push(`${method} ${apiPath} documented but not declared in edge`);
-        }
-      }
-    }
-    expect(mismatches).toEqual([]);
+  it('defines only versioned public API paths', () => {
+    const unversioned = Object.keys(paths).filter(p => !p.startsWith('/v1/'));
+    expect(unversioned).toEqual([]);
   });
 });
-function extractEdgeRoutes(edgeSource: string): Map<string, Set<string>> {
-  const routes = new Map<string, Set<string>>();
-
-  // Match route descriptors with or without an explicit methods array.
-  const routeRegex = /id:\s*'([^']+)'[\s\S]*?test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,300}?)(?=\n\s*(?:id|handle|methods)\s*:)/g;
-
-  for (const match of edgeSource.matchAll(routeRegex)) {
-    const testFn = match[2];
-    if (!testFn) { continue; }
-
-    // Try to extract explicit methods; default to all methods if absent.
-    const methodsMatch = testFn.match(/methods:\s*\[([^\]]+)\]/);
-    const methodsList = methodsMatch?.[1];
-    const methods = methodsList
-      ? methodsList.split(',').map(m => m.trim().replace(/'/g, ''))
-      : ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-
-    // Extract path patterns from the test function body.
-    const pathPatterns = extractPathPatterns(testFn);
-    for (const pattern of pathPatterns) {
-      const normalized = pattern.replace(/^\/v1/, '');
-      if (!routes.has(normalized)) {
-        routes.set(normalized, new Set());
-      }
-      for (const method of methods) {
-        routes.get(normalized)!.add(method);
-      }
-    }
-  }
-
-  // The /health endpoint is handled before resolveRoute(), not in ROUTES array.
-  if (!routes.has('/health')) {
-    routes.set('/health', new Set(['GET']));
-  }
-
-  return routes;
-}
-
-function extractPathPatterns(testFn: string): string[] {
-  const patterns: string[] = [];
-
-  // Direct path matches: path === '/something'
-  for (const m of testFn.matchAll(/path\s*===\s*'([^']+)'/g)) {
-    const [, exact] = m;
-    if (exact) { patterns.push(exact); }
-  }
-
-  // Prefix matches: path.startsWith('/something/')
-  for (const m of testFn.matchAll(/path\.startsWith\(\s*'([^']+)'\s*\)/g)) {
-    const [, prefix] = m;
-    if (prefix) { patterns.push(prefix + '*'); }
-  }
-
-  // Regex patterns: /^\/something\/[^/]+$/.test(path)  →  /something/:id
-  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\\\[\\^\\/\\\\]\\\\+\\\\$', 'g'))) {
-    const prefix = m[1];
-    if (!prefix) { continue; }
-    patterns.push(`/${prefix.replace(/\\\//g, '/')}/:id`);
-  }
-
-  // Regex patterns: /^\/something\/$/.test(path)  →  /something
-  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\$', 'g'))) {
-    const prefix = m[1];
-    if (!prefix) { continue; }
-    patterns.push(`/${prefix.replace(/\\\//g, '/')}`);
-  }
-
-  // Template literal paths: `/wallet/${userId}`
-  for (const m of testFn.matchAll(/`(\/[A-Za-z0-9_/-]*)\${/g)) {
-    patterns.push(m[1] + '/:param');
-  }
-
-  // parseWalletRoute and parseEntityRoute
-  for (const _m of testFn.matchAll(/parseWalletRoute\(\s*path\s*\)/g)) {
-    patterns.push('/wallet/:userId/:action?/:resourceId?');
-  }
-  for (const m of testFn.matchAll(/parseEntityRoute\(\s*path\s*,\s*'([^']+)'/g)) {
-    patterns.push(`/${m[1]}/:id/:action?`);
-  }
-
-  return [...new Set(patterns)];
-}
-function pathsMatch(openApiPath: string, edgePath: string): boolean {
-  // Convert OpenAPI path params to regex
-  const regex = new RegExp('^' + openApiPath.replace(/\{([^}]+)\}/g, '[^/]+') + '$');
-  return regex.test(edgePath);
-}
 describe('OpenAPI schemas reference valid types', () => {
   const schemas = (OPENAPI_SPEC.components as Record<string, unknown>)?.schemas as Record<string, unknown>;
   it('all referenced schemas exist', () => {

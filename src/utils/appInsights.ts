@@ -10,6 +10,7 @@ import {
     DistributedTracingModes,
 } from '@microsoft/applicationinsights-web';
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
+import { hasAnalyticsConsent } from './analyticsConsent';
 
 let appInsights: ApplicationInsights | null = null;
 
@@ -57,6 +58,10 @@ function isUsableInstrumentationKey(value: string | undefined): value is string 
 }
 
 export function initializeAppInsights(): void {
+    if (!hasAnalyticsConsent()) {
+        return;
+    }
+
     // Prefer connection string (modern); fall back to instrumentation key (legacy).
     const connectionString = import.meta.env.VITE_APP_INSIGHTS_CONNECTION_STRING as string | undefined;
     const instrumentationKey = import.meta.env.VITE_APP_INSIGHTS_KEY as string | undefined;

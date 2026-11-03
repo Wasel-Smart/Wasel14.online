@@ -12,6 +12,7 @@ import { getCurrentScope } from '@sentry/core';
 import { createCorrelationId, createStructuredLogEntry } from '../platform/observability';
 import { sanitizeLogMessage } from './sanitization';
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
+import { hasAnalyticsConsent } from './analyticsConsent';
 
 // @sentry/core's Scope type does not declare setMeasurement, but some runtime
 // builds expose it. Model it as optional so the call stays a safe no-op where
@@ -78,18 +79,19 @@ export async function initSentry(): Promise<void> {
   sentryInitializationStarted = true;
 
   try {
+    const analyticsConsent = hasAnalyticsConsent();
     const integrations = [
       browserTracingIntegration(),
-      replayIntegration({ maskAllText: true, blockAllMedia: true }),
+      ...( analyticsConsent ? [ replayIntegration( { maskAllText: true, blockAllMedia: true } ) ] : [] ),
     ];
 
     sentryInit({
       dsn,
       environment,
       integrations,
-      tracesSampleRate: environment === 'production' ? 0.1 : 1,
-      replaysSessionSampleRate: environment === 'production' ? 0.05 : 0,
-      replaysOnErrorSampleRate: 1.0,
+      tracesSampleRate: analyticsConsent ? ( environment === 'production' ? 0.1 : 1 ) : 0,
+      replaysSessionSampleRate: analyticsConsent && environment === 'production' ? 0.05 : 0,
+      replaysOnErrorSampleRate: analyticsConsent ? 1 : 0,
       release: `wasel@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
       ignoreErrors: [
         'ResizeObserver loop limit exceeded',

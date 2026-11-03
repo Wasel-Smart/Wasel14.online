@@ -7,9 +7,9 @@
  * `_handlers/shared.ts` reads every secret at module scope, so the environment is
  * frozen on first import. These cases need the secrets *absent*, which is
  * incompatible with the signature suites in `webhooks.test.ts` sharing one module
- * graph. Deno gives each test file its own module graph under `--parallel`
- * (which `scripts/run-edge-tests.mjs` passes), so keeping them in a separate file
- * makes both suites meaningful instead of order-dependent.
+ * graph. `scripts/run-edge-tests.mjs` executes each suite in a separate process,
+ * so keeping them in a separate file makes the cases meaningful instead of
+ * order-dependent.
  */
 
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
@@ -19,7 +19,6 @@ for (
     'STRIPE_WEBHOOK_SECRET',
     'CLIQ_WEBHOOK_SECRET',
     'JOPACC_WEBHOOK_SECRET',
-    'SANAD_WEBHOOK_SECRET',
     'SUPABASE_AUTH_HOOK_SEND_SMS_SECRET',
     'SEND_SMS_HOOK_SECRET',
   ]
@@ -35,7 +34,7 @@ function makeRequest(path: string, body: string): Request {
   });
 }
 
-const { handleStripeWebhook, handleCliqWebhook, handleSanadWebhook, handleSendSmsHook } = await import(
+const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook } = await import(
   '../make-server-0b1f4071/_handlers/webhooks.ts'
 );
 
@@ -46,11 +45,6 @@ Deno.test('handleStripeWebhook — 503 when secret not configured', async () => 
 
 Deno.test('handleCliqWebhook — 503 when secret not configured', async () => {
   const res = await handleCliqWebhook(makeRequest('/payments/webhooks/cliq', '{}'));
-  assertEquals(res.status, 503);
-});
-
-Deno.test('handleSanadWebhook — 503 when secret not configured', async () => {
-  const res = await handleSanadWebhook(makeRequest('/trust/webhooks/sanad', '{}'));
   assertEquals(res.status, 503);
 });
 

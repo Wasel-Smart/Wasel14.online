@@ -35,6 +35,7 @@ function createMockQueryBuilder () {
 vi.mock( '../directSupabase/helpers', () => {
   const mockDb = {
     from: vi.fn( ( _table: string ) => createMockQueryBuilder() ),
+    rpc: vi.fn(),
   };
 
   return {
@@ -274,20 +275,25 @@ describe( 'Direct Trust Driver Mode', () => {
   } );
 
   it( 'enables driver mode', async () => {
-    mockBuildUserContext.mockResolvedValue( { user: { id: 'user-123', role: 'rider' } } );
-
-    mockDb.from.mockImplementation( ( table: string ) => {
-      const builder = createMockQueryBuilder();
-      if ( table === 'users' ) {
-        builder.single.mockResolvedValue( { data: { id: 'user-123', role: 'rider' }, error: null } );
-      }
-      return builder;
-    } );
+    mockDb.rpc.mockResolvedValue( { data: { enabled: true, role: 'driver' }, error: null } );
 
     const { enableDirectTrustDriverMode } = await import( '../directSupabase/trust' );
     const result = await enableDirectTrustDriverMode( 'user-123' );
     expect( result.enabled ).toBe( true );
     expect( result.role ).toBe( 'driver' );
+    expect( mockDb.rpc ).toHaveBeenCalledWith( 'app_enable_driver_mode' );
+  } );
+
+  it( 'surfaces an RPC failure instead of claiming driver mode is enabled', async () => {
+    mockDb.rpc.mockResolvedValue( {
+      data: null,
+      error: new Error( 'Driver mode is unavailable for this account.' ),
+    } );
+
+    const { enableDirectTrustDriverMode } = await import( '../directSupabase/trust' );
+    await expect( enableDirectTrustDriverMode( 'user-123' ) ).rejects.toThrow(
+      'Driver mode is unavailable for this account.',
+    );
   } );
 } );
 

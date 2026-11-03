@@ -2,12 +2,14 @@
 
 This folder contains all Supabase SQL migrations for the Wasel platform.
 
-## Important Rules
+## Rules
 
-1. Never edit an existing migration file once it has been applied.
+1. Never edit an existing migration file once it has been applied to any environment.
 2. Always create a new file for schema changes using the timestamp naming convention below.
-3. Test migrations locally against a Supabase dev project before running on production.
-4. Migrations run in filename order.
+3. Test migrations locally against a Supabase dev project before running on staging or production.
+4. Migrations run in filename (lexicographic) order — timestamps must be unique.
+5. Every migration must have a corresponding rollback script in `rollback/`.
+6. Every migration that modifies data or drops objects must be wrapped in `BEGIN`/`COMMIT`.
 
 ---
 
@@ -17,151 +19,133 @@ This folder contains all Supabase SQL migrations for the Wasel platform.
 YYYYMMDDHHMMSS_short_description.sql
 ```
 
-Example: `20260401120000_add_driver_rating_column.sql`
+Example: `20261101000000_trips_column_normalization.sql`
+
+Rollback files mirror the forward migration name:
+
+```text
+rollback/YYYYMMDDHHMMSS_short_description_rollback.sql
+```
+
+**Important:** Two files must never share the same `YYYYMMDDHHMMSS` prefix. The Supabase CLI
+records migrations by the numeric version; a duplicate version causes the second file to be
+silently skipped or to error. If a collision is discovered after the fact, re-apply the
+affected content under a new unique timestamp (see migration 20261102000000 for an example).
 
 ---
 
-## Applied Migration Sequence
+## Linked Project Migration State (verified 2026-11-03)
 
-| # | File | Description | Status |
-|---|------|-------------|--------|
-| 01 | `20260210000000_baseline_schema.sql` | **Canonical baseline** — single clean definition of all core tables, enums, functions, triggers, RLS, and grants. Replaces 14 overlapping source migrations with no duplicate table definitions and no conflicting column names. | Applied |
-| 11 | `20260326080000_legacy_public_table_cutover.sql` | Preserve conflicting legacy public tables before canonical runtime tables are created | Ready |
-| 12 | `20260327090000_production_operating_model.sql` | Operating model, pricing, and service workflows | Ready |
-| 13 | `20260327110000_notifications_runtime_contract.sql` | Canonical notifications runtime table aligned with current app usage | Ready |
-| 14 | `20260401093000_database_hardening.sql` | Integrity constraints, default-payment safety, and audit indexes | Ready |
-| 15 | `20260401113000_unified_backend_contract.sql` | Canonical user backfill, auth sync trigger, and 2FA fields | Ready |
-| 16 | `20260401133000_align_canonical_rls_policies.sql` | Explicit canonical insert/update/delete policies aligned with app fallback paths | Ready |
-| 17 | `20260401143000_harden_rpc_execute_permissions.sql` | Restrict privileged RPC execution and set safe search paths on security-definer functions | Ready |
-| 18 | `20260401183000_growth_and_demand_alerts.sql` | Demand capture persistence for ride, bus, and package growth flows | Ready |
-| 19 | `20260401193000_referrals_and_growth_events.sql` | Referral attribution and growth event persistence | Ready |
-| 20 | `20260401213000_expand_runtime_contract_tables.sql` | Add the remaining trip, booking, and package columns required by the live app runtime contract | Ready |
-| 21 | `20260401223000_communications_runtime_contract.sql` | Persist communication preferences and outbound delivery queue rows | Ready |
-| 22 | `20260401233000_communication_delivery_operations.sql` | Add retries, idempotency, and processor operation fields for outbound communications | Ready |
-| 23 | `20260402000000_database_hardening_complete.sql` | Audit logging, soft delete, versioning, enhanced constraints, and data retention | Ready |
-| 24 | `20260402010000_gdpr_compliance_schema.sql` | GDPR compliance: user consents, data export, and deletion requests | Ready |
-| 25 | `20260512000000_database_excellence_upgrade.sql` | 9.5/10 upgrade: PostGIS spatial indexes, secure views, rate limiting, covering indexes, anonymization, and monitoring | Applied |
-| 26 | `20260513000000_production_readiness_final.sql` | 10.0/10: Wire rate limiting into RPCs, automate retention enforcement, add production safeguards and monitoring | Applied |
+The linked project history was queried with `supabase migration list --linked`, and
+the missing remote migration files were fetched with `supabase migration fetch --linked`.
+This exposed a real mismatch between the repository and the linked database. This
+section supersedes any earlier “Applied” labels in this file.
+
+Remote history includes `20260125000000`, `20260320000000`, `20260326080000`,
+`20260327090000`, `20260327110000`, `20260401093000`, `20260401113000`,
+`20260401133000`, `20260401143000`, the four `20260720*` migrations, and the four
+`20261009*` migrations. The exact scripts for these versions are present locally now.
+
+The CLI reports local-only versions `20260210000000`, `20261017000000`,
+`20261018000000` (two files collide on this version), `20261019000000`,
+`20261019000001`, `20261019000002`, `20261028000000`, `20261101000000`,
+`20261101000001`, `20261102000000`, and `20261103000000`. It also reports
+`20260302` and `20260310` as unmatched on both sides despite local files with those
+names. **Do not run `supabase db push` from this checkout** until the migration
+history, duplicate version, and local-only changes have been reconciled against a
+backup and reviewed plan. No migrations were applied during this audit.
+
+Treat migration history on the linked project as authoritative. Do not use the
+consolidated `20260210000000_baseline_schema.sql` as a production reset/cutover on
+an existing project: it is not in the linked project's applied migration history.
 
 ---
 
-## Live Cutover Sequence
+## Rollback Coverage
 
-For older production projects that still have legacy `public.users`, `public.trips`,
-`public.bookings`, or `public.vehicles` tables, apply the runtime cutover in this order:
+Every migration has a corresponding rollback script:
 
-1. `20260326080000_legacy_public_table_cutover.sql`
-2. `20260327090000_production_operating_model.sql`
-3. `20260327110000_notifications_runtime_contract.sql`
-4. `20260401093000_database_hardening.sql`
-5. `20260401113000_unified_backend_contract.sql`
-6. `20260401133000_align_canonical_rls_policies.sql`
-7. `20260401143000_harden_rpc_execute_permissions.sql`
-8. `20260401183000_growth_and_demand_alerts.sql`
-9. `20260401193000_referrals_and_growth_events.sql`
-10. `20260401213000_expand_runtime_contract_tables.sql`
-11. `20260401223000_communications_runtime_contract.sql`
-12. `20260401233000_communication_delivery_operations.sql`
-13. `20260402000000_database_hardening_complete.sql`
-14. `20260402010000_gdpr_compliance_schema.sql`
-15. `20260512000000_database_excellence_upgrade.sql`
-16. `20260513000000_production_readiness_final.sql`
-17. `supabase/seeds/mock_engine_launch_pack.sql`
-18. `supabase/seeds/mock_engine_smoke_checks.sql`
+| Migration | Rollback Script |
+|-----------|----------------|
+| `20260210000000_baseline_schema.sql` | `rollback/20260210000000_baseline_schema_rollback.sql` |
+| `20260401093000_database_hardening.sql` | *(additive constraints only — drop constraints to revert)* |
+| `20261017000000_rls_price_and_view_hardening.sql` | `rollback/20261017_rls_price_and_view_hardening_rollback.sql` |
+| `20261018000000_fix_profiles_rls_soft_delete.sql` | `rollback/20261018_fix_profiles_rls_soft_delete_rollback.sql` |
+| `20261018000000_lock_communication_delivery_client_inserts.sql` | `rollback/20261018_lock_communication_delivery_client_inserts_rollback.sql` |
+| `20261019000000_materialize_user_stats.sql` | `rollback/20261019000000_materialize_user_stats_rollback.sql` |
+| `20261019000001_fix_unique_active_booking_constraint.sql` | `rollback/20261019000001_fix_unique_active_booking_constraint_rollback.sql` |
+| `20261019000002_ledger_wallet_balance.sql` | `rollback/20261019000002_ledger_wallet_balance_rollback.sql` |
+| `20261028000000_close_wallet_pin_hash_client_access.sql` | `rollback/20261028000000_close_wallet_pin_hash_client_access_rollback.sql` |
+| `20261101000000_trips_column_normalization.sql` | `rollback/20261101000000_trips_column_normalization_rollback.sql` |
+| `20261101000001_ledger_drift_alert_and_schema_health.sql` | `rollback/20261101000001_ledger_drift_alert_and_schema_health_rollback.sql` |
+| `20261102000000_schema_hygiene_completeness.sql` | `rollback/20261102000000_schema_hygiene_completeness_rollback.sql` |
 
-### Post-migration validation steps
+---
 
-```sql
--- 1. Validate constraints (no table lock, can run during business hours)
-ALTER TABLE public.users VALIDATE CONSTRAINT users_phone_e164_format;
-ALTER TABLE public.bookings VALIDATE CONSTRAINT bookings_amount_matches_calculation;
-ALTER TABLE public.transactions VALIDATE CONSTRAINT transactions_metadata_is_object;
+## Applying migrations safely
 
--- 2. Verify rate limiting works
-SELECT public.check_rate_limit(
-  (SELECT id FROM public.users LIMIT 1),
-  'test_operation',
-  3,  -- max 3 attempts
-  15  -- per 15 minutes
-);
+There is no valid production cutover sequence documented yet. First reconcile local
+and remote migration versions, resolve the duplicate `20261018000000` prefix, review
+every local-only migration against the current remote schema, and test the ordered
+result on a disposable project restored from a production backup. Only then prepare
+a separate reviewed deployment plan. `supabase db push` is deliberately not part of
+this development task.
 
--- 3. Test retention enforcement (dry run)
-SELECT * FROM public.enforce_retention_policies();
-
--- 4. Check system health
-SELECT * FROM v_system_health ORDER BY severity DESC;
-
--- 5. Review deployment checklist
-SELECT * FROM deployment_checklist WHERE NOT completed ORDER BY item_name;
-```
-
-### Automated scheduling options
-
-**Option A: pg_cron (recommended for Supabase Pro+)**
+### Post-migration validation
 
 ```sql
--- Already configured in migration if pg_cron is available
--- Verify schedules:
-SELECT * FROM cron.job;
-```
+-- 1. Run the production readiness audit (read-only).
+--    Expected: zero HIGH rows.
+\i supabase/ops/production-readiness-audit.sql
 
-**Option B: Supabase Edge Function (for all tiers)**
+-- 2. Run the client privilege probe (read-only).
+--    Expected: zero rows on queries 2, 4, 5.
+\i supabase/ops/audit_client_privileges.sql
 
-```typescript
-// supabase/functions/scheduled-maintenance/index.ts
-import { createClient } from "@supabase/supabase-js"
+-- 3. Verify all SECURITY DEFINER functions have search_path pinned.
+SELECT p.oid::regprocedure AS function
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.prosecdef
+  AND NOT EXISTS (
+    SELECT 1 FROM unnest(COALESCE(p.proconfig, '{}'::text[])) cfg
+    WHERE cfg LIKE 'search_path=%'
+  );
+-- Expected: zero rows.
 
-Deno.serve(async (req) => {
-  const authHeader = req.headers.get("Authorization")
-  if (authHeader !== `Bearer ${Deno.env.get("CRON_SECRET")}`) {
-    return new Response("Unauthorized", { status: 401 })
-  }
+-- 4. Verify all views are SECURITY INVOKER.
+SELECT relname AS view_name
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relkind = 'v'
+  AND NOT COALESCE(c.reloptions::text, '') LIKE '%security_invoker=true%';
+-- Expected: only views that are intentionally owner-rights (document each one).
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  )
+-- 5. Verify no table in public has RLS disabled.
+SELECT relname FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity;
+-- Expected: zero rows.
 
-  // Run retention enforcement
-  const { data: retention } = await supabase.rpc("enforce_retention_policies")
-  
-  // Refresh statistics
-  await supabase.rpc("refresh_statistics")
+-- 6. Verify wallet ledger integrity.
+SELECT * FROM public.reconcile_wallet_balances(false);
+-- Expected: zero rows (no drift).
 
-  return new Response(JSON.stringify({ retention }), {
-    headers: { "Content-Type": "application/json" }
-  })
-})
-```
-
-**Option C: GitHub Actions (external scheduler)**
-
-```yaml
-# .github/workflows/db-maintenance.yml
-name: Database Maintenance
-on:
-  schedule:
-    - cron: '0 2 * * *'  # Daily at 2 AM UTC
-
-jobs:
-  maintenance:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run retention policies
-        run: |
-          curl -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/enforce_retention_policies" \
-            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+-- 7. Check schema health view.
+SELECT * FROM public.v_schema_health ORDER BY status DESC;
+-- Expected: all rows show status = 'ok' or 'unknown' (never 'alert' or 'stale').
 ```
 
 ---
 
 ## Schema Design Notes
 
-- The `trips` table carries both the carpool column set (`from_location`, `to_location`, `departure_date DATE`, `departure_time TIME`) and the on-demand column set (`origin`, `destination`, `departure_timestamptz TIMESTAMPTZ`). Both sets are populated by their respective service paths; neither is removed to preserve backward compatibility with existing queries.
+- The `trips` table previously carried three overlapping coordinate column sets accumulated across migration passes. Migration `20261101000000` dropped the redundant alias columns (`origin_lat/lng`, `destination_lat/lng`, `origin`, `destination`). The canonical columns are `from_lat/from_lng`, `to_lat/to_lng`, and the derived GEOGRAPHY columns `from_location_geom`/`to_location_geom` kept in sync by `trg_sync_trip_geography`.
+- `GRANT` statements are explicit per-table (enforced by `20261101000000`). The broad `GRANT … ON ALL TABLES IN SCHEMA public TO authenticated` has been revoked. New tables are denied to `authenticated` by default (fail-closed) until an explicit grant is added.
+- All `SECURITY DEFINER` functions must include `SET search_path = public, pg_temp` as a function attribute (not inside the body). This is enforced by `20261102000000` and verified by the post-migration query above.
+- All views that expose user data must be created with `WITH (security_invoker = true)` so RLS applies to the calling role, not the view owner.
 - All `updated_at` triggers use a single `update_updated_at_column()` function — no duplicate definitions.
-- `GRANT` statements are explicit per-table. The previous `GRANT ... ON ALL TABLES IN SCHEMA public TO authenticated` has been removed.
-- Future migrations must use full `YYYYMMDDHHMMSS` timestamps to avoid collisions.
+- Future migrations must use full `YYYYMMDDHHMMSS` timestamps and must never reuse an existing prefix.
 
 ---
 
@@ -174,7 +158,7 @@ supabase db push
 Or manually:
 
 ```bash
-psql "$SUPABASE_DB_URL" -f migrations/20260401120000_my_change.sql
+psql "$SUPABASE_DB_URL" -f migrations/20261101000000_my_change.sql
 ```
 
 ## Seed Packs
@@ -190,8 +174,10 @@ Mock engine seed assets live in `supabase/seeds/`.
 
 | File | Purpose |
 |------|---------|
-| `schema.sql` | Full current schema snapshot for reference only |
+| `schema.sql` | Full current schema snapshot for reference only — not applied by the CLI |
 | `ai_schema.sql` | AI and intelligence layer schema reference |
+| `supabase/ops/production-readiness-audit.sql` | Read-only security audit — run against production before any release |
+| `supabase/ops/audit_client_privileges.sql` | Read-only client privilege probe — run against production after any grant change |
 
 ---
 
@@ -200,5 +186,8 @@ Mock engine seed assets live in `supabase/seeds/`.
 Supabase does not support automatic rollbacks. Before any destructive migration:
 
 1. Take a manual backup from the Supabase dashboard.
-2. Prepare a compensating migration that undoes the change.
-3. Keep the rollback migration ready before production rollout.
+2. Prepare and test the compensating rollback script.
+3. Keep the rollback script ready before production rollout.
+4. Execute rollbacks in **reverse order** of the forward migrations.
+
+See `ROLLBACK_STRATEGY.md` for the full dependency graph and risk assessments.

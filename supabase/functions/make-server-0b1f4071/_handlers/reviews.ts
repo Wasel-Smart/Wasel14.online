@@ -26,7 +26,7 @@ import {
  * booking on this trip with this driver" instead.
  */
 
-const REVIEWABLE_BOOKING_STATUSES = [ 'confirmed', 'in_progress', 'completed' ];
+const REVIEWABLE_BOOKING_STATUSES = [ 'completed' ];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -42,8 +42,8 @@ async function resolveBookingForReview (
 ): Promise<Record<string, unknown> | null> {
   const { data, error } = await admin
     .from( 'bookings' )
-    .select( 'id, booking_id, user_id, trip_id, status, booking_status, created_at' )
-    .eq( 'user_id', userId )
+    .select( 'booking_id, passenger_id, trip_id, booking_status, created_at' )
+    .eq( 'passenger_id', userId )
     .order( 'created_at', { ascending: false } )
     .limit( 25 );
 
@@ -64,7 +64,7 @@ async function resolveBookingForReview (
   if ( tripReference && !UUID_PATTERN.test( tripReference ) ) {
     const shareCode = tripReference.slice( 0, 8 ).toUpperCase();
     const byShareCode = candidates.find( ( booking: Record<string, unknown> ) => (
-      String( booking.id ?? booking.booking_id ?? '' ).slice( 0, 8 ).toUpperCase() === shareCode
+      String( booking.booking_id ?? '' ).slice( 0, 8 ).toUpperCase() === shareCode
     ) );
     if ( byShareCode ) {return byShareCode;}
   }
@@ -85,11 +85,11 @@ async function isReviewableDriver (
   const { data: trip } = await admin
     .from( 'trips' )
     .select( 'driver_id' )
-    .or( `id.eq.${ tripId },trip_id.eq.${ tripId }` )
+    .eq( 'trip_id', tripId )
     .maybeSingle();
 
   const driverId = String( ( trip as Record<string, unknown> | null )?.driver_id ?? '' );
-  if ( !driverId ) {return true;}
+  if ( !driverId ) {return false;}
   if ( driverId === revieweeId ) {return true;}
 
   const { data: driver } = await admin

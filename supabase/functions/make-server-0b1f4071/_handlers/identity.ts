@@ -343,6 +343,7 @@ export async function handleSubmitDriverDocuments ( request: Request ) {
 
   const { error: verificationError } = await auth.admin.from( 'verification_records' ).insert( {
     user_id: auth.canonicalUser.id,
+    sanad_status: 'unverified',
     document_status: 'pending',
     verification_level: nextLevel,
     provider_reference: 'driver_documents',

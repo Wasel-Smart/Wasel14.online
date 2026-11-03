@@ -18,12 +18,8 @@ import {
 } from '../domain/rides/lifecycle';
 import { createDomainEvent, domainEventBus } from '../platform/event-bus';
 import type { PostedRide } from './journeyLogistics';
-import {
-  createDirectBooking,
-  getDirectDriverBookings,
-  getDirectUserBookings,
-  updateDirectBookingStatus,
-} from './directSupabase';
+import { getDirectDriverBookings, getDirectUserBookings } from './directSupabase';
+import { bookingsAPI } from './bookings';
 import { trackGrowthEvent } from './growthEngine';
 import { supabase } from '../utils/supabase/client';
 import { isLocalOnlySession } from '../utils/localSession';
@@ -256,18 +252,13 @@ export async function createRideBooking ( input: {
   // ── 1. Write to Supabase (primary store) ──────────────────────────────────
   let persisted: { booking_id?: string; id?: string; status?: string | null } | null = null;
   try {
-    const result = await createDirectBooking( {
+    const result = await bookingsAPI.createBooking( {
       tripId: input.rideId,
-      userId: input.passengerId,
       seatsRequested,
       pickup: input.from,
       dropoff: input.to,
-      bookingStatus: input.routeMode === 'live_post' ? 'pending_driver' : 'confirmed',
-      metadata: {
-        total_price: input.pricePerSeatJod ? seatsRequested * input.pricePerSeatJod : seatsRequested,
-      },
     } );
-    persisted = result.booking;
+    persisted = result;
   } catch ( error ) {
     // Real backend + real user session: surface the failure, never fake a booking.
     if ( supabase && !isLocalOnlySession() ) {
@@ -373,11 +364,8 @@ export async function updateRideBooking (
       updates.status === 'cancelled' ||
       updates.status === 'confirmed' )
   ) {
-    const directStatus = updates.status === 'confirmed' ? 'accepted' : updates.status;
-    await updateDirectBookingStatus(
-      target.backendBookingId,
-      directStatus as 'accepted' | 'rejected' | 'cancelled',
-    );
+    const apiStatus = updates.status === 'confirmed' ? 'accepted' : updates.status === 'rejected' ? 'rejected' : 'cancelled';
+    await bookingsAPI.updateBookingStatus( target.backendBookingId, apiStatus );
   }
 
   const updated: RideBookingRecord = {

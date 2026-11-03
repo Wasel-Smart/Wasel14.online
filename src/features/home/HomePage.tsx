@@ -12,6 +12,8 @@ import { CurrencyService } from '../../utils/currency';
 import { trackUserAction } from '../../utils/monitoring';
 import { API_URL } from '../../services/core';
 import { WaselErrorBoundary } from '../../components/ErrorBoundary';
+import { SkipToContent } from '../../components/SkipToContent';
+import { readCookieDecision, saveCookieDecision } from '../../utils/analyticsConsent';
 import { ActiveTripsBanner } from '../../components/TripProgressCard';
 import { C, F, POPULAR_ROUTES, TYPE } from './HomePageShared';
 import cookieBannerStyles from './sections/CookieBanner.module.css';
@@ -104,15 +106,16 @@ function CookieBanner ( { bannerRef, onAccept, onDecline, t }: CookieBannerProps
 }
 
 function useCookieConsent ( language: Language, setLanguage: ( lang: Language ) => void ) {
-  const [ cookieConsented, setCookieConsented ] = useState( false );
-  const [ cookieDeclined, setCookieDeclined ] = useState( false );
+  const [ decision, setDecision ] = useState( readCookieDecision );
   const cookieBannerRef = useRef<HTMLDivElement | null>( null );
 
   useEffect( () => {
-    const savedCookieConsent = localStorage.getItem( 'wasel-cookie-consent' );
-    const savedLanguage = localStorage.getItem( 'wasel-language' );
-    if ( savedCookieConsent ) {
-      setCookieConsented( true );
+    const savedCookieConsent = readCookieDecision();
+    let savedLanguage: string | null = null;
+    try {
+      savedLanguage = localStorage.getItem( 'wasel-language' );
+    } catch {
+      // Language detection is optional; keep the current language if storage is blocked.
     }
 
     if ( typeof navigator === 'undefined' ) { return; }
@@ -124,18 +127,30 @@ function useCookieConsent ( language: Language, setLanguage: ( lang: Language ) 
   }, [ language, setLanguage ] );
 
   const acceptCookies = () => {
-    localStorage.setItem( 'wasel-cookie-consent', 'accepted' );
-    setCookieConsented( true );
+    saveCookieDecision( 'accepted' );
+    setDecision( 'accepted' );
   };
 
   const declineCookies = () => {
-    localStorage.setItem( 'wasel-cookie-consent', 'declined' );
-    setCookieDeclined( true );
-    setCookieConsented( true );
+    saveCookieDecision( 'declined' );
+    setDecision( 'declined' );
   };
 
   useEffect( () => {
-    if ( cookieConsented || cookieDeclined ) { return; }
+    if ( decision !== null ) { return; }
+
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    cookieBannerRef.current
+      ?.querySelector<HTMLElement>( 'button:not([disabled]), a[href]' )
+      ?.focus();
+
+    return () => previousFocus?.focus();
+  }, [ decision ] );
+
+  useEffect( () => {
+    if ( decision !== null ) { return; }
 
     const handleKeyDown = ( e: KeyboardEvent ) => {
       if ( e.key === 'Escape' ) {
@@ -166,11 +181,11 @@ function useCookieConsent ( language: Language, setLanguage: ( lang: Language ) 
 
     document.addEventListener( 'keydown', handleKeyDown );
     return () => document.removeEventListener( 'keydown', handleKeyDown );
-  }, [ cookieConsented, cookieDeclined ] );
+  }, [ decision ] );
 
   return {
-    cookieConsented,
-    cookieDeclined,
+    cookieConsented: decision !== null,
+    cookieDeclined: decision === 'declined',
     cookieBannerRef,
     acceptCookies,
     declineCookies,
@@ -491,6 +506,7 @@ export function HomePage () {
       <div className="wasel-home-shell" dir={ dir } style={ { color: C.text, fontFamily: F } }>
         <HomePageStyles />
         <StructuredData ar={ ar } />
+        <SkipToContent targetId="main-content" />
 
         { !cookieConsented && !cookieDeclined && (
           <CookieBanner
@@ -507,7 +523,7 @@ export function HomePage () {
           t={ t }
         />
 
-        <div className="wasel-home-container relative z-10">
+        <main id="main-content" tabIndex={ -1 } className="wasel-home-container relative z-10">
           <HomeHeroSection
             ar={ ar }
             user={ user }
@@ -575,7 +591,7 @@ export function HomePage () {
               }
             />
           ) : null }
-        </div>
+        </main>
       </div>
     </WaselErrorBoundary>
   );

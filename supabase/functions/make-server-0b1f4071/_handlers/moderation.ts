@@ -50,7 +50,7 @@ export async function handleSubmitReport ( request: Request ) {
     const { data: booking, error: bookingError } = await admin
       .from( 'bookings' )
       .select( '*' )
-      .eq( 'id', bookingId )
+      .eq( 'booking_id', bookingId )
       .maybeSingle();
     if ( bookingError ) {
       console.error( '[reports] booking lookup failed', bookingError.message );
@@ -59,8 +59,7 @@ export async function handleSubmitReport ( request: Request ) {
     if ( booking ) {
       // bookings carries the passenger as `passenger_id` on newer schemas and
       // `user_id` on older ones, so accept either; the trip's driver may also report.
-      let isParticipant =
-        booking.passenger_id === canonicalUser.id || booking.user_id === canonicalUser.id;
+      let isParticipant = booking.passenger_id === canonicalUser.id;
       if ( !isParticipant && booking.trip_id ) {
         isParticipant = await assertTripParticipant( admin, String( booking.trip_id ), canonicalUser.id )
           .catch( ( error: unknown ) => {
@@ -72,7 +71,7 @@ export async function handleSubmitReport ( request: Request ) {
         return json( { error: 'You can only report a booking you took part in.' }, 403 );
       }
     }
-    bookingIdResolved = booking?.id ?? null;
+    bookingIdResolved = booking?.booking_id ?? null;
   }
 
   const { error: insertError } = await admin.from( 'reports' ).insert( {

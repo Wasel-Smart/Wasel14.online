@@ -16,7 +16,7 @@ measured by CI; treat every item as unverified until `npm run verify` is green.
 |---|---|
 | **Security — webhook JWT gate** | Dedicated `supabase/functions/webhooks/` function with `verify_jwt = false`. Provider signature checks now run before any auth. `supabase/config.toml` updated. |
 | **Security — password policy** | `minimum_password_length` raised from 8 → 12. |
-| **Testing — edge functions** | `supabase/functions/tests/webhooks.test.ts` added: 7 Deno tests covering 503/401/200 paths for Stripe, CliQ, Sanad, and Send-SMS handlers. |
+| **Testing — edge functions** | Deno handler tests cover Stripe, CliQ, Resend, Twilio, and Send-SMS signature/configuration paths. This review adds current Resend/Svix format and replay/tamper cases; these tests still need to pass in CI and against configured provider callbacks. |
 | **Testing — excluded suites** | `tests/database/**` and `tests/utils/pricing/**` removed from vitest exclude list — they now run in CI. |
 | **CI — translation drift** | `verify-translations.mjs` now exits 1 on drift (was always 0). `translations` job added to CI and gates the build. |
 | **CI — deno lint + test** | `deno-lint` CI job now runs `deno lint supabase/functions/` AND `deno test` for webhook handlers. |
@@ -49,8 +49,9 @@ measured by CI; treat every item as unverified until `npm run verify` is green.
 
 ## Remaining improvements (not blockers)
 
-- Resend/Twilio webhooks authenticate with a query-string token; upgrade to Svix
-  signature verification (Resend) and `X-Twilio-Signature` HMAC (Twilio).
+- Twilio webhook authentication still allows a query-string token until
+  `TWILIO_WEBHOOK_REQUIRE_SIGNATURE=true` is enabled after validating the
+  provider-side signature URL and secret.
 - Confirm `finalizeTopUpTransaction` dedupes on Stripe `event.id` and that
   `verifyStripeWebhookSignature` enforces a timestamp tolerance.
 - Keep one payment implementation — consolidate `make-server` handlers and

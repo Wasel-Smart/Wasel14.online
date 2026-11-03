@@ -214,6 +214,26 @@ describe('runBackendWorkflow', () => {
     expect(fallback).toHaveBeenCalledOnce();
   });
 
+  it('allows only an authenticated RPC fallback when general direct writes are disabled', async () => {
+    const edge = vi.fn().mockRejectedValue(new BackendRequestError('edge down', { recoverable: true }));
+    const fallback = vi.fn().mockResolvedValue({ enabled: true });
+    mockFallbackAllowed.mockReturnValue(false);
+    mockGetAuth.mockResolvedValue({ token: 'tok_test', userId: 'user-1' });
+
+    const result = await runBackendWorkflow({
+      operation: 'enableDriverMode',
+      authMode: 'required',
+      fallbackPolicy: 'authenticated-rpc',
+      operationType: 'write',
+      edge,
+      fallback,
+    });
+
+    expect(result).toEqual({ enabled: true });
+    expect(fallback).toHaveBeenCalledOnce();
+    expect(mockFallbackAllowed).not.toHaveBeenCalled();
+  });
+
   it('does NOT call fallback when edge throws a non-recoverable error', async () => {
     const edge = vi.fn().mockRejectedValue(new BackendRequestError('hard fail', { recoverable: false }));
     const fallback = vi.fn().mockResolvedValue({ fromFallback: true });

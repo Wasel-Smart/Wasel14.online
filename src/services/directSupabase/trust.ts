@@ -204,12 +204,28 @@ export async function confirmDirectTrustPhoneVerification ( userId: string, code
   };
 }
 
-export async function enableDirectTrustDriverMode ( userId: string ) {
-  const context = await buildUserContext( userId );
+function isDriverModeEnabledResponse (
+  value: unknown,
+): value is { enabled: true; role: 'driver' } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray( value ) &&
+    'enabled' in value &&
+    value.enabled === true &&
+    'role' in value &&
+    value.role === 'driver'
+  );
+}
+
+export async function enableDirectTrustDriverMode ( _userId: string ) {
   const db = getDb();
 
-  const { error } = await db.from( 'users' ).update( { role: 'driver' } ).eq( 'id', context.user.id );
+  const { data, error } = await db.rpc( 'app_enable_driver_mode' );
   if ( error ) { throw error; }
+  if ( !isDriverModeEnabledResponse( data ) ) {
+    throw new Error( 'Driver mode could not be enabled. Please try again.' );
+  }
 
   return {
     enabled: true,
@@ -273,6 +289,7 @@ export async function submitDirectTrustDriverDocuments (
 
   const { error: verificationError } = await db.from( 'verification_records' ).insert( {
     user_id: context.user.id,
+    sanad_status: 'unverified',
     document_status: 'pending',
     verification_level: nextLevel,
     provider_reference: 'driver_documents',

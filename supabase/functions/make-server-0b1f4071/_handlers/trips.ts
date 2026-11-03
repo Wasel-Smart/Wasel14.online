@@ -68,6 +68,9 @@ export async function handleTripRequest ( request: Request, path: string ) {
       return json( { error: 'Trip route is not authorized for this user.' }, 403 );
     }
     const driver = await ensureDriverForUser( auth.admin, auth.canonicalUser );
+    // A driver-mode user who has not submitted documents has no drivers row yet, so
+    // there are no trips to list. Querying with a null driver_id would error.
+    if ( !driver.driver_id ) {return json( [] );}
     const { data, error } = await auth.admin
       .from( 'trips' )
       .select( 'trip_id, driver_id, origin_city, destination_city, departure_time, available_seats, price_per_seat, trip_status, allow_packages, package_capacity, vehicle_make, vehicle_model, notes, created_at' )

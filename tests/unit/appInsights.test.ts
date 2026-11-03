@@ -1,16 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the heavy SDK before importing the module under test
-vi.mock('@microsoft/applicationinsights-web', () => {
-  const mockInstance = {
+const { mockInstance } = vi.hoisted(() => ({
+  mockInstance: {
     loadAppInsights: vi.fn(),
     trackPageView: vi.fn(),
     trackEvent: vi.fn(),
     trackException: vi.fn(),
     trackMetric: vi.fn(),
-  };
+  },
+}));
+
+vi.mock('@microsoft/applicationinsights-web', () => {
   return {
-    ApplicationInsights: vi.fn(() => mockInstance),
+    ApplicationInsights: vi.fn(function MockApplicationInsights() { return mockInstance; }),
     DistributedTracingModes: { AI: 'AI' },
     __mockInstance: mockInstance,
   };
@@ -37,14 +40,7 @@ import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
 // Access the shared mock instance
 const getMockInstance = () =>
-  (vi.mocked(ApplicationInsights) as unknown as { __mockInstance: ReturnType<typeof vi.fn> })
-    .__mockInstance as {
-    loadAppInsights: ReturnType<typeof vi.fn>;
-    trackPageView: ReturnType<typeof vi.fn>;
-    trackEvent: ReturnType<typeof vi.fn>;
-    trackException: ReturnType<typeof vi.fn>;
-    trackMetric: ReturnType<typeof vi.fn>;
-  };
+  mockInstance;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -92,7 +88,6 @@ describe('getAppInsights', () => {
   it('returns null before initialization', () => {
     // Fresh import state — appInsights is null
     // (This test relies on module-level state; run before initializeAppInsights)
-    const result = getAppInsights();
     // May be null or an instance depending on test order; just assert it doesn't throw
     expect(() => getAppInsights()).not.toThrow();
   });

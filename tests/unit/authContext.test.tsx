@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import { useContext } from 'react';
-import { AuthContext, AuthProvider } from '@/contexts/auth/AuthContext';
+import { AuthContext, AuthProvider, type AuthContextType } from '@/contexts/auth/AuthContext';
 
 // ── Supabase client mock ──────────────────────────────────────────────────────
 const mockOnAuthStateChange = vi.fn();
@@ -161,7 +161,7 @@ describe('AuthProvider — signIn', () => {
     const fakeSession = { user: fakeUser, access_token: 'tok2' };
     vi.mocked(authAPI.signIn).mockResolvedValue({ user: fakeUser, session: fakeSession } as never);
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() {
       ctx = useContext(AuthContext);
       return null;
@@ -183,7 +183,7 @@ describe('AuthProvider — signIn', () => {
   it('returns an error when signIn throws', async () => {
     vi.mocked(authAPI.signIn).mockRejectedValue(new Error('Invalid credentials'));
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -200,7 +200,7 @@ describe('AuthProvider — signUp', () => {
   it('returns requiresEmailConfirmation=true when no session is returned', async () => {
     vi.mocked(authAPI.signUp).mockResolvedValue({ user: { id: 'u3' }, session: null } as never);
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -217,7 +217,7 @@ describe('AuthProvider — signUp', () => {
   it('returns error when backend is not configured', async () => {
     vi.mocked(getSupabaseClient).mockReturnValue(null as never);
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -236,7 +236,7 @@ describe('AuthProvider — signOut', () => {
   it('clears user and session after signOut', async () => {
     vi.mocked(authAPI.signOut).mockResolvedValue(undefined);
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -249,7 +249,7 @@ describe('AuthProvider — signOut', () => {
 
 describe('AuthProvider — updateProfile', () => {
   it('returns error when no user is logged in', async () => {
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -272,7 +272,7 @@ describe('AuthProvider — updateProfile', () => {
     vi.mocked(authAPI.updateProfile).mockResolvedValue({ success: true } as never);
     vi.mocked(loadProfileFromBackend).mockResolvedValue({ id: 'u4', full_name: 'New Name' } as never);
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -289,7 +289,7 @@ describe('AuthProvider — resetPassword', () => {
   it('returns null error on success', async () => {
     mockSupabaseClient.auth.resetPasswordForEmail = vi.fn().mockResolvedValue({ error: null });
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -303,7 +303,7 @@ describe('AuthProvider — resetPassword', () => {
   it('returns error when backend is not configured', async () => {
     vi.mocked(getSupabaseClient).mockReturnValue(null as never);
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -319,7 +319,7 @@ describe('AuthProvider — changePassword', () => {
   it('returns null error on success', async () => {
     mockSupabaseClient.auth.updateUser = vi.fn().mockResolvedValue({ error: null });
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });
@@ -333,7 +333,7 @@ describe('AuthProvider — changePassword', () => {
   it('returns error when backend is not configured', async () => {
     vi.mocked(getSupabaseClient).mockReturnValue(null as never);
 
-    let ctx!: ReturnType<typeof useContext<typeof AuthContext>>;
+    let ctx!: AuthContextType;
     function Capture() { ctx = useContext(AuthContext); return null; }
 
     await act(async () => { render(<AuthProvider><Capture /></AuthProvider>); });

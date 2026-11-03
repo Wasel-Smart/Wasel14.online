@@ -1,9 +1,7 @@
 import { requestEdgeJson, runBackendWorkflow } from './backendWorkflow';
 import {
-  createDirectBooking,
   getDirectTripBookings,
   getDirectUserBookings,
-  updateDirectBookingStatus,
 } from './directSupabase';
 
 export interface BookingRecord {
@@ -57,18 +55,7 @@ export const bookingsAPI = {
     return runBackendWorkflow({
       operation: 'Booking creation',
       authMode: 'required',
-      fallbackPolicy: 'writes-if-enabled',
-      fallback: async ({ userId }) =>
-        normalizeBookingRecord(
-          await createDirectBooking({
-            tripId: input.tripId,
-            userId: userId ?? '',
-            seatsRequested: input.seatsRequested,
-            pickup: input.pickup,
-            dropoff: input.dropoff,
-            metadata: input.metadata,
-          }),
-        ),
+      fallbackPolicy: 'never',
       edge: context =>
         requestEdgeJson<BookingRecord>({
           path: '/bookings',
@@ -125,9 +112,7 @@ export const bookingsAPI = {
     return runBackendWorkflow({
       operation: 'Booking update',
       authMode: 'required',
-      fallbackPolicy: 'writes-if-enabled',
-      fallback: async () =>
-        normalizeBookingRecord(await updateDirectBookingStatus(bookingId, status)),
+      fallbackPolicy: 'never',
       edge: context =>
         requestEdgeJson<BookingRecord>({
           path: `/bookings/${bookingId}`,

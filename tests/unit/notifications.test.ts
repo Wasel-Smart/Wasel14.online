@@ -130,7 +130,7 @@ describe('notificationsAPI.markAsRead', () => {
 
   it('calls markDirectNotificationAsRead when API_URL is empty and user is authenticated', async () => {
     vi.mocked(getAuthDetails).mockResolvedValue({ token: 'tok', userId: 'u1' } as never);
-    vi.mocked(markDirectNotificationAsRead).mockResolvedValue(undefined);
+    vi.mocked(markDirectNotificationAsRead).mockResolvedValue(null);
 
     const result = await notificationsAPI.markAsRead('n2');
     expect(markDirectNotificationAsRead).toHaveBeenCalledWith('n2', 'u1');

@@ -729,8 +729,8 @@ async function resolvePayableAmount (
   if ( referenceType === 'ride_booking' ) {
     const { data, error } = await admin
       .from( 'bookings' )
-      .select( 'id, trip_id, amount, total_price, price_per_seat, seats_requested, user_id, passenger_id, booking_status, payment_status' )
-      .eq( 'id', referenceId )
+      .select( 'booking_id, trip_id, amount, price_per_seat, seats_requested, passenger_id, booking_status, payment_status' )
+      .eq( 'booking_id', referenceId )
       .maybeSingle();
 
     if ( error ) {return { error: walletOperationFailed( 'pay', error ) };}
@@ -751,7 +751,7 @@ async function resolvePayableAmount (
     const perSeat = toMoneyNumber( data.price_per_seat );
     const seats = toNumber( data.seats_requested, 1 );
     const computed = perSeat > 0 && seats > 0 ? toMoneyNumber( perSeat * seats ) : 0;
-    const amountJod = computed > 0 ? computed : toMoneyNumber( data.total_price ?? data.amount );
+    const amountJod = computed > 0 ? computed : toMoneyNumber( data.amount );
 
     if ( amountJod <= 0 ) {
       return { error: json( { error: 'This booking has no payable amount.' }, 409 ) };
@@ -759,7 +759,7 @@ async function resolvePayableAmount (
 
     return {
       amountJod,
-      metadata: { trip_id: data.trip_id ?? null, booking_id: data.id },
+      metadata: { trip_id: data.trip_id ?? null, booking_id: data.booking_id },
     };
   }
 
@@ -816,7 +816,7 @@ async function resolvePayableAmount (
 
 /** Booking ownership spans several schema generations, so check every owner column. */
 function isOwnedByCaller ( row: Record<string, unknown>, callerUserId: string ): boolean {
-  const ownerColumns = [ 'user_id', 'passenger_id', 'rider_id', 'sender_id' ];
+  const ownerColumns = [ 'passenger_id', 'rider_id', 'sender_id' ];
   return ownerColumns.some( column => row[ column ] === callerUserId );
 }
 

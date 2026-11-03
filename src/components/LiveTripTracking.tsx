@@ -39,7 +39,7 @@ import { WaselBadge } from './wasel-ui/WaselBadge';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { activeTripAPI } from '../services/activeTrip';
 import { API_URL, fetchWithRetry, getAuthDetails } from '../services/core';
-import { updateDirectBookingStatus } from '../services/directSupabase';
+import { bookingsAPI } from '../services/bookings';
 import { subscribeToLiveTripPresence, type LiveTripSnapshot } from '../services/liveTripTracking';
 import { shareContent } from '../hooks/useShare';
 import { useLocalAuth } from '../contexts/LocalAuth';
@@ -656,15 +656,22 @@ export function LiveTripTracking() {
 
   const handleCancelConfirm = useCallback(async () => {
     setCancelling(true);
-    if (liveTrip?.bookingId) {
-      await updateDirectBookingStatus(liveTrip.bookingId, 'cancelled').catch(() => undefined);
+    try {
+      if ( liveTrip?.bookingId ) {
+        await bookingsAPI.updateBookingStatus( liveTrip.bookingId, 'cancelled' );
+      }
+      await activeTripAPI.clearActiveTrip();
+      setShowCancel( false );
+      toast.info( 'Ride cancelled' );
+      navigate( '/app/dashboard' );
+    } catch ( error ) {
+      toast.error( 'Could not cancel this ride', {
+        description: error instanceof Error ? error.message : 'Please retry or contact support.',
+      } );
+    } finally {
+      setCancelling( false );
     }
-    await activeTripAPI.clearActiveTrip().catch(() => false);
-    setCancelling(false);
-    setShowCancel(false);
-    toast.info('Ride cancelled · تم إلغاء الرحلة');
-    navigate('/app/dashboard');
-  }, [liveTrip?.bookingId, navigate]);
+  }, [ liveTrip?.bookingId, navigate ]);
 
   const copyShareCode = useCallback(() => {
     navigator.clipboard?.writeText(trip.shareCode).then(() => {

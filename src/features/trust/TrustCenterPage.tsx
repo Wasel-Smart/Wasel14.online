@@ -46,6 +46,7 @@ import {
   getTrustCenterStatus,
   resendTrustEmailConfirmation,
   startTrustPhoneVerification,
+  submitTrustIdentityVerification,
   submitTrustDriverDocuments,
 } from '../../services/trustCenter';
 import {
@@ -88,7 +89,7 @@ function applyOptimisticStepUpdate (
   next.completedSteps = allSteps.filter( ( s ) => s.state === 'completed' ).length;
   next.totalSteps = allSteps.length;
   next.nextStepId = ( () => {
-    const ordered = [ next.steps.phone, next.steps.email, next.steps.driverDocuments, next.steps.walletStanding ];
+    const ordered = [ next.steps.identity, next.steps.email, next.steps.phone, next.steps.driverDocuments, next.steps.walletStanding ];
     return ordered.find( ( s ) => s.state !== 'completed' )?.id ?? null;
   } )();
   next.blockedSteps = allSteps.filter( ( s ) => s.state === 'failed' ).map( ( s ) => s.id );
@@ -117,6 +118,8 @@ function formatTimestamp ( value?: string | null ): string | null {
 
 function getTrustStepTitle ( stepId: string | null, t: ( key: string ) => string ): string {
   switch ( stepId ) {
+    case 'identity':
+      return t( 'trustCenterExpanded.identity' );
     case 'email':
       return t( 'trustCenterExpanded.email' );
     case 'phone':
@@ -139,6 +142,8 @@ function getNextTrustStepDetail (
   }
 
   switch ( status.nextStepId ) {
+    case 'identity':
+      return status.steps.identity.detail;
     case 'email':
       return status.steps.email.detail;
     case 'phone':
@@ -160,6 +165,7 @@ export default function TrustCenterPage () {
   const ar = language === 'ar';
   const workflowRef = useRef<HTMLDivElement | null>( null );
   const contactRef = useRef<HTMLDivElement | null>( null );
+  const identityRef = useRef<HTMLDivElement | null>( null );
   const documentsRef = useRef<HTMLDivElement | null>( null );
   const walletRef = useRef<HTMLDivElement | null>( null );
 
@@ -169,6 +175,8 @@ export default function TrustCenterPage () {
   const [ actionKey, setActionKey ] = useState<string | null>( null );
   const [ phoneInput, setPhoneInput ] = useState( user?.phone ?? '' );
   const [ phoneCode, setPhoneCode ] = useState( '' );
+  const [ identityReference, setIdentityReference ] = useState( '' );
+  const [ identityDocumentReference, setIdentityDocumentReference ] = useState( '' );
   const [ licenseNumber, setLicenseNumber ] = useState( '' );
   const [ driverDocumentReference, setDriverDocumentReference ] = useState( '' );
   const [ confirmState, setConfirmState ] = useState<{
@@ -257,6 +265,7 @@ export default function TrustCenterPage () {
     user?.phone,
     user?.emailVerified,
     user?.phoneVerified,
+    user?.sanadVerifiedStatus,
     user?.verificationLevel,
     user?.walletStatus,
     user?.role,
@@ -343,6 +352,10 @@ export default function TrustCenterPage () {
 
   const handleNextAction = () => {
     switch ( effectiveStatus?.nextStepId ) {
+      case 'identity':
+        identityRef.current?.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+        document.getElementById( 'sanad-reference' )?.focus();
+        break;
       case 'email':
       case 'phone':
         contactRef.current?.scrollIntoView( { behavior: 'smooth', block: 'start' } );
@@ -370,6 +383,23 @@ export default function TrustCenterPage () {
       toast.success( t( 'trustCenterExpanded.sendConfirmation' ) + ' ' + user.email );
       await reloadTrustStatus( true );
     } );
+  };
+
+  const handleSubmitIdentity = async () => {
+    const reference = identityReference.trim();
+    if ( reference.length < 6 || reference.length > 120 || !/^[A-Za-z0-9._/-]+$/.test( reference ) ) {
+      setValidationErrors( current => ( { ...current, identity: t( 'trustCenterExpanded.invalidSanadReference' ) } ) );
+      return;
+    }
+    setValidationErrors( current => ( { ...current, identity: null } ) );
+    await runAction( 'identity', async () => {
+      await submitTrustIdentityVerification( {
+        providerReference: reference,
+        documentReference: identityDocumentReference.trim() || undefined,
+      } );
+      await reloadTrustStatus( true );
+      toast.success( t( 'trustCenterExpanded.identitySubmitted' ) );
+    }, current => applyOptimisticStepUpdate( current, 'identity', 'in_progress' ) );
   };
 
   const handleStartPhone = async () => {
@@ -492,6 +522,7 @@ export default function TrustCenterPage () {
     } );
   };
 
+  const identityStep = effectiveStatus?.steps.identity;
   const emailStep = effectiveStatus?.steps.email;
   const phoneStep = effectiveStatus?.steps.phone;
   const driverStep = effectiveStatus?.steps.driverDocuments;
@@ -869,6 +900,58 @@ export default function TrustCenterPage () {
                 icon={ <Activity size={ 16 } color={ C.cyan } /> }
               >
                 <div style={ { display: 'grid', gap: SPACE[ 4 ] } }>
+                  <div ref={ identityRef }>
+                    <StepCard
+                      title={ t( 'trustCenterExpanded.identityTitle' ) }
+                      subtitle={ identityStep?.detail ?? t( 'trustCenterExpanded.identityDetail' ) }
+                      state={ identityStep?.state ?? 'not_started' }
+                      badgeLabel={ getStepBadge( identityStep?.state ?? 'not_started', t ).label }
+                      icon={ <BadgeCheck size={ 16 } color={ stateAccent( identityStep?.state ?? 'not_started' ) } /> }
+                    >
+                      <div style={ { display: 'grid', gap: SPACE[ 3 ] } }>
+                        { identityStep?.failureReason ? <FailureNotice message={ identityStep.failureReason } /> : null }
+                        <WaselInput
+                          id="sanad-reference"
+                          label={ t( 'trustCenterExpanded.sanadReference' ) }
+                          value={ identityReference }
+                          onChange={ setIdentityReference }
+                          dir="ltr"
+                          aria-invalid={ Boolean( validationErrors.identity ) }
+                          aria-describedby="sanad-reference-error"
+                        />
+                        { validationErrors.identity ? (
+                          <div id="sanad-reference-error" role="alert" style={ { color: C.error, fontSize: TYPE.size.xs, fontFamily: F } }>
+                            { validationErrors.identity }
+                          </div>
+                        ) : null }
+                        <WaselInput
+                          id="sanad-document-reference"
+                          label={ t( 'trustCenterExpanded.identityDocumentReference' ) }
+                          value={ identityDocumentReference }
+                          onChange={ setIdentityDocumentReference }
+                          dir="ltr"
+                        />
+                        <div style={ { color: C.textMuted, fontSize: TYPE.size.xs, lineHeight: 1.6 } }>
+                          { t( 'trustCenterExpanded.identityManualReviewNotice' ) }
+                        </div>
+                        <TrustActionRow
+                          primary={
+                            <WaselButton
+                              onClick={ () => { void handleSubmitIdentity(); } }
+                              loading={ actionKey === 'identity' }
+                              disabled={ actionKey === 'identity' || identityStep?.state === 'in_progress' || identityStep?.state === 'completed' }
+                              variant="primary"
+                            >
+                              { identityStep?.state === 'failed'
+                                ? t( 'trustCenterExpanded.resubmit' )
+                                : t( 'trustCenterExpanded.submitIdentity' ) }
+                            </WaselButton>
+                          }
+                        />
+                      </div>
+                    </StepCard>
+                  </div>
+
                   <div ref={ contactRef }>
                     <StepCard
                       title={ t( 'trustCenterExpanded.emailPhoneTitle' ) }

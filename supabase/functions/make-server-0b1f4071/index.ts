@@ -12,6 +12,8 @@ import {
 import {
   handleAdminListPendingDrivers,
   handleAdminApproveDriver,
+  handleAdminListPendingIdentity,
+  handleAdminReviewIdentity,
   handleAdminListUsers,
   handleAdminSetUserStatus,
   handleAdminListDisputes,
@@ -106,6 +108,7 @@ import {
 import {
   handleConfirmPhoneVerification,
   handleGetTrustStatus,
+  handleSubmitIdentityVerification,
   handleStartPhoneVerification,
 } from './_handlers/trust.ts';
 
@@ -389,6 +392,12 @@ const ROUTES: RouteDescriptor[] = [
     handle: ( request ) => handleConfirmPhoneVerification( request ),
   },
   {
+    id: 'trust-identity-submit',
+    methods: [ 'POST' ],
+    test: ( path ) => path === '/trust/identity/submit',
+    handle: ( request ) => handleSubmitIdentityVerification( request ),
+  },
+  {
     id: 'trust-driver-mode-enable',
     methods: [ 'POST' ],
     test: ( path ) => path === '/trust/driver-mode/enable',
@@ -465,6 +474,18 @@ const ROUTES: RouteDescriptor[] = [
     methods: [ 'GET' ],
     test: ( path ) => path === '/admin/drivers/pending',
     handle: ( request ) => handleAdminListPendingDrivers( request ),
+  },
+  {
+    id: 'admin-identity-pending',
+    methods: [ 'GET' ],
+    test: ( path ) => path === '/admin/identity/pending',
+    handle: ( request ) => handleAdminListPendingIdentity( request ),
+  },
+  {
+    id: 'admin-identity-review',
+    methods: [ 'POST' ],
+    test: ( path ) => /^\/admin\/identity\/[^/]+\/review$/.test( path ),
+    handle: ( request, path ) => handleAdminReviewIdentity( request, decodeURIComponent( path.split( '/' )[ 3 ] ) ),
   },
   {
     id: 'admin-approve-driver',

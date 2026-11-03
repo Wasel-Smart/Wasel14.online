@@ -83,6 +83,44 @@ export async function handleGetTrustStatus ( request: Request ) {
   }
 }
 
+/** Submit a Sanad reference for human review. A reference is only evidence
+ * submitted by the user; this endpoint never marks identity as verified. */
+export async function handleSubmitIdentityVerification ( request: Request ) {
+  const auth = await authenticateRequest( request );
+  if ( 'error' in auth ) {return auth.error;}
+
+  const body = await request.json().catch( () => ( {} ) );
+  const providerReference = String( body.providerReference ?? '' ).trim();
+  const documentReference = String( body.documentReference ?? '' ).trim() || null;
+  if ( providerReference.length < 6 || providerReference.length > 120 || !/^[\\p{L}\\p{N}._/-]+$/u.test( providerReference ) ) {
+    return json( { error: 'Enter a valid Sanad verification reference.' }, 400 );
+  }
+  if ( documentReference && ( documentReference.length > 120 || /[<>\\u0000-\\u001f]/.test( documentReference ) ) ) {
+    return json( { error: 'Document reference is invalid.' }, 400 );
+  }
+
+  const { data: pending, error: lookupError } = await auth.admin
+    .from( 'verification_records' )
+    .select( 'verification_id' )
+    .eq( 'user_id', auth.canonicalUser.id )
+    .eq( 'sanad_status', 'pending' )
+    .neq( 'provider_reference', 'driver_documents' )
+    .limit( 1 )
+    .maybeSingle();
+  if ( lookupError ) {return json( { error: 'Identity verification is temporarily unavailable.' }, 503 );}
+  if ( pending ) {return json( { error: 'An identity verification is already awaiting review.' }, 409 );}
+
+  const { data, error } = await auth.admin.rpc( 'app_submit_sanad_verification', {
+    p_user_id: auth.canonicalUser.id,
+    p_provider_reference: providerReference,
+    p_document_reference: documentReference,
+  } );
+  if ( error?.code === '23505' ) {return json( { error: 'An identity verification is already awaiting review.' }, 409 );}
+  if ( error ) {return json( { error: 'Identity verification could not be submitted.' }, 500 );}
+
+  return json( { submitted: true, status: 'pending_review', verificationId: data }, 202 );
+}
+
 export async function handleStartPhoneVerification ( request: Request ) {
   try {
     return await startPhoneVerification( request );

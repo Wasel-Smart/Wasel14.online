@@ -396,6 +396,8 @@ export const API_ENDPOINTS = {
   ADMIN_DASHBOARD: '/v1/admin/dashboard/metrics',
   ADMIN_DRIVERS_PENDING: '/v1/admin/drivers/pending',
   ADMIN_DRIVER_APPROVE: ( driverId: string ) => `/v1/admin/drivers/${ driverId }/approve`,
+  ADMIN_IDENTITY_PENDING: '/v1/admin/identity/pending',
+  ADMIN_IDENTITY_REVIEW: ( verificationId: string ) => `/v1/admin/identity/${ verificationId }/review`,
   COMMUNICATIONS_PREFS: '/v1/communications/preferences',
   COMMUNICATIONS_DELIVER: '/v1/communications/deliver',
   COMMUNICATIONS_PROCESS: '/v1/communications/process',

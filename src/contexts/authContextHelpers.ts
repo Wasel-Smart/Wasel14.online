@@ -22,6 +22,7 @@ export type Profile = {
   trip_count?: number | null;
   verified?: boolean | null;
   sanad_verified?: boolean | null;
+  sanad_verified_status?: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired' | null;
   verification_level?: string | null;
   wallet_status?: string | null;
   avatar_url?: string | null;
@@ -42,6 +43,7 @@ export interface WaselUser {
   trips: number;
   verified: boolean;
   sanadVerified: boolean;
+  sanadVerifiedStatus?: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
   verificationLevel: string;
   walletStatus: 'active' | 'limited' | 'frozen' | 'closed' | 'unavailable';
   avatar?: string;
@@ -77,6 +79,7 @@ export function createLocalAuthProfile(localUser: WaselUser): Profile {
     trip_count: localUser.trips,
     verified: localUser.verified,
     sanad_verified: localUser.sanadVerified,
+    sanad_verified_status: localUser.sanadVerifiedStatus ?? null,
     verification_level: localUser.verificationLevel,
     wallet_status: localUser.walletStatus,
     avatar_url: localUser.avatar ?? null,
@@ -308,6 +311,7 @@ export function mapBackendProfile({
     trips: Number(profile?.trip_count ?? 0),
     verified,
     sanadVerified,
+    sanadVerifiedStatus: profile?.sanad_verified_status ?? (sanadVerified ? 'verified' : 'unverified'),
     verificationLevel,
     walletStatus,
     avatar: profile?.avatar_url ?? authUser?.user_metadata?.avatar_url ?? authUser?.user_metadata?.picture ?? undefined,

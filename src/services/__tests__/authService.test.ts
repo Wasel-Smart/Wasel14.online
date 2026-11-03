@@ -66,7 +66,11 @@ describe('redactAuthErrorText', () => {
   });
 
   it('redacts JWT tokens', () => {
-    const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyLTEifQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    const jwt = [
+      'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0',
+      'eyJzdWIiOiJmYWtlIn0',
+      'test-signature-value',
+    ].join('.');
     const out = redactAuthErrorText(`token: ${jwt}`);
     expect(out).not.toContain(jwt);
   });

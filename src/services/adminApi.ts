@@ -56,3 +56,26 @@ export async function dispatchRide(rideId: string, driverId: string) {
   const response = await api.patch(`/v1/admin/rides/${rideId}/dispatch`, { driverId });
   return response as { data: unknown };
 }
+
+export interface PendingIdentitySubmission {
+  verification_id: string;
+  user_id: string;
+  provider_reference: string | null;
+  document_reference: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getPendingIdentitySubmissions() {
+  const response = await api.get('/v1/admin/identity/pending');
+  return response as { submissions: PendingIdentitySubmission[] };
+}
+
+export async function reviewIdentitySubmission(
+  verificationId: string,
+  decision: 'approve' | 'reject',
+  failureReason?: string,
+) {
+  const response = await api.post(`/v1/admin/identity/${verificationId}/review`, { decision, failureReason });
+  return response as { reviewed: boolean; verificationId: string; decision: 'approve' | 'reject' };
+}

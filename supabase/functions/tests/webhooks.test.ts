@@ -19,13 +19,14 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 
 const STRIPE_SECRET = 'whsec_placeholder_for_testing_only';
+const RESEND_SECRET = `whsec_${btoa('test-resend-signing-key-32-bytes-long')}`;
 
 Deno.env.set('STRIPE_WEBHOOK_SECRET', STRIPE_SECRET);
 Deno.env.set('CLIQ_WEBHOOK_SECRET', 'test-cliq-secret-32-chars-minimum!');
-Deno.env.set('SANAD_WEBHOOK_SECRET', 'test-sanad-secret-32-chars-minimum!!');
 const TWILIO_TEST_SECRET = 'test-twilio-signing-secret-32-chars!';
 Deno.env.set('TWILIO_WEBHOOK_SIGNING_SECRET', TWILIO_TEST_SECRET);
 Deno.env.set('SUPABASE_AUTH_HOOK_SEND_SMS_SECRET', STRIPE_SECRET);
+Deno.env.set('RESEND_WEBHOOK_SIGNING_SECRET', RESEND_SECRET);
 
 // `handleStripeWebhook` builds the admin client before it branches on the event
 // type, so even an unrecognised event needs these present. No request is made for
@@ -56,12 +57,55 @@ async function signStripe(payload: string, secret: string): Promise<string> {
   return `t=${timestamp},v1=${hex}`;
 }
 
-const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook, handleTwilioWebhook } = await import(
+const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook, handleTwilioWebhook, handleResendWebhook } = await import(
   '../make-server-0b1f4071/_handlers/webhooks.ts'
 );
-const { toStripeMinorUnits } = await import(
+const { toStripeMinorUnits, verifyResendWebhookSignature } = await import(
   '../make-server-0b1f4071/_handlers/shared.ts'
 );
+
+async function signResend(payload: string, secret: string, id = 'msg_test_123', timestamp = Math.floor(Date.now() / 1000)) {
+  const keyBytes = Uint8Array.from(atob(secret.slice('whsec_'.length)), (char) => char.charCodeAt(0));
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${timestamp}.${payload}`));
+  const signature = btoa(String.fromCharCode(...new Uint8Array(mac)));
+  return new Headers({
+    'svix-id': id,
+    'svix-timestamp': String(timestamp),
+    'svix-signature': `v1,${signature}`,
+  });
+}
+
+Deno.test('verifyResendWebhookSignature — accepts current Svix signature format', async () => {
+  const payload = '{"type":"email.delivered","data":{"email_id":"email_123"}}';
+  const headers = await signResend(payload, RESEND_SECRET);
+  assertEquals(await verifyResendWebhookSignature(payload, headers), true);
+});
+
+Deno.test('verifyResendWebhookSignature — rejects a changed raw payload', async () => {
+  const payload = '{"type":"email.delivered"}';
+  const headers = await signResend(payload, RESEND_SECRET);
+  assertEquals(await verifyResendWebhookSignature(`${payload} `, headers), false);
+});
+
+Deno.test('verifyResendWebhookSignature — rejects stale signatures and legacy header format', async () => {
+  const payload = '{"type":"email.delivered"}';
+  const staleHeaders = await signResend(payload, RESEND_SECRET, 'msg_stale', Math.floor(Date.now() / 1000) - 301);
+  const legacyHeaders = new Headers({ 'resend-signature': `t=${Math.floor(Date.now() / 1000)},v1=deadbeef` });
+  assertEquals(await verifyResendWebhookSignature(payload, staleHeaders), false);
+  assertEquals(await verifyResendWebhookSignature(payload, legacyHeaders), false);
+});
+
+Deno.test('handleResendWebhook — rejects unsupported signature headers before database access', async () => {
+  const response = await handleResendWebhook(
+    new Request('https://example.supabase.co/functions/v1/webhooks/communications/webhooks/resend', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'resend-signature': 'legacy-format' },
+      body: '{"type":"email.delivered"}',
+    }),
+  );
+  assertEquals(response.status, 401);
+});
 
 // ── Stripe ────────────────────────────────────────────────────────────────────
 

@@ -22,11 +22,9 @@ function verificationRank ( level?: string ): number {
   }
 }
 
-// Driver statuses the backend uses once an operator has cleared the account.
-// `offline` / `online` / `busy` are the live availability states of an approved
-// driver, so they must count as cleared exactly like `approved` does.
-// `pending_approval` means documents were submitted and are awaiting review;
-// the backend also allows trip creation at this stage.
+// Driver statuses that allow trip creation. `pending_approval` means the driver
+// has submitted documents and is awaiting review — the backend also allows trip
+// creation at this stage so routes are live the moment approval comes through.
 const CLEARED_DRIVER_STATUSES = new Set(['approved', 'online', 'offline', 'busy', 'pending_approval']);
 
 /**

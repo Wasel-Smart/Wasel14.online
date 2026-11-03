@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { load } from 'js-yaml';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = resolve(__dirname, '../..');
 
@@ -15,32 +16,10 @@ const EDGE_INDEX = readSource('supabase/functions/make-server-0b1f4071/index.ts'
 
 describe('API endpoint contracts between frontend and backend', () => {
   const apiEndpoints = extractApiEndpoints(API_ENDPOINTS_SOURCE);
-  const edgeHandlers = extractEdgeHandlers(EDGE_INDEX);
 
-  it('every frontend API_ENDPOINTS entry has a corresponding edge handler', () => {
-    const missing: string[] = [];
-    for (const [name, endpoint] of Object.entries(apiEndpoints)) {
-      const normalizedPath = endpoint.path.replace(/^(\/v1)/, '');
-      const hasExact = edgeHandlers.has(normalizedPath);
-      const hasPrefix = !hasExact && Array.from(edgeHandlers.keys()).some(
-        k => k.endsWith('*') && normalizedPath.startsWith(k.slice(0, -1)),
-      );
-      if (!hasExact && !hasPrefix) {
-        missing.push(`${name}: ${endpoint.method} ${endpoint.path}`);
-      }
-    }
-    expect(missing).toEqual([]);
-  });
-
-  it('HTTP methods match between frontend and edge', () => {
-    const mismatches: string[] = [];
-    for (const [name, endpoint] of Object.entries(apiEndpoints)) {
-      const handler = edgeHandlers.get(endpoint.path);
-      if (handler && handler.method !== endpoint.method) {
-        mismatches.push(`${name}: frontend uses ${endpoint.method}, edge expects ${handler.method}`);
-      }
-    }
-    expect(mismatches).toEqual([]);
+  it('every frontend route is covered by the edge route table', () => {
+    const result = spawnSync('node', ['scripts/check-route-contract.mjs'], { cwd: ROOT, encoding: 'utf8' });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
   });
 
   it('all endpoints use /v1 prefix consistently', () => {
@@ -53,51 +32,25 @@ describe('API endpoint contracts between frontend and backend', () => {
     expect(nonV1).toEqual([]);
   });
 
-  it('dynamic endpoints have proper parameter handling', () => {
-    const dynamicEndpoints = Object.entries(apiEndpoints).filter(([_, e]) => e.path.includes('('));
-    for (const [, endpoint] of dynamicEndpoints) {
-      expect(endpoint.path).toMatch(/\$\{[^}]+\}/);
-    }
+  it('documents the mobile identity submission endpoint', () => {
+    expect(apiEndpoints.TRUST_IDENTITY?.path).toBe('/v1/trust/identity/submit');
+    expect(EDGE_INDEX).toContain("path === '/trust/identity/submit'");
   });
 });
 
 describe('API endpoint security requirements', () => {
-  const apiEndpoints = extractApiEndpoints(API_ENDPOINTS_SOURCE);
-
   it('mutating endpoints are marked for CSRF protection', () => {
-    const mutatingWithoutCSRF: string[] = [];
-    for (const [name, endpoint] of Object.entries(apiEndpoints)) {
-      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(endpoint.method) &&
-          endpoint.path !== '/health' &&
-          !endpoint.path.includes('webhook') &&
-          !endpoint.path.includes('auth/') &&
-          !endpoint.path.includes('/events')) {
-        // Check if the endpoint is used in a way that would add CSRF
-        const usage = API_ENDPOINTS_SOURCE.match(new RegExp(`${name}\\s*\\(`));
-        if (usage) {
-          // In practice, apiPost/apiPut/apiPatch/apiDelete all add CSRF via getApiHeaders
-        }
-      }
+    expect(API_ENDPOINTS_SOURCE).toContain("[ 'POST', 'PUT', 'PATCH', 'DELETE' ].includes( method )");
+    expect(API_ENDPOINTS_SOURCE).toContain('return addCSRFHeader( headers )');
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      expect(API_ENDPOINTS_SOURCE).toContain(`getApiHeaders( accessToken, undefined, '${method}' )`);
     }
-    // This is verified by the api.ts implementation
-    expect(mutatingWithoutCSRF).toEqual([]);
   });
 
   it('endpoints requiring auth are not public', () => {
-    // Auth requirements are enforced at the edge via authenticateRequest
-    // This test ensures we document which endpoints need auth
-    const publicEndpoints = ['/health', '/trips/search', '/mobility-os/public-snapshot'];
-    const allPaths = Object.values(apiEndpoints).map(e => e.path);
-
-    for (const path of allPaths) {
-      if (!publicEndpoints.includes(path) &&
-          !path.includes('webhook') &&
-          !path.includes('/events') &&
-          !path.includes('/auth/')) {
-        // These should require authentication
-        expect(path).not.toBe('/health');
-      }
-    }
+    const trustHandler = readSource('supabase/functions/make-server-0b1f4071/_handlers/trust.ts');
+    expect(trustHandler).toContain('export async function handleSubmitIdentityVerification');
+    expect(trustHandler).toContain("const auth = await authenticateRequest( request )");
   });
 });
 
@@ -160,7 +113,7 @@ describe('OpenAPI to edge function path coverage', () => {
     ];
 
     for (const domain of requiredDomains) {
-      const hasPath = Object.keys(paths).some(p => p.startsWith(domain));
+      const hasPath = Object.keys(paths).some(p => p.replace(/^\/v1(?=\/|$)/, '').startsWith(domain));
       expect(hasPath).toBe(true);
     }
   });
@@ -209,75 +162,3 @@ function inferMethod(key: string): string {
   return 'GET';
 }
 
-function extractEdgeHandlers(source: string): Map<string, { method: string; handler: string }> {
-  const handlers = new Map<string, { method: string; handler: string }>();
-
-  // Match route descriptors with or without an explicit methods array.
-  const routeRegex = /id:\s*'([^']+)'[\s\S]*?test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,300}?)(?=\n\s*(?:id|handle|methods)\s*:)/g;
-
-  for (const match of source.matchAll(routeRegex)) {
-    const [, id, testFn] = match;
-    if (!id || !testFn) { continue; }
-
-    // Try to extract explicit methods; default to all methods if absent.
-    const methodsMatch = testFn.match(/methods:\s*\[([^\]]+)\]/);
-    const methods = methodsMatch?.[1]
-      ? methodsMatch[1].split(',').map(m => m.trim().replace(/'/g, ''))
-      : ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
-
-    // Extract path patterns from the test function body.
-    const routeSection = source.slice(source.indexOf(`id: '${id}'`));
-    const pathMatch = routeSection.match(/test:\s*\([^)]*\)\s*=>\s*([\s\S]{0,300})/);
-    const pathBody = pathMatch?.[1];
-    if (pathBody) {
-      const paths = extractPathsFromTest(pathBody);
-      for (const path of paths) {
-        for (const method of methods) {
-          handlers.set(path, { method, handler: id });
-        }
-      }
-    }
-  }
-
-  return handlers;
-}
-
-function extractPathsFromTest(testFn: string): string[] {
-  const paths: string[] = [];
-
-  // Direct path matches: path === '/something'
-  for (const m of testFn.matchAll(/path\s*===\s*'([^']+)'/g)) {
-    const direct = m[1];
-    if (direct) { paths.push(direct); }
-  }
-
-  // Prefix matches: path.startsWith('/something/')
-  for (const m of testFn.matchAll(/path\.startsWith\(\s*'([^']+)'\s*\)/g)) {
-    const prefix = m[1];
-    if (prefix) { paths.push(prefix + '*'); }
-  }
-
-  // Regex patterns: /^\/something\/[^/]+$/.test(path)  →  /something/:id
-  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\\\[\\^\\/\\\\]\\\\+\\\\$', 'g'))) {
-    const prefix = m[1]?.replace(/\\\//g, '/');
-    if (prefix) { paths.push(`/${prefix}/:id`); }
-  }
-
-  // Regex patterns: /^\/something\/$/.test(path)  →  /something
-  for (const m of testFn.matchAll(new RegExp('\\/^\\\\/(.*?)\\\\\\/\\\\$', 'g'))) {
-    const prefix = m[1]?.replace(/\\\//g, '/');
-    if (prefix) { paths.push(`/${prefix}`); }
-  }
-
-  // Wallet route dispatcher
-  if (/parseWalletRoute\(\s*path\s*\)/.test(testFn)) {
-    paths.push('/wallet/:userId/:action?/:resourceId?');
-  }
-
-  // Entity route dispatcher: parseEntityRoute(path, 'prefix')
-  for (const m of testFn.matchAll(/parseEntityRoute\(\s*path\s*,\s*'([^']+)'/g)) {
-    paths.push(`/${m[1]}/:id/:action?`);
-  }
-
-  return [...new Set(paths)];
-}

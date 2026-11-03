@@ -10,13 +10,17 @@ vi.mock('../corridorBetaMetrics', () => ({
   recordCorridorBetaMetricsFromBookings: vi.fn(),
 }));
 
+vi.mock('../bookings', () => ({
+  bookingsAPI: {
+    createBooking: vi.fn(async () => ({ booking_id: 'backend-123', trip_id: 'ride-100', status: 'pending_driver' })),
+    updateBookingStatus: vi.fn(async () => ({ booking_id: 'backend-123', status: 'cancelled' })),
+  },
+}));
+
+
 vi.mock('../directSupabase', () => ({
-  createDirectBooking: vi.fn(async () => ({
-    booking: { booking_id: 'backend-123', status: 'pending' },
-  })),
   getDirectDriverBookings: vi.fn(async () => []),
   getDirectUserBookings: vi.fn(async () => []),
-  updateDirectBookingStatus: vi.fn(async () => true),
 }));
 
 vi.mock('../../platform/event-bus', () => ({

@@ -79,8 +79,8 @@ export async function computeBookingAmountMinor (
 
   const { data: booking, error: bookingError } = await admin
     .from( 'bookings' )
-    .select( 'id, passenger_id, user_id, fare, amount, total_price, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id, status' )
-    .eq( 'id', bookingIdTrim )
+    .select( 'booking_id, passenger_id, amount, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id' )
+    .eq( 'booking_id', bookingIdTrim )
     .maybeSingle();
 
   if ( bookingError ) {
@@ -89,7 +89,7 @@ export async function computeBookingAmountMinor (
   }
   if ( !booking ) {return null;}
 
-  const isOwnedByCaller = String( booking.passenger_id ?? booking.user_id ?? '' ) === authUser.id;
+  const isOwnedByCaller = String( booking.passenger_id ?? '' ) === authUser.id;
   if ( !isOwnedByCaller ) {return null;}
 
   if ( BOOKING_PREPAID_STATUSES.has( String( booking.payment_status ?? '' ).toLowerCase() ) ) {
@@ -117,7 +117,7 @@ export async function verifyPaymentIntentOwnership (
   intentId: string,
 ): Promise<{ owned: boolean; booking: Record<string, unknown> | null; amountMinor: number | null }> {
   const bookingColumns =
-    'id, passenger_id, user_id, fare, amount, total_price, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id';
+    'booking_id, passenger_id, amount, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id';
 
   const { data: booking, error: bookingError } = await admin
     .from( 'bookings' )
@@ -266,7 +266,7 @@ export async function handlePaymentIntentCreate ( request: Request ): Promise<Re
     const { error: bindError } = await auth.admin
       .from( 'bookings' )
       .update( { stripe_payment_intent_id: pi.id, updated_at: new Date().toISOString() } )
-      .eq( 'id', bookingId );
+      .eq( 'booking_id', bookingId );
 
     if ( bindError ) {
       console.error( '[payments] intent binding failed', bindError.message );
@@ -334,8 +334,8 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
     const bookingIdTrim = booking_id.trim();
     const { data, error: lookupError } = await auth.admin
       .from( 'bookings' )
-      .select( 'id, passenger_id, user_id, fare, amount, total_price, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id' )
-      .eq( 'id', bookingIdTrim )
+      .select( 'booking_id, passenger_id, amount, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id' )
+      .eq( 'booking_id', bookingIdTrim )
       .maybeSingle();
 
     if ( lookupError ) {
@@ -411,7 +411,7 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
     // payment_status 'succeeded' keeps this idempotent and never re-opens a
     // booking that was already refunded; failure to persist state is not fatal
     // to the Stripe refund itself, which is the source of truth here.
-    if ( bookingRow && String( bookingRow.id ?? '' ) ) {
+    if ( bookingRow && String( bookingRow.booking_id ?? '' ) ) {
       const { error: stateError } = await auth.admin
         .from( 'bookings' )
         .update( { payment_status: 'refunded', updated_at: new Date().toISOString() } )
@@ -447,7 +447,7 @@ export async function handleGetPaymentStatus ( request: Request, bookingId: stri
   const { data, error } = await admin
     .from( 'bookings' )
     .select( 'payment_status' )
-    .eq( 'id', bookingId )
+    .eq( 'booking_id', bookingId )
     .eq( 'passenger_id', auth.canonicalUser.id )
     .maybeSingle();
 

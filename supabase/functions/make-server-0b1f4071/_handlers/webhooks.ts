@@ -107,13 +107,13 @@ export async function handleStripeWebhook ( request: Request ) {
       return json( { received: true, transactionId, pending: true, paymentStatus: String( session?.payment_status ?? '' ) } );
     }
 
-    await finalizeTopUpTransaction(
+    await finalizeTopUpTransaction( {
       transactionId,
-      String( session?.id ?? '' ),
-      event,
-      'stripe',
-      stripeReportedPayment( session?.amount_total, session?.currency ),
-    );
+      externalReference: String( session?.id ?? '' ),
+      providerPayload: event,
+      provider: 'stripe',
+      expected: stripeReportedPayment( session?.amount_total, session?.currency ),
+    } );
     return json( { received: true, transactionId, finalized: true } );
   }
 
@@ -202,13 +202,13 @@ export async function handleStripeWebhook ( request: Request ) {
     const bookingId = String( metadata.booking_id ?? '' );
 
     if ( transactionId ) {
-      const result = await finalizeTopUpTransaction(
+      const result = await finalizeTopUpTransaction( {
         transactionId,
-        intentId,
-        event,
-        'stripe',
-        stripeReportedPayment( intent?.amount_received ?? paidAmount, currency ),
-      );
+        externalReference: intentId,
+        providerPayload: event,
+        provider: 'stripe',
+        expected: stripeReportedPayment( intent?.amount_received ?? paidAmount, currency ),
+      } );
       return json( { received: true, transactionId, finalized: result.applied } );
     }
 
@@ -272,9 +272,15 @@ export async function handleCliqWebhook ( request: Request ) {
     // if it is sent in fils, legitimate credits would be held as amount_mismatch.
     const reportedAmount = Number( firstStringValue( eventObject, [ 'amount', 'paidAmount', 'paid_amount', 'amountPaid' ] ) );
     const reportedCurrency = firstStringValue( eventObject, [ 'currency', 'currencyCode' ] );
-    await finalizeTopUpTransaction( transactionId, providerReference, event, 'cliq', {
-      amountJod: Number.isFinite( reportedAmount ) && reportedAmount > 0 ? reportedAmount : null,
-      currency: reportedCurrency || null,
+    await finalizeTopUpTransaction( {
+      transactionId,
+      externalReference: providerReference,
+      providerPayload: event,
+      provider: 'cliq',
+      expected: {
+        amountJod: Number.isFinite( reportedAmount ) && reportedAmount > 0 ? reportedAmount : null,
+        currency: reportedCurrency || null,
+      },
     } );
     return json( { received: true, transactionId, finalized: true } );
   }
@@ -305,7 +311,7 @@ export async function handleResendWebhook ( request: Request ) {
   const rawPayload = await request.text();
   // Verify the Resend webhook signature (HMAC-SHA256 over `<timestamp>.<body>`)
   // instead of a URL token. Fail closed when the signing secret is not configured.
-  if ( !await verifyResendWebhookSignature( rawPayload, request.headers.get( 'resend-signature' ) ) ) {
+  if ( !await verifyResendWebhookSignature( rawPayload, request.headers ) ) {
     return json( { error: 'Invalid Resend signature' }, 401 );
   }
 
