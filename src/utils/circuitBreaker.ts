@@ -189,7 +189,7 @@ class CircuitBreakerRegistry {
     if (!this.breakers.has(name)) {
       this.breakers.set(name, new CircuitBreaker(name, config));
     }
-    return this.breakers.get(name) ?? new CircuitBreaker(name, config);
+    return this.breakers.get(name)!;
   }
 
   /**

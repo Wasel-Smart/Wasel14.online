@@ -22,10 +22,13 @@ BEGIN
   -- Only client roles (authenticated, anon) are blocked from setting price/payment columns.
   -- Server roles (service_role, postgres, supabase_admin, etc.) may freely update them.
   IF TG_OP IN ('INSERT', 'UPDATE') THEN
-    IF current_user IN ('authenticated', 'anon')
-       OR current_user LIKE 'authenticated%'
-       OR current_user LIKE 'anon%'
+    IF current_user NOT IN ('authenticated', 'anon')
+       AND current_user NOT LIKE 'authenticated%'
+       AND current_user NOT LIKE 'anon%'
     THEN
+      -- Server roles may freely update price/payment columns; skip guard.
+      NULL;
+    ELSE
       IF (NEW.price_per_seat IS DISTINCT FROM OLD.price_per_seat)
          OR (NEW.total_price IS DISTINCT FROM OLD.total_price)
          OR (NEW.payment_status IS DISTINCT FROM OLD.payment_status)

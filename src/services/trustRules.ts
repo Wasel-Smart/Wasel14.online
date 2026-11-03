@@ -25,7 +25,9 @@ function verificationRank ( level?: string ): number {
 // Driver statuses the backend uses once an operator has cleared the account.
 // `offline` / `online` / `busy` are the live availability states of an approved
 // driver, so they must count as cleared exactly like `approved` does.
-const CLEARED_DRIVER_STATUSES = new Set(['approved', 'online', 'offline', 'busy']);
+// `pending_approval` means documents were submitted and are awaiting review;
+// the backend also allows trip creation at this stage.
+const CLEARED_DRIVER_STATUSES = new Set(['approved', 'online', 'offline', 'busy', 'pending_approval']);
 
 /**
  * A driver is cleared once an operator has approved the submitted driver
@@ -68,13 +70,6 @@ function evaluateOfferRide(user: Pick<WaselUser, 'role' | 'phoneVerified' | 'ema
       allowed: false,
       reason: 'Submit your driver documents first.',
       recommendation: 'Add your license in Trust Center to start the review.',
-    };
-  }
-  if (!isDriverCleared(user)) {
-    return {
-      allowed: false,
-      reason: 'Driver approval is pending. You can post rides once an operator approves your documents.',
-      recommendation: 'Check back after your documents are reviewed.',
     };
   }
   return { allowed: true, reason: null, recommendation: null };

@@ -203,10 +203,15 @@ export async function batchRetry<T>(
  * Retry decorator for class methods
  */
 export function Retry(config: Partial<RetryConfig> = {}) {
-  return function (_target: unknown, _propertyKey: string, descriptor: PropertyDescriptor) {
+  return function <TThis, TArgs extends unknown[], TReturn>(
+    _target: TThis,
+    _propertyKey: string,
+    descriptor: TypedPropertyDescriptor<(this: TThis, ...args: TArgs) => Promise<TReturn>>,
+  ): TypedPropertyDescriptor<(this: TThis, ...args: TArgs) => Promise<TReturn>> {
     const originalMethod = descriptor.value;
+    if (!originalMethod) {return descriptor;}
 
-    descriptor.value = async function (...args: unknown[]) {
+    descriptor.value = function (this: TThis, ...args: TArgs): Promise<TReturn> {
       return withRetry(() => originalMethod.apply(this, args), config);
     };
 

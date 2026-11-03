@@ -421,19 +421,40 @@ export default function TrustCenterPage () {
 
   const handleEnableDriverMode = async () => {
     if ( actionKey === 'driver-mode' ) { return; }
-    await runAction( 'driver-mode', async () => {
-      await enableTrustDriverMode();
-      updateUser( { role: 'driver' } );
-      await safeRefreshProfile();
-      await reloadTrustStatus( true );
-      window.setTimeout( () => {
-        documentsRef.current?.scrollIntoView( { behavior: 'smooth', block: 'center' } );
-        document.getElementById( 'driver-license' )?.focus();
-      }, 200 );
-    } );
+    await runAction(
+      'driver-mode',
+      async () => {
+        await enableTrustDriverMode();
+        updateUser( { role: 'driver' } );
+        await safeRefreshProfile();
+        await reloadTrustStatus( true );
+        window.setTimeout( () => {
+          documentsRef.current?.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+          document.getElementById( 'driver-license' )?.focus();
+        }, 200 );
+      },
+      ( current ) => {
+        // Optimistically flip the driver documents step so the license form
+        // renders immediately without waiting for the server reload.
+        const next = {
+          ...current,
+          steps: {
+            ...current.steps,
+            driverDocuments: {
+              ...current.steps.driverDocuments,
+              state: 'not_started' as const,
+              detail: 'Submit driver license and compliance documents.',
+              meta: { ...current.steps.driverDocuments.meta, role: 'driver' as const },
+            },
+          },
+        };
+        return next;
+      },
+    );
   };
 
   const handleDriverBadgeClick = () => {
+    if ( actionKey === 'driver-mode' ) { return; }
     if ( user.role !== 'driver' && user.role !== 'both' ) {
       void handleEnableDriverMode();
       return;
@@ -1048,7 +1069,11 @@ export default function TrustCenterPage () {
                       }
                       state={ driverStep?.state ?? 'not_started' }
                       onBadgeClick={ driverStep?.state === 'completed' ? undefined : handleDriverBadgeClick }
-                      badgeLabel={ getStepBadge( driverStep?.state ?? 'not_started', t ).label }
+                      badgeLabel={
+                        actionKey === 'driver-mode'
+                          ? t( 'trustCenterExpanded.inProgress' )
+                          : getStepBadge( driverStep?.state ?? 'not_started', t ).label
+                      }
                       icon={
                         <FileCheck
                           size={ 16 }
@@ -1074,7 +1099,9 @@ export default function TrustCenterPage () {
                                 disabled={ actionKey === 'driver-mode' }
                                 variant="primary"
                               >
-                                { t( 'trustCenterExpanded.enableDriverMode' ) }
+                                { actionKey === 'driver-mode'
+                                  ? t( 'trustCenterExpanded.inProgress' )
+                                  : t( 'trustCenterExpanded.enableDriverMode' ) }
                               </WaselButton>
                             }
                           />

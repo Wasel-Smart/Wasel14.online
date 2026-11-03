@@ -10,6 +10,7 @@
 import { API_URL } from '../core';
 import { BackendRequestError, requestEdgeJson } from '../backendWorkflow';
 import { getConfig } from '../../utils/env';
+import { sanitizeHtml } from '../../utils/sanitization';
 import {
   canUseLocalWalletStorage,
   fetchWalletLocal,
@@ -98,20 +99,10 @@ function getWalletPath(userId: string, suffix = ''): string {
   return `/v1/wallet/${userId}${suffix}`;
 }
 
-function sanitizeString(value: unknown): string {
-  if (typeof value !== 'string') {return '';}
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
 function sanitizeTransactions(transactions: WalletTransaction[]): WalletTransaction[] { // nosec CWE-79 CWE-80
   return transactions.map(tx => ({
     ...tx,
-    description: sanitizeString(tx.description),
+    description: sanitizeHtml(tx.description),
   }));
 }
 
@@ -126,7 +117,7 @@ function sanitizeWalletData(data: WalletData): WalletData {
     transactions: sanitizeTransactions(transactions),
     activeRewards: activeRewards.map(reward => ({
       ...reward,
-      description: sanitizeString(reward.description),
+      description: sanitizeHtml(reward.description),
     })),
   };
 }

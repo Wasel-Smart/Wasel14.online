@@ -1411,14 +1411,6 @@ paths:
       responses:
         '200':
           description: ok
-  /packages/*:
-    get:
-      tags:
-        - API
-      operationId: packagesStarX
-      responses:
-        '200':
-          description: ok
 components:
   schemas:
     Metadata:
@@ -1601,12 +1593,18 @@ components:
     CreatePackageRequest:
       type: object
       required:
+        - tracking_number
+        - sender_id
         - receiver_name
         - receiver_phone
         - origin_name
         - destination_name
         - size
       properties:
+        tracking_number:
+          type: string
+        sender_id:
+          type: string
         receiver_name:
           type: string
         receiver_phone:
@@ -1644,19 +1642,18 @@ components:
         fragile:
           type: boolean
     ErrorEnvelope:
-      allOf:
-        - $ref: '#/components/schemas/EnvelopeBase'
-        - type: object
-          required:
-            - success
-            - error
-          properties:
-            success:
-              type: boolean
-              const: false
-            error:
-              $ref: '#/components/schemas/ErrorPayload'
-      required: []
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          $ref: '#/components/schemas/ErrorPayload'
+        metadata:
+          $ref: '#/components/schemas/Metadata'
   /v1/gdpr/consents:
     post:
       tags:

@@ -117,8 +117,8 @@ export function getDriverReadinessSummary(
   if (!isDriverCleared(user)) {
     return {
       status: 'pending_review',
-      headline: 'Final review in progress',
-      detail: 'Your documents are submitted. You can publish rides as soon as an operator approves them.',
+      headline: 'Documents submitted — review in progress',
+      detail: 'Your documents are under review. You can already post rides while you wait.',
       steps,
       canOfferRide: offerRideGate.allowed,
       canCarryPackages: false,

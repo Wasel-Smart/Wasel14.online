@@ -108,6 +108,10 @@ export abstract class BaseWorker<T = unknown> {
 
   abstract process(message: QueueMessage<T>): Promise<void>;
 
+  getName(): string {
+    return this.config.name;
+  }
+
   async start(): Promise<void> {
     if (this.isRunning) {return;}
     this.isRunning = true;
@@ -321,7 +325,7 @@ export class WorkerRegistry {
   private workers: Map<string, BaseWorker> = new Map();
 
   register(worker: BaseWorker): void {
-    this.workers.set(worker['config'].name, worker);
+    this.workers.set(worker.getName(), worker);
   }
 
   async startAll(): Promise<void> {

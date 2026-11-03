@@ -974,16 +974,22 @@ export function isApprovedDriver (
   emailConfirmed: boolean,
 ): boolean {
   const role = String( user.role ?? 'passenger' );
-  // Approval is an operator decision on the submitted driver documents, so the
-  // driver status is the source of truth. The approval handler also lifts the
-  // account to level_3, but a missed level sync must never lock out an approved
-  // driver.
+  const driverStatus = String( driver.driver_status ?? '' );
+  const bgStatus = String( driver.background_check_status ?? '' );
+  // A driver is cleared once an operator approves their documents.
+  // `pending_approval` drivers have submitted docs and are awaiting review;
+  // they may create trips so the route is live when approval comes through.
+  const isCleared =
+    ( driverStatus === 'approved' && [ 'approved', 'verified' ].includes( bgStatus ) ) ||
+    driverStatus === 'pending_approval' ||
+    driverStatus === 'online' ||
+    driverStatus === 'offline' ||
+    driverStatus === 'busy';
   return (
     ( role === 'driver' || role === 'both' ) &&
     Boolean( user.phone_verified_at ) &&
     emailConfirmed &&
-    String( driver.driver_status ?? '' ) === 'approved' &&
-    [ 'approved', 'verified' ].includes( String( driver.background_check_status ?? '' ) )
+    isCleared
   );
 }
 

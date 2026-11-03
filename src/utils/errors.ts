@@ -389,7 +389,7 @@ export function handleError(error: unknown, context?: ErrorContext): WaselError 
       code: isNetwork ? 'NETWORK_002' : 'SYSTEM_001',
       message: error.message,
       category: isNetwork ? ErrorCategory.NETWORK : ErrorCategory.SYSTEM,
-      severity: isNetwork ? ErrorSeverity.HIGH : ErrorSeverity.HIGH,
+      severity: isNetwork ? ErrorSeverity.HIGH : ErrorSeverity.CRITICAL,
       context,
       originalError: error,
       retryable: isNetwork,

@@ -285,8 +285,9 @@ export async function createRideBooking ( input: {
   const persistedStatus = persisted?.status;
   const remoteStatus: RideBookingStatus = resolveRemoteStatus( persistedStatus, persistedId, input.routeMode );
 
+  const localId = makeTicketCode();
   const booking: RideBookingRecord = {
-    id: persistedId || makeTicketCode(),
+    id: persistedId || localId,
     rideId: input.rideId,
     ownerId: input.ownerId,
     passengerId: input.passengerId,
@@ -302,7 +303,7 @@ export async function createRideBooking ( input: {
     paymentStatus: remoteStatus === 'confirmed' ? 'authorized' : 'pending',
     routeMode: input.routeMode,
     supportThreadOpen: false,
-    ticketCode: makeTicketCode(),
+    ticketCode: persistedId || localId,
     backendBookingId: persistedId || undefined,
     syncedAt: persistedId ? now : undefined,
     createdAt: now,

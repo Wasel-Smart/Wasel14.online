@@ -20,7 +20,12 @@ describe('API endpoint contracts between frontend and backend', () => {
   it('every frontend API_ENDPOINTS entry has a corresponding edge handler', () => {
     const missing: string[] = [];
     for (const [name, endpoint] of Object.entries(apiEndpoints)) {
-      if (!edgeHandlers.has(endpoint.path)) {
+      const normalizedPath = endpoint.path.replace(/^(\/v1)/, '');
+      const hasExact = edgeHandlers.has(normalizedPath);
+      const hasPrefix = !hasExact && Array.from(edgeHandlers.keys()).some(
+        k => k.endsWith('*') && normalizedPath.startsWith(k.slice(0, -1)),
+      );
+      if (!hasExact && !hasPrefix) {
         missing.push(`${name}: ${endpoint.method} ${endpoint.path}`);
       }
     }

@@ -1,5 +1,6 @@
 import { supabase } from '@/utils/supabase/client';
 import { paymentService } from './payment';
+import { sanitizeString } from '@/utils/sanitization';
 
 export interface CancelBookingRequest {
   bookingId: string;
@@ -91,7 +92,7 @@ class CancellationService {
       user_id: driverId,
       type: 'booking_cancelled',
       title: 'Booking Cancelled',
-      body: `A passenger cancelled their booking. Reason: ${reason}`,
+      body: `A passenger cancelled their booking. Reason: ${sanitizeString(reason)}`,
       data: { bookingId, tripId: booking.trip_id },
     });
   }
@@ -178,7 +179,7 @@ class CancellationService {
           user_id: booking.passenger_id,
           type: 'trip_cancelled',
           title: 'Trip Cancelled',
-          body: `Your trip has been cancelled by the driver. Reason: ${reason}`,
+          body: `Your trip has been cancelled by the driver. Reason: ${sanitizeString(reason)}`,
           data: { bookingId: booking.id, tripId },
         });
       }
