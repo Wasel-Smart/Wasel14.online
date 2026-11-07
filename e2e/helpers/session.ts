@@ -13,7 +13,6 @@ export const demoUser = {
   rating: 4.8,
   trips: 18,
   verified: true,
-  sanadVerified: true,
   verificationLevel: 'level_3',
   walletStatus: 'active',
   driverStatus: 'approved',

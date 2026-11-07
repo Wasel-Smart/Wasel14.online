@@ -83,42 +83,73 @@ export async function handleGetTrustStatus ( request: Request ) {
   }
 }
 
-/** Submit a Sanad reference for human review. A reference is only evidence
- * submitted by the user; this endpoint never marks identity as verified. */
 export async function handleSubmitIdentityVerification ( request: Request ) {
   const auth = await authenticateRequest( request );
   if ( 'error' in auth ) {return auth.error;}
 
   const body = await request.json().catch( () => ( {} ) );
-  const providerReference = String( body.providerReference ?? '' ).trim();
-  const documentReference = String( body.documentReference ?? '' ).trim() || null;
-  if ( providerReference.length < 6 || providerReference.length > 120 || !/^[\\p{L}\\p{N}._/-]+$/u.test( providerReference ) ) {
-    return json( { error: 'Enter a valid Sanad verification reference.' }, 400 );
-  }
-  if ( documentReference && ( documentReference.length > 120 || /[<>\\u0000-\\u001f]/.test( documentReference ) ) ) {
-    return json( { error: 'Document reference is invalid.' }, 400 );
+  const providerReference = typeof body.providerReference === 'string' ? body.providerReference.trim() : '';
+  const documentReference = typeof body.documentReference === 'string' ? body.documentReference.trim() || null : null;
+
+  if ( providerReference.length < 6 || providerReference.length > 120 || !/^[\p{L}\p{N}._/-]+$/u.test( providerReference ) ) {
+    return json( { error: 'Enter a valid provider reference.' }, 400 );
   }
 
-  const { data: pending, error: lookupError } = await auth.admin
+  if ( documentReference && ( documentReference.length > 120 || /[<>]/.test( documentReference ) || containsControlCharacters( documentReference ) ) ) {
+    return json( { error: 'Document reference contains invalid characters.' }, 400 );
+  }
+
+  const { data: existingVerification, error: verificationLookupError } = await auth.admin
     .from( 'verification_records' )
     .select( 'verification_id' )
     .eq( 'user_id', auth.canonicalUser.id )
     .eq( 'sanad_status', 'pending' )
     .neq( 'provider_reference', 'driver_documents' )
-    .limit( 1 )
     .maybeSingle();
-  if ( lookupError ) {return json( { error: 'Identity verification is temporarily unavailable.' }, 503 );}
-  if ( pending ) {return json( { error: 'An identity verification is already awaiting review.' }, 409 );}
 
-  const { data, error } = await auth.admin.rpc( 'app_submit_sanad_verification', {
-    p_user_id: auth.canonicalUser.id,
-    p_provider_reference: providerReference,
-    p_document_reference: documentReference,
-  } );
-  if ( error?.code === '23505' ) {return json( { error: 'An identity verification is already awaiting review.' }, 409 );}
-  if ( error ) {return json( { error: 'Identity verification could not be submitted.' }, 500 );}
+  if ( verificationLookupError ) {
+    return json( { error: verificationLookupError.message }, 500 );
+  }
 
-  return json( { submitted: true, status: 'pending_review', verificationId: data }, 202 );
+  if ( existingVerification ) {
+    return json( { error: 'An identity verification is already pending.' }, 409 );
+  }
+
+  const { data: insertedVerification, error: insertError } = await auth.admin
+    .from( 'verification_records' )
+    .insert( {
+      user_id: auth.canonicalUser.id,
+      sanad_status: 'pending',
+      document_status: documentReference ? 'pending' : 'unverified',
+      verification_level: 'level_1',
+      provider_reference: providerReference,
+      document_reference: documentReference,
+      failure_reason: null,
+    } )
+    .select( 'verification_id' )
+    .single();
+
+  if ( insertError ) {
+    return json( { error: insertError.message }, 500 );
+  }
+
+  const { error: updateUserError } = await auth.admin
+    .from( 'users' )
+    .update( {
+      sanad_verified_status: 'pending',
+      updated_at: new Date().toISOString(),
+    } )
+    .eq( 'id', auth.canonicalUser.id );
+
+  if ( updateUserError ) {
+    return json( { error: updateUserError.message }, 500 );
+  }
+
+  return json( {
+    submitted: true,
+    status: 'pending_review',
+    verificationId: insertedVerification.verification_id,
+  }, 202 );
 }
 
 export async function handleStartPhoneVerification ( request: Request ) {

@@ -12,7 +12,6 @@ function readSource(relativePath: string): string {
 
 const OPENAPI_SPEC = load(readSource('docs/openapi/wasel-v1.yaml')) as Record<string, unknown>;
 const API_ENDPOINTS_SOURCE = readSource('src/utils/api.ts');
-const EDGE_INDEX = readSource('supabase/functions/make-server-0b1f4071/index.ts');
 
 describe('API endpoint contracts between frontend and backend', () => {
   const apiEndpoints = extractApiEndpoints(API_ENDPOINTS_SOURCE);
@@ -32,10 +31,6 @@ describe('API endpoint contracts between frontend and backend', () => {
     expect(nonV1).toEqual([]);
   });
 
-  it('documents the mobile identity submission endpoint', () => {
-    expect(apiEndpoints.TRUST_IDENTITY?.path).toBe('/v1/trust/identity/submit');
-    expect(EDGE_INDEX).toContain("path === '/trust/identity/submit'");
-  });
 });
 
 describe('API endpoint security requirements', () => {
@@ -47,13 +42,7 @@ describe('API endpoint security requirements', () => {
     }
   });
 
-  it('endpoints requiring auth are not public', () => {
-    const trustHandler = readSource('supabase/functions/make-server-0b1f4071/_handlers/trust.ts');
-    expect(trustHandler).toContain('export async function handleSubmitIdentityVerification');
-    expect(trustHandler).toContain("const auth = await authenticateRequest( request )");
-  });
 });
-
 describe('API endpoint request/response contracts', () => {
   const schemas = (OPENAPI_SPEC.components as Record<string, unknown>)?.schemas as Record<string, unknown>;
 

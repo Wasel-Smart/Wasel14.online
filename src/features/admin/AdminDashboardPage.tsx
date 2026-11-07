@@ -4,12 +4,7 @@ import { PageShell } from '../../components/wasel-ui/WaselPagePrimitives';
 import { C, R, SPACE, TYPE, card, pillStyle } from '../../utils/wasel-ds';
 import { RefreshCw, AlertTriangle, Users, Package, Car, DollarSign } from 'lucide-react';
 import { tx } from '../../locales/tx';
-import {
-  getAdminMetrics,
-  getPendingIdentitySubmissions,
-  reviewIdentitySubmission,
-  type PendingIdentitySubmission,
-} from '../../services/adminApi';
+import { getAdminMetrics } from '../../services/adminApi';
 
 interface AdminMetrics {
   activeTrips: number;
@@ -31,10 +26,6 @@ export function AdminDashboardPage() {
 const [range, setRange] = useState<Range>('1d');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
-  const [pendingIdentity, setPendingIdentity] = useState<PendingIdentitySubmission[]>([]);
-  const [identityQueueError, setIdentityQueueError] = useState<string | null>(null);
-  const [identityReasons, setIdentityReasons] = useState<Record<string, string>>({});
-  const [reviewingIdentityId, setReviewingIdentityId] = useState<string | null>(null);
 
 useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -51,17 +42,6 @@ useEffect(() => {
         if (cancelled) {return;}
 
         setMetrics(metrics);
-        try {
-          const queue = await getPendingIdentitySubmissions();
-          if (!cancelled) {
-            setPendingIdentity(queue.submissions ?? []);
-            setIdentityQueueError(null);
-          }
-        } catch (queueError) {
-          if (!cancelled) {
-            setIdentityQueueError(queueError instanceof Error ? queueError.message : 'Identity review queue is unavailable.');
-          }
-        }
         setLastUpdated(new Date());
         setError(null);
       } catch (err) {
@@ -79,24 +59,6 @@ useEffect(() => {
 
     return () => { cancelled = true; };
   }, [range, session?.access_token, user?.role, refetchTrigger]);
-
-  const reviewIdentity = async (submission: PendingIdentitySubmission, decision: 'approve' | 'reject') => {
-    const failureReason = identityReasons[submission.verification_id]?.trim() ?? '';
-    if (decision === 'reject' && failureReason.length < 5) {
-      setIdentityQueueError('Enter a rejection reason of at least 5 characters.');
-      return;
-    }
-    setReviewingIdentityId(submission.verification_id);
-    setIdentityQueueError(null);
-    try {
-      await reviewIdentitySubmission(submission.verification_id, decision, decision === 'reject' ? failureReason : undefined);
-      setPendingIdentity(current => current.filter(item => item.verification_id !== submission.verification_id));
-    } catch (reviewError) {
-      setIdentityQueueError(reviewError instanceof Error ? reviewError.message : 'Could not save the identity review.');
-    } finally {
-      setReviewingIdentityId(null);
-    }
-  };
 
   if (!user || user.role !== 'admin') {
     return (
@@ -312,48 +274,7 @@ useEffect(() => {
           </div>
         ) : null}
 
-        <section style={{ ...card({ padding: SPACE[5], radius: R.xxl }), marginTop: SPACE[5] }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: SPACE[3], marginBottom: SPACE[4] }}>
-            <div>
-              <h2 style={{ margin: 0, color: C.text, fontSize: TYPE.size.xl }}>Sanad identity reviews</h2>
-              <p style={{ margin: `${SPACE[1]} 0 0`, color: C.textMuted, fontSize: TYPE.size.sm }}>
-                User-submitted references remain pending until a reviewer decides.
-              </p>
-            </div>
-            <span style={pillStyle(pendingIdentity.length ? C.gold : C.green)}>{pendingIdentity.length} pending</span>
-          </div>
-          {identityQueueError && <p role="alert" style={{ color: C.error }}>{identityQueueError}</p>}
-          {pendingIdentity.length === 0 ? (
-            <p style={{ color: C.textMuted }}>No pending identity submissions.</p>
-          ) : (
-            <div style={{ display: 'grid', gap: SPACE[3] }}>
-              {pendingIdentity.map(submission => (
-                <article key={submission.verification_id} style={{ ...card({ padding: SPACE[4], radius: R.lg }), background: C.elevated }}>
-                  <div style={{ display: 'grid', gap: SPACE[2], color: C.textSub, fontSize: TYPE.size.sm }}>
-                    <div>User: <code>{submission.user_id}</code></div>
-                    <div>Sanad reference: <code>{submission.provider_reference ?? '—'}</code></div>
-                    {submission.document_reference && <div>Document reference: <code>{submission.document_reference}</code></div>}
-                    <div>Submitted: {new Date(submission.created_at).toLocaleString()}</div>
-                  </div>
-                  <label style={{ display: 'grid', gap: SPACE[2], marginTop: SPACE[3], color: C.textMuted, fontSize: TYPE.size.sm }}>
-                    Rejection reason (required to reject)
-                    <textarea
-                      value={identityReasons[submission.verification_id] ?? ''}
-                      onChange={event => setIdentityReasons(current => ({ ...current, [submission.verification_id]: event.target.value }))}
-                      maxLength={500}
-                      rows={2}
-                      style={{ width: '100%', boxSizing: 'border-box', borderRadius: R.md, border: `1px solid ${C.border}`, background: C.bg, color: C.text, padding: SPACE[3] }}
-                    />
-                  </label>
-                  <div style={{ display: 'flex', gap: SPACE[2], marginTop: SPACE[3] }}>
-                    <button disabled={reviewingIdentityId === submission.verification_id} onClick={() => void reviewIdentity(submission, 'approve')} style={{ ...pillStyle(C.green), cursor: 'pointer' }}>Approve</button>
-                    <button disabled={reviewingIdentityId === submission.verification_id} onClick={() => void reviewIdentity(submission, 'reject')} style={{ ...pillStyle(C.error), cursor: 'pointer' }}>Reject</button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+
       </div>
     </PageShell>
   );

@@ -142,7 +142,7 @@ class TelemetryCollector {
         );
       }
       // Forward completed span to OTLP collector if configured
-      import('./telemetry').then(({ exportSpanToOtlp }) => exportSpanToOtlp(span)).catch(() => undefined);
+      void exportSpanToOtlp(span);
     }
   }
 

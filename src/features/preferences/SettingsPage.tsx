@@ -45,6 +45,7 @@ import {
   type TwoFactorSetup,
 } from '../../utils/security';
 import { C, F, R, TYPE } from '../../utils/wasel-ds';
+import { hasAnalyticsConsent, setAnalyticsConsent } from '../../utils/analyticsConsent';
 import { supabase } from '../../utils/supabase/client';
 import styles from '../../styles/app-shell.module.css';
 import { Section, ToggleRow, SelectRow, LinkRow, ActionButton, FormField } from './components/SettingsPrimitives';
@@ -138,7 +139,7 @@ export default function SettingsPage() {
       const settings = await getAccountSettings(user?.id ?? null, defaultAccountSettings);
       if (cancelled) {return;}
 
-      setPrivacy(settings.privacy);
+      setPrivacy({ ...settings.privacy, dataAnalytics: hasAnalyticsConsent() });
       setDisplay({
         ...settings.display,
         language,
@@ -515,6 +516,7 @@ export default function SettingsPage() {
   const resetToDefaults = () => {
     setShowResetConfirm(false);
     setPrivacy(defaultAccountSettings.privacy);
+    setAnalyticsConsent(false);
     setDisplay({
       ...defaultAccountSettings.display,
       language,
@@ -763,7 +765,10 @@ export default function SettingsPage() {
             label={t('settingsExpanded.analyticsAndImprovement')}
             sub={t('settingsExpanded.anonymousUsage')}
             value={privacy.dataAnalytics}
-            onChange={value => setPrivacy(previous => ({ ...previous, dataAnalytics: value }))}
+            onChange={value => {
+              setPrivacy(previous => ({ ...previous, dataAnalytics: value }));
+              setAnalyticsConsent(value);
+            }}
           />
           <div className={styles.settingsSectionInner}>
             <button onClick={requestResetToDefaults} className={styles.settingsResetButton}>

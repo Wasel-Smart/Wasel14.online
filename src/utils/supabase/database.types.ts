@@ -117,7 +117,6 @@ export interface Database {
           | 'online'
           | 'busy';
         verification_level: 'level_0' | 'level_1' | 'level_2' | 'level_3';
-        sanad_identity_linked: boolean;
         background_check_status: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
         created_at: string;
         updated_at: string;
@@ -230,7 +229,6 @@ export interface Database {
         verified: boolean | null;
         id_verified: boolean | null;
         is_verified: boolean | null;
-        sanad_verified: boolean | null;
         phone_verified: boolean | null;
         verification_level: string | null;
         wallet_status: string | null;
@@ -329,7 +327,6 @@ export interface Database {
         national_id: string | null;
         national_id_hash: string | null;
         national_id_last4: string | null;
-        sanad_verified_status: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
         profile_status: 'pending' | 'active' | 'suspended' | 'blocked';
         role: 'passenger' | 'driver' | 'admin';
         verification_level: 'level_0' | 'level_1' | 'level_2' | 'level_3';
@@ -359,7 +356,6 @@ export interface Database {
       verification_records: RowSet<{
         verification_id: string;
         user_id: string;
-        sanad_status: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
         document_status: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
         verification_level: 'level_0' | 'level_1' | 'level_2' | 'level_3';
         verification_timestamp: string;
@@ -623,7 +619,7 @@ export interface Database {
 
     Functions: {
       app_enable_driver_mode: {
-        Args: {};
+        Args: Record<PropertyKey, never>;
         Returns: Json;
       };
 

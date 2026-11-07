@@ -507,7 +507,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (updates.rating !== undefined) {profileUpdates.rating = updates.rating;}
       if (updates.trips !== undefined) {profileUpdates.trip_count = updates.trips;}
       if (updates.verified !== undefined) {profileUpdates.verified = updates.verified;}
-      if (updates.sanadVerified !== undefined) {profileUpdates.sanad_verified = updates.sanadVerified;}
       if (updates.verificationLevel !== undefined) {profileUpdates.verification_level = updates.verificationLevel;}
       if (updates.walletStatus !== undefined) {profileUpdates.wallet_status = updates.walletStatus;}
       if (updates.avatar !== undefined) {profileUpdates.avatar_url = updates.avatar;}

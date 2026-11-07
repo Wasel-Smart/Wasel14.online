@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // This file exercises walletApi with the edge transport UNCONFIGURED
-// (API_URL = ''), which is how the module resolves canUseEdgeApi() at
-// import time. It covers the direct-Supabase and local-storage fallback
-// tiers. See walletApi.edge.test.ts for the edge-transport-available tier.
+// (API_URL = ''). Read-only/local fallbacks remain covered here; money
+// movement must fail closed without the authenticated edge backend.
 
 vi.mock('../core', () => ({
   API_URL: '',
@@ -31,14 +30,10 @@ vi.mock('../../utils/env', () => ({
 const walletDirectMocks = vi.hoisted(() => ({
   fetchWalletDirect: vi.fn(),
   getWalletTransactionRows: vi.fn(),
-  transferWalletFundsDirect: vi.fn(),
-  withdrawWalletFundsDirect: vi.fn(),
-  updateWalletPreferencesDirect: vi.fn(),
   getPaymentMethodsDirect: vi.fn(),
   addPaymentMethodDirect: vi.fn(),
   deletePaymentMethodDirect: vi.fn(),
   getTrustScoreDirect: vi.fn(),
-  payWithWalletDirect: vi.fn(),
 }));
 vi.mock('../wallet/walletDirect', () => walletDirectMocks);
 
@@ -74,7 +69,7 @@ function makeWallet(overrides: Partial<WalletData> = {}): WalletData {
   };
 }
 
-describe('walletApi — edge transport NOT configured (direct/local tiers)', () => {
+describe('walletApi — edge transport NOT configured (read-only/local tiers)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: false });
@@ -86,7 +81,7 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
       const caps = getWalletCapabilities();
       expect(caps).toEqual({
         topUp: false, rewardClaim: false, subscription: false, pin: false,
-        send: true, withdraw: true, autoTopUp: true,
+        send: false, withdraw: false, autoTopUp: false,
       });
     });
   });
@@ -163,38 +158,29 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
   });
 
   describe('withdraw', () => {
-    it('routes to direct Supabase when fallback is allowed', async () => {
+    it('fails closed without the secure edge backend, even when direct fallback is enabled', async () => {
       getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
-      const result = makeWallet({ balance: 75 });
-      walletDirectMocks.withdrawWalletFundsDirect.mockResolvedValue(result);
-
-      const out = await walletApi.withdraw('user-123', 25, 'JO00BANK123', { method: 'bank_transfer' });
-
-      expect(walletDirectMocks.withdrawWalletFundsDirect).toHaveBeenCalledWith(
-        'user-123', 25, 'JO00BANK123', 'bank_transfer',
+      await expect(walletApi.withdraw('user-123', 25, 'JO00BANK123')).rejects.toThrow(
+        'Secure wallet API is not configured.',
       );
-      expect(out).toBe(result);
+      expect(walletDirectMocks.fetchWalletDirect).not.toHaveBeenCalled();
     });
 
-    it('throws when direct fallback is disabled', async () => {
+    it('fails closed when direct fallback is disabled', async () => {
       getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: false });
       await expect(walletApi.withdraw('user-123', 25, 'JO00BANK123')).rejects.toThrow(
-        'Secure API is not configured and direct database access is disabled for this environment.',
+        'Secure wallet API is not configured.',
       );
-      expect(walletDirectMocks.withdrawWalletFundsDirect).not.toHaveBeenCalled();
+      expect(walletDirectMocks.fetchWalletDirect).not.toHaveBeenCalled();
     });
   });
 
   describe('sendMoney', () => {
-    it('wraps the direct transfer result in the expected { success, note, wallet } shape', async () => {
+    it('fails closed without the secure edge backend, even when direct fallback is enabled', async () => {
       getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
-      const updatedWallet = makeWallet({ balance: 50 });
-      walletDirectMocks.transferWalletFundsDirect.mockResolvedValue(updatedWallet);
-
-      const out = await walletApi.sendMoney('user-123', 'user-456', 30, { note: 'lunch money' });
-
-      expect(walletDirectMocks.transferWalletFundsDirect).toHaveBeenCalledWith('user-123', 'user-456', 30);
-      expect(out).toEqual({ success: true, note: 'lunch money', wallet: updatedWallet });
+      await expect(walletApi.sendMoney('user-123', 'user-456', 30, { note: 'lunch money' }))
+        .rejects.toThrow('Secure wallet API is not configured.');
+      expect(walletDirectMocks.fetchWalletDirect).not.toHaveBeenCalled();
     });
   });
 
@@ -237,25 +223,13 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
   });
 
   describe('setAutoTopUp', () => {
-    it('falls back to local storage when the direct update fails', async () => {
+    it('fails closed without the secure edge backend, even when direct fallback is enabled', async () => {
       getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
-      walletLocalMocks.canUseLocalWalletStorage.mockReturnValue(true);
-      walletDirectMocks.updateWalletPreferencesDirect.mockRejectedValue(new Error('rls denied'));
-      const localResult = makeWallet({ autoTopUp: true });
-      walletLocalMocks.setAutoTopUpLocal.mockResolvedValue(localResult);
-
-      const out = await walletApi.setAutoTopUp('user-123', true, 30, 10);
-
-      expect(walletLocalMocks.setAutoTopUpLocal).toHaveBeenCalledWith('user-123', true, 30, 10);
-      expect(out).toBe(localResult);
-    });
-
-    it('propagates the direct error when local storage is unavailable (no silent swallow)', async () => {
-      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
-      walletLocalMocks.canUseLocalWalletStorage.mockReturnValue(false);
-      walletDirectMocks.updateWalletPreferencesDirect.mockRejectedValue(new Error('rls denied'));
-
-      await expect(walletApi.setAutoTopUp('user-123', true, 30, 10)).rejects.toThrow('rls denied');
+      await expect(walletApi.setAutoTopUp('user-123', true, 30, 10)).rejects.toThrow(
+        'Secure wallet API is not configured.',
+      );
+      expect(walletDirectMocks.fetchWalletDirect).not.toHaveBeenCalled();
+      expect(walletLocalMocks.setAutoTopUpLocal).not.toHaveBeenCalled();
     });
   });
 
@@ -285,17 +259,11 @@ describe('walletApi — edge transport NOT configured (direct/local tiers)', () 
   });
 
   describe('pay', () => {
-    it('routes checkout payment through the direct wallet-payment RPC wrapper', async () => {
+    it('fails closed without the secure edge backend, even when direct fallback is enabled', async () => {
       getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
-      const paidWallet = makeWallet({ balance: 70 });
-      walletDirectMocks.payWithWalletDirect.mockResolvedValue(paidWallet);
-
-      const out = await walletApi.pay('user-123', 30, 'ride_booking', { referenceId: 'trip-1', metadata: { note: 'fare' } });
-
-      expect(walletDirectMocks.payWithWalletDirect).toHaveBeenCalledWith({
-        userId: 'user-123', amount: 30, referenceType: 'ride_booking', referenceId: 'trip-1', metadata: { note: 'fare' },
-      });
-      expect(out).toBe(paidWallet);
+      await expect(walletApi.pay('user-123', 30, 'ride_booking', { referenceId: 'trip-1', metadata: { note: 'fare' } }))
+        .rejects.toThrow('Secure wallet API is not configured.');
+      expect(walletDirectMocks.fetchWalletDirect).not.toHaveBeenCalled();
     });
   });
 

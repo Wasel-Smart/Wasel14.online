@@ -38,8 +38,8 @@ import { useNavigate } from 'react-router';
 import { WaselBadge } from './wasel-ui/WaselBadge';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { activeTripAPI } from '../services/activeTrip';
-import { API_URL, fetchWithRetry, getAuthDetails } from '../services/core';
 import { bookingsAPI } from '../services/bookings';
+import { ratingsService } from '../services/ratings';
 import { subscribeToLiveTripPresence, type LiveTripSnapshot } from '../services/liveTripTracking';
 import { shareContent } from '../hooks/useShare';
 import { useLocalAuth } from '../contexts/LocalAuth';
@@ -625,24 +625,18 @@ export function LiveTripTracking() {
   const handleRatingSubmit = useCallback(
     async (stars: number, comment: string) => {
       try {
-        const { token } = await getAuthDetails();
-        await fetchWithRetry(`${API_URL}/reviews`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            reviewee_id: trip.driver.id,
-            role: 'driver',
-            overall_rating: stars,
-            comment,
-            trip_id: liveTrip?.tripId ?? trip.shareCode,
-          }),
+        await ratingsService.submitTripReview({
+          reviewee_id: trip.driver.id,
+          role: 'driver',
+          overall_rating: stars,
+          comment,
+          trip_id: liveTrip?.tripId ?? trip.shareCode,
         });
       } catch {
-        // Not critical — proceed regardless
+        toast.error('We could not save your rating. Please try again. · تعذر حفظ تقييمك، حاول مرة أخرى.');
+        return;
       }
-      toast.success('Thanks for rating! · شكراً على تقييمك', {
-        description: '+10 Wasel Points earned 🌟',
-      });
+      toast.success('Thanks for rating! · شكراً على تقييمك');
       setShowRating(false);
       navigate('/app/my-trips');
     },

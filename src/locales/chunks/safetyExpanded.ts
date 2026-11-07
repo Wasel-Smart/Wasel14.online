@@ -1,7 +1,7 @@
 export const safetyExpanded = {
   en: {
     verifiedIdentity: 'Verified Identity',
-    identityDetail: 'Your identity is verified through Sanad, building trust across the platform.',
+    identityDetail: 'Account trust is supported by verified contact details and required documents.',
     step: 'Step',
     emergencyHelp: 'Emergency Help',
     emergencyDetail: 'One tap connects you to emergency services and shares your live location.',

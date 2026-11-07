@@ -148,7 +148,7 @@ The frontend profile mapping in `LocalAuth.tsx` → `authContextHelpers.ts` → 
 - `users.verification_level` (enum: `level_0`..`level_3`) → `WaselUser.verificationLevel`
 - `users.phone_verified_at` → `WaselUser.phoneVerified`
 - `wallets.balance` → `WaselUser.balance`
-- `verification_records.sanad_status` → `WaselUser.verified` / `WaselUser.sanadVerified`
+- `verification_records.document_status` → `WaselUser.verified`
 
 The `verification_level` enum in the database (`verification_level_v2`) matches the string values used by the app (`'level_0'`, `'level_1'`, `'level_2'`, `'level_3'`). No type mismatch.
 

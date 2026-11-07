@@ -361,7 +361,6 @@ export function TrustScoreCard({
   user?: {
     emailVerified?: boolean;
     phoneVerified?: boolean;
-    sanadVerified?: boolean;
     verified?: boolean;
     trips?: number;
     rating?: number;
@@ -372,7 +371,7 @@ export function TrustScoreCard({
   const pct = resolved ? Math.max(0, Math.min(100, score)) : 0;
   const emailPoints = user?.emailVerified ? 10 : 0;
   const phonePoints = user?.phoneVerified ? 10 : 0;
-  const identityPoints = user?.sanadVerified || user?.verified ? 15 : 0;
+  const identityPoints = user?.verified ? 15 : 0;
   const tripsPoints = Math.min(user?.trips ?? 0, 50) * 0.4;
   const ratingPoints = Math.max(0, Math.min(5, user?.rating ?? 0)) * 2;
   const basePoints = 45;

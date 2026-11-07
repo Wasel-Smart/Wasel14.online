@@ -582,7 +582,6 @@ export function HomePage () {
                   ? {
                     emailVerified: waselUser.emailVerified,
                     phoneVerified: waselUser.phoneVerified,
-                    sanadVerified: waselUser.sanadVerified,
                     verified: waselUser.verified,
                     trips: waselUser.trips,
                     rating: waselUser.rating,

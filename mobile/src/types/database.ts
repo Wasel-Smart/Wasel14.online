@@ -870,7 +870,6 @@ export type Database = {
           driver_id: string
           driver_status: Database["public"]["Enums"]["driver_status_v2"]
           license_number: string
-          sanad_identity_linked: boolean
           updated_at: string
           user_id: string
           vehicle_id: string | null
@@ -882,7 +881,6 @@ export type Database = {
           driver_id?: string
           driver_status?: Database["public"]["Enums"]["driver_status_v2"]
           license_number: string
-          sanad_identity_linked?: boolean
           updated_at?: string
           user_id: string
           vehicle_id?: string | null
@@ -894,7 +892,6 @@ export type Database = {
           driver_id?: string
           driver_status?: Database["public"]["Enums"]["driver_status_v2"]
           license_number?: string
-          sanad_identity_linked?: boolean
           updated_at?: string
           user_id?: string
           vehicle_id?: string | null
@@ -2499,7 +2496,6 @@ export type Database = {
           profile_status: Database["public"]["Enums"]["profile_status_v2"]
           referral_code: string | null
           role: Database["public"]["Enums"]["user_role_v2"]
-          sanad_verified_status: Database["public"]["Enums"]["verification_status_v2"]
           two_factor_backup_codes: string[] | null
           two_factor_enabled: boolean
           two_factor_secret: string | null
@@ -2521,7 +2517,6 @@ export type Database = {
           profile_status?: Database["public"]["Enums"]["profile_status_v2"]
           referral_code?: string | null
           role?: Database["public"]["Enums"]["user_role_v2"]
-          sanad_verified_status?: Database["public"]["Enums"]["verification_status_v2"]
           two_factor_backup_codes?: string[] | null
           two_factor_enabled?: boolean
           two_factor_secret?: string | null
@@ -2543,7 +2538,6 @@ export type Database = {
           profile_status?: Database["public"]["Enums"]["profile_status_v2"]
           referral_code?: string | null
           role?: Database["public"]["Enums"]["user_role_v2"]
-          sanad_verified_status?: Database["public"]["Enums"]["verification_status_v2"]
           two_factor_backup_codes?: string[] | null
           two_factor_enabled?: boolean
           two_factor_secret?: string | null
@@ -2608,7 +2602,6 @@ export type Database = {
           failure_reason: string | null
           provider_reference: string | null
           reviewer_admin_id: string | null
-          sanad_status: Database["public"]["Enums"]["verification_status_v2"]
           updated_at: string
           user_id: string
           verification_id: string
@@ -2622,7 +2615,6 @@ export type Database = {
           failure_reason?: string | null
           provider_reference?: string | null
           reviewer_admin_id?: string | null
-          sanad_status?: Database["public"]["Enums"]["verification_status_v2"]
           updated_at?: string
           user_id: string
           verification_id?: string
@@ -2636,7 +2628,6 @@ export type Database = {
           failure_reason?: string | null
           provider_reference?: string | null
           reviewer_admin_id?: string | null
-          sanad_status?: Database["public"]["Enums"]["verification_status_v2"]
           updated_at?: string
           user_id?: string
           verification_id?: string
@@ -2762,7 +2753,6 @@ export type Database = {
           created_at: string | null
           driver_id: string | null
           driver_status: Database["public"]["Enums"]["driver_status_v2"] | null
-          sanad_identity_linked: boolean | null
           user_id: string | null
           verification_level:
             | Database["public"]["Enums"]["verification_level_v2"]
@@ -2775,7 +2765,6 @@ export type Database = {
           created_at?: string | null
           driver_id?: string | null
           driver_status?: Database["public"]["Enums"]["driver_status_v2"] | null
-          sanad_identity_linked?: boolean | null
           user_id?: string | null
           verification_level?:
             | Database["public"]["Enums"]["verification_level_v2"]
@@ -2788,7 +2777,6 @@ export type Database = {
           created_at?: string | null
           driver_id?: string | null
           driver_status?: Database["public"]["Enums"]["driver_status_v2"] | null
-          sanad_identity_linked?: boolean | null
           user_id?: string | null
           verification_level?:
             | Database["public"]["Enums"]["verification_level_v2"]
@@ -2941,15 +2929,6 @@ export type Database = {
         }
         Returns: string
       }
-      app_complete_sanad_verification: {
-        Args: {
-          p_admin_id?: string
-          p_failure_reason?: string
-          p_user_id: string
-          p_verified: boolean
-        }
-        Returns: string
-      }
       app_confirm_package_delivery: {
         Args: { p_driver_id: string; p_package_id: string }
         Returns: string
@@ -2969,14 +2948,6 @@ export type Database = {
       }
       app_credit_driver_earnings: {
         Args: { p_booking_id: string }
-        Returns: string
-      }
-      app_submit_sanad_verification: {
-        Args: {
-          p_document_reference?: string
-          p_provider_reference?: string
-          p_user_id: string
-        }
         Returns: string
       }
       app_transfer_wallet_funds: {

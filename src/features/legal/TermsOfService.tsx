@@ -140,7 +140,7 @@ export function TermsOfService() {
           content: [
             'Must be 18+ years old',
             'Drivers: Valid license and insurance required',
-            'Mandatory verification via Sanad (National ID)',
+            'Required account, contact, and driver document checks',
             'One account per user',
             'Accurate and up-to-date information required',
             'We reserve the right to suspend violating accounts',

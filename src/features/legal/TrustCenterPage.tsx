@@ -1,4 +1,4 @@
-import { AlertTriangle, Eye, FileCheck, Fingerprint, Globe2, KeyRound, Lock, MapPinned, Server, ShieldCheck, Smartphone, Shield, TimerReset, Wallet, Mail } from 'lucide-react';
+import { AlertTriangle, Eye, FileCheck, Fingerprint, Globe2, KeyRound, Lock, Mail, MapPinned, Server, Shield, ShieldCheck, Smartphone, TimerReset, Wallet } from 'lucide-react';
 import {
   MetricCard,
   PageHero,
@@ -76,10 +76,10 @@ const complianceItems = [
 const trustSteps = [
   {
     icon: Shield,
-    title: 'Identity / Sanad',
-    titleAr: 'الهوية / سند',
-    detail: 'Government-verified identity via Sanad eKYC for account creation and high-value actions.',
-    detailAr: 'توثيق هوية حكومي عبر سند eKYC لإنشاء الحساب والإجراءات عالية القيمة.',
+    title: 'Identity and trust checks',
+    titleAr: 'فحوصات الهوية والثقة',
+    detail: 'Account trust uses email, phone, driver documents, and wallet-standing checks.',
+    detailAr: 'تعتمد الثقة على البريد والهاتف ووثائق السائق وحالة المحفظة.',
     accent: C.cyan,
   },
   {

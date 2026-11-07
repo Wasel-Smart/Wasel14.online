@@ -14,7 +14,6 @@ interface SignedInUtilitySectionProps {
   user?: {
     emailVerified?: boolean;
     phoneVerified?: boolean;
-    sanadVerified?: boolean;
     verified?: boolean;
     trips?: number;
     rating?: number;

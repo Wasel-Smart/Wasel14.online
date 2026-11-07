@@ -44,7 +44,6 @@ under OneDrive and `SECURITY_AUDIT_FINDINGS.md` already records interrupted inst
 | ID | Finding | State |
 |---|---|---|
 | A1 | `20260720054123` grants `anon` SELECT on `public.drivers` (rows carry `license_number`, `background_check_status`). Safe only if RLS blocks anon; the later PII view targets `driver_profiles`, a different table. | OPEN, TO RUN with the anon key |
-| A2 | `app_submit_sanad_verification(p_user_id ...)` is SECURITY DEFINER, granted to `authenticated`, with no check that `p_user_id` is the caller. | OPEN, verify against `20261001120000` |
 | A3 | Booking, rating, payment, review, moderation, chat participant, and live-trip queries were aligned to canonical `booking_id`/`passenger_id`/`booking_status` columns. Verify against linked `information_schema.columns` after migration reconciliation. | CODE FIXED; LIVE SCHEMA VERIFY OPEN |
 
 ## Tier 3 - payments and transaction integrity

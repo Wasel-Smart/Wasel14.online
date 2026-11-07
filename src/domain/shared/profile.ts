@@ -19,7 +19,6 @@ export interface WaselUserProfile {
   joinedAt?: string;
   phoneVerified: boolean;
   emailVerified: boolean;
-  sanadVerified: boolean;
   verificationLevel: WaselVerificationLevel;
   trustScore: number;
   walletStatus: WaselWalletStatus;
@@ -50,7 +49,6 @@ type PartialProfileSource = Partial<{
   verified: boolean;
   email_verified: boolean;
   phone_verified: boolean;
-  sanad_verified: boolean;
   verification_level: string;
   rating: number;
   trips: number;
@@ -116,7 +114,6 @@ export function createDemoUserProfile(input: DemoProfileInput): WaselUserProfile
     joinedAt: input.joinedAt ?? new Date().toISOString().slice(0, 10),
     phoneVerified,
     emailVerified,
-    sanadVerified: false,
     verificationLevel,
     trustScore: deriveTrustScore({ verificationLevel, rating, trips }),
     walletStatus: 'active',
@@ -162,7 +159,6 @@ export function mapBackendProfile(args: {
     joinedAt: profile?.created_at ?? profile?.joined_at ?? authUser.created_at?.slice(0, 10),
     phoneVerified,
     emailVerified,
-    sanadVerified: false,
     verificationLevel,
     trustScore: deriveTrustScore({ verificationLevel, rating, trips }),
     walletStatus: resolveWalletStatus(profile),

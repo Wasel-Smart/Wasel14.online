@@ -11,8 +11,8 @@ describe('trust profile derivation', () => {
   it('assigns verification levels correctly', () => {
     expect(deriveVerificationLevel({})).toBe('level_0');
     expect(deriveVerificationLevel({ phoneVerified: true })).toBe('level_1');
-    expect(deriveVerificationLevel({ sanadVerified: true, role: 'passenger' })).toBe('level_2');
-    expect(deriveVerificationLevel({ sanadVerified: true, role: 'driver' })).toBe('level_3');
+    expect(deriveVerificationLevel({ verified: true, role: 'passenger' })).toBe('level_2');
+    expect(deriveVerificationLevel({ verified: true, role: 'driver' })).toBe('level_3');
   });
 
   it('keeps trust score inside 0-99 bounds', () => {
@@ -33,7 +33,6 @@ describe('trust profile derivation', () => {
     });
 
     expect(profile.verificationLevel).toBe('level_3');
-    expect(profile.sanadVerified).toBe(true);
     expect(profile.backendMode).toBe('demo');
     expect(profile.walletStatus).toBe('active');
   });
@@ -51,7 +50,6 @@ describe('trust profile derivation', () => {
         full_name: 'Backend User',
         role: 'driver',
         phone_number: '+962711111111',
-        sanad_verified: true,
         verification_level: 'level_3',
         wallet_balance: 44.2,
         trip_count: 25,
@@ -87,7 +85,7 @@ describe('trust profile derivation', () => {
     expect(mapped.verificationLevel).toBe('level_0');
   });
 
-  it('uses one deterministic score mapper for contact and Sanad state', () => {
+  it('uses one deterministic score mapper for contact verification state', () => {
     expect(deriveAccountTrustScore({ emailVerified: true, rating: 5 })).toBe(65);
     expect(
       deriveAccountTrustScore({

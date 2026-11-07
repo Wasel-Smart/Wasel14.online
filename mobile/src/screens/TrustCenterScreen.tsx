@@ -38,7 +38,6 @@ interface TrustStatus {
   totalSteps: number;
   nextStepId: string | null;
   steps: {
-    identity: TrustStep;
     email: TrustStep;
     phone: TrustStep;
     driverDocuments: TrustStep;
@@ -47,7 +46,6 @@ interface TrustStatus {
 }
 
 const stepMeta: Record<string, { icon: keyof typeof Ionicons.glyphMap; labelKey: string }> = {
-  identity: { icon: 'shield-checkmark', labelKey: 'trustCenterExpanded.identity' },
   email: { icon: 'mail', labelKey: 'trustCenterExpanded.email' },
   phone: { icon: 'call', labelKey: 'trustCenterExpanded.phone' },
   driverDocuments: { icon: 'document-text', labelKey: 'trustCenterExpanded.driverDocuments' },
@@ -69,8 +67,6 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
   const [loadingStatus, setLoadingStatus] = useState(false);
   const [phone, setPhone] = useState('');
   const [phoneCode, setPhoneCode] = useState('');
-  const [identityRef, setIdentityRef] = useState('');
-  const [identityDocRef, setIdentityDocRef] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [driverDocRef, setDriverDocRef] = useState('');
   const [actionKey, setActionKey] = useState<string | null>(null);
@@ -117,12 +113,6 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
     return null;
   }, [t]);
 
-  const validateIdentity = useCallback((value: string) => {
-    if (!value.trim()) return t('trustCenterExpanded.validationRequired');
-    if (value.trim().length < 6) return t('trustCenterExpanded.validationTooShort').replace('{min}', '6');
-    return null;
-  }, [t]);
-
   const validateLicense = useCallback((value: string) => {
     if (!value.trim()) return t('trustCenterExpanded.validationRequired');
     if (value.trim().length < 6) return t('trustCenterExpanded.validationTooShort').replace('{min}', '6');
@@ -159,23 +149,6 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
       setPhoneCode('');
     });
   }, [phoneCode, run, t]);
-
-  const handleSubmitIdentity = useCallback(async () => {
-    const identityError = validateIdentity(identityRef);
-    setErrors((prev) => ({ ...prev, identityRef: identityError }));
-    if (identityError) return;
-
-    await run('identity', async () => {
-      const response = await apiClient.request('/trust/identity/submit', {
-        method: 'POST',
-        body: {
-          providerReference: identityRef.trim(),
-          documentReference: identityDocRef.trim() || undefined,
-        },
-      });
-      if (response.error) throw new Error(response.error);
-    });
-  }, [identityRef, identityDocRef, run, validateIdentity]);
 
   const handleEnableDriverMode = useCallback(async () => {
     await run('driver-mode', async () => {
@@ -417,34 +390,6 @@ const TrustCenterScreen = React.memo(function TrustCenterScreen() {
                   </View>
                 )}
 
-                {isNext && stepId === 'identity' && (
-                  <View style={styles.actionStack}>
-                    <TextInput
-                      value={identityRef}
-                      onChangeText={setIdentityRef}
-                      placeholder={t('trustCenterExpanded.sanadReference')}
-                      style={[styles.input, errors.identityRef ? { borderColor: colors.error } : {}]}
-                      placeholderTextColor={colors.muted}
-                    />
-                    {errors.identityRef ? <Text style={styles.errorText}>{errors.identityRef}</Text> : null}
-                    <TextInput
-                      value={identityDocRef}
-                      onChangeText={setIdentityDocRef}
-                      placeholder={t('trustCenterExpanded.documentReferenceOptional')}
-                      style={styles.input}
-                      placeholderTextColor={colors.muted}
-                    />
-                    <PrimaryButton
-                      label={step.state === 'failed' ? t('trustCenterExpanded.resubmit') : t('trustCenterExpanded.submitForReview')}
-                      tone={colors.cyan}
-                      disabled={actionKey === 'identity'}
-                      loading={actionKey === 'identity'}
-                      onPress={handleSubmitIdentity}
-                      testID="trust-identity-submit"
-                    />
-                  </View>
-                )}
-
                 {isNext && stepId === 'driverDocuments' && (
                   <View style={styles.actionStack}>
                     {effective.steps.driverDocuments.meta?.role !== 'driver' && effective.steps.driverDocuments.meta?.role !== 'both' ? (
@@ -516,12 +461,6 @@ function buildLocalFallback(user: any): TrustStatus {
   const walletStatus = String(meta.wallet_status ?? meta.walletStatus ?? user?.walletStatus ?? 'active');
 
   const steps: TrustStatus['steps'] = {
-    identity: {
-      id: 'identity',
-      state: 'not_started',
-      detail: 'Submit Sanad verification to continue.',
-      failureReason: null,
-    },
     email: {
       id: 'email',
       state: emailVerified ? 'completed' : 'not_started',
@@ -550,7 +489,7 @@ function buildLocalFallback(user: any): TrustStatus {
 
   const all = Object.values(steps);
   const completed = all.filter(s => s.state === 'completed').length;
-  const ordered = [steps.identity, steps.email, steps.phone, steps.driverDocuments, steps.walletStanding];
+  const ordered = [steps.email, steps.phone, steps.driverDocuments, steps.walletStanding];
   const next = ordered.find(s => s.state !== 'completed') ?? null;
 
   return {

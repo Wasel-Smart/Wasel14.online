@@ -9,6 +9,14 @@ export interface RatingSubmission {
   tags?: string[];
 }
 
+export interface TripReviewSubmission {
+  reviewee_id: string;
+  role: 'driver';
+  overall_rating: number;
+  comment: string;
+  trip_id: string;
+}
+
 export interface DriverRating {
   averageRating: number;
   totalRatings: number;
@@ -21,6 +29,16 @@ export interface DriverRating {
 }
 
 class RatingsService {
+  async submitTripReview(submission: TripReviewSubmission): Promise<void> {
+    if (!Number.isFinite(submission.overall_rating) || submission.overall_rating < 1 || submission.overall_rating > 5) {
+      throw new Error('Rating must be between 1 and 5');
+    }
+    if (!submission.reviewee_id.trim() || !submission.trip_id.trim()) {
+      throw new Error('A driver and trip are required to submit a review');
+    }
+    await apiPost(API_ENDPOINTS.REVIEWS, submission);
+  }
+
   async submitRating(submission: RatingSubmission): Promise<void> {
     if (!Number.isFinite(submission.rating) || submission.rating < 1 || submission.rating > 5) {
       throw new Error('Rating must be between 1 and 5');

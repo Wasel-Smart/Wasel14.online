@@ -72,7 +72,7 @@ export function getDefaultAccountSettings(
       showProfile: true,
       hidePhoto: false,
       shareLocation: true,
-      dataAnalytics: true,
+      dataAnalytics: false,
     },
     display: {
       language,

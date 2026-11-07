@@ -1,4 +1,4 @@
-export type TrustStepId = 'identity' | 'email' | 'phone' | 'driver_documents' | 'wallet_standing';
+export type TrustStepId = 'email' | 'phone' | 'driver_documents' | 'wallet_standing';
 
 export type TrustStepState = 'not_started' | 'in_progress' | 'completed' | 'failed';
 
@@ -13,10 +13,6 @@ export interface TrustStepStatus<TMeta = Record<string, unknown>> {
 
 export interface EmailStepMeta {
   email: string | null;
-}
-
-export interface IdentityStepMeta {
-  providerReference: string | null;
 }
 
 export interface PhoneStepMeta {
@@ -53,7 +49,6 @@ export interface TrustCenterStatus {
   blockedSteps: TrustStepId[];
   reviewHistory: ReviewHistoryItem[];
   steps: {
-    identity: TrustStepStatus<IdentityStepMeta>;
     email: TrustStepStatus<EmailStepMeta>;
     phone: TrustStepStatus<PhoneStepMeta>;
     driverDocuments: TrustStepStatus<DriverDocumentsStepMeta>;
@@ -69,7 +64,6 @@ type FallbackTrustUser = {
   emailVerified: boolean;
   phone?: string;
   phoneVerified: boolean;
-  sanadVerifiedStatus?: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
   walletStatus: 'active' | 'limited' | 'frozen' | 'closed' | 'unavailable';
 };
 
@@ -97,31 +91,6 @@ function buildEmailStep(user: FallbackTrustUser): TrustStepStatus<EmailStepMeta>
       ? 'Email confirmation is still required.'
       : 'Add an email address to continue.';
   return buildStatus('email', state, { email: user.email ?? null }, { detail });
-}
-
-function buildIdentityStep(user: FallbackTrustUser): TrustStepStatus<IdentityStepMeta> {
-  const status = user.sanadVerifiedStatus ?? 'unverified';
-  if (status === 'verified') {
-    return buildStatus('identity', 'completed', { providerReference: null }, {
-      detail: 'Identity verification is approved.',
-    });
-  }
-  if (status === 'pending') {
-    return buildStatus('identity', 'in_progress', { providerReference: null }, {
-      detail: 'Identity reference submitted and awaiting manual review.',
-    });
-  }
-  if (status === 'rejected' || status === 'expired') {
-    return buildStatus('identity', 'failed', { providerReference: null }, {
-      detail: status === 'rejected'
-        ? 'Identity verification was rejected. Review the reason and resubmit.'
-        : 'Identity verification expired. Submit a new reference.',
-      failureReason: status === 'rejected' ? 'The submitted Sanad reference was not approved.' : null,
-    });
-  }
-  return buildStatus('identity', 'not_started', { providerReference: null }, {
-    detail: 'Submit your Sanad verification reference for review.',
-  });
 }
 
 function buildPhoneStep(user: FallbackTrustUser): TrustStepStatus<PhoneStepMeta> {
@@ -198,7 +167,7 @@ function resolveWalletStatusValue(
 }
 
 function pickNextStepId(steps: TrustCenterStatus['steps']): TrustCenterStatus['nextStepId'] {
-  const ordered = [steps.identity, steps.email, steps.phone, steps.driverDocuments, steps.walletStanding];
+  const ordered = [steps.email, steps.phone, steps.driverDocuments, steps.walletStanding];
   const next = ordered.find(step => step.state !== 'completed');
   return next?.id ?? null;
 }
@@ -207,7 +176,6 @@ export function buildFallbackTrustCenterStatus(user: FallbackTrustUser): TrustCe
   const verificationLevel = String(user.verificationLevel ?? 'level_0');
 
   const steps = {
-    identity: buildIdentityStep(user),
     email: buildEmailStep(user),
     phone: buildPhoneStep(user),
     driverDocuments: buildDriverDocsStep(user, verificationLevel),

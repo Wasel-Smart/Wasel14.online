@@ -29,6 +29,18 @@ const RESERVED_METADATA_KEYS = new Set( [
 ] );
 
 const BOOKING_PREPAID_STATUSES = new Set( [ 'succeeded', 'completed', 'paid', 'refunded' ] );
+const BOOKING_PAYMENT_COLUMNS =
+  'booking_id, passenger_id, amount, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id';
+const LEGACY_BOOKING_PAYMENT_COLUMNS =
+  'booking_id, user_id, amount, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id';
+
+function isMissingColumnError ( error: unknown ): boolean {
+  if ( !error || typeof error !== 'object' ) {return false;}
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown };
+  const code = String( candidate.code ?? '' );
+  const text = `${ String( candidate.message ?? '' ) } ${ String( candidate.details ?? '' ) }`;
+  return code === '42703' || code === 'PGRST204' || /column .* does not exist|could not find .* column/i.test( text );
+}
 
 function deriveBookingAmountMinor ( booking: Record< string, unknown >, currencyLower: string ): number | null {
   // The payable amount is owned by the server. Prefer the per-seat breakdown
@@ -77,11 +89,25 @@ export async function computeBookingAmountMinor (
   const bookingIdTrim = String( bookingId ?? '' ).trim();
   if ( !bookingIdTrim ) {return null;}
 
-  const { data: booking, error: bookingError } = await admin
+  const modernLookup = await admin
     .from( 'bookings' )
-    .select( 'booking_id, passenger_id, amount, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id' )
+    .select( BOOKING_PAYMENT_COLUMNS )
     .eq( 'booking_id', bookingIdTrim )
     .maybeSingle();
+  let booking: Record<string, unknown> | null = modernLookup.data as Record<string, unknown> | null;
+  let bookingError = modernLookup.error;
+
+  // Older deployments use `user_id` for the booking owner. Retry only when the
+  // modern ownership column is absent; unrelated lookup errors still fail closed.
+  if ( bookingError && isMissingColumnError( bookingError ) ) {
+    const legacyLookup = await admin
+      .from( 'bookings' )
+      .select( LEGACY_BOOKING_PAYMENT_COLUMNS )
+      .eq( 'booking_id', bookingIdTrim )
+      .maybeSingle();
+    booking = legacyLookup.data as Record<string, unknown> | null;
+    bookingError = legacyLookup.error;
+  }
 
   if ( bookingError ) {
     console.error( '[payments] booking lookup failed', bookingError.message );
@@ -89,7 +115,7 @@ export async function computeBookingAmountMinor (
   }
   if ( !booking ) {return null;}
 
-  const isOwnedByCaller = String( booking.passenger_id ?? '' ) === authUser.id;
+  const isOwnedByCaller = String( booking.passenger_id ?? booking.user_id ?? '' ) === authUser.id;
   if ( !isOwnedByCaller ) {return null;}
 
   if ( BOOKING_PREPAID_STATUSES.has( String( booking.payment_status ?? '' ).toLowerCase() ) ) {
@@ -116,14 +142,25 @@ export async function verifyPaymentIntentOwnership (
   admin: ReturnType<typeof getAdminClient>,
   intentId: string,
 ): Promise<{ owned: boolean; booking: Record<string, unknown> | null; amountMinor: number | null }> {
-  const bookingColumns =
-    'booking_id, passenger_id, amount, price_per_seat, seats_requested, currency, payment_status, stripe_payment_intent_id';
+  const bookingColumns = BOOKING_PAYMENT_COLUMNS;
 
-  const { data: booking, error: bookingError } = await admin
+  const modernLookup = await admin
     .from( 'bookings' )
     .select( bookingColumns )
     .eq( 'stripe_payment_intent_id', intentId )
     .maybeSingle();
+  let booking = modernLookup.data as Record<string, unknown> | null;
+  let bookingError = modernLookup.error;
+
+  if ( bookingError && isMissingColumnError( bookingError ) ) {
+    const legacyLookup = await admin
+      .from( 'bookings' )
+      .select( LEGACY_BOOKING_PAYMENT_COLUMNS )
+      .eq( 'stripe_payment_intent_id', intentId )
+      .maybeSingle();
+    booking = legacyLookup.data as Record<string, unknown> | null;
+    bookingError = legacyLookup.error;
+  }
 
   if ( !bookingError && booking ) {
     const row = booking as Record<string, unknown>;

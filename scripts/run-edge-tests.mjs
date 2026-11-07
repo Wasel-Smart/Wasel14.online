@@ -75,7 +75,7 @@ for (const suite of suites) {
   console.log(`\n── ${ suite } ${'─'.repeat(Math.max(0, 46 - suite.length))}`);
   const result = spawnSync(
     DENO.bin,
-    ['test', '--allow-env', '--allow-net', '--no-lock', suite],
+    ['test', '--allow-env', '--allow-net', '--allow-read=supabase/functions', '--no-lock', suite],
     { stdio: 'inherit' },
   );
   if (result.status !== 0) failed += 1;

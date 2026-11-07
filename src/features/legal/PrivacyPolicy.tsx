@@ -127,7 +127,7 @@ export function PrivacyPolicy() {
           title: '1. Information We Collect',
           content: [
             'Account Information: Name, email, phone number',
-            'Verification Data: National ID (Sanad) for government verification',
+            'Verification Data: email, phone, and driver documents where applicable',
             'Location Data: For ride matching and live tracking',
             'Payment Information: Payment details (encrypted)',
             'Usage Data: Trip history, preferences, ratings',
@@ -138,7 +138,7 @@ export function PrivacyPolicy() {
           title: '2. How We Use Your Information',
           content: [
             'Provide carpooling and package delivery services',
-            'Verify user identities (Sanad eKYC)',
+            'Verify account contact details and driver eligibility',
             'Process payments and bookings',
             'Improve security and prevent fraud',
             'Send trip notifications and updates',

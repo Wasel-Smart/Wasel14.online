@@ -38,14 +38,10 @@ vi.mock( '../../utils/env', () => ( {
 const walletDirectMocks = vi.hoisted( () => ( {
   fetchWalletDirect: vi.fn(),
   getWalletTransactionRows: vi.fn(),
-  transferWalletFundsDirect: vi.fn(),
-  withdrawWalletFundsDirect: vi.fn(),
-  updateWalletPreferencesDirect: vi.fn(),
   getPaymentMethodsDirect: vi.fn(),
   addPaymentMethodDirect: vi.fn(),
   deletePaymentMethodDirect: vi.fn(),
   getTrustScoreDirect: vi.fn(),
-  payWithWalletDirect: vi.fn(),
 } ) );
 vi.mock( '../wallet/walletDirect', () => walletDirectMocks );
 
@@ -187,7 +183,7 @@ describe( 'walletApi — edge transport configured', () => {
         method: 'POST',
         body: { amount: 25, bankAccount: 'JO00BANK123', method: 'bank_transfer' },
       } ) );
-      expect( walletDirectMocks.withdrawWalletFundsDirect ).not.toHaveBeenCalled();
+      expect( walletDirectMocks.fetchWalletDirect ).not.toHaveBeenCalled();
     } );
 
     it( 'sendMoney returns the edge response as-is (no re-wrapping)', async () => {
@@ -196,6 +192,19 @@ describe( 'walletApi — edge transport configured', () => {
 
       const out = await walletApi.sendMoney( 'user-123', 'user-456', 30, 'lunch' );
       expect( out ).toBe( edgeResult );
+    } );
+
+    it( 'updates auto-top-up through the edge API without direct database fallback', async () => {
+      requestEdgeJsonMock.mockResolvedValue( { success: true } );
+
+      await walletApi.setAutoTopUp( 'user-123', true, 30, 10 );
+
+      expect( requestEdgeJsonMock ).toHaveBeenCalledWith( expect.objectContaining( {
+        path: '/v1/wallet/user-123/auto-topup',
+        method: 'POST',
+        body: { enabled: true, amount: 30, threshold: 10 },
+      } ) );
+      expect( walletDirectMocks.fetchWalletDirect ).not.toHaveBeenCalled();
     } );
 
     it( 'setPin posts the pin to the edge endpoint', async () => {

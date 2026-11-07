@@ -25,6 +25,7 @@ Deno.env.set('STRIPE_WEBHOOK_SECRET', STRIPE_SECRET);
 Deno.env.set('CLIQ_WEBHOOK_SECRET', 'test-cliq-secret-32-chars-minimum!');
 const TWILIO_TEST_SECRET = 'test-twilio-signing-secret-32-chars!';
 Deno.env.set('TWILIO_WEBHOOK_SIGNING_SECRET', TWILIO_TEST_SECRET);
+Deno.env.set('COMMUNICATION_WEBHOOK_TOKEN', 'test-communication-webhook-token-32chars!');
 Deno.env.set('SUPABASE_AUTH_HOOK_SEND_SMS_SECRET', STRIPE_SECRET);
 Deno.env.set('RESEND_WEBHOOK_SIGNING_SECRET', RESEND_SECRET);
 
@@ -236,6 +237,16 @@ Deno.test('handleTwilioWebhook — 401 when a signed parameter is tampered with'
 Deno.test('handleTwilioWebhook — 401 with no signature and no URL token', async () => {
   const res = await handleTwilioWebhook(makeTwilioRequest({ MessageStatus: 'delivered' }));
   assertEquals(res.status, 401);
+});
+
+Deno.test('handleTwilioWebhook — rejects the legacy query-token fallback', async () => {
+  const request = new Request(`${TWILIO_URL}?token=test-communication-webhook-token-32chars!`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ MessageStatus: 'delivered' }),
+  });
+  const response = await handleTwilioWebhook(request);
+  assertEquals(response.status, 401);
 });
 
 // ── Stripe minor units ────────────────────────────────────────────────────────

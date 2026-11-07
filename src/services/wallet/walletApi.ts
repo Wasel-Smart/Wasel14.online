@@ -1,10 +1,9 @@
 /**
  * Wallet API — public facade.
  *
- * Strategy (edge → direct → local):
- *  1. Edge Function (production, authenticated)
- *  2. Direct Supabase (dev / fallback when allowDirectSupabaseFallback=true)
- *  3. localStorage (offline / cold-start last resort)
+ * Read-only operations can fall back through direct Supabase and local storage
+ * when explicitly enabled. Money movement and payment settings require the
+ * authenticated edge API in every build so server-side validation is mandatory.
  */
 
 import { API_URL } from '../core';
@@ -14,7 +13,6 @@ import { sanitizeHtml } from '../../utils/sanitization';
 import {
   canUseLocalWalletStorage,
   fetchWalletLocal,
-  setAutoTopUpLocal,
   getPaymentMethodsLocal,
   addPaymentMethodLocal,
   deletePaymentMethodLocal,
@@ -25,14 +23,10 @@ import {
 import {
   fetchWalletDirect,
   getWalletTransactionRows,
-  transferWalletFundsDirect,
-  withdrawWalletFundsDirect,
-  updateWalletPreferencesDirect,
   getPaymentMethodsDirect,
   addPaymentMethodDirect,
   deletePaymentMethodDirect,
   getTrustScoreDirect,
-  payWithWalletDirect,
 } from './walletDirect';
 import type {
   InsightsData,
@@ -80,19 +74,12 @@ async function tryEdgeThenDirect<T>(edgeFn: () => Promise<T>, directFn: () => Pr
   throw new Error('Secure API is not configured and direct database access is disabled for this environment.');
 }
 
-/**
- * Money-moving operations (withdraw, send, pay) must only ever run through the
- * edge function: it enforces the wallet PIN and re-derives prices server-side.
- * The direct tier calls the wallet RPCs from the browser with client-supplied
- * amounts and bypasses both, so it is never used in a production build, even if
- * VITE_ALLOW_DIRECT_SUPABASE_FALLBACK is switched on by mistake.
- */
-async function tryEdgeThenDirectForMoney<T>(edgeFn: () => Promise<T>, directFn: () => Promise<T>): Promise<T> {
-  if (import.meta.env.PROD) {
-    if (!canUseEdgeApi()) {throw new Error('Secure wallet API is not configured.');}
-    return edgeFn();
+/** Money movement always requires the authenticated edge API and server checks. */
+async function runSecureWalletOperation<T>(edgeFn: () => Promise<T>): Promise<T> {
+  if (!canUseEdgeApi()) {
+    throw new Error('Secure wallet API is not configured.');
   }
-  return tryEdgeThenDirect(edgeFn, directFn);
+  return edgeFn();
 }
 
 function getWalletPath(userId: string, suffix = ''): string {
@@ -155,7 +142,7 @@ async function fetchSubscriptionViaBackend(userId: string): Promise<WalletSubscr
 
 export function getWalletCapabilities(): WalletCapabilities {
   const secureEdgeReady = canUseEdgeApi();
-  return { topUp: secureEdgeReady, rewardClaim: secureEdgeReady, subscription: secureEdgeReady, pin: secureEdgeReady, send: true, withdraw: true, autoTopUp: true };
+  return { topUp: secureEdgeReady, rewardClaim: secureEdgeReady, subscription: secureEdgeReady, pin: secureEdgeReady, send: secureEdgeReady, withdraw: secureEdgeReady, autoTopUp: secureEdgeReady };
 }
 
 export const walletApi = {
@@ -209,9 +196,8 @@ export const walletApi = {
 
   async withdraw(userId: string, amount: number, bankAccount: string, opts: { method?: string; pin?: string } = {}) {
     const { method = 'bank_transfer', pin } = opts;
-    return tryEdgeThenDirectForMoney(
+    return runSecureWalletOperation(
       () => requestWalletJson(userId, '/withdraw', 'Withdraw wallet funds', { method: 'POST', body: { amount, bankAccount, method, ...(pin ? { pin } : {}) } }),
-      () => withdrawWalletFundsDirect(userId, amount, bankAccount, method),
     );
   },
 
@@ -225,9 +211,8 @@ export const walletApi = {
       note = optsOrNote.note;
       pin = optsOrNote.pin;
     }
-    return tryEdgeThenDirectForMoney(
+    return runSecureWalletOperation(
       () => requestWalletJson<{ success: boolean; note?: string; wallet: WalletData }>(userId, '/send', 'Send wallet funds', { method: 'POST', body: { recipientId, amount, note, ...(pin ? { pin } : {}) } }),
-      async () => ({ success: true, note, wallet: await transferWalletFundsDirect(userId, recipientId, amount) }),
     );
   },
 
@@ -291,16 +276,8 @@ export const walletApi = {
   },
 
   async setAutoTopUp(userId: string, enabled: boolean, amount: number, threshold: number) {
-    const patch = { auto_top_up_enabled: enabled, auto_top_up_amount: amount, auto_top_up_threshold: threshold };
-    const directFn = async () => {
-      if (canUseLocalWalletStorage()) {
-        try { return await updateWalletPreferencesDirect(userId, patch); } catch { return setAutoTopUpLocal(userId, enabled, amount, threshold); }
-      }
-      return updateWalletPreferencesDirect(userId, patch);
-    };
-    return tryEdgeThenDirect(
+    return runSecureWalletOperation(
       () => requestWalletJson(userId, '/auto-topup', 'Update wallet auto top-up', { method: 'POST', body: { enabled, amount, threshold } }),
-      directFn,
     );
   },
 
@@ -345,9 +322,8 @@ export const walletApi = {
 
   async pay(userId: string, amount: number, referenceType: string, opts: { referenceId?: string; metadata?: Record<string, unknown> } = {}) {
     const { referenceId, metadata } = opts;
-    return tryEdgeThenDirectForMoney(
+    return runSecureWalletOperation(
       () => requestWalletJson(userId, '/pay', 'Wallet checkout payment', { method: 'POST', body: { amount, referenceType, referenceId, metadata } }),
-      () => payWithWalletDirect({ userId, amount, referenceType, referenceId, metadata }),
     );
   },
 

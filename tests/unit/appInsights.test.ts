@@ -8,6 +8,8 @@ const { mockInstance } = vi.hoisted(() => ({
     trackEvent: vi.fn(),
     trackException: vi.fn(),
     trackMetric: vi.fn(),
+    addTelemetryInitializer: vi.fn(),
+    unload: vi.fn(),
   },
 }));
 
@@ -29,12 +31,14 @@ vi.mock('web-vitals', () => ({
 
 import {
   initializeAppInsights,
+  disableAppInsights,
   getAppInsights,
   trackCustomEvent,
   trackException,
   trackMetric,
   trackPageView,
 } from '@/utils/appInsights';
+import { setAnalyticsConsent } from '@/utils/analyticsConsent';
 
 import { ApplicationInsights } from '@microsoft/applicationinsights-web';
 
@@ -43,6 +47,8 @@ const getMockInstance = () =>
   mockInstance;
 
 beforeEach(() => {
+  disableAppInsights();
+  setAnalyticsConsent(false);
   vi.clearAllMocks();
   vi.unstubAllEnvs();
 });
@@ -66,6 +72,7 @@ describe('initializeAppInsights', () => {
   });
 
   it('initializes when a valid connection string is provided', () => {
+    setAnalyticsConsent(true);
     vi.stubEnv(
       'VITE_APP_INSIGHTS_CONNECTION_STRING',
       'InstrumentationKey=12345678-1234-1234-1234-123456789abc;IngestionEndpoint=https://eastus.in.applicationinsights.azure.com/',
@@ -78,6 +85,7 @@ describe('initializeAppInsights', () => {
   });
 
   it('initializes when a valid UUID instrumentation key is provided', () => {
+    setAnalyticsConsent(true);
     vi.stubEnv('VITE_APP_INSIGHTS_KEY', 'a1b2c3d4-e5f6-7890-abcd-ef1234567890');
     initializeAppInsights();
     expect(ApplicationInsights).toHaveBeenCalled();

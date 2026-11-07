@@ -154,72 +154,6 @@ export async function getWalletTransactionRows(userId: string): Promise<Transact
   }));
 }
 
-export async function transferWalletFundsDirect(
-  userId: string,
-  recipientId: string,
-  amount: number,
-): Promise<WalletData> {
-  const db = getDb();
-  let { error } = await db.rpc('app_transfer_wallet_funds', {
-    p_from_user_id: userId,
-    p_to_user_id: recipientId,
-    p_amount: amount,
-    p_payment_method: 'wallet',
-  });
-
-  if (error) {
-    const fromId = await resolveCanonicalUserId(userId);
-    const toId = await resolveCanonicalUserId(recipientId);
-    if (fromId !== userId || toId !== recipientId) {
-      const retry = await db.rpc('app_transfer_wallet_funds', {
-        p_from_user_id: fromId,
-        p_to_user_id: toId,
-        p_amount: amount,
-        p_payment_method: 'wallet',
-      });
-      error = retry.error;
-    }
-  }
-
-  if (error) {throw error;}
-  return fetchWalletDirect(userId);
-}
-
-export async function withdrawWalletFundsDirect(
-  userId: string,
-  amount: number,
-  bankAccount: string,
-  method: string,
-): Promise<WalletData> {
-  const db = getDb();
-  const canonicalUserId = await resolveCanonicalUserId(userId);
-  const { error } = await db.rpc('app_withdraw_wallet_funds', {
-    p_user_id: canonicalUserId,
-    p_amount: amount,
-    p_bank_account: bankAccount,
-    p_method: method,
-  });
-  if (error) {throw error;}
-  return fetchWalletDirect(canonicalUserId);
-}
-
-export async function updateWalletPreferencesDirect(
-  userId: string,
-  patch: Record<string, unknown>,
-): Promise<WalletData> {
-  const db = getDb();
-  let { error } = await db.from('wallets').update(patch).eq('user_id', userId);
-  if (error) {
-    const canonicalUserId = await resolveCanonicalUserId(userId);
-    if (canonicalUserId !== userId) {
-      const retry = await db.from('wallets').update(patch).eq('user_id', canonicalUserId);
-      error = retry.error;
-    }
-  }
-  if (error) {throw error;}
-  return fetchWalletDirect(userId);
-}
-
 export async function getPaymentMethodsDirect(userId: string): Promise<{ methods: PaymentMethodRow[] }> {
   const wallet = await fetchWalletDirect(userId);
   return { methods: Array.isArray(wallet.wallet.paymentMethods) ? wallet.wallet.paymentMethods : [] };
@@ -291,37 +225,4 @@ export async function getTrustScoreDirect(userId: string) {
     onTimePayments: null as number | null,
     deposit: toNumber(wallet?.balance, 0),
   };
-}
-
-export async function payWithWalletDirect(args: {
-  userId: string;
-  amount: number;
-  referenceType: string;
-  referenceId?: string;
-  metadata?: Record<string, unknown>;
-}): Promise<WalletData> {
-  const { userId, amount, referenceType, referenceId, metadata } = args;
-  const db = getDb();
-  const transactionType = mapReferenceTypeToTransactionType(referenceType);
-  const { error } = await db.rpc('app_pay_with_wallet', {
-    p_user_id: userId,
-    p_amount: amount,
-    p_transaction_type: transactionType,
-    p_payment_method: 'wallet_balance',
-    p_reference_type: referenceType,
-    p_reference_id: referenceId ?? null,
-    p_metadata: metadata ?? {},
-  });
-  if (error) {throw error;}
-  return fetchWalletDirect(userId);
-}
-
-function mapReferenceTypeToTransactionType(referenceType: string): string {
-  switch (referenceType) {
-    case 'ride_booking': return 'ride_payment';
-    case 'package_delivery': return 'package_payment';
-    case 'bus_booking': return 'bus_payment';
-    case 'subscription': return 'subscription_payment';
-    default: return 'purchase';
-  }
 }

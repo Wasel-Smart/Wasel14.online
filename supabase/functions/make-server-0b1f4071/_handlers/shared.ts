@@ -1444,7 +1444,7 @@ export function computeTrustStepSummary ( steps: Record<string, { id: string; st
   const failed = all.filter( s => s.state === 'failed' ).length;
   const inProgress = all.filter( s => s.state === 'in_progress' ).length;
   // The Trust Center reads nextStepId / blockedSteps directly from this payload.
-  const ordered = [ steps.identity, steps.email, steps.phone, steps.driverDocuments, steps.walletStanding ].filter( Boolean );
+  const ordered = [ steps.email, steps.phone, steps.driverDocuments, steps.walletStanding ].filter( Boolean );
   return {
     totalSteps: all.length,
     completedSteps: completed,
@@ -1472,7 +1472,7 @@ export async function buildTrustStatus (
     return null;
   }
 
-  const [ verificationResult, identityResult, driverResult, walletResult, otpResult ] = await Promise.all( [
+  const [ verificationResult, driverResult, walletResult, otpResult ] = await Promise.all( [
     auth.admin
       .from( 'verification_records' )
       .select(
@@ -1481,14 +1481,6 @@ export async function buildTrustStatus (
       .eq( 'user_id', auth.canonicalUser.id )
       .eq( 'provider_reference', 'driver_documents' )
       .order( 'verification_timestamp', { ascending: false } )
-      .limit( 1 )
-      .maybeSingle(),
-    auth.admin
-      .from( 'verification_records' )
-      .select( 'verification_id, sanad_status, failure_reason, updated_at, verification_timestamp' )
-      .eq( 'user_id', auth.canonicalUser.id )
-      .neq( 'sanad_status', 'unverified' )
-      .order( 'updated_at', { ascending: false } )
       .limit( 1 )
       .maybeSingle(),
     auth.admin
@@ -1516,13 +1508,11 @@ export async function buildTrustStatus (
   ] );
 
   if ( verificationResult.error ) {throw new Error( verificationResult.error.message );}
-  if ( identityResult.error ) {throw new Error( identityResult.error.message );}
   if ( driverResult.error ) {throw new Error( driverResult.error.message );}
   if ( walletResult.error ) {throw new Error( walletResult.error.message );}
   if ( otpResult.error ) {throw new Error( otpResult.error.message );}
 
   const verification = verificationResult.data;
-  const identityVerification = identityResult.data;
   const driver = driverResult.data;
   const wallet = walletResult.data;
   const otpSession = otpResult.data;
@@ -1584,32 +1574,6 @@ export async function buildTrustStatus (
     {
       failureReason: phoneFailureReason,
       updatedAt: otpSession?.created_at ?? auth.canonicalUser.phone_verified_at ?? null,
-    },
-  );
-
-  const identityStatus = String( identityVerification?.sanad_status ?? 'unverified' );
-  const identity = buildTrustStep(
-    'identity',
-    identityStatus === 'verified'
-      ? 'completed'
-      : identityStatus === 'pending'
-        ? 'in_progress'
-        : identityStatus === 'rejected' || identityStatus === 'expired'
-          ? 'failed'
-          : 'not_started',
-    identityStatus === 'verified'
-      ? 'Identity verification is approved.'
-      : identityStatus === 'pending'
-        ? 'Identity reference submitted and awaiting manual review.'
-        : identityStatus === 'rejected'
-          ? 'Identity verification was rejected. Review the reason and resubmit.'
-          : identityStatus === 'expired'
-            ? 'Identity verification expired. Submit a new reference.'
-            : 'Submit your Sanad verification reference for review.',
-    {},
-    {
-      failureReason: identityStatus === 'rejected' ? identityVerification?.failure_reason : null,
-      updatedAt: identityVerification?.updated_at ?? identityVerification?.verification_timestamp ?? null,
     },
   );
 
@@ -1752,7 +1716,6 @@ export async function buildTrustStatus (
         );
 
   const steps = {
-    identity,
     email,
     phone,
     driverDocuments,
@@ -2959,7 +2922,8 @@ async function computeHmacBase64 ( secret: string, payload: string, algorithm: '
 }
 
 // Parses a `t=<ts>,v1=<hex>` style header (Stripe/Resend/Standard-Webhooks).
-function parseTimestampedSignature ( header: string ): { timestamp: string; candidates: string[] } | null {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _parseTimestampedSignature ( header: string ): { timestamp: string; candidates: string[] } | null {
   if ( !header ) {return null;}
   const segments = header.split( ',' ).map( ( segment ) => segment.trim() ).filter( Boolean );
   const timestamp = segments.find( ( segment ) => segment.startsWith( 't=' ) )?.slice( 2 ) ?? '';

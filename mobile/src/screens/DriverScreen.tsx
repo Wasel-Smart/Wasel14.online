@@ -24,7 +24,6 @@ const DriverScreen = React.memo(function DriverScreen() {
   const [steps, setSteps] = useState<DriverStep[]>([
     { id: 'email', label: 'تأكيد البريد الإلكتروني', description: 'أكد بريدك الإلكتروني من الإعدادات.', complete: Boolean(user?.email) },
     { id: 'phone', label: 'تأكيد رقم الهاتف', description: 'أضف رقم موبايل أردني وفعّله.', complete: false },
-    { id: 'sanad', label: 'هوية سند', description: 'كمّل التحقق من الهوية الوطنية عبر سند.', complete: false },
     { id: 'license', label: 'رخصة السواقة', description: 'ارفع رخصة سواقة أردنية سارية.', complete: false },
     { id: 'vehicle', label: 'تفاصيل المركبة', description: 'أضف نوع المركبة وموديلها ورقم اللوحة.', complete: false },
     { id: 'insurance', label: 'وثيقة التأمين', description: 'ارفع تأمين المركبة الساري حالياً.', complete: false },

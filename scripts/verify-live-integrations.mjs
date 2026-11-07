@@ -372,24 +372,7 @@ function verifyCliq() {
   );
 }
 
-function verifySanad() {
-  const provider = 'Sanad';
-  requireEnv(provider, [
-    'SANAD_API_BASE_URL',
-    'SANAD_CLIENT_ID',
-    'SANAD_CLIENT_SECRET',
-    'SANAD_WEBHOOK_SECRET',
-  ]);
-  requireSourceToken(provider, 'supabase/functions/make-server-0b1f4071/index.ts', 'app_submit_sanad_verification');
-  const server = readSource('supabase/functions/make-server-0b1f4071/index.ts').toLowerCase();
-  const hasLiveSanad = server.includes('sanad_api_base_url') || server.includes('sanad_client_secret');
-  record(
-    provider,
-    'code:live-provider-client',
-    hasLiveSanad ? 'pass' : 'fail',
-    hasLiveSanad ? 'Sanad provider client found' : 'Sanad is manual/pending workflow; no live API client found',
-  );
-}
+
 
 function verifyMobile() {
   const provider = 'Mobile';
@@ -425,7 +408,7 @@ await verifyEmail();
 await verifyTwilioAndWhatsApp();
 verifyCommunicationsWorker();
 verifyCliq();
-verifySanad();
+
 verifyMobile();
 
 const failed = checks.filter(check => check.status === 'fail');

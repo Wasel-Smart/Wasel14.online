@@ -289,7 +289,6 @@ export async function submitDirectTrustDriverDocuments (
 
   const { error: verificationError } = await db.from( 'verification_records' ).insert( {
     user_id: context.user.id,
-    sanad_status: 'unverified',
     document_status: 'pending',
     verification_level: nextLevel,
     provider_reference: 'driver_documents',

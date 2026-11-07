@@ -13,6 +13,7 @@ import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 import { hasAnalyticsConsent } from './analyticsConsent';
 
 let appInsights: ApplicationInsights | null = null;
+let eventListenersRegistered = false;
 
 const PLACEHOLDER_MARKERS = [
     'paste_your',
@@ -58,7 +59,7 @@ function isUsableInstrumentationKey(value: string | undefined): value is string 
 }
 
 export function initializeAppInsights(): void {
-    if (!hasAnalyticsConsent()) {
+    if (!hasAnalyticsConsent() || appInsights) {
         return;
     }
 
@@ -94,37 +95,53 @@ export function initializeAppInsights(): void {
             },
         });
 
+        instance.addTelemetryInitializer(() => hasAnalyticsConsent());
+        appInsights = instance;
         instance.loadAppInsights();
         instance.trackPageView();
-        appInsights = instance;
 
-        // Wire real Web Vitals into App Insights as custom metrics.
-        onCLS(({ value }) => appInsights?.trackMetric({ name: 'web_vital_CLS', average: value }));
-        onFCP(({ value }) => appInsights?.trackMetric({ name: 'web_vital_FCP', average: value }));
-        onINP(({ value }) => appInsights?.trackMetric({ name: 'web_vital_INP', average: value }));
-        onLCP(({ value }) => appInsights?.trackMetric({ name: 'web_vital_LCP', average: value }));
-        onTTFB(({ value }) => appInsights?.trackMetric({ name: 'web_vital_TTFB', average: value }));
+        if (!eventListenersRegistered) {
+            eventListenersRegistered = true;
+            // Each callback reads the current SDK instance so re-consent does not
+            // accumulate duplicate listeners or send after withdrawal.
+            onCLS(({ value }) => appInsights?.trackMetric({ name: 'web_vital_CLS', average: value }));
+            onFCP(({ value }) => appInsights?.trackMetric({ name: 'web_vital_FCP', average: value }));
+            onINP(({ value }) => appInsights?.trackMetric({ name: 'web_vital_INP', average: value }));
+            onLCP(({ value }) => appInsights?.trackMetric({ name: 'web_vital_LCP', average: value }));
+            onTTFB(({ value }) => appInsights?.trackMetric({ name: 'web_vital_TTFB', average: value }));
 
-        window.addEventListener('unhandledrejection', (event) => {
-            if (appInsights) {
-                const exception = event.reason instanceof Error
-                    ? event.reason
-                    : new Error(String(event.reason ?? 'Unhandled promise rejection'));
-                appInsights.trackException({ exception, severityLevel: 2 });
-            }
-        });
+            window.addEventListener('unhandledrejection', (event) => {
+                if (appInsights) {
+                    const exception = event.reason instanceof Error
+                        ? event.reason
+                        : new Error(String(event.reason ?? 'Unhandled promise rejection'));
+                    appInsights.trackException({ exception, severityLevel: 2 });
+                }
+            });
 
-        window.addEventListener('error', (event) => {
-            if (appInsights) {
-                appInsights.trackException({
-                    exception: event.error instanceof Error ? event.error : new Error(event.message),
-                    severityLevel: 2,
-                });
-            }
-        });
+            window.addEventListener('error', (event) => {
+                if (appInsights) {
+                    appInsights.trackException({
+                        exception: event.error instanceof Error ? event.error : new Error(event.message),
+                        severityLevel: 2,
+                    });
+                }
+            });
+        }
 
     } catch {
         // Initialization failure is non-fatal; telemetry will be unavailable.
+    }
+}
+
+export function disableAppInsights(): void {
+    const instance = appInsights;
+    appInsights = null;
+    if (!instance) { return; }
+    try {
+        instance.unload(false);
+    } catch {
+        // Consent withdrawal must not break the application if SDK teardown fails.
     }
 }
 

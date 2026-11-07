@@ -72,7 +72,6 @@ describe( 'Direct Trust Phone Verification', () => {
       phone_number: null,
       role: 'rider',
       verification_level: 'level_0',
-      sanad_verified_status: null,
     };
 
     mockBuildUserContext.mockResolvedValue( { user: mockUser } );
@@ -99,7 +98,6 @@ describe( 'Direct Trust Phone Verification', () => {
       phone_number: null,
       role: 'rider',
       verification_level: 'level_0',
-      sanad_verified_status: null,
     };
 
     mockBuildUserContext.mockResolvedValue( { user: mockUser } );

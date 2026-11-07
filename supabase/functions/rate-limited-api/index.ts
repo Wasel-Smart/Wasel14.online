@@ -1,6 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { checkRateLimit } from './_shared/rate-limiter.ts';
+import { resolveCorsOrigin } from './_shared/cors.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -48,13 +49,19 @@ async function authenticateToken(token: string): Promise<{ userId: string } | nu
 
 Deno.serve(async (request: Request) => {
   if (request.method === 'OPTIONS') {
+    const allowedOrigin = resolveCorsOrigin(
+      request.headers.get('origin'),
+      Deno.env.get('ALLOWED_ORIGINS') ?? 'https://wasel14.online,https://www.wasel14.online',
+    );
+    const headers = new Headers({
+      'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      'Vary': 'Origin',
+    });
+    if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
     return new Response(null, {
       status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGINS') || 'https://wasel14.online',
-        'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-      },
+      headers,
     });
   }
 

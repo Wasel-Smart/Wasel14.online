@@ -10,7 +10,6 @@ export type Profile = {
   rating?: number | null;
   trip_count?: number | null;
   verified?: boolean | null;
-  sanad_verified?: boolean | null;
   verification_level?: string | null;
   wallet_status?: string | null;
   avatar_url?: string | null;

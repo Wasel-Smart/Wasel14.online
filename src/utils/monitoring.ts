@@ -5,21 +5,9 @@ import {
   captureException,
   captureMessage,
   startInactiveSpan,
-  browserTracingIntegration,
-  replayIntegration,
 } from '@sentry/react';
-import { getCurrentScope } from '@sentry/core';
 import { createCorrelationId, createStructuredLogEntry } from '../platform/observability';
 import { sanitizeLogMessage } from './sanitization';
-import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
-import { hasAnalyticsConsent } from './analyticsConsent';
-
-// @sentry/core's Scope type does not declare setMeasurement, but some runtime
-// builds expose it. Model it as optional so the call stays a safe no-op where
-// it is missing, without resorting to `any`.
-type MeasurementCapableScope = {
-  setMeasurement?: (name: string, value: number, unit: string) => void;
-};
 
 let sentryInitialized = false;
 let sentryInitializationStarted = false;
@@ -79,19 +67,12 @@ export async function initSentry(): Promise<void> {
   sentryInitializationStarted = true;
 
   try {
-    const analyticsConsent = hasAnalyticsConsent();
-    const integrations = [
-      browserTracingIntegration(),
-      ...( analyticsConsent ? [ replayIntegration( { maskAllText: true, blockAllMedia: true } ) ] : [] ),
-    ];
-
     sentryInit({
       dsn,
       environment,
-      integrations,
-      tracesSampleRate: analyticsConsent ? ( environment === 'production' ? 0.1 : 1 ) : 0,
-      replaysSessionSampleRate: analyticsConsent && environment === 'production' ? 0.05 : 0,
-      replaysOnErrorSampleRate: analyticsConsent ? 1 : 0,
+      tracesSampleRate: 0,
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 0,
       release: `wasel@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
       ignoreErrors: [
         'ResizeObserver loop limit exceeded',
@@ -142,20 +123,6 @@ export async function initSentry(): Promise<void> {
     sentryInitialized = true;
     writeConsole('info', 'Sentry initialized.');
 
-    const reportVital = (name: string, value: number) => {
-      try {
-        const scope = getCurrentScope() as unknown as MeasurementCapableScope;
-        scope.setMeasurement?.(name, value, name === 'CLS' ? '' : 'millisecond');
-      } catch {
-        // setMeasurement may not be available in all environments
-      }
-      logger.metric(`web_vital.${name}`, value, { name });
-    };
-    onCLS(({ value }) => reportVital('CLS', value));
-    onFCP(({ value }) => reportVital('FCP', value));
-    onINP(({ value }) => reportVital('INP', value));
-    onLCP(({ value }) => reportVital('LCP', value));
-    onTTFB(({ value }) => reportVital('TTFB', value));
   } catch (error) {
     sentryInitializationStarted = false;
     if (import.meta.env.DEV) {

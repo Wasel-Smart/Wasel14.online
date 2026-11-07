@@ -1368,15 +1368,6 @@ paths:
       responses:
         '200':
           description: ok
-  /v1/trust/webhooks/sanad:
-    post:
-      tags:
-        - Trust
-      summary: x
-      operationId: sanadWebhook
-      responses:
-        '200':
-          description: ok
   /v1/communications/webhooks/resend:
     post:
       tags:
@@ -1752,15 +1743,6 @@ components:
         - API
       summary: API endpoint
       operationId: cliqEndpoint
-      responses:
-        '200':
-          description: OK
-  /v1/trust/webhooks/sanad:
-    post:
-      tags:
-        - API
-      summary: API endpoint
-      operationId: sanadEndpoint
       responses:
         '200':
           description: OK

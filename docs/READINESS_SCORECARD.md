@@ -42,7 +42,7 @@ Last independent review: 2026-10-17 (file-level; nothing executed).
 
 1. Rotate every provider credential; purge git history if a secret was ever committed.
 2. Run `npm run edge:sync`, then `npm run verify`, and fix what fails.
-3. Deploy `webhooks` and confirm Stripe, CliQ, Sanad and Twilio callbacks return 200.
+3. Deploy `webhooks` and confirm Stripe, CliQ and Twilio callbacks return 200.
 4. Confirm the Stripe account entity is eligible for a Jordan-market business.
 
 ## Open: code

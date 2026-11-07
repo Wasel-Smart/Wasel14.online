@@ -3,7 +3,6 @@ import {
   authenticateRequest,
   sanitizePlainText,
   isPlainObject,
-  hasAnyPermission,
   type AdminClient,
 } from './shared.ts';
 
@@ -26,7 +25,7 @@ import {
  * booking on this trip with this driver" instead.
  */
 
-const REVIEWABLE_BOOKING_STATUSES = [ 'completed' ];
+const REVIEWABLE_BOOKING_STATUSES = [ 'confirmed', 'checked_in', 'completed' ];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -69,7 +68,7 @@ async function resolveBookingForReview (
     if ( byShareCode ) {return byShareCode;}
   }
 
-  return candidates[ 0 ] ?? null;
+  return null;
 }
 
 /**
@@ -77,20 +76,23 @@ async function resolveBookingForReview (
  * `trips.driver_id` points at the drivers table, but some read paths hand the
  * client the driver profile id instead, so both identifiers are accepted.
  */
-async function isReviewableDriver (
+async function resolveReviewableDriverId (
   admin: AdminClient,
   tripId: string,
   revieweeId: string,
-): Promise<boolean> {
+): Promise<{ driverId: string; userId: string } | null> {
   const { data: trip } = await admin
     .from( 'trips' )
-    .select( 'driver_id' )
+    .select( 'driver_id, departure_time' )
     .eq( 'trip_id', tripId )
     .maybeSingle();
 
-  const driverId = String( ( trip as Record<string, unknown> | null )?.driver_id ?? '' );
-  if ( !driverId ) {return false;}
-  if ( driverId === revieweeId ) {return true;}
+  const tripRow = trip as Record<string, unknown> | null;
+  const driverId = String( tripRow?.driver_id ?? '' );
+  const departureTime = Date.parse( String( tripRow?.departure_time ?? '' ) );
+  const reviewEligibleAt = departureTime + 2 * 60 * 60 * 1000;
+  if ( !Number.isFinite( departureTime ) || Date.now() < reviewEligibleAt ) {return null;}
+  if ( !driverId ) {return null;}
 
   const { data: driver } = await admin
     .from( 'drivers' )
@@ -98,7 +100,9 @@ async function isReviewableDriver (
     .eq( 'driver_id', driverId )
     .maybeSingle();
 
-  return String( ( driver as Record<string, unknown> | null )?.user_id ?? '' ) === revieweeId;
+  const driverUserId = String( ( driver as Record<string, unknown> | null )?.user_id ?? '' );
+  if ( !driverUserId || ( driverId !== revieweeId && driverUserId !== revieweeId ) ) {return null;}
+  return { driverId, userId: driverUserId };
 }
 
 export async function handleSubmitReview ( request: Request ) {
@@ -117,10 +121,6 @@ export async function handleSubmitReview ( request: Request ) {
   if ( !revieweeId ) {return json( { error: 'reviewee_id is required' }, 400 );}
 
   const { admin, canonicalUser } = auth;
-
-  // Moderators are trusted to file a review on someone's behalf, so they skip
-  // the "this is my booking" check the same way /ratings does.
-  const canModerateRatings = hasAnyPermission( auth, [ 'trust:moderate' ] );
 
   let booking: Record<string, unknown> | null;
   try {
@@ -142,17 +142,14 @@ export async function handleSubmitReview ( request: Request ) {
     return json( { error: 'This booking is not linked to a trip' }, 409 );
   }
 
-  if ( !canModerateRatings ) {
-    let reviewerIsPassenger: boolean;
-    try {
-      reviewerIsPassenger = await isReviewableDriver( admin, tripId, revieweeId );
-    } catch ( error ) {
-      return json( { error: ( error as Error ).message }, 500 );
-    }
-
-    if ( !reviewerIsPassenger ) {
-      return json( { error: 'You can only review a driver you travelled with' }, 403 );
-    }
+  let reviewableDriver: { driverId: string; userId: string } | null;
+  try {
+    reviewableDriver = await resolveReviewableDriverId( admin, tripId, revieweeId );
+  } catch ( error ) {
+    return json( { error: ( error as Error ).message }, 500 );
+  }
+  if ( !reviewableDriver ) {
+    return json( { error: 'You can only review a driver you travelled with' }, 403 );
   }
 
   const rating = Math.round( overallRating );
@@ -168,7 +165,7 @@ export async function handleSubmitReview ( request: Request ) {
         booking_id: String( booking.id ?? booking.booking_id ),
         trip_id: tripId,
         rider_id: canonicalUser.id,
-        driver_id: revieweeId,
+         driver_id: reviewableDriver.driverId,
         rating,
         review: comment,
         tags: [],
@@ -182,7 +179,7 @@ export async function handleSubmitReview ( request: Request ) {
 
   // Best-effort: a failed notification must not fail the review.
   await admin.from( 'notifications' ).insert( {
-    user_id: revieweeId,
+    user_id: reviewableDriver.userId,
     type: 'rating_received',
     title: 'New Rating',
     message: `You received a ${ rating }-star rating`,

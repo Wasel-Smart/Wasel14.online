@@ -30,7 +30,7 @@ account key, Vercel token, then OAuth providers, email providers, and worker sec
 Webhook URLs in this project live under the edge function, for example:
 `https://<project-ref>.supabase.co/functions/v1/make-server-0b1f4071/payments/webhooks/stripe`
 (other routes: `/communications/webhooks/twilio`, `/communications/webhooks/resend`,
-`/trust/webhooks/sanad`, `/payments/webhooks/cliq`, `/auth/hooks/send-sms`).
+`/payments/webhooks/cliq`, `/auth/hooks/send-sms`).
 
 ---
 

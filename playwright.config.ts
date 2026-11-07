@@ -14,6 +14,7 @@ export default defineConfig({
   },
   use: {
     baseURL,
+    channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
     trace: 'retain-on-failure',
     screenshot: {
       mode: 'only-on-failure',

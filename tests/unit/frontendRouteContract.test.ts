@@ -96,7 +96,7 @@ describe('/reviews honours the client contract, not the /ratings contract', () =
   it('maps them onto the ratings columns instead of aliasing to /ratings', () => {
     expect(REVIEWS).toContain("from( 'ratings' )");
     expect(REVIEWS).toContain('rider_id: canonicalUser.id');
-    expect(REVIEWS).toContain('driver_id: revieweeId');
+    expect(REVIEWS).toContain('driver_id: reviewableDriver.driverId');
     expect(REVIEWS).toContain('review: comment');
   });
 

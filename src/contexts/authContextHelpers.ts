@@ -21,8 +21,6 @@ export type Profile = {
   rating_as_driver?: number | null;
   trip_count?: number | null;
   verified?: boolean | null;
-  sanad_verified?: boolean | null;
-  sanad_verified_status?: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired' | null;
   verification_level?: string | null;
   wallet_status?: string | null;
   avatar_url?: string | null;
@@ -42,8 +40,6 @@ export interface WaselUser {
   rating: number;
   trips: number;
   verified: boolean;
-  sanadVerified: boolean;
-  sanadVerifiedStatus?: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
   verificationLevel: string;
   walletStatus: 'active' | 'limited' | 'frozen' | 'closed' | 'unavailable';
   avatar?: string;
@@ -78,8 +74,6 @@ export function createLocalAuthProfile(localUser: WaselUser): Profile {
     rating: localUser.rating,
     trip_count: localUser.trips,
     verified: localUser.verified,
-    sanad_verified: localUser.sanadVerified,
-    sanad_verified_status: localUser.sanadVerifiedStatus ?? null,
     verification_level: localUser.verificationLevel,
     wallet_status: localUser.walletStatus,
     avatar_url: localUser.avatar ?? null,
@@ -170,7 +164,7 @@ export function shouldRefreshProfile(event: AuthChangeEvent, session: Session | 
 function computeTrustScore(
   user: Pick<
     WaselUser,
-    'verified' | 'sanadVerified' | 'emailVerified' | 'phoneVerified' | 'trips' | 'rating'
+    'verified' | 'emailVerified' | 'phoneVerified' | 'trips' | 'rating'
   >,
 ) {
   return deriveAccountTrustScore(user);
@@ -247,16 +241,11 @@ function resolveUserRole(profileRole: string | null | undefined): WaselUser['rol
 
 function resolveVerificationLevel(
   profile: Profile | null,
-  role: WaselUser['role'],
-  sanadVerified: boolean,
-  phoneVerified: boolean,
+  _phoneVerified: boolean,
   emailVerified: boolean,
 ): string {
   if (profile?.verification_level) {return profile.verification_level;}
-  if (sanadVerified) {
-    return role === 'driver' || role === 'both' ? 'level_3' : 'level_2';
-  }
-  if (phoneVerified || emailVerified) {return 'level_1';}
+  if (_phoneVerified || emailVerified) {return 'level_1';}
   return 'level_0';
 }
 
@@ -292,12 +281,11 @@ export function mapBackendProfile({
 }): WaselUser {
   const name = resolveUserName(profile, authUser);
   const phone = profile?.phone_number ?? authUser?.phone ?? undefined;
-  const verified = Boolean(profile?.verified ?? profile?.sanad_verified ?? false);
-  const sanadVerified = Boolean(profile?.sanad_verified ?? verified);
+  const verified = Boolean(profile?.verified ?? false);
   const emailVerified = Boolean(profile?.email_verified ?? authUser?.email_confirmed_at ?? false);
   const phoneVerified = Boolean(profile?.phone_verified ?? authUser?.phone_confirmed_at ?? false);
   const role = resolveUserRole(profile?.role);
-  const verificationLevel = resolveVerificationLevel(profile, role, sanadVerified, phoneVerified, emailVerified);
+  const verificationLevel = resolveVerificationLevel(profile, phoneVerified, emailVerified);
   const walletStatus = resolveWalletStatus(profile?.wallet_status);
 
   const baseUser: WaselUser = {
@@ -310,8 +298,6 @@ export function mapBackendProfile({
     rating: Number(profile?.rating ?? 5),
     trips: Number(profile?.trip_count ?? 0),
     verified,
-    sanadVerified,
-    sanadVerifiedStatus: profile?.sanad_verified_status ?? (sanadVerified ? 'verified' : 'unverified'),
     verificationLevel,
     walletStatus,
     avatar: profile?.avatar_url ?? authUser?.user_metadata?.avatar_url ?? authUser?.user_metadata?.picture ?? undefined,
@@ -334,7 +320,6 @@ export function applyUserUpdates(user: WaselUser, updates: Partial<WaselUser>): 
   const next = { ...user, ...updates };
   next.trustScore = computeTrustScore({
     verified: next.verified,
-    sanadVerified: next.sanadVerified,
     emailVerified: next.emailVerified,
     phoneVerified: next.phoneVerified,
     trips: next.trips,
@@ -343,11 +328,7 @@ export function applyUserUpdates(user: WaselUser, updates: Partial<WaselUser>): 
 
   next.verificationLevel =
     next.verificationLevel ||
-    (next.sanadVerified
-      ? next.role === 'driver' || next.role === 'both'
-        ? 'level_3'
-        : 'level_2'
-      : next.phoneVerified || next.emailVerified
+    (next.phoneVerified || next.emailVerified
         ? 'level_1'
         : 'level_0');
 

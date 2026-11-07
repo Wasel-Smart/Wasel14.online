@@ -22,10 +22,9 @@ function verificationRank ( level?: string ): number {
   }
 }
 
-// Driver statuses that allow trip creation. `pending_approval` means the driver
-// has submitted documents and is awaiting review — the backend also allows trip
-// creation at this stage so routes are live the moment approval comes through.
-const CLEARED_DRIVER_STATUSES = new Set(['approved', 'online', 'offline', 'busy', 'pending_approval']);
+// Only operator-approved drivers may publish trips. Submission and approval are
+// distinct states; the server enforces the same boundary for every write path.
+const CLEARED_DRIVER_STATUSES = new Set(['approved', 'online', 'offline', 'busy']);
 
 /**
  * A driver is cleared once an operator has approved the submitted driver
@@ -68,6 +67,13 @@ function evaluateOfferRide(user: Pick<WaselUser, 'role' | 'phoneVerified' | 'ema
       allowed: false,
       reason: 'Submit your driver documents first.',
       recommendation: 'Add your license in Trust Center to start the review.',
+    };
+  }
+  if (!isDriverCleared(user)) {
+    return {
+      allowed: false,
+      reason: 'Driver approval is required before publishing rides.',
+      recommendation: 'Wait for the Trust Center to approve your documents.',
     };
   }
   return { allowed: true, reason: null, recommendation: null };

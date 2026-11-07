@@ -122,7 +122,7 @@ describe('AuthProvider — initialization', () => {
   it('falls back to local E2E session when VITE_E2E_LOCAL_AUTH is true', async () => {
     const localUser = {
       id: 'e2e-user', name: 'E2E Rider', email: 'e2e@wasel.jo', role: 'rider',
-      balance: 0, rating: 5, trips: 0, verified: false, sanadVerified: false,
+      balance: 0, rating: 5, trips: 0, verified: false,
       verificationLevel: 'level_0', walletStatus: 'active', emailVerified: false,
       phoneVerified: false, twoFactorEnabled: false, trustScore: 0, backendMode: 'supabase',
     };

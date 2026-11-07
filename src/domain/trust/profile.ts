@@ -12,7 +12,6 @@ export interface TrustProfileInput {
   verified?: boolean;
   phoneVerified?: boolean;
   emailVerified?: boolean;
-  sanadVerified?: boolean;
   verificationLevel?: VerificationLevel;
   rating?: number;
   trips?: number;
@@ -28,7 +27,6 @@ export interface RuntimeTrustProfile {
   backendMode: 'demo' | 'supabase';
   phoneVerified: boolean;
   emailVerified: boolean;
-  sanadVerified: boolean;
   verificationLevel: VerificationLevel;
   trustScore: number;
   walletStatus: 'active' | 'inactive';
@@ -40,7 +38,6 @@ export interface RuntimeTrustProfile {
 export function deriveVerificationLevel(input: TrustProfileInput): VerificationLevel {
   if (input.verificationLevel) {return input.verificationLevel;}
   if (input.role === 'driver') {return 'level_3';}
-  if (input.sanadVerified) {return 'level_2';}
   if (input.verified) {return 'level_2';}
   if (input.phoneVerified || input.emailVerified) {return 'level_1';}
   return 'level_0';
@@ -72,7 +69,6 @@ export function createDemoUserProfile(input: TrustProfileInput): RuntimeTrustPro
     backendMode: 'demo',
     phoneVerified: input.phoneVerified ?? Boolean(input.phone),
     emailVerified: input.emailVerified ?? Boolean(input.email),
-    sanadVerified: input.sanadVerified ?? input.verified ?? false,
     verificationLevel,
     trustScore: deriveTrustScore(profileInput),
     walletStatus: 'active',
@@ -117,7 +113,6 @@ export function mapBackendProfile(input: {
     backendMode: 'supabase',
     phoneVerified,
     emailVerified,
-    sanadVerified: false,
     verificationLevel,
     trustScore: deriveTrustScore({ verificationLevel, trips, rating }),
     walletStatus: balance > 0 ? 'active' : 'inactive',

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
-- Stripe, CliQ and Sanad webhooks now answer 400 (not a retryable 500) when a correctly signed body is not a JSON object; covered by new Deno tests
+- Stripe and CliQ webhooks now answer 400 (not a retryable 500) when a correctly signed body is not a JSON object; covered by new Deno tests
 - `/communications/admin/apply-migrations` and `/moderation/admin/apply-migrations` return 410 unless `ALLOW_RUNTIME_MIGRATIONS=true`; schema changes ship through `supabase db push`
 
 ### Changed

@@ -8,6 +8,7 @@
 import { onCLS, onFCP, onLCP, onTTFB, onINP, type MetricType } from 'web-vitals';
 import { logger } from './monitoring';
 import { sanitizeLogMessage } from './sanitization';
+import { hasAnalyticsConsent } from './analyticsConsent';
 
 let performanceMonitoringInitialized = false;
 let longTaskObserverStarted = false;
@@ -408,7 +409,7 @@ function reportWebVital(metric: MetricType) {
 
   // Check against performance budget
   const budget = PERFORMANCE_BUDGETS[vital.name.toLowerCase() as keyof typeof PERFORMANCE_BUDGETS];
-  if (budget && vital.value > budget) {
+  if (hasAnalyticsConsent() && budget && vital.value > budget) {
     logger.warning(`Performance budget exceeded: ${sanitizeLogMessage(vital.name)}`, {
       value: Number(vital.value.toFixed(2)),
       budget,
@@ -421,7 +422,7 @@ function reportWebVital(metric: MetricType) {
   sendToAnalytics(vital);
 
   // Send to Sentry for poor metrics
-  if (vital.rating === 'poor') {
+  if (hasAnalyticsConsent() && vital.rating === 'poor') {
     logger.error(
       `Poor performance: ${sanitizeLogMessage(vital.name)}`,
       new Error('Performance threshold exceeded'),
@@ -437,7 +438,7 @@ function sendToAnalytics(vital: WebVital) {
 
   // Check analytics consent before sending
   try {
-    if (!localStorage.getItem('consent-analytics')) {
+    if (!hasAnalyticsConsent()) {
       return;
     }
   } catch {

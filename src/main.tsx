@@ -11,7 +11,8 @@ import { initializeSessionManagement } from './utils/session';
 import { verifyBackendConnection, startHealthCheckMonitoring } from './utils/healthCheck';
 import { clearMasterKey } from './utils/encryption';
 import { installBenignRuntimeErrorFilter } from './components/system/ErrorBoundary';
-import { scheduleIdleTask } from './utils/performance';
+import { initPerformanceMonitoring, scheduleIdleTask, detectLongTasks } from './utils/performance';
+import { initSentry } from './utils/monitoring';
 
 const LOCAL_DEV_RESET_KEY = 'wasel-local-dev-cache-reset';
 
@@ -313,22 +314,34 @@ if ( environmentIsValid ) {
   void scheduleIdle( () => {
     void ( async () => {
       try {
-        let analyticsInitialized = false;
+        let appInsightsModule: {
+          initializeAppInsights: () => void;
+          disableAppInsights: () => void;
+        } | null = null;
+        let appInsightsImport: Promise<void> | null = null;
         const initializeConsentBasedAnalytics = () => {
-          if ( analyticsInitialized || !hasAnalyticsConsent() ) { return; }
-          analyticsInitialized = true;
-          void import( './utils/appInsights' )
-            .then( module => module.initializeAppInsights() )
-            .catch( () => { /* Analytics must not disrupt core application flows. */ } );
-          void import( '@vercel/speed-insights' )
-            .then( module => module.injectSpeedInsights() )
-            .catch( () => { /* Analytics must not disrupt core application flows. */ } );
+          if ( !hasAnalyticsConsent() ) {
+            appInsightsModule?.disableAppInsights();
+            return;
+          }
+          if ( appInsightsModule ) {
+            appInsightsModule.initializeAppInsights();
+            return;
+          }
+          if ( appInsightsImport ) { return; }
+          appInsightsImport = import( './utils/appInsights' )
+            .then( module => {
+              appInsightsModule = module;
+              if ( hasAnalyticsConsent() ) { module.initializeAppInsights(); }
+              else { module.disableAppInsights(); }
+            } )
+            .catch( () => { /* Analytics must not disrupt core application flows. */ } )
+            .finally( () => { appInsightsImport = null; } );
         };
         initializeConsentBasedAnalytics();
         window.addEventListener( ANALYTICS_CONSENT_CHANGED, initializeConsentBasedAnalytics );
-        // Sentry is loaded lazily inside initSentry() — only downloads the SDK
-        // when VITE_SENTRY_DSN is set, so this is safe to call unconditionally.
-        const { initSentry } = await import( './utils/monitoring' );
+        // Initialize observability after first paint; monitoring is already part
+        // of the shared app graph through the app and error boundary.
         void initSentry();
         initializeCsrfProtection();
         initializeSessionManagement();
@@ -338,8 +351,7 @@ if ( environmentIsValid ) {
         initPerfObserver();
 
         // Wire up Web Vitals tracking.
-        const { initPerformanceMonitoring: initWebVitals, detectLongTasks } = await import( './utils/performance' );
-        initWebVitals();
+        initPerformanceMonitoring();
         detectLongTasks();
 
         verifyBackendConnection()
@@ -458,7 +470,7 @@ if ( environmentIsValid ) {
     document.documentElement.classList.add( 'pwa-standalone' );
   }
 
-  type ServiceWorkerMessage = { type: 'NAVIGATE'; url: string } | { type: 'BACKGROUND_SYNC' } | { type: 'SW_UPDATED' };
+  type ServiceWorkerMessage = { type: 'NAVIGATE'; url: string } | { type: 'BACKGROUND_SYNC' } | { type: 'SW_UPDATED' }; // eslint-disable-line @typescript-eslint/consistent-type-imports
 
   const handleServiceWorkerMessage = ( event: MessageEvent<ServiceWorkerMessage> ) => {
     const message = event.data;

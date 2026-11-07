@@ -1,3 +1,4 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
     json,
     authenticateRequest,
@@ -253,20 +254,29 @@ export async function handleEnableDriverMode ( request: Request ) {
     );
   }
 
-  const { error } = await auth.admin
-    .from( 'users' )
-    .update( {
-      role: 'driver',
-    } )
-    .eq( 'id', auth.canonicalUser.id );
-  if ( error ) {
-    return json( { error: error.message }, 500 );
+  const supabaseUrl = Deno.env.get( 'SUPABASE_URL' ) ?? '';
+  const anonKey = Deno.env.get( 'SUPABASE_ANON_KEY' ) ?? '';
+  const bearerToken = request.headers.get( 'Authorization' ) ?? '';
+  if ( !supabaseUrl || !anonKey || !bearerToken.startsWith( 'Bearer ' ) ) {
+    return json( { error: 'Driver mode activation is temporarily unavailable.' }, 503 );
   }
 
-  return json( {
-    enabled: true,
-    role: 'driver',
+  // Invoke the caller-bound RPC with the user's JWT so auth.uid() and RLS apply.
+  // The service-role client is used only for token validation and role checks.
+  const userClient = createClient( supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: bearerToken } },
   } );
+  const { data: activation, error } = await userClient.rpc( 'app_enable_driver_mode' );
+  if ( error ) {
+    const status = error.code === '42501' ? 403 : error.code === 'P0002' ? 404 : 500;
+    return json( { error: error.message }, status );
+  }
+  if ( !activation || activation.enabled !== true || activation.role !== 'driver' ) {
+    return json( { error: 'Driver mode could not be enabled.' }, 500 );
+  }
+
+  return json( activation );
 }
 
 export async function handleSubmitDriverDocuments ( request: Request ) {
@@ -343,7 +353,6 @@ export async function handleSubmitDriverDocuments ( request: Request ) {
 
   const { error: verificationError } = await auth.admin.from( 'verification_records' ).insert( {
     user_id: auth.canonicalUser.id,
-    sanad_status: 'unverified',
     document_status: 'pending',
     verification_level: nextLevel,
     provider_reference: 'driver_documents',

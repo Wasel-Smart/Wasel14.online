@@ -10,6 +10,7 @@
  */
 
 import { logger } from './monitoring';
+import { onCLS, onFCP, onINP, onLCP, onTTFB } from 'web-vitals';
 
 type WebVitalName = 'LCP' | 'FID' | 'CLS' | 'INP' | 'TTFB' | 'FCP';
 
@@ -136,18 +137,14 @@ export function initPerformanceMonitoring() {
   initLayoutShiftObserver();
   initMemoryObserver();
 
-  // Import web-vitals from the npm package via dynamic import so it is
-  // excluded from the synchronous critical-path bundle.
-  // The previous implementation checked `'web-vitals' in window` which is
-  // always false — the package is never attached to window — so all five
-  // metrics were silently never collected.
-  import('web-vitals').then(({ onLCP, onCLS, onINP, onTTFB, onFCP }) => {
-    onLCP((m)  => emitWebVital({ name: 'LCP',  value: m.value, rating: ratingForThreshold(m.value, LCP_THRESHOLDS),  delta: m.delta, id: m.id }));
-    onCLS((m)  => emitWebVital({ name: 'CLS',  value: m.value, rating: ratingForThreshold(m.value, CLS_THRESHOLDS),  delta: m.delta, id: m.id }));
-    onINP((m)  => emitWebVital({ name: 'INP',  value: m.value, rating: ratingForThreshold(m.value, INP_THRESHOLDS),  delta: m.delta, id: m.id }));
-    onTTFB((m) => emitWebVital({ name: 'TTFB', value: m.value, rating: ratingForThreshold(m.value, TTFB_THRESHOLDS), delta: m.delta, id: m.id }));
-    onFCP((m)  => emitWebVital({ name: 'FCP',  value: m.value, rating: ratingForThreshold(m.value, FCP_THRESHOLDS),  delta: m.delta, id: m.id }));
-  }).catch(() => { /* web-vitals unavailable — fail silently */ });
+  // Keep initialization deferred until the caller's idle phase. The package
+  // is already part of the app graph through other telemetry modules, so a
+  // dynamic import here cannot create a separate chunk.
+  onLCP((m)  => emitWebVital({ name: 'LCP',  value: m.value, rating: ratingForThreshold(m.value, LCP_THRESHOLDS),  delta: m.delta, id: m.id }));
+  onCLS((m)  => emitWebVital({ name: 'CLS',  value: m.value, rating: ratingForThreshold(m.value, CLS_THRESHOLDS),  delta: m.delta, id: m.id }));
+  onINP((m)  => emitWebVital({ name: 'INP',  value: m.value, rating: ratingForThreshold(m.value, INP_THRESHOLDS),  delta: m.delta, id: m.id }));
+  onTTFB((m) => emitWebVital({ name: 'TTFB', value: m.value, rating: ratingForThreshold(m.value, TTFB_THRESHOLDS), delta: m.delta, id: m.id }));
+  onFCP((m)  => emitWebVital({ name: 'FCP',  value: m.value, rating: ratingForThreshold(m.value, FCP_THRESHOLDS),  delta: m.delta, id: m.id }));
 }
 
 export function measureRouteChange(routeName: string) {

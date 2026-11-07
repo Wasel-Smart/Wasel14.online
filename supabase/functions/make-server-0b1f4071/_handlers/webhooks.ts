@@ -25,7 +25,6 @@ import {
 import {
     mapResendEventToStatus,
     mapTwilioStatusToLifecycle,
-    hasValidWebhookToken,
 } from '../_shared/communication-runtime.ts';
 
 // Stripe reports JOD in fils (1 JOD = 1000 fils) while wallets are credited in JOD.
@@ -362,34 +361,32 @@ export async function handleResendWebhook ( request: Request ) {
 }
 
 export async function handleTwilioWebhook ( request: Request ) {
-  const url = new URL( request.url );
   const form = await request.formData();
 
   // Twilio signs the callback URL plus every POST parameter (sorted by name) with
-  // HMAC-SHA1 and sends the digest in X-Twilio-Signature. That proof is preferred.
-  // The URL token stays as a fallback until TWILIO_WEBHOOK_REQUIRE_SIGNATURE=true is
-  // set. Behind a proxy request.url can differ from the URL configured in Twilio,
-  // so TWILIO_WEBHOOK_PUBLIC_URL overrides it when needed.
+  // HMAC-SHA1 and sends the digest in X-Twilio-Signature. Require that signature:
+  // query-string credentials can leak through access logs and referrers.
+  // Behind a proxy, TWILIO_WEBHOOK_PUBLIC_URL must match Twilio's configured URL.
   const signature = request.headers.get( 'x-twilio-signature' );
   const signingSecretConfigured = Boolean( deliveryEnv.twilioWebhookSigningSecret || deliveryEnv.twilioAuthToken );
-  let authorized = false;
-  if ( signature && signingSecretConfigured ) {
-    const signedParams = [ ...form.entries() ]
-      .filter( ( entry ): entry is [ string, string ] => typeof entry[ 1 ] === 'string' )
-      .sort( ( left, right ) => ( left[ 0 ] < right[ 0 ] ? -1 : left[ 0 ] > right[ 0 ] ? 1 : 0 ) )
-      .map( ( [ key, value ] ) => `${ key }${ value }` )
-      .join( '' );
-    authorized = await _verifyTwilioWebhookSignature(
-      signedParams,
-      signature,
-      Deno.env.get( 'TWILIO_WEBHOOK_PUBLIC_URL' ) ?? request.url,
-    );
+  if ( !signingSecretConfigured ) {
+    return json( { error: 'Twilio webhook signature verification is not configured.' }, 503 );
   }
+  if ( !signature ) {
+    return json( { error: 'Missing Twilio webhook signature.' }, 401 );
+  }
+  const signedParams = [ ...form.entries() ]
+    .filter( ( entry ): entry is [ string, string ] => typeof entry[ 1 ] === 'string' )
+    .sort( ( left, right ) => ( left[ 0 ] < right[ 0 ] ? -1 : left[ 0 ] > right[ 0 ] ? 1 : 0 ) )
+    .map( ( [ key, value ] ) => `${ key }${ value }` )
+    .join( '' );
+  const authorized = await _verifyTwilioWebhookSignature(
+    signedParams,
+    signature,
+    Deno.env.get( 'TWILIO_WEBHOOK_PUBLIC_URL' ) ?? request.url,
+  );
   if ( !authorized ) {
-    const signatureRequired = Deno.env.get( 'TWILIO_WEBHOOK_REQUIRE_SIGNATURE' ) === 'true';
-    if ( signatureRequired || !hasValidWebhookToken( url, deliveryEnv.communicationWebhookToken ) ) {
-      return json( { error: 'Invalid Twilio webhook authentication' }, 401 );
-    }
+    return json( { error: 'Invalid Twilio webhook signature.' }, 401 );
   }
   const externalReference = String( form.get( 'MessageSid' ) ?? '' );
   const rawStatus = String( form.get( 'MessageStatus' ) ?? '' );

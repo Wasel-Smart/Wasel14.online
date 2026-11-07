@@ -60,7 +60,7 @@ AS $$
   SELECT app_private.enable_driver_mode();
 $$;
 
-REVOKE ALL ON FUNCTION public.app_enable_driver_mode() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.app_enable_driver_mode() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.app_enable_driver_mode() TO authenticated;
 
 COMMIT;

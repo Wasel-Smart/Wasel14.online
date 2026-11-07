@@ -4,7 +4,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { WaselButton } from '@/components/wasel-ui/WaselButton';
-import { safeStorageGetItem, safeStorageSetItem } from '@/utils/browserStorage';
+import { safeStorageGetItem } from '@/utils/browserStorage';
+import { saveCookieDecision } from '@/utils/analyticsConsent';
 import { tx } from '../../locales/tx';
 
 const CONSENT_KEY = 'wasel_cookie_consent';
@@ -27,28 +28,12 @@ export function CookieConsentBanner() {
   }, []);
 
   const handleAccept = useCallback(() => {
-    safeStorageSetItem(
-      'localStorage',
-      CONSENT_KEY,
-      JSON.stringify({
-        accepted: true,
-        timestamp: Date.now(),
-        version: '1.0',
-      }),
-    );
+    saveCookieDecision('accepted');
     setShowBanner(false);
   }, []);
 
   const handleDecline = useCallback(() => {
-    safeStorageSetItem(
-      'localStorage',
-      CONSENT_KEY,
-      JSON.stringify({
-        accepted: false,
-        timestamp: Date.now(),
-        version: '1.0',
-      }),
-    );
+    saveCookieDecision('declined');
     setShowBanner(false);
   }, []);
 

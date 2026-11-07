@@ -18,7 +18,7 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 Deno.env.set('SUPABASE_URL', 'https://example.supabase.co');
 Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key');
 
-const { computeBookingAmountMinor } = await import(
+const { computeBookingAmountMinor, verifyPaymentIntentOwnership } = await import(
   '../make-server-0b1f4071/_handlers/payments.ts'
 );
 
@@ -28,11 +28,20 @@ type Admin = Parameters<typeof computeBookingAmountMinor>[0];
 function fakeAdmin(
   row: Record<string, unknown> | null,
   error: { message: string } | null = null,
+  options: { missingPassengerId?: boolean } = {},
 ): Admin {
+  let selectedColumns = '';
   const chain = {
-    select: () => chain,
+    select: (columns: string) => {
+      selectedColumns = columns;
+      return chain;
+    },
     eq: () => chain,
-    maybeSingle: () => Promise.resolve({ data: row, error }),
+    maybeSingle: () => Promise.resolve(
+      options.missingPassengerId && selectedColumns.includes('passenger_id')
+        ? { data: null, error: { code: '42703', message: 'column bookings.passenger_id does not exist' } }
+        : { data: row, error },
+    ),
   };
   return { from: () => chain } as unknown as Admin;
 }
@@ -70,8 +79,18 @@ Deno.test('computeBookingAmountMinor — a different user cannot pay for the boo
 
 Deno.test('computeBookingAmountMinor — older schemas that store the owner in user_id still match', async () => {
   const legacy = booking({ passenger_id: null, user_id: OWNER.id });
-  const result = await computeBookingAmountMinor(fakeAdmin(legacy), 'b-1', OWNER);
+  const result = await computeBookingAmountMinor(fakeAdmin(legacy, null, { missingPassengerId: true }), 'b-1', OWNER);
   assertEquals(result?.amountMinor, 8000);
+});
+
+Deno.test('verifyPaymentIntentOwnership — recognizes intents in legacy user_id bookings', async () => {
+  const legacy = booking({ passenger_id: null, user_id: OWNER.id, stripe_payment_intent_id: 'pi_legacy' });
+  const result = await verifyPaymentIntentOwnership(
+    fakeAdmin(legacy, null, { missingPassengerId: true }),
+    'pi_legacy',
+  );
+  assertEquals(result.owned, true);
+  assertEquals(result.amountMinor, 8000);
 });
 
 Deno.test('computeBookingAmountMinor — an already paid or refunded booking is not payable again', async () => {

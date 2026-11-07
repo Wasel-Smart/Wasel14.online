@@ -187,7 +187,6 @@ async function requireSupabase() {
 }
 
 type VerificationRecord = {
-  sanad_status?: string | null;
   document_status?: string | null;
   verification_level?: string | null;
   verification_timestamp?: string | null;
@@ -208,16 +207,14 @@ function mergeVerificationIntoProfile(
   }
 
   const current = profile ?? {};
-  const sanadVerified = verification.sanad_status === 'verified';
   const documentVerified = verification.document_status === 'verified';
   const verificationLevel =
     verification.verification_level ||
-    (sanadVerified ? 'level_3' : documentVerified ? 'level_2' : 'level_0');
+    (documentVerified ? 'level_2' : 'level_0');
 
   return {
     ...current,
-    sanad_verified: current.sanad_verified ?? sanadVerified,
-    verified: current.verified ?? (sanadVerified || documentVerified),
+    verified: current.verified ?? documentVerified,
     verification_level: current.verification_level ?? verificationLevel,
     verification_updated_at:
       current.verification_updated_at ??

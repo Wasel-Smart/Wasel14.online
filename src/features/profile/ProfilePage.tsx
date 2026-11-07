@@ -432,7 +432,7 @@ function ProfilePageContent({
               label={t('profileExpanded.verificationLevel')}
               value={(user.verificationLevel ?? 'level_0').replace('level_', 'L')}
               detail={t('profileExpanded.verificationLevelDetail')}
-              color={user.verified || user.sanadVerified ? CYAN : C.gold}
+              color={user.verified ? CYAN : C.gold}
             />
             <SharedInsightCard
               label={t('profileExpanded.walletStatus')}
