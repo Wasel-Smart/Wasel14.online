@@ -1,4 +1,10 @@
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+
+// Register cleanup explicitly instead of relying on Testing Library to detect
+// Vitest's globals at module initialization. Without this, rendered trees leak
+// between tests in isolated VM workers and unrelated UI tests see duplicate DOM.
+afterEach(() => cleanup());
 
 // Polyfill Web Crypto API for jsdom — required by src/utils/encryption.ts
 // which uses crypto.subtle (AES-GCM). Node's webcrypto is spec-compliant.
