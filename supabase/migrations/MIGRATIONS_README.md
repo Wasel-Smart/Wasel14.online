@@ -78,10 +78,11 @@ or health of a deployed Edge Function.
 
 The schema cleanup migration `20261108014245_remove_retired_identity_schema.sql`
 was executed transactionally with `supabase db query --linked` on 2026-11-08 and
-verified against the linked schema. That command does not create migration
-history, so this version remains pending and its idempotent SQL will run again
-when the history is reconciled. Do not push this migration by itself while the
-broader history remains mismatched.
+verified against the linked schema. The version was then marked applied with
+`supabase migration repair 20261108014245 --status applied --linked` so the
+database history matches the already-executed SQL. This repairs only that exact
+version. Other local-only migrations remain unresolved; do not push them until
+the broader history is reconciled.
 
 ---
 
