@@ -57,6 +57,33 @@ export function OfferRidePage() {
   const offerGate = evaluateTrustCapability(user, 'offer_ride');
   const packageGate = evaluateTrustCapability(user, 'carry_packages');
   const driverReadiness = getDriverReadinessSummary(user);
+  const readinessHeadline = ar
+    ? {
+      not_started: 'ابدأ إعداد السائق',
+      complete_profile: 'أكد معلومات الاتصال',
+      complete_verification: 'أرسل مستندات السائق',
+      pending_review: 'مستنداتك قيد المراجعة',
+      ready: 'أنت جاهز لنشر الرحلة',
+    }[driverReadiness.status]
+    : driverReadiness.headline;
+  const readinessDetail = ar
+    ? {
+      not_started: 'فعّل وضع السائق للبدء.',
+      complete_profile: 'أكد رقم هاتفك وبريدك الإلكتروني للمتابعة.',
+      complete_verification: 'أدخل رقم رخصة القيادة لإرسال مستنداتك للمراجعة.',
+      pending_review: 'يمكنك تجهيز مسارك الآن؛ يتاح النشر بعد اعتماد المستندات.',
+      ready: 'يمكنك نشر الرحلات بعد إكمال خطوات التحقق.',
+    }[driverReadiness.status]
+    : driverReadiness.detail;
+  const readinessStepLabels = ar
+    ? {
+      account_role: 'تفعيل وضع السائق',
+      phone: 'تأكيد الهاتف',
+      email: 'تأكيد البريد الإلكتروني',
+      driver_documents: 'إرسال مستندات السائق',
+      driver_clearance: 'اعتماد السائق',
+    }
+    : null;
   const driverPlan = useMemo(
     () => buildDriverRoutePlan(form.from, form.to, form.seats),
     [form.from, form.to, form.seats],
@@ -237,12 +264,71 @@ export function OfferRidePage() {
             }}
           >
             <div style={{ fontWeight: 800, marginBottom: 6 }}>
-              {tx('offerRidePage.finish_trust_setup')}
+              {!offerGate.allowed
+                ? readinessHeadline
+                : ar ? 'إكمال متطلبات الطرود' : 'Finish package requirements'}
             </div>
             <div style={{ color: DS.sub, fontSize: '0.82rem', lineHeight: 1.55 }}>
-              {(!offerGate.allowed ? offerGate.reason : packageGate.reason) ??
-                'Finish account checks before going live.'}
+              {!offerGate.allowed
+                ? readinessDetail
+                : packageGate.reason ?? 'Finish the package checks before carrying packages.'}
             </div>
+            {!offerGate.allowed && (
+              <div style={{ color: DS.sub, fontSize: '0.78rem', lineHeight: 1.5, marginTop: 8 }}>
+                {ar
+                  ? 'يتم حفظ تفاصيل المسار تلقائيًا على هذا الجهاز. يمكنك نشره فور اعتماد مستندات السائق.'
+                  : 'Your route details save automatically on this device. You can publish as soon as your driver documents are approved.'}
+              </div>
+            )}
+            {!offerGate.allowed && (
+              <ol
+                aria-label={ar ? 'تقدم إعداد السائق' : 'Driver setup progress'}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))',
+                  gap: 8,
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: '14px 0 0',
+                }}
+              >
+                {driverReadiness.steps.map((readinessStep, index) => (
+                  <li
+                    key={readinessStep.id}
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      alignItems: 'center',
+                      border: `1px solid ${readinessStep.complete ? `${DS.green}55` : DS.border}`,
+                      background: readinessStep.complete ? C.greenDim : DS.card2,
+                      borderRadius: r(12),
+                      padding: '9px 10px',
+                      color: readinessStep.complete ? C.text : DS.sub,
+                      fontSize: '0.72rem',
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'grid',
+                        placeItems: 'center',
+                        flex: '0 0 20px',
+                        height: 20,
+                        borderRadius: '50%',
+                        background: readinessStep.complete ? DS.green : C.elevated,
+                        color: readinessStep.complete ? '#052a24' : DS.muted,
+                        fontWeight: 900,
+                        fontSize: '0.68rem',
+                      }}
+                    >
+                      {readinessStep.complete ? '✓' : index + 1}
+                    </span>
+                    <span>{readinessStepLabels?.[readinessStep.id] ?? readinessStep.label}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
               <button
                 onClick={() => { void nav('/app/trust'); }}
@@ -257,7 +343,9 @@ export function OfferRidePage() {
                   cursor: 'pointer',
                 }}
               >
-                {tx('offerRidePage.finish_checks')}
+                {driverReadiness.status === 'pending_review'
+                  ? ar ? 'متابعة حالة المراجعة' : 'Check approval status'
+                  : tx('offerRidePage.finish_checks')}
               </button>
               <button
                 onClick={() => { void nav('/app/driver'); }}

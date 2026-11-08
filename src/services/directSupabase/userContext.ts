@@ -139,8 +139,8 @@ export async function ensureDriverForUser(context: UserContext): Promise<DriverR
     return data as DriverRow;
   }
 
-  // Allow pending_approval drivers to post trips — the trust gate in
-  // evaluateTrustCapability already enforces final approval before going live.
+  // Keep pending profiles available to the UI so the driver can review setup
+  // status. The trip INSERT RLS policy independently requires operator approval.
   const allowedStatuses = ['approved', 'online', 'offline', 'busy', 'pending_approval'];
   if (!allowedStatuses.includes(context.driver.driver_status ?? '')) {
     throw new Error(
