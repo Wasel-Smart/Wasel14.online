@@ -1,0 +1,2 @@
+-- This cleanup is intentionally irreversible because the retired state columns
+-- were removed. Restore from a pre-change database backup if rollback is required.

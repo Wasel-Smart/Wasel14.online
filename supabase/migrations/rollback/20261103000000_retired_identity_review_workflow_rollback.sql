@@ -1,0 +1,1 @@
+-- Retired identity workflow has no rollback path.

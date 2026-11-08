@@ -76,6 +76,13 @@ all local-only changes, and a backup-based cutover sequence have been reviewed.
 This snapshot records read-only CLI output; it does not attest to the contents
 or health of a deployed Edge Function.
 
+The schema cleanup migration `20261108014245_remove_retired_identity_schema.sql`
+was executed transactionally with `supabase db query --linked` on 2026-11-08 and
+verified against the linked schema. That command does not create migration
+history, so this version remains pending and its idempotent SQL will run again
+when the history is reconciled. Do not push this migration by itself while the
+broader history remains mismatched.
+
 ---
 
 ## Rollback Coverage

@@ -20,7 +20,6 @@ declare
     'public.app_create_trip(uuid,text,text,timestamp with time zone,integer,numeric,boolean,integer)',
     'public.app_book_trip(uuid,uuid,integer,public.payment_method_v2)',
     'public.app_assign_package_to_trip(uuid,uuid)',
-    'public.app_submit_sanad_verification(uuid,text,text)',
     'public.find_trips_near_point(double precision,double precision,integer,integer)',
     'public.check_rate_limit(uuid,text,integer,integer)',
     'public.anonymize_user_data(uuid)',

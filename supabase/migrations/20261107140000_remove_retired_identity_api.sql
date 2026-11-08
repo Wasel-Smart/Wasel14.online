@@ -1,0 +1,1 @@
+-- Retired identity workflow cleanup is represented by the forward schema migration.

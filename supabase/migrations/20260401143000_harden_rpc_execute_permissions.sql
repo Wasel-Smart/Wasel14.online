@@ -29,12 +29,6 @@ alter function public.app_assign_package_to_trip(
 alter function public.app_confirm_package_delivery(
   uuid, uuid
 ) set search_path = public, pg_temp;
-alter function public.app_submit_sanad_verification(
-  uuid, text, text
-) set search_path = public, pg_temp;
-alter function public.app_complete_sanad_verification(
-  uuid, boolean, uuid, text
-) set search_path = public, pg_temp;
 alter function public.app_approve_driver(
   uuid, uuid
 ) set search_path = public, pg_temp;
@@ -62,12 +56,6 @@ revoke execute on function public.app_assign_package_to_trip(
 revoke execute on function public.app_confirm_package_delivery(
   uuid, uuid
 ) from public, anon, authenticated;
-revoke execute on function public.app_submit_sanad_verification(
-  uuid, text, text
-) from public, anon, authenticated;
-revoke execute on function public.app_complete_sanad_verification(
-  uuid, boolean, uuid, text
-) from public, anon, authenticated;
 revoke execute on function public.app_approve_driver(
   uuid, uuid
 ) from public, anon, authenticated;
@@ -87,12 +75,8 @@ grant execute on function public.app_book_trip(
 grant execute on function public.app_assign_package_to_trip(
   uuid, uuid
 ) to authenticated;
-grant execute on function public.app_submit_sanad_verification(
-  uuid, text, text
-) to authenticated;
 -- Keep these internal/admin-only by not granting to authenticated:
 -- - wallet_post_transaction
 -- - app_credit_driver_earnings
 -- - app_confirm_package_delivery
--- - app_complete_sanad_verification
 -- - app_approve_driver;

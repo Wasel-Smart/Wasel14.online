@@ -28,7 +28,6 @@ create table if not exists public.users (
   national_id bytea,
   national_id_hash text unique,
   national_id_last4 text,
-  sanad_verified_status verification_status_v2 not null default 'unverified',
   profile_status profile_status_v2 not null default 'pending',
   role user_role_v2 not null default 'passenger',
   verification_level verification_level_v2 not null default 'level_0',
@@ -43,7 +42,6 @@ create table if not exists public.drivers (
   vehicle_id uuid,
   driver_status driver_status_v2 not null default 'pending_approval',
   verification_level verification_level_v2 not null default 'level_0',
-  sanad_identity_linked boolean not null default false,
   background_check_status verification_status_v2 not null default 'pending',
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
@@ -130,7 +128,6 @@ create table if not exists public.transactions (
 create table if not exists public.verification_records (
   verification_id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
-  sanad_status verification_status_v2 not null default 'pending',
   document_status verification_status_v2 not null default 'pending',
   verification_level verification_level_v2 not null default 'level_0',
   verification_timestamp timestamptz not null default timezone('utc', now()),
@@ -568,67 +565,6 @@ begin
   return v_transaction_id;
 end;
 $$;
-create or replace function public.app_submit_sanad_verification(
-  p_user_id uuid,
-  p_provider_reference text,
-  p_document_reference text default null
-)
-returns uuid
-language plpgsql
-security definer
-as $$
-declare
-  v_record_id uuid;
-begin
-  insert into public.verification_records (
-    user_id, sanad_status, document_status, verification_level, provider_reference, document_reference
-  )
-  values (
-    p_user_id, 'pending',
-    case when p_document_reference is null then 'unverified' else 'pending' end,
-    'level_1', p_provider_reference, p_document_reference
-  )
-  returning verification_id into v_record_id;
-
-  update public.users set sanad_verified_status = 'pending' where id = p_user_id;
-  return v_record_id;
-end;
-$$;
-create or replace function public.app_complete_sanad_verification(
-  p_user_id uuid,
-  p_verified boolean,
-  p_admin_id uuid default null,
-  p_failure_reason text default null
-)
-returns uuid
-language plpgsql
-security definer
-as $$
-declare
-  v_record_id uuid;
-  v_level verification_level_v2;
-begin
-  v_level := case when p_verified then 'level_2' else 'level_0' end;
-
-  update public.verification_records
-  set sanad_status = case when p_verified then 'verified' else 'rejected' end,
-      document_status = case when p_verified then 'verified' else document_status end,
-      verification_level = v_level,
-      verification_timestamp = timezone('utc', now()),
-      reviewer_admin_id = p_admin_id,
-      failure_reason = p_failure_reason
-  where user_id = p_user_id
-  returning verification_id into v_record_id;
-
-  update public.users
-  set sanad_verified_status = case when p_verified then 'verified' else 'rejected' end,
-      verification_level = v_level,
-      profile_status = case when p_verified then 'active' else profile_status end
-  where id = p_user_id;
-
-  return v_record_id;
-end;
-$$;
 create or replace function public.app_approve_driver(
   p_driver_id uuid,
   p_admin_id uuid
@@ -643,8 +579,7 @@ declare
 begin
   update public.drivers
   set driver_status = 'approved',
-      verification_level = 'level_3',
-      sanad_identity_linked = true
+      verification_level = 'level_3'
   where driver_id = p_driver_id
   returning user_id into v_user_id;
 

@@ -1,0 +1,1 @@
+-- Retired identity workflow; intentionally contains no application logic.

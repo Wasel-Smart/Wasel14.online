@@ -57,7 +57,6 @@ CREATE TABLE users (
   email_verified BOOLEAN DEFAULT false,
   phone_verified BOOLEAN DEFAULT false,
   identity_verified verification_status DEFAULT 'unverified',
-  sanad_verified BOOLEAN DEFAULT false, -- Jordan National ID verification
   
   -- Trust & Safety
   trust_score DECIMAL(3,2) DEFAULT 0.0 CHECK (trust_score >= 0 AND trust_score <= 5.0),
