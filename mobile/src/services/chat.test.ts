@@ -1,253 +1,109 @@
+jest.mock('../lib/api', () => ({
+  apiClient: { get: jest.fn(), post: jest.fn() },
+}));
+
 jest.mock('../lib/config', () => ({
-  supabase: {
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(),
-    channel: jest.fn(),
-    removeChannel: jest.fn(),
-  },
+  supabase: { channel: jest.fn(), removeChannel: jest.fn() },
 }));
 
-jest.mock('./auth', () => ({
-  mobileAuth: {
-    getUser: jest.fn(),
-  },
-}));
-
+import { apiClient } from '../lib/api';
 import { supabase } from '../lib/config';
-import { mobileAuth } from './auth';
 import { MobileChatService } from './chat';
 
-const mockSupabase = supabase as unknown as {
-  auth: { getUser: jest.Mock };
-  from: jest.Mock;
+const api = apiClient as unknown as { get: jest.Mock; post: jest.Mock };
+const realtime = supabase as unknown as {
   channel: jest.Mock;
   removeChannel: jest.Mock;
 };
 
-const mockMobileAuth = mobileAuth as unknown as {
-  getUser: jest.Mock;
-};
+const history = (messages: unknown[] = [], conversationId = 'conversation-1') => ({
+  data: { messages, conversationId }, error: null, status: 200,
+});
 
-function createMessagesQuery(result: { data: unknown; error: unknown }) {
-  const limit = jest.fn().mockResolvedValue(result);
-  const order = jest.fn().mockReturnValue({ limit });
-  const eq = jest.fn().mockReturnValue({ order });
-  const select = jest.fn().mockReturnValue({ eq });
+const rawMessage = (overrides: Record<string, unknown> = {}) => ({
+  id: 'message-1',
+  trip_id: 'trip-1',
+  sender_id: 'user-1',
+  content: 'Hello',
+  type: 'text',
+  metadata: {},
+  read_by: [],
+  created_at: '2026-11-08T00:00:00.000Z',
+  sender: { full_name: 'Rider' },
+  ...overrides,
+});
 
-  return { select, eq, order, limit };
-}
-
-function createMaybeSingleQuery(result: { data: unknown; error?: unknown }) {
-  const maybeSingle = jest.fn().mockResolvedValue(result);
-  const eq = jest.fn().mockReturnValue({ maybeSingle });
-  const select = jest.fn().mockReturnValue({ eq });
-
-  return { select, eq, maybeSingle };
-}
-
-function createParticipantQuery(result: { data: unknown; error?: unknown }) {
-  const single = jest.fn().mockResolvedValue(result);
-  const limit = jest.fn().mockReturnValue({ single });
-  const or = jest.fn().mockReturnValue({ limit });
-  const eq = jest.fn().mockReturnValue({ or });
-  const select = jest.fn().mockReturnValue({ eq });
-
-  return { select, eq, or, limit, single };
-}
-
-function createInsertQuery(result: { data: unknown; error: unknown }) {
-  const single = jest.fn().mockResolvedValue(result);
-  const select = jest.fn().mockReturnValue({ single });
-  const insert = jest.fn().mockReturnValue({ select });
-
-  return { insert, select, single };
-}
-
-describe('MobileChatService', () => {
+describe('MobileChatService API contract', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.resetAllMocks();
-    mockMobileAuth.getUser.mockReturnValue({ id: 'user-1' });
-    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
-    mockSupabase.removeChannel.mockResolvedValue('ok');
+    realtime.removeChannel.mockResolvedValue('ok');
   });
 
-  it('loads trip messages newest-first from Supabase and returns them chronologically', async () => {
-    const query = createMessagesQuery({
-      data: [
-        {
-          id: 'm2',
-          trip_id: 'trip-1',
-          sender_id: 'driver-1',
-          content: 'Second',
-          type: 'text',
-          read_by: [],
-          created_at: '2026-07-20T10:02:00.000Z',
-          sender: { full_name: 'Ahmad' },
-        },
-        {
-          id: 'm1',
-          trip_id: 'trip-1',
-          sender_id: 'user-1',
-          content: 'First',
-          type: 'text',
-          read_by: ['user-1'],
-          created_at: '2026-07-20T10:01:00.000Z',
-          sender: { full_name: 'Passenger' },
-        },
-      ],
-      error: null,
-    });
-    mockSupabase.from.mockReturnValueOnce(query);
+  it('loads the canonical chat API response and returns chronological messages', async () => {
+    api.get.mockResolvedValue(history([
+      rawMessage({ id: 'newer', created_at: '2026-11-08T00:02:00.000Z' }),
+      rawMessage({ id: 'older', created_at: '2026-11-08T00:01:00.000Z' }),
+    ]));
 
-    const messages = await new MobileChatService().getMessages('trip-1');
+    const messages = await new MobileChatService().getMessages('trip-1', 200);
 
-    expect(mockSupabase.from).toHaveBeenCalledWith('messages');
-    expect(query.eq).toHaveBeenCalledWith('trip_id', 'trip-1');
-    expect(query.order).toHaveBeenCalledWith('created_at', { ascending: false });
-    expect(messages.map(message => message.id)).toEqual(['m1', 'm2']);
-    expect(messages[1]).toMatchObject({
-      senderName: 'Ahmad',
-      content: 'Second',
-      readBy: [],
-    });
+    expect(api.get).toHaveBeenCalledWith('/v1/chat/trips/trip-1/messages?limit=100');
+    expect(messages.map(message => message.id)).toEqual(['older', 'newer']);
+    expect(messages[0]).toMatchObject({ tripId: 'trip-1', senderId: 'user-1', senderName: 'Rider' });
   });
 
-  it('sends an authenticated passenger message through the messages table', async () => {
-    const tripQuery = createParticipantQuery({
-      data: {
-        driver_id: 'driver-1',
-        bookings: [{ passenger_id: 'user-1' }],
-      },
-      error: null,
-    });
-    const insertQuery = createInsertQuery({
-      data: {
-        id: 'm3',
-        trip_id: 'trip-1',
-        sender_id: 'user-1',
-        content: 'I am ready',
-        type: 'text',
-        metadata: {},
-        read_by: ['user-1'],
-        created_at: '2026-07-20T10:03:00.000Z',
-      },
-      error: null,
-    });
-    mockSupabase.from.mockReturnValueOnce(tripQuery).mockReturnValueOnce(insertQuery);
+  it('sends bounded content and preserves supported message metadata', async () => {
+    api.post.mockResolvedValue({ data: { message: rawMessage({ id: 'sent-1', content: 'Ready' }) }, error: null, status: 201 });
 
     const message = await new MobileChatService().sendMessage({
-      tripId: 'trip-1',
-      content: '  I am ready  ',
+      tripId: 'trip-1', content: '  Ready  ', type: 'location', metadata: { lat: 31.95, lng: 35.93 },
     });
 
-    expect(tripQuery.eq).toHaveBeenCalledWith('id', 'trip-1');
-    expect(tripQuery.or).toHaveBeenCalledWith(
-      expect.stringContaining('driver_id.eq.user-1'),
-    );
-    expect(tripQuery.limit).toHaveBeenCalledWith(1);
-    expect(insertQuery.insert).toHaveBeenCalledWith({
-      trip_id: 'trip-1',
-      sender_id: 'user-1',
-      content: 'I am ready',
-      type: 'text',
-      metadata: {},
-      read_by: ['user-1'],
+    expect(api.post).toHaveBeenCalledWith('/v1/chat/trips/trip-1/messages', {
+      content: 'Ready', type: 'location', metadata: { lat: 31.95, lng: 35.93 },
     });
-    expect(message).toMatchObject({
-      id: 'm3',
-      tripId: 'trip-1',
-      senderId: 'user-1',
-      content: 'I am ready',
-    });
+    expect(message).toMatchObject({ id: 'sent-1', content: 'Ready', tripId: 'trip-1' });
   });
 
-  it('rejects sending when no authenticated user is available', async () => {
-    mockMobileAuth.getUser.mockReturnValue(null);
-    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
+  it('does not make a request for empty messages and propagates API errors', async () => {
+    await expect(new MobileChatService().sendMessage({ tripId: 'trip-1', content: '  ' }))
+      .rejects.toThrow('Message is empty');
+    expect(api.post).not.toHaveBeenCalled();
 
-    await expect(
-      new MobileChatService().sendMessage({ tripId: 'trip-1', content: 'Hello' }),
-    ).rejects.toThrow('User not authenticated');
+    api.get.mockResolvedValue({ data: null, error: 'Forbidden', status: 403 });
+    await expect(new MobileChatService().getMessages('trip-1')).rejects.toThrow('Forbidden');
   });
 
-  it('marks unread messages as read for the current user', async () => {
-    const inQuery = jest.fn().mockResolvedValue({
-      data: [
-        { id: 'm1', read_by: [] },
-        { id: 'm2', read_by: ['user-1'] },
-      ],
-      error: null,
-    });
-    const select = jest.fn().mockReturnValue({ in: inQuery });
-    const updateEq = jest.fn().mockResolvedValue({ error: null });
-    const update = jest.fn().mockReturnValue({ eq: updateEq });
-    mockSupabase.from.mockReturnValueOnce({ select }).mockReturnValueOnce({ update });
+  it('marks at most 100 unique message ids through the API', async () => {
+    api.post.mockResolvedValue({ data: { ok: true }, error: null, status: 200 });
+    const ids = Array.from({ length: 101 }, (_, index) => `message-${index}`);
+    await new MobileChatService().markAsRead([ids[0], ids[0], ...ids]);
 
-    await new MobileChatService().markAsRead(['m1', 'm2', 'm1']);
-
-    expect(inQuery).toHaveBeenCalledWith('id', ['m1', 'm2']);
-    expect(update).toHaveBeenCalledWith({
-      read_by: ['user-1'],
-      read_at: expect.any(String),
-    });
-    expect(updateEq).toHaveBeenCalledWith('id', 'm1');
+    expect(api.post).toHaveBeenCalledWith('/v1/chat/messages/read', { messageIds: ids.slice(0, 100) });
   });
 
-  it('subscribes to realtime trip changes, fetches the changed row, and removes the channel', async () => {
-    let changeHandler: ((payload: { new?: { id?: string } }) => Promise<void>) | undefined;
-    const channel: { on: jest.Mock; subscribe: jest.Mock } = {
-      on: jest.fn(),
-      subscribe: jest.fn(),
+  it('authorizes through history before subscribing by deployed conversation id', async () => {
+    let onChange: ((payload: { new?: { message_id?: string } }) => void) | undefined;
+    const channel = {
+      on: jest.fn((_event, _filter, handler) => { onChange = handler; return channel; }),
+      subscribe: jest.fn().mockReturnThis(),
     };
-    const subscribe = jest.fn().mockReturnValue(channel);
-    const on: jest.Mock = jest.fn((_event, _filter, handler) => {
-      changeHandler = handler;
-      return { on, subscribe };
-    });
-    channel.on = on;
-    channel.subscribe = subscribe;
-    mockSupabase.channel.mockReturnValue(channel);
-
-    const single = jest.fn().mockResolvedValue({
-      data: {
-        id: 'm4',
-        trip_id: 'trip-1',
-        sender_id: 'driver-1',
-        content: 'I arrived',
-        type: 'text',
-        read_by: [],
-        created_at: '2026-07-20T10:04:00.000Z',
-        sender: { full_name: 'Ahmad' },
-      },
-      error: null,
-    });
-    const eq = jest.fn().mockReturnValue({ single });
-    const select = jest.fn().mockReturnValue({ eq });
-    mockSupabase.from.mockReturnValue({ select });
+    realtime.channel.mockReturnValue(channel);
+    api.get.mockResolvedValueOnce(history([], 'conversation-7'))
+      .mockResolvedValueOnce(history([rawMessage({ id: 'live-1' })], 'conversation-7'));
 
     const onMessage = jest.fn();
-    const unsubscribe = new MobileChatService().subscribeToTrip('trip-1', onMessage);
-    await changeHandler?.({ new: { id: 'm4' } });
-    unsubscribe();
+    const dispose = new MobileChatService().subscribeToTrip('trip-1', onMessage);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(realtime.channel).toHaveBeenCalledWith('mobile-trip-messages-trip-1');
+    expect(channel.on).toHaveBeenCalledWith('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'messages', filter: 'conversation_id=eq.conversation-7',
+    }, expect.any(Function));
 
-    expect(mockSupabase.channel).toHaveBeenCalledWith(
-      'mobile-trip-messages-trip-1',
-      { config: { broadcast: { self: false } } },
-    );
-    expect(on).toHaveBeenCalledWith(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-        filter: 'trip_id=eq.trip-1',
-      },
-      expect.any(Function),
-    );
-    expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({ id: 'm4' }));
-    expect(mockSupabase.removeChannel).toHaveBeenCalledWith(channel);
+    onChange?.({ new: { message_id: 'live-1' } });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(onMessage).toHaveBeenCalledWith(expect.objectContaining({ id: 'live-1' }));
+    dispose();
+    expect(realtime.removeChannel).toHaveBeenCalledWith(channel);
   });
 });

@@ -59,6 +59,23 @@ Treat migration history on the linked project as authoritative. Do not use the
 consolidated `20260210000000_baseline_schema.sql` as a production reset/cutover on
 an existing project: it is not in the linked project's applied migration history.
 
+### Follow-up audit snapshot (2026-11-08)
+
+The linked history was queried again with `supabase migration list --linked` on
+2026-11-08. The mismatch remains. In addition to the versions listed above, the
+following local migrations were not present remotely at that time:
+
+- `20261103230701_secure_sensitive_rpc_execution.sql`
+- `20261107231309_align_chat_runtime_contract.sql`
+
+The linked project did contain `20261103164909`, `20261107140000`, and
+`20261107224630`. The chat contract migration is required by the current local
+chat handler and must be applied before deploying that handler. Do not mark any
+migration as applied manually or push this history until the duplicate timestamp,
+all local-only changes, and a backup-based cutover sequence have been reviewed.
+This snapshot records read-only CLI output; it does not attest to the contents
+or health of a deployed Edge Function.
+
 ---
 
 ## Rollback Coverage
@@ -79,6 +96,7 @@ Every migration has a corresponding rollback script:
 | `20261101000000_trips_column_normalization.sql` | `rollback/20261101000000_trips_column_normalization_rollback.sql` |
 | `20261101000001_ledger_drift_alert_and_schema_health.sql` | `rollback/20261101000001_ledger_drift_alert_and_schema_health_rollback.sql` |
 | `20261102000000_schema_hygiene_completeness.sql` | `rollback/20261102000000_schema_hygiene_completeness_rollback.sql` |
+| `20261107231309_align_chat_runtime_contract.sql` | `rollback/20261107231309_align_chat_runtime_contract_rollback.sql` |
 
 ---
 
