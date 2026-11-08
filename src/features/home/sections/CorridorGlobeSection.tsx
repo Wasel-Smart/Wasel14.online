@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Radar, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { WaselErrorBoundary } from '../../../components/ErrorBoundary';
@@ -24,21 +24,50 @@ interface CorridorGlobeSectionProps {
 }
 
 export function CorridorGlobeSection({ ar }: CorridorGlobeSectionProps) {
+  const sectionRef = useRef<HTMLElement>(null);
   const [canRender3D, setCanRender3D] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
-    setCanRender3D(supportsWebGL());
+    const section = sectionRef.current;
+    if (!section) {return;}
 
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setReduceMotion(mediaQuery.matches);
-    const handleChange = (event: MediaQueryListEvent) => setReduceMotion(event.matches);
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    let removeMotionListener = () => {};
+    const initializeGlobe = () => {
+      setCanRender3D(supportsWebGL());
+      const mediaQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+      if (!mediaQuery) {return;}
+
+      setReduceMotion(mediaQuery.matches);
+      const handleChange = (event: MediaQueryListEvent) => setReduceMotion(event.matches);
+      mediaQuery.addEventListener('change', handleChange);
+      removeMotionListener = () => mediaQuery.removeEventListener('change', handleChange);
+    };
+
+    if (typeof IntersectionObserver === 'undefined') {
+      const frame = window.requestAnimationFrame(initializeGlobe);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        removeMotionListener();
+      };
+    }
+
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        observer.disconnect();
+        initializeGlobe();
+      }
+    }, { rootMargin: '300px 0px' });
+    observer.observe(section);
+    return () => {
+      observer.disconnect();
+      removeMotionListener();
+    };
   }, []);
 
   return (
     <motion.section
+      ref={sectionRef}
       initial={false}
       className="wasel-home-section"
       aria-label={ar ? 'شبكة الممرات الحية' : 'The live corridor network'}

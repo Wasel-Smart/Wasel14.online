@@ -95,16 +95,17 @@ class ChatService {
               table: 'messages',
               filter: `conversation_id=eq.${conversationId}`,
             },
-            async (payload: { new: { message_id?: string } }) => {
+            (payload: { new: { message_id?: string } }) => {
               const messageId = payload.new?.message_id;
               if (!messageId) {return;}
-              try {
-                const messages = await this.getMessages(tripId, 100);
-                const message = messages.find(item => item.id === messageId);
-                if (message) {onMessage(message);}
-              } catch {
-                // A failed refresh is recoverable on the next history load.
-              }
+              void this.getMessages(tripId, 100)
+                .then(messages => {
+                  const message = messages.find(item => item.id === messageId);
+                  if (message) {onMessage(message);}
+                })
+                .catch(error => {
+                  onError?.(error instanceof Error ? error : new Error('Could not load new message'));
+                });
             },
           )
           .subscribe((status: string) => {
