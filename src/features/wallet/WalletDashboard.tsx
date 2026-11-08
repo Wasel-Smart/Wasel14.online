@@ -473,6 +473,7 @@ export function WalletDashboard() {
           <WalletActionModals
             actionLoading={actionLoading}
             balance={bal}
+            canWithdraw={walletCapabilities.withdraw}
             isRTL={isRTL}
             pinValue={pinValue}
             currentPinValue={currentPinValue}

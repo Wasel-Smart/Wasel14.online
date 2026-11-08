@@ -431,22 +431,35 @@ async function verifyStandardWebhookSignature ( headers: Headers, rawBody: strin
   const issuedAt = Number( timestamp );
   if ( !Number.isFinite( issuedAt ) || Math.abs( Date.now() / 1000 - issuedAt ) > 300 ) {return false;}
 
-  const base64Secret = secret.replace( /^v1,/, '' ).replace( /^whsec_/, '' );
-  let key: CryptoKey;
-  try {
-    const keyBytes = Uint8Array.from( atob( base64Secret ), ( char ) => char.charCodeAt( 0 ) );
-    key = await crypto.subtle.importKey( 'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, [ 'sign' ] );
-  } catch {
-    return false;
+  // Supabase supports overlapping hook secrets during rotation, encoded as a
+  // pipe-delimited list. Accept each configured key while the dashboard and
+  // Edge Function are being updated, then remove the retired key afterward.
+  const configuredSecrets = secret.split( '|' ).map( ( value ) => value.trim() ).filter( Boolean );
+  const signatureParts = signatures.split( ' ' ).map( ( part ) => part.split( ',' ) );
+  let isValid = false;
+
+  for ( const configuredSecret of configuredSecrets ) {
+    const base64Secret = configuredSecret.replace( /^v1,/, '' ).replace( /^whsec_/, '' );
+    try {
+      const keyBytes = Uint8Array.from( atob( base64Secret ), ( char ) => char.charCodeAt( 0 ) );
+      const key = await crypto.subtle.importKey(
+        'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, [ 'sign' ],
+      );
+      const mac = await crypto.subtle.sign(
+        'HMAC', key, new TextEncoder().encode( `${ id }.${ timestamp }.${ rawBody }` ),
+      );
+      const expected = btoa( String.fromCharCode( ...new Uint8Array( mac ) ) );
+      for ( const [ version, signature ] of signatureParts ) {
+        const matches = version === 'v1' && signature !== undefined && constantTimeEquals( signature, expected );
+        isValid = matches || isValid;
+      }
+    } catch {
+      // A malformed candidate must not prevent another valid rotation key
+      // from being checked.
+    }
   }
 
-  const mac = await crypto.subtle.sign( 'HMAC', key, new TextEncoder().encode( `${ id }.${ timestamp }.${ rawBody }` ) );
-  const expected = btoa( String.fromCharCode( ...new Uint8Array( mac ) ) );
-
-  return signatures.split( ' ' ).some( ( part ) => {
-    const [ version, signature ] = part.split( ',' );
-    return version === 'v1' && signature !== undefined && constantTimeEquals( signature, expected );
-  } );
+  return isValid;
 }
 
 // eslint-disable-next-line complexity

@@ -9,6 +9,7 @@ import { tx } from '../../../locales/tx';
 type WalletActionModalsProps = {
   actionLoading: boolean;
   balance: number;
+  canWithdraw: boolean;
   isRTL: boolean;
   pinValue: string;
   currentPinValue: string;
@@ -49,6 +50,7 @@ type WalletActionModalsProps = {
 export function WalletActionModals({
   actionLoading,
   balance,
+  canWithdraw,
   isRTL,
   pinValue,
   currentPinValue,
@@ -160,12 +162,18 @@ export function WalletActionModals({
         title={withdrawLabel}
       >
         <div className="space-y-3">
+          {!canWithdraw ? (
+            <p role="status" className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+              {t.withdrawUnavailableHint ?? 'Withdrawals are temporarily unavailable.'}
+            </p>
+          ) : null}
           <div>
             <Label className="text-xs text-muted-foreground">{t.withdrawAmount}</Label>
             <Input
               type="number"
               value={withdrawAmount}
               onChange={e => setWithdrawAmount(e.target.value)}
+              disabled={!canWithdraw}
               className="mt-1 rounded-lg"
               placeholder="0.00"
             />
@@ -178,6 +186,7 @@ export function WalletActionModals({
             <Input
               value={withdrawBank}
               onChange={e => setWithdrawBank(e.target.value)}
+              disabled={!canWithdraw}
               className="mt-1 rounded-lg"
               placeholder={tx('walletActionModals.jo12abcd')}
             />
@@ -191,7 +200,8 @@ export function WalletActionModals({
                 key={method.id}
                 type="button"
                 onClick={() => { void setWithdrawMethod(method.id); }}
-                className={`rounded-lg border p-3 text-left transition-all ${withdrawMethod === method.id ? 'border-primary bg-primary/10' : 'border-border hover:border-slate-500'}`}
+                disabled={!canWithdraw}
+                className={`rounded-lg border p-3 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50 ${withdrawMethod === method.id ? 'border-primary bg-primary/10' : 'border-border hover:border-slate-500'}`}
               >
                 <p className="text-sm font-medium">{method.label}</p>
                 <p className="text-xs text-muted-foreground">{method.fee}</p>
@@ -200,7 +210,7 @@ export function WalletActionModals({
           </div>
           <Button
             onClick={() => { void onWithdraw(); }}
-            disabled={actionLoading}
+            disabled={actionLoading || !canWithdraw}
             className="h-11 w-full rounded-xl font-semibold"
             style={{ background: WaselColors.bronze }}
           >

@@ -31,10 +31,6 @@ const supabase = SUPABASE_URL && SUPABASE_KEY
 const paymentRateLimit = createRateLimitMiddleware(
   { windowMs: 60_000, maxRequests: 30 },
 );
-const ALLOWED_CURRENCIES = new Set(["jod", "usd"]);
-const MAX_PAYMENT_AMOUNT_MINOR = 500_000;
-const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
-const ALLOWED_PAYMENT_PURPOSES = new Set(['wallet_top_up', 'ride_payment', 'package_payment']);
 const WASEL_PLUS_PRICE_ID = Deno.env.get('STRIPE_WASEL_PLUS_PRICE_ID') ?? '';
 
 function getCorsHeaders(request: Request): Record<string, string> {
@@ -82,15 +78,6 @@ function isAllowedRedirectUrl(value: unknown): value is string {
   }
 }
 
-function normalizeAmount(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) {return null;}
-  const amount = Math.round(value);
-  if (amount < 50 || amount > MAX_PAYMENT_AMOUNT_MINOR) {return null;}
-  return amount;
-}
-
-const OUTBOX_TABLE = "event_outbox";
-
 async function requireAuthenticatedUser(
   req: Request,
 ): Promise<{ id: string } | Response> {
@@ -118,36 +105,6 @@ async function requireAuthenticatedUser(
   }
 
   return { id: user.id };
-}
-
-async function _publishEvent(
-  admin: ReturnType<typeof _getAdminClient>,
-  event: Record<string, unknown>,
-) {
-  try {
-    await admin.from(OUTBOX_TABLE).insert({
-      id: event.id as string,
-      topic: event.topic as string,
-      payload: event.payload as never,
-      producer: event.producer as string,
-      trace_id: event.trace_id as string,
-      status: "pending",
-      attempts: 0,
-      created_at: event.occurred_at as string,
-    });
-  } catch {
-    // outbox publish failure is non-fatal
-  }
-}
-
-function _makeId(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
-
-function _getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
 }
 
 Deno.serve(async (req: Request) => {
@@ -184,76 +141,14 @@ Deno.serve(async (req: Request) => {
     const pathname = url.pathname.replace(/\/+$/, "");
 
     if ((pathname.endsWith("/create-payment-intent") || pathname.endsWith("/stripe-payments-v2")) && req.method === "POST") {
-      const auth = await requireAuthenticatedUser(req);
-      if (auth instanceof Response) {return auth;}
-
-      const body = await req.json();
-      const {
-        action,
-        amount,
-        currency = "usd",
-        metadata,
-        idempotency_key,
-      } = body as {
-        action?: string;
-        amount?: unknown;
-        currency?: string;
-        metadata?: Record<string, string>;
-        idempotency_key?: string;
-      };
-      if (pathname.endsWith("/stripe-payments-v2") && action !== "create-payment-intent") {
-        return jsonResponse({ error: "Unsupported payment action" }, { status: 400 });
-      }
-      const normalizedAmount = normalizeAmount(amount);
-      const normalizedCurrency = String(currency).toLowerCase();
-      if (!normalizedAmount) {
-        return jsonResponse({ error: "Invalid amount" }, { status: 400 });
-      }
-      if (!ALLOWED_CURRENCIES.has(normalizedCurrency)) {
-        return jsonResponse({ error: "Invalid currency" }, { status: 400 });
-      }
-      if (idempotency_key && !IDEMPOTENCY_KEY_PATTERN.test(idempotency_key)) {
-        return jsonResponse({ error: "Invalid idempotency key" }, { status: 400 });
-      }
-      const purpose = typeof metadata?.purpose === 'string' ? metadata.purpose : undefined;
-      if (purpose && !ALLOWED_PAYMENT_PURPOSES.has(purpose)) {
-        return jsonResponse({ error: "Invalid payment purpose" }, { status: 400 });
-      }
-
-      const pi = await stripe.paymentIntents.create(
-        {
-          amount: normalizedAmount,
-          currency: normalizedCurrency,
-          // The account receiving any wallet credit is derived from the JWT,
-          // never from a client-supplied user ID.
-          metadata: { ...(purpose ? { purpose } : {}), user_id: auth.id },
-        },
-        idempotency_key ? { idempotencyKey: idempotency_key } : undefined,
+      // This legacy endpoint created chargeable intents without the durable
+      // transaction_id or booking binding required by the canonical webhook.
+      // Do not accept money until it can be tied to a payable business record.
+      return jsonResponse(
+        { error: "This payment endpoint is retired. Create payment intents through the canonical booking or wallet checkout flow." },
+        { status: 410 },
+        req,
       );
-
-      // Persist to payments table if available
-      if (supabase) {
-        try {
-          await supabase.from("payments").insert(
-            [{
-              id: pi.id,
-              amount: pi.amount,
-              currency: pi.currency,
-              status: pi.status,
-              raw: pi,
-            }],
-          );
-        } catch {
-          // persistence failure is non-fatal; payment intent already created
-        }
-      }
-
-      return jsonResponse({
-        clientSecret: pi.client_secret,
-        paymentIntentId: pi.id,
-        // Temporary compatibility for direct HTTP clients using snake_case.
-        client_secret: pi.client_secret,
-      });
     }
 
     if (
@@ -324,7 +219,6 @@ Deno.serve(async (req: Request) => {
       {
         status: "ok",
         routes: [
-          "/create-payment-intent",
           "/create-checkout-session",
         ],
         webhookNote: "Stripe webhooks must be sent to make-server-0b1f4071/payments/webhooks/stripe",

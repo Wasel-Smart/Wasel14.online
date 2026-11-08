@@ -8,7 +8,8 @@ import {
     parseEntityRoute,
 } from './shared.ts';
 
-import { hasPermission, resolveAccessRole } from '../_shared/rbac.ts';
+import { isHighPrivilegeRole, resolveAccessRole } from '../_shared/rbac.ts';
+import { satisfiesRequiredAal } from '../_shared/auth-assurance.ts';
 
 import {
   generateBackupCodes,
@@ -47,7 +48,23 @@ export async function handleProfileRequest ( request: Request, path: string ) {
     // mutations require an admin caller and are enforced server-side — a normal
     // user can NEVER escalate privileges or credit their own wallet.
     const resolvedRole = resolveAccessRole( user.role );
-    const canWriteUsers = hasPermission( resolvedRole, 'users:write' );
+    if (isHighPrivilegeRole(resolvedRole)) {
+      const { data: claimsData, error: claimsError } = await auth.admin.auth.getClaims(auth.token);
+      if (claimsError) {
+        console.error('[auth] privileged assurance verification failed', claimsError.message);
+        return json(
+          { error: 'Unable to verify privileged authentication. Please try again.' },
+          503,
+        );
+      }
+      if (!satisfiesRequiredAal(true, claimsData?.claims.aal)) {
+        return json(
+          { error: 'Multi-factor authentication is required', code: 'AAL2_REQUIRED' },
+          403,
+        );
+      }
+    }
+    const isAdmin = resolvedRole === 'admin';
 
     const patch: Record<string, unknown> = {};
     if ( typeof body.email === 'string' ) {patch.email = body.email.trim();}
@@ -65,7 +82,7 @@ export async function handleProfileRequest ( request: Request, path: string ) {
       patch.phone_verified_at = null;
     }
 
-    if ( canWriteUsers ) {
+    if ( isAdmin ) {
       if ( typeof body.role === 'string' ) {
         const normalizedRole = body.role.toLowerCase();
         if ( [ 'passenger', 'driver', 'operator', 'admin' ].includes( normalizedRole ) ) {
@@ -85,7 +102,7 @@ export async function handleProfileRequest ( request: Request, path: string ) {
     // Wallet balance is NEVER mutated through this endpoint. Balance changes
     // must originate from verified payment webhooks / atomic wallet RPCs only.
     // An admin may adjust wallet_status; no raw balance writes are accepted.
-    if ( canWriteUsers && typeof body.wallet_status === 'string' ) {
+    if ( isAdmin && typeof body.wallet_status === 'string' ) {
       const walletPatch: Record<string, unknown> = { wallet_status: body.wallet_status };
       await auth.admin.from( 'wallets' ).update( walletPatch ).eq( 'user_id', user.id );
     }

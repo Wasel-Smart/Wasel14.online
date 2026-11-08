@@ -47,13 +47,15 @@ Remote history includes `20260125000000`, `20260320000000`, `20260326080000`,
 `20261009*` migrations. The exact scripts for these versions are present locally now.
 
 The CLI reports local-only versions `20260210000000`, `20261017000000`,
-`20261018000000` (two files collide on this version), `20261019000000`,
+`20261018000000`, `20261019000000`,
 `20261019000001`, `20261019000002`, `20261028000000`, `20261101000000`,
 `20261101000001`, `20261102000000`, and `20261103000000`. It also reports
 `20260302` and `20260310` as unmatched on both sides despite local files with those
-names. **Do not run `supabase db push` from this checkout** until the migration
-history, duplicate version, and local-only changes have been reconciled against a
-backup and reviewed plan. No migrations were applied during this audit.
+names. The current checkout has one forward migration with the `20261018000000`
+prefix; older notes about a duplicate forward file are historical. **Do not run
+`supabase db push` from this checkout** until the migration history and local-only
+changes have been reconciled against a backup and reviewed plan. No migrations
+were applied during this audit.
 
 Treat migration history on the linked project as authoritative. Do not use the
 consolidated `20260210000000_baseline_schema.sql` as a production reset/cutover on
@@ -71,10 +73,19 @@ following local migrations were not present remotely at that time:
 The linked project did contain `20261103164909`, `20261107140000`, and
 `20261107224630`. The chat contract migration is required by the current local
 chat handler and must be applied before deploying that handler. Do not mark any
-migration as applied manually or push this history until the duplicate timestamp,
-all local-only changes, and a backup-based cutover sequence have been reviewed.
+migration as applied manually or push this history until all local-only changes
+and a backup-based cutover sequence have been reviewed.
 This snapshot records read-only CLI output; it does not attest to the contents
 or health of a deployed Edge Function.
+
+The linked migration list was queried read-only again after the local security
+changes below. The remote still has no record of `20261103230701`,
+`20261107231309`, `20261108025826`, or `20261108120000`. Production catalog
+inspection on 2026-11-08 confirmed RLS is already enabled on public tables,
+participant-scoped policies exist for bookings and ratings, and direct client
+grants are absent for precise driver locations. No extra migration was created
+for those already-protected tables. This is a catalog snapshot, not a complete
+application security certification.
 
 The schema cleanup migration `20261108014245_remove_retired_identity_schema.sql`
 was executed transactionally with `supabase db query --linked` on 2026-11-08 and
@@ -111,9 +122,9 @@ Every migration has a corresponding rollback script:
 ## Applying migrations safely
 
 There is no valid production cutover sequence documented yet. First reconcile local
-and remote migration versions, resolve the duplicate `20261018000000` prefix, review
-every local-only migration against the current remote schema, and test the ordered
-result on a disposable project restored from a production backup. Only then prepare
+and remote migration versions, review every local-only migration against the current
+remote schema, and test the ordered result on a disposable project restored from a
+production backup. Only then prepare
 a separate reviewed deployment plan. `supabase db push` is deliberately not part of
 this development task.
 

@@ -248,6 +248,67 @@ if (!CHECK_ONLY) {
   }
 }
 
+function syncWebhookMakeServerClosure() {
+  const webhookVendorRoot = join(
+    FUNCTIONS_ROOT,
+    'webhooks',
+    VENDOR_DIR_NAME,
+    'supabase',
+    'functions',
+    'make-server-0b1f4071',
+  );
+  const makeServerRoot = join(FUNCTIONS_ROOT, 'make-server-0b1f4071');
+  if (!existsSync(webhookVendorRoot)) {return;}
+
+  const queue = [];
+  for (const file of walk(webhookVendorRoot)) {
+    const source = join(makeServerRoot, relative(webhookVendorRoot, file));
+    if (existsSync(source)) {
+      queue.push(source);
+    } else {
+      log(`    DANGLING ${toPosix(relative(REPO_ROOT, file))} has no make-server source`, 'red');
+      dangling += 1;
+    }
+  }
+
+  const seen = new Set();
+  while (queue.length) {
+    const source = queue.shift();
+    if (seen.has(source)) {continue;}
+    seen.add(source);
+
+    for (const spec of relativeImports(readFileSync(source, 'utf8'))) {
+      const dependency = resolveSpecifier(source, spec);
+      if (!dependency) {
+        log(`    DANGLING ${toPosix(relative(REPO_ROOT, source))} imports '${spec}'`, 'red');
+        dangling += 1;
+        continue;
+      }
+      if (!isInside(dependency, makeServerRoot)) {continue;}
+
+      const destination = join(webhookVendorRoot, relative(makeServerRoot, dependency));
+      const content = BANNER(dependency) + readFileSync(dependency, 'utf8');
+      if (CHECK_ONLY) {
+        if (!existsSync(destination) || readFileSync(destination, 'utf8') !== content) {
+          log(`    DRIFT ${toPosix(relative(REPO_ROOT, destination))} is missing or out of date`, 'red');
+          drift += 1;
+        }
+      } else {
+        mkdirSync(dirname(destination), { recursive: true });
+        if (!existsSync(destination) || readFileSync(destination, 'utf8') !== content) {
+          log(`    vendor ${toPosix(relative(REPO_ROOT, dependency))}`, 'cyan');
+          writeFileSync(destination, content, 'utf8');
+          vendoredCount += 1;
+        }
+      }
+      queue.push(dependency);
+    }
+  }
+}
+
+// Keep transitive make-server imports beside the webhook's vendored snapshots.
+syncWebhookMakeServerClosure();
+
 log('\n' + '='.repeat(64), 'cyan');
 if (CHECK_ONLY) {
   // --check must also catch a vendored copy that drifted from its source.

@@ -1,4 +1,5 @@
 import { addCSRFHeader } from '../../utils/csrf';
+import { publicAnonKey } from './api-resolver';
 
 export function createEdgeHeaders(
   headers?: HeadersInit,
@@ -13,16 +14,12 @@ export function createEdgeHeaders(
 
   const finalHeaders = new Headers(headersInit);
 
-  // NOTE: we intentionally do NOT inject the Supabase `apikey` header here.
-  // The Edge Function gateway validates `apikey` against the project's anon JWT,
-  // which Supabase disabled in September 2026; the publishable key
-  // (`sb_publishable_...`) is rejected by the gateway with
-  // `UNAUTHORIZED_INVALID_API_KEY` before the function body runs. With
-  // `verify_jwt = false` (see supabase/config.toml) the function authenticates
-  // requests itself via the `Authorization: Bearer` JWT through
-  // `authenticateRequest()` (admin.auth.getUser), and the public `/health` route
-  // is unauthenticated — so the `apikey` header is both rejected and unneeded.
-  // Gotrue auth calls go through the supabase-js client, not this helper.
+  // The publishable key identifies the project at the Edge gateway; it is not
+  // a user credential and must never be sent as a bearer token. Protected
+  // handlers validate the user's signed access token in Authorization.
+  if (publicAnonKey) {
+    finalHeaders.set('apikey', publicAnonKey);
+  }
 
   if (userToken) {
     finalHeaders.set('Authorization', `Bearer ${userToken}`);

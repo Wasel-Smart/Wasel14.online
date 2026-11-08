@@ -1,8 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
-    hasPermission,
     resolveAccessRole,
 } from './_shared/rbac.ts';
+import { isHighPrivilegeRole } from './_vendor/packages/rbac/deno/index.ts';
+import { satisfiesRequiredAal } from './_shared/auth-assurance.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -85,7 +86,29 @@ async function authenticateRequest(request: Request) {
   }
   if (!canonicalUser) {return { error: json({ error: 'Canonical user profile was not found' }, 404) };}
 
-  return { admin, authUser: authData.user, canonicalUser };
+  const role = resolveAccessRole(canonicalUser.role);
+  if (isHighPrivilegeRole(role)) {
+    const { data: claimsData, error: claimsError } = await admin.auth.getClaims(token);
+    if (claimsError) {
+      console.error('[auth] privileged assurance verification failed', claimsError.message);
+      return {
+        error: json(
+          { error: 'Unable to verify privileged authentication. Please try again.' },
+          503,
+        ),
+      };
+    }
+    if (!satisfiesRequiredAal(true, claimsData?.claims.aal)) {
+      return {
+        error: json(
+          { error: 'Multi-factor authentication is required', code: 'AAL2_REQUIRED' },
+          403,
+        ),
+      };
+    }
+  }
+
+  return { admin, authUser: authData.user, canonicalUser, token };
 }
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -156,7 +179,24 @@ async function handleProfileRequest(request: Request, path: string) {
 
   if (request.method === 'PATCH') {
     const resolvedRole = resolveAccessRole(user.role);
-    const canWriteUsers = hasPermission(resolvedRole, 'users:write');
+    const isPrivileged = isHighPrivilegeRole(resolvedRole);
+    if (isPrivileged) {
+      const { data: claimsData, error: claimsError } = await auth.admin.auth.getClaims(auth.token);
+      if (claimsError) {
+        console.error('[auth] privileged assurance verification failed', claimsError.message);
+        return json(
+          { error: 'Unable to verify privileged authentication. Please try again.' },
+          503,
+        );
+      }
+      if (!satisfiesRequiredAal(true, claimsData?.claims.aal)) {
+        return json(
+          { error: 'Multi-factor authentication is required', code: 'AAL2_REQUIRED' },
+          403,
+        );
+      }
+    }
+    const isAdmin = resolvedRole === 'admin';
     const patch: Record<string, unknown> = {};
 
     if (typeof body.email === 'string') {patch.email = body.email.trim();}
@@ -169,7 +209,7 @@ async function handleProfileRequest(request: Request, path: string) {
       patch.phone_verified_at = null;
     }
 
-    if (canWriteUsers) {
+    if (isAdmin) {
       if (typeof body.role === 'string') {
         const normalizedRole = body.role.toLowerCase();
         if (['passenger', 'driver', 'operator', 'admin'].includes(normalizedRole)) {patch.role = normalizedRole;}
@@ -182,7 +222,7 @@ async function handleProfileRequest(request: Request, path: string) {
       if (error) {return json({ error: 'Internal server error' }, 500);}
     }
 
-    if (canWriteUsers && typeof body.wallet_status === 'string') {
+    if (isAdmin && typeof body.wallet_status === 'string') {
       await auth.admin.from('wallets').update({ wallet_status: body.wallet_status }).eq('user_id', user.id);
     }
   }

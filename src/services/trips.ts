@@ -1,5 +1,4 @@
 import { hasConfiguredEdgeTransport, requestEdgeJson, runBackendWorkflow } from './backendWorkflow';
-import { publicAnonKey } from './core/api-resolver';
 import {
   calculateDirectPrice,
   createDirectTrip,
@@ -199,11 +198,10 @@ export const tripsAPI = {
         requestEdgeJson<PriceCalculationResult>( {
           path: '/trips/calculate-price',
           method: 'POST',
-          // The edge rejects every mutation that has no `Authorization: Bearer`
-          // and no x-csrf-token. This route is public (it never resolves a user),
-          // so the publishable key stands in for the bearer. authMode 'none'
-          // sent no bearer at all and the call always came back 403.
-          headers: publicAnonKey ? { Authorization: `Bearer ${ publicAnonKey }` } : undefined,
+          authMode: 'public',
+          // This public calculation route needs the project key in `apikey`,
+          // which requestEdgeJson adds. The publishable key is not a user JWT
+          // and must never be sent as a bearer token.
           body: { type, weight, distance_km, base_price },
           operation: 'Failed to calculate price',
         } ),

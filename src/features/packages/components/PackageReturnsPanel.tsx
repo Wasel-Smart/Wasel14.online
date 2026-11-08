@@ -39,6 +39,15 @@ export function PackageReturnsPanel({
 }: PackageReturnsPanelProps) {
   const { language } = useLanguage();
   const ar = language === 'ar';
+  const cityName = (value: string) => {
+    if (!ar) {return value;}
+    const labels: Record<string, string> = {
+      Amman: 'عمّان', Aqaba: 'العقبة', Irbid: 'إربد', Zarqa: 'الزرقاء',
+      'Dead Sea': 'البحر الميت', Karak: 'الكرك', Madaba: 'مادبا',
+      Petra: 'البتراء', Jerash: 'جرش', Mafraq: 'المفرق', Salt: 'السلط',
+    };
+    return labels[value] ?? value;
+  };
   const returnSteps = ar ? PACKAGE_RETURN_STEPS_AR : PACKAGE_RETURN_STEPS;
   const phoneDigits = pkg.recipientPhone.replace(/[^\d]/g, '').length;
   const canCreate =
@@ -190,7 +199,7 @@ export function PackageReturnsPanel({
         </div>
         <p style={{ color: DS.muted, fontSize: '0.75rem', margin: 0, lineHeight: 1.55 }}>
           {ar
-            ? `سيتم الإرجاع من ${pkg.from} إلى ${pkg.to} بنفس الرقم الذي يظهر في التتبّع.`
+            ? `سيتم الإرجاع من ${cityName(pkg.from)} إلى ${cityName(pkg.to)} بنفس الرقم الذي يظهر في التتبّع.`
             : `The return runs on the ${pkg.from} to ${pkg.to} corridor using the same tracking ID.`}
         </p>
       </div>

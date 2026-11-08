@@ -57,7 +57,8 @@ export function getApiHeaders ( accessToken?: string, requestId?: string, method
     'X-Client-Info': 'wasel-web',
     'X-Request-Id': requestId ?? createCorrelationId(),
     'X-Api-Version': 'v1',
-    Authorization: `Bearer ${ accessToken || publicAnonKey }`,
+    ...(publicAnonKey ? { apikey: publicAnonKey } : {}),
+    ...(accessToken ? { Authorization: `Bearer ${ accessToken }` } : {}),
   };
 
   if ( method && [ 'POST', 'PUT', 'PATCH', 'DELETE' ].includes( method ) ) {
@@ -127,22 +128,20 @@ async function resolveSessionToken (): Promise<string | undefined> {
   return data.session?.access_token ?? undefined;
 }
 
-// A caller that passed an explicit `accessToken` already built its own
+// A caller that passed an explicit access token already built its own
 // Authorization header (see getApiHeaders). Recover that token so it can be
-// honoured; getApiHeaders' anon-key fallback must never be the one that wins.
+// honoured; the publishable project key is carried separately in `apikey`.
 function readCallerBearer ( headers: HeadersInit | undefined ): string | undefined {
   if ( !headers ) { return undefined; }
   const value = new Headers( headers ).get( 'Authorization' ) ?? '';
   return value.startsWith( 'Bearer ' ) ? value.slice( 7 ) : undefined;
 }
 
-// Explicit caller token first, then the ambient session, and only then the
-// anon-key fallback inside getApiHeaders. The apiGet/apiPost/... helpers
-// pre-build their own headers, so a bearer equal to the anon key just means
-// "no token supplied" rather than a deliberate choice.
+// Explicit caller token first, then the ambient session. Requests without a
+// signed-in user omit Authorization and rely on the project key in `apikey`.
 function resolveAuthToken ( headers: HeadersInit | undefined, sessionToken: string | undefined ): string | undefined {
   const callerBearer = readCallerBearer( headers );
-  if ( callerBearer && callerBearer !== publicAnonKey ) { return callerBearer; }
+  if ( callerBearer ) { return callerBearer; }
   return sessionToken;
 }
 
@@ -199,9 +198,9 @@ export async function apiRequest<T = unknown> (
         ...options,
         // Caller headers go first so the resolved auth headers below win.
         // The apiGet/apiPost/... helpers build their own headers from an
-        // `accessToken` argument that is usually undefined, which made
-        // getApiHeaders() fall back to the anon key and overwrite the real
-        // session bearer — every request through adminApi went out anonymous.
+        // `accessToken` argument that is usually undefined. Resolve the ambient
+        // session first so protected calls keep the user's signed JWT; the
+        // publishable project key is sent separately in `apikey`.
         headers: {
           ...options.headers,
           ...getApiHeaders( authToken, requestId, method ),

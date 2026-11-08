@@ -56,5 +56,5 @@ test( 'authenticated user receives the signed-in landing surface @smoke', async 
 test( 'unknown route renders 404 with navigation link', async ( { page } ) => {
   await page.goto( '/app/this-route-does-not-exist-xyz' );
   await expect( page.getByText( '404' ) ).toBeVisible();
-  await expect( page.getByRole( 'link', { name: /back|home|wasel/i } ) ).toBeVisible();
+  await expect( page.getByRole( 'link', { name: 'Back to Wasel', exact: true } ) ).toBeVisible();
 } );

@@ -8,6 +8,13 @@ const { handleEnableDriverMode } = await import('../make-server-0b1f4071/_handle
 const originalFetch = globalThis.fetch;
 const userId = '11111111-1111-4111-8111-111111111111';
 
+function makeJwt(payload: Record<string, unknown>) {
+  const encode = (value: string) => btoa(value).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const header = encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const claims = encode(JSON.stringify(payload));
+  return `${header}.${claims}.${encode('test-signature')}`;
+}
+
 function user(role: string) {
   return {
     id: userId,
@@ -39,21 +46,41 @@ Deno.test('driver mode invokes the caller-authenticated RPC and rejects staff ac
     return new Response('unexpected request', { status: 500 });
   };
 
-  const request = () => new Request('https://edge.test/trust/driver-mode/enable', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer test-token' },
-  });
+  const makeRequest = (aal = 'aal2') => {
+    const token = makeJwt({
+      sub: userId,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      aal,
+    });
+    const authorization = `Bearer ${token}`;
+    return {
+      authorization,
+      request: new Request('https://edge.test/trust/driver-mode/enable', {
+        method: 'POST',
+        headers: { Authorization: authorization },
+      }),
+    };
+  };
 
   try {
-    const enabled = await handleEnableDriverMode(request());
+    const riderRequest = makeRequest();
+    const enabled = await handleEnableDriverMode(riderRequest.request);
     assertEquals(enabled.status, 200);
     assertEquals(await enabled.json(), { enabled: true, role: 'driver' });
     assertEquals(rpcCount, 1);
-    assertEquals(forwardedAuthorization, 'Bearer test-token');
+    assertEquals(forwardedAuthorization, riderRequest.authorization);
 
     role = 'admin';
-    const staff = await handleEnableDriverMode(request());
+    const staff = await handleEnableDriverMode(makeRequest().request);
     assertEquals(staff.status, 409);
+    assertEquals(rpcCount, 1);
+
+    const staffWithoutMfa = await handleEnableDriverMode(makeRequest('aal1').request);
+    assertEquals(staffWithoutMfa.status, 403);
+    assertEquals(await staffWithoutMfa.json(), {
+      error: 'Multi-factor authentication is required',
+      code: 'AAL2_REQUIRED',
+    });
     assertEquals(rpcCount, 1);
   } finally {
     globalThis.fetch = originalFetch;

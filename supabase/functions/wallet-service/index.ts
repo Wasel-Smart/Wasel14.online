@@ -133,6 +133,37 @@ async function verifyWalletPinHash(pin: string, storedHash?: string | null): Pro
   return timingSafeEqual(new Uint8Array(derivedBits), expected);
 }
 
+async function verifyWalletPinForAction(
+  admin: ReturnType<typeof getAdminClient>,
+  userId: string,
+  wallet: WalletRow,
+  suppliedPin: unknown,
+  amountJod: number,
+): Promise<Response | null> {
+  if (!wallet.pin_hash) {
+    return amountJod > 25
+      ? json({ error: 'Set a wallet PIN to move more than JOD 25 at a time.', code: 'PIN_SETUP_REQUIRED' }, 403)
+      : null;
+  }
+
+  const rateLimit = await checkDbRateLimit(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+    userId,
+    'wallet_pin_sensitive_action',
+    { maxAttempts: 5, windowMinutes: 15 },
+  );
+  if (!rateLimit.allowed) {
+    return json({ error: 'Too many wallet PIN attempts. Try again later.' }, 429);
+  }
+
+  const pin = typeof suppliedPin === 'string' ? suppliedPin.trim() : '';
+  if (!/^\d{4}$/.test(pin) || !await verifyWalletPinHash(pin, wallet.pin_hash)) {
+    return json({ error: 'Wallet PIN is incorrect.' }, 403);
+  }
+  return null;
+}
+
 function parseWalletRoute(path: string) {
   const match = /^\/wallet\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec(path);
   if (!match) {return null;}
@@ -185,6 +216,11 @@ async function handleWalletRequest(request: Request, path: string) {
     const pin = String(body.pin ?? '').trim();
     if (!/^\d{4}$/.test(pin)) {return json({ error: 'Wallet PIN must be four digits.' }, 400);}
     try {
+      const wallet = await ensureWalletForUser(admin, auth.canonicalUser.id);
+      if (wallet.pin_hash) {
+        const pinDenied = await verifyWalletPinForAction(admin, auth.canonicalUser.id, wallet, body.currentPin, 0);
+        if (pinDenied) {return pinDenied;}
+      }
       const pinHash = await hashWalletPin(pin);
       const { error } = await admin.from('wallets').update({ pin_hash: pinHash, updated_at: new Date().toISOString() }).eq('user_id', auth.canonicalUser.id);
       if (error) {throw new Error('PIN update failed');}
@@ -199,6 +235,14 @@ async function handleWalletRequest(request: Request, path: string) {
     const body = await request.json().catch(() => ({}));
     const pin = String(body.pin ?? '').trim();
     try {
+      const rateLimit = await checkDbRateLimit(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY,
+        auth.canonicalUser.id,
+        'wallet_pin_sensitive_action',
+        { maxAttempts: 5, windowMinutes: 15 },
+      );
+      if (!rateLimit.allowed) {return json({ error: 'Too many wallet PIN attempts. Try again later.' }, 429);}
       const wallet = await ensureWalletForUser(admin, auth.canonicalUser.id);
       const verified = await verifyWalletPinHash(pin, wallet.pin_hash);
       return json({ verified });
@@ -226,27 +270,7 @@ async function handleWalletRequest(request: Request, path: string) {
   }
 
   if (action === 'withdraw' && request.method === 'POST') {
-    const body = await request.json().catch(() => ({}));
-    const amountJod = toMoneyNumber(body.amount);
-    const bankAccount = String(body.bankAccount ?? '').trim();
-    if (amountJod <= 0) {return json({ error: 'Amount must be greater than zero.' }, 400);}
-    if (!bankAccount) {return json({ error: 'Bank account is required.' }, 400);}
-    const rl = await checkDbRateLimit(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, auth.canonicalUser.id, 'wallet_withdraw', { maxAttempts: 3, windowMinutes: 60 });
-    if (!rl.allowed) {return json({ error: 'Too many withdrawal attempts. Try again later.' }, 429);}
-    try {
-      const wallet = await ensureWalletForUser(admin, auth.canonicalUser.id);
-      if (toNumber(wallet.balance, 0) < amountJod) {return json({ error: 'Insufficient wallet balance.' }, 400);}
-      const { error } = await admin.rpc('wallet_post_transaction', {
-        p_wallet_id: wallet.wallet_id, p_amount: amountJod, p_transaction_type: 'withdraw_funds',
-        p_payment_method: 'local_gateway', p_direction: 'debit', p_reference_type: 'bank_account',
-        p_reference_id: null, p_metadata: { bank_account: bankAccount, description: 'Wallet withdrawal' },
-      });
-      if (error) {throw new Error('Withdrawal failed');}
-      return json({ success: true });
-    } catch (error) {
-      console.error('Withdraw error:', error instanceof Error ? error.message : String(error));
-      return json({ error: 'Internal server error' }, 500);
-    }
+    return json({ error: 'Withdrawals are temporarily unavailable until a payout provider is configured.', code: 'PAYOUT_UNAVAILABLE' }, 503);
   }
 
   if (action === 'send' && request.method === 'POST') {
@@ -255,10 +279,14 @@ async function handleWalletRequest(request: Request, path: string) {
     const recipientId = String(body.recipientId ?? '').trim();
     const note = String(body.note ?? '').trim();
     if (amountJod <= 0) {return json({ error: 'Amount must be greater than zero.' }, 400);}
+    if (amountJod > 1000) {return json({ error: 'Transfers are limited to JOD 1000 per request.' }, 400);}
     if (!recipientId) {return json({ error: 'recipientId is required.' }, 400);}
     const rl = await checkDbRateLimit(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, auth.canonicalUser.id, 'wallet_send', { maxAttempts: 10, windowMinutes: 60 });
     if (!rl.allowed) {return json({ error: 'Too many send attempts. Try again later.' }, 429);}
     try {
+      const wallet = await ensureWalletForUser(admin, auth.canonicalUser.id);
+      const pinDenied = await verifyWalletPinForAction(admin, auth.canonicalUser.id, wallet, body.pin, amountJod);
+      if (pinDenied) {return pinDenied;}
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(recipientId);
       let recipientUserId: string | null = null;
       if (isUuid) {

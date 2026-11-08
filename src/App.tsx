@@ -4,6 +4,7 @@ import { RouterProvider } from 'react-router';
 import { Toaster } from 'sonner';
 import { PWAInstallPrompt } from './components/mobile/PWAInstallPrompt';
 import { AppErrorBoundary } from './components/system/ErrorBoundary';
+import { PrivilegedMfaGate } from './components/PrivilegedMfaGate';
 
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
@@ -66,7 +67,7 @@ function AppProviders({ children }: { children: ReactNode }) {
   return (
     <LanguageProvider>
       <AuthProvider>
-        {children}
+        <PrivilegedMfaGate>{children}</PrivilegedMfaGate>
         <BrandToaster />
       </AuthProvider>
     </LanguageProvider>

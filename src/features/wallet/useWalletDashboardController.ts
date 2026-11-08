@@ -232,6 +232,9 @@ export function useWalletDashboardController() {
   };
 
   const handleWithdraw = async () => {
+    if (!walletCapabilities.withdraw) {
+      return toast.error(t.withdrawUnavailableHint ?? 'Withdrawals are temporarily unavailable.');
+    }
     const amt = parseFloat(withdrawAmount);
     if (!amt || amt <= 0) {return toast.error(t.invalidAmount);}
     if (amt > (walletData?.balance ?? 0)) {return toast.error(t.insufficientBalance);}

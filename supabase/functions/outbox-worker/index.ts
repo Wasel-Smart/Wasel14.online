@@ -4,6 +4,7 @@ const SUPABASE_URL = Deno.env.get( 'SUPABASE_URL' ) ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get( 'SUPABASE_SERVICE_ROLE_KEY' ) ?? '';
 const WORKER_SECRET = Deno.env.get( 'OUTBOX_WORKER_SECRET' ) ?? '';
 const BATCH_SIZE = 50;
+const MAX_ATTEMPTS = 5;
 
 type OutboxRow = {
   id: string;
@@ -16,17 +17,16 @@ type OutboxRow = {
 };
 
 // Topic → edge function path for fan-out dispatch.
-// Extend this map as new workers are deployed.
 const TOPIC_FUNCTION_MAP: Record<string, string> = {
-  'rides.requested':          'matching-worker',
-  'rides.assigned':           'make-server-0b1f4071',
-  'rides.completed':          'make-server-0b1f4071',
-  'packages.created':         'package-service',
-  'packages.location-updated':'package-service',
-  'packages.delivered':       'make-server-0b1f4071',
-  'payments.authorized':      'make-server-0b1f4071',
-  'payments.captured':        'make-server-0b1f4071',
-  'notifications.dispatch':   'make-server-0b1f4071',
+  'rides.requested':           'matching-worker',
+  'rides.assigned':            'make-server-0b1f4071',
+  'rides.completed':           'make-server-0b1f4071',
+  'packages.created':          'package-service',
+  'packages.location-updated': 'package-service',
+  'packages.delivered':        'make-server-0b1f4071',
+  'payments.authorized':       'make-server-0b1f4071',
+  'payments.captured':         'make-server-0b1f4071',
+  'notifications.dispatch':    'make-server-0b1f4071',
 };
 
 function getAdminClient () {
@@ -45,7 +45,6 @@ function constantTimeEqual ( a: string, b: string ): boolean {
 async function dispatchEvent ( event: OutboxRow ): Promise<{ ok: boolean; reason?: string }> {
   const fnName = TOPIC_FUNCTION_MAP[ event.topic ];
   if ( !fnName ) {
-    // No worker registered — mark processed so it doesn't block the queue.
     return { ok: true, reason: 'no_worker_registered' };
   }
 
@@ -85,14 +84,12 @@ async function dispatchEvent ( event: OutboxRow ): Promise<{ ok: boolean; reason
 async function drainOutbox (): Promise<{ processed: number; succeeded: number; failed: number; skipped: number }> {
   const admin = getAdminClient();
 
-  const { data, error } = await admin
-    .from( 'event_outbox' )
-    .select( 'id, topic, payload, producer, trace_id, attempts, created_at' )
-    .eq( 'status', 'pending' )
-    .order( 'created_at', { ascending: true } )
-    .limit( BATCH_SIZE );
+  // Atomically claim a batch with SKIP LOCKED — concurrent worker invocations
+  // (cron overlap, manual trigger) each get a disjoint set of rows and never
+  // dispatch the same event twice.
+  const { data, error } = await admin.rpc( 'consume_outbox_batch', { p_batch_size: BATCH_SIZE } );
 
-  if ( error ) {throw new Error( `outbox fetch failed: ${ error.message }` );}
+  if ( error ) {throw new Error( `outbox batch claim failed: ${ error.message }` );}
 
   const rows = ( Array.isArray( data ) ? data : [] ) as OutboxRow[];
   let succeeded = 0;
@@ -103,7 +100,6 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
     const result = await dispatchEvent( event );
 
     if ( result.reason === 'no_worker_registered' ) {
-      // Mark processed — no worker will ever handle this topic.
       await admin
         .from( 'event_outbox' )
         .update( { status: 'processed', processed_at: new Date().toISOString() } )
@@ -119,15 +115,23 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
         .eq( 'id', event.id );
       succeeded++;
     } else {
-      const nextAttempts = ( event.attempts ?? 0 ) + 1;
-      const maxAttempts = 5;
-      await admin
-        .from( 'event_outbox' )
-        .update( {
-          attempts: nextAttempts,
-          status: nextAttempts >= maxAttempts ? 'failed' : 'pending',
-        } )
-        .eq( 'id', event.id );
+      // Delegate backoff scheduling and DLQ transition to the DB function so the
+      // logic is consistent regardless of which worker instance handles the row.
+      const { error: failError } = await admin.rpc( 'outbox_record_failure', {
+        p_id:           event.id,
+        p_max_attempts: MAX_ATTEMPTS,
+        p_error:        result.reason ?? null,
+      } );
+
+      if ( failError ) {
+        console.error( JSON.stringify( {
+          level: 'error',
+          service: 'outbox-worker',
+          message: 'outbox_record_failure RPC failed',
+          eventId: event.id,
+          rpcError: failError.message,
+        } ) );
+      }
 
       console.error( JSON.stringify( {
         level: 'error',
@@ -136,7 +140,7 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
         eventId: event.id,
         topic: event.topic,
         traceId: event.trace_id,
-        attempts: nextAttempts,
+        attempts: ( event.attempts ?? 0 ) + 1,
         reason: result.reason,
       } ) );
 
@@ -148,8 +152,6 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
 }
 
 Deno.serve( async ( request: Request ) => {
-  // All invocations, including scheduled ones, must prove knowledge of the
-  // secret. Request headers are client-controlled and cannot identify cron.
   if ( request.method !== 'POST' ) {
     return new Response( JSON.stringify( { error: 'Method not allowed' } ), { status: 405 } );
   }

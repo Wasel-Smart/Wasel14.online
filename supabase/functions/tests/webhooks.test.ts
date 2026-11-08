@@ -20,13 +20,15 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 
 const STRIPE_SECRET = 'whsec_placeholder_for_testing_only';
 const RESEND_SECRET = `whsec_${btoa('test-resend-signing-key-32-bytes-long')}`;
+const AUTH_HOOK_OLD_SECRET = `v1,whsec_${btoa('old-auth-hook-signing-key-32-bytes')}`;
+const AUTH_HOOK_NEW_SECRET = `v1,whsec_${btoa('new-auth-hook-signing-key-32-bytes')}`;
 
 Deno.env.set('STRIPE_WEBHOOK_SECRET', STRIPE_SECRET);
 Deno.env.set('CLIQ_WEBHOOK_SECRET', 'test-cliq-secret-32-chars-minimum!');
 const TWILIO_TEST_SECRET = 'test-twilio-signing-secret-32-chars!';
 Deno.env.set('TWILIO_WEBHOOK_SIGNING_SECRET', TWILIO_TEST_SECRET);
 Deno.env.set('COMMUNICATION_WEBHOOK_TOKEN', 'test-communication-webhook-token-32chars!');
-Deno.env.set('SUPABASE_AUTH_HOOK_SEND_SMS_SECRET', STRIPE_SECRET);
+Deno.env.set('SUPABASE_AUTH_HOOK_SEND_SMS_SECRET', `${AUTH_HOOK_OLD_SECRET}|${AUTH_HOOK_NEW_SECRET}`);
 Deno.env.set('RESEND_WEBHOOK_SIGNING_SECRET', RESEND_SECRET);
 
 // `handleStripeWebhook` builds the admin client before it branches on the event
@@ -75,6 +77,19 @@ async function signResend(payload: string, secret: string, id = 'msg_test_123', 
     'svix-timestamp': String(timestamp),
     'svix-signature': `v1,${signature}`,
   });
+}
+
+async function signAuthHook(payload: string, secret: string, id = 'msg_test_123', timestamp = Math.floor(Date.now() / 1000)) {
+  const encodedSecret = secret.slice(secret.indexOf('whsec_') + 'whsec_'.length);
+  const keyBytes = Uint8Array.from(atob(encodedSecret), (char) => char.charCodeAt(0));
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${timestamp}.${payload}`));
+  const signature = btoa(String.fromCharCode(...new Uint8Array(mac)));
+  return {
+    id,
+    timestamp,
+    signature,
+  };
 }
 
 Deno.test('verifyResendWebhookSignature — accepts current Svix signature format', async () => {
@@ -186,6 +201,27 @@ Deno.test('handleSendSmsHook — 401 on invalid Standard Webhooks signature', as
   );
   const res = await handleSendSmsHook(req);
   assertEquals(res.status, 401);
+});
+
+Deno.test('handleSendSmsHook — accepts either key in an overlapping rotation set', async () => {
+  const rawBody = JSON.stringify({ unrelated: true });
+  for (const secret of [AUTH_HOOK_OLD_SECRET, AUTH_HOOK_NEW_SECRET]) {
+    const signed = await signAuthHook(rawBody, secret);
+    const req = new Request('https://example.supabase.co/functions/v1/webhooks/auth/hooks/send-sms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'webhook-id': signed.id,
+        'webhook-timestamp': String(signed.timestamp),
+        'webhook-signature': `v1,${signed.signature}`,
+      },
+      body: rawBody,
+    });
+    const res = await handleSendSmsHook(req);
+    // Signature validation succeeds; the intentionally incomplete payload then
+    // fails validation before any SMS provider request can be made.
+    assertEquals(res.status, 400);
+  }
 });
 
 // ── Twilio ────────────────────────────────────────────────────────────────────

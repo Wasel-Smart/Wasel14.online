@@ -241,6 +241,8 @@ enabled = false
 # Gateway JWT verification is disabled because /health must be
 # publicly accessible. Every other protected route MUST perform
 # independent JWT authentication and authorization.
+# Privileged user routes also require Supabase AAL2; webhook routes
+# validate their provider signatures.
 #
 # OPTIONS requests must be handled with proper CORS responses.
 

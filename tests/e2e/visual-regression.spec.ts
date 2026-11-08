@@ -7,12 +7,12 @@ const VIEWPORTS = [
 ];
 
 const PAGES = [
-  { name: 'home', url: '/', waitFor: '[data-testid="home-page"]' },
-  { name: 'find-ride', url: '/find-ride', waitFor: '[data-testid="find-ride-page"]' },
-  { name: 'offer-ride', url: '/offer-ride', waitFor: '[data-testid="offer-ride-page"]' },
-  { name: 'wallet', url: '/wallet', waitFor: '[data-testid="wallet-page"]' },
-  { name: 'trips', url: '/trips', waitFor: '[data-testid="trips-page"]' },
-  { name: 'auth', url: '/auth', waitFor: '[data-testid="auth-page"]' },
+  { name: 'home', url: '/', heading: /Wasel|movement|daily/i },
+  { name: 'find-ride', url: '/app/find-ride', heading: /find ride|find a ride|ابحث/i },
+  { name: 'offer-ride', url: '/app/offer-ride', heading: /offer ride|اعرض مشوار/i },
+  { name: 'wallet', url: '/app/wallet', heading: /wallet|المحفظة/i },
+  { name: 'trips', url: '/app/my-trips', heading: /trips|مشاوير/i },
+  { name: 'auth', url: '/auth', heading: /sign in|welcome|تسجيل الدخول/i },
 ];
 
 for (const page of PAGES) {
@@ -21,8 +21,9 @@ for (const page of PAGES) {
       test.use({ viewport: { width: viewport.width, height: viewport.height } });
 
       test('matches baseline screenshot', async ({ page: p }) => {
-        await p.goto(page.url);
-        await p.waitForSelector(page.waitFor, { timeout: 30_000 });
+        await p.goto(page.url, { waitUntil: 'domcontentloaded' });
+        await expect(p.locator('main').first()).toBeVisible();
+        await expect(p.getByRole('heading', { name: page.heading }).first()).toBeVisible();
         await p.waitForTimeout(500);
         await expect(p).toHaveScreenshot(`${page.name}-${viewport.name}.png`, {
           fullPage: true,

@@ -5951,7 +5951,9 @@ BEGIN
 END $$;
 
 DROP POLICY IF EXISTS "Users can view their refunds" ON refunds;
-CREATE POLICY "Users can view their refunds" ON refunds FOR SELECT USING (true);
+-- Refund records contain provider references and amounts. The application
+-- reads them through service-role Edge Functions; client access is denied.
+REVOKE ALL ON TABLE public.refunds FROM PUBLIC, anon, authenticated;
 
 -- =====================================================
 -- 7. ENABLE REALTIME

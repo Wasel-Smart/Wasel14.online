@@ -43,6 +43,8 @@ export function OfferRidePage() {
   const ar = language === 'ar';
   const city = (value: string) => cityLabel(value, language);
   const capacity = (value: string) => packageCapacityLabel(value, language);
+  const departureWindow = (value: string) =>
+    ar ? value.replace(/\band\b/g, 'و') : value;
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(() => readStoredObject(OFFER_RIDE_DRAFT_KEY, defaultForm));
@@ -635,7 +637,7 @@ export function OfferRidePage() {
                       : `${corridorCount} live route${corridorCount === 1 ? '' : 's'} on this lane`,
                   selectedSignal
                     ? ar
-                      ? `نافذة الانطلاق التالية: ${selectedSignal.nextWaveWindow}`
+                      ? `نافذة الانطلاق التالية: ${departureWindow(selectedSignal.nextWaveWindow)}`
                       : `${selectedSignal.nextWaveWindow} | ${selectedSignal.recommendedPickupPoint}`
                     : ar
                       ? 'تظهر أفضل نافذة للانطلاق هنا'

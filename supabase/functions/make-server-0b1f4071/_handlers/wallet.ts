@@ -88,19 +88,26 @@ export async function handleGetWalletInsights ( request: Request, requestedUserI
   if ( 'error' in auth ) {return auth.error;}
 
   try {
-    const details = await loadWalletDetails( auth.admin, auth.canonicalUser.id );
-    return json( buildWalletInsights( details.transactions.map( toWalletTransaction ) ) );
+    const wallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
+    // Insights aggregate over all settled transactions, not just the newest 50.
+    // loadWalletDetails() hard-limits to 50 rows, so users with more history got
+    // incorrect monthly totals. Fetch all rows here without a limit.
+    const { data, error } = await auth.admin
+      .from( 'transactions' )
+      .select( '*' )
+      .eq( 'wallet_id', wallet.wallet_id )
+      .order( 'created_at', { ascending: false } );
+    if ( error ) {throw new Error( error.message );}
+    return json( buildWalletInsights( ( Array.isArray( data ) ? data : [] ).map( toWalletTransaction ) ) );
   } catch ( error ) {
     return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
   }
 }
 
 // Per-operation ceilings (JOD). Anything larger must go through support/KYC.
-const MAX_WALLET_WITHDRAW_JOD = 2000;
 const MAX_WALLET_SEND_JOD = 1000;
 const MAX_WALLET_TOPUP_JOD = 2000;
 const MAX_WALLET_AUTO_TOPUP_THRESHOLD_JOD = 1000;
-const WITHDRAW_METHODS = new Set( [ 'bank_transfer', 'instant' ] );
 const PIN_MAX_ATTEMPTS = 5;
 const PIN_LOCKOUT_SECONDS = 15 * 60;
 // A wallet with no PIN has no second factor on money-out. Until a PIN is set, a
@@ -199,52 +206,13 @@ export async function enforceWalletPin (
 export async function handleWalletWithdraw ( request: Request, requestedUserId: string ) {
   const auth = await authenticateWalletRequest( request, requestedUserId );
   if ( 'error' in auth ) {return auth.error;}
-
-  const throttled = await consumeRateLimit( auth.admin, `wallet-withdraw:${ auth.canonicalUser.id }`, 5, { windowSeconds: 3600, failClosed: true } );
-  if ( throttled ) {return throttled;}
-
-  const body = await request.json().catch( () => ( {} ) );
-  const amountJod = toMoneyNumber( body.amount );
-  const bankAccount = String( body.bankAccount ?? '' ).trim();
-  const method = String( body.method ?? 'bank_transfer' ).trim() || 'bank_transfer';
-  if ( amountJod <= 0 ) {return json( { error: 'Amount must be greater than zero.' }, 400 );}
-  if ( amountJod > MAX_WALLET_WITHDRAW_JOD ) {
-    return json( { error: `Withdrawals are limited to JOD ${ MAX_WALLET_WITHDRAW_JOD } per request.` }, 400 );
-  }
-  if ( !bankAccount ) {return json( { error: 'Bank account is required.' }, 400 );}
-  if ( !/^[A-Za-z0-9 -]{6,64}$/.test( bankAccount ) ) {
-    return json( { error: 'Bank account format is invalid.' }, 400 );
-  }
-  if ( !WITHDRAW_METHODS.has( method ) ) {
-    return json( { error: 'Unsupported withdrawal method.' }, 400 );
-  }
-
-  try {
-    const wallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
-    const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, wallet, body.pin, amountJod );
-    if ( pinDenied ) {return pinDenied;}
-    if ( toNumber( wallet.balance, 0 ) < amountJod ) {
-      return json( { error: 'Insufficient wallet balance.' }, 400 );
-    }
-    const { error } = await auth.admin.rpc( 'wallet_post_transaction', {
-      p_wallet_id: wallet.wallet_id,
-      p_amount: amountJod,
-      p_transaction_type: 'withdraw_funds',
-      p_payment_method: 'local_gateway',
-      p_direction: 'debit',
-      p_reference_type: 'bank_account',
-      p_reference_id: null,
-      p_metadata: {
-        bank_account: bankAccount,
-        requested_via: method,
-        description: 'Wallet withdrawal',
-      },
-    } );
-    if ( error ) {throw new Error( error.message );}
-    return json( await loadWalletPayload( auth.admin, auth.canonicalUser.id ) );
-  } catch ( error ) {
-    return walletOperationFailed( 'withdraw', error );
-  }
+  // Do not debit the wallet until a real payout provider is configured and the
+  // provider's result can be reconciled. The previous path only wrote a ledger
+  // debit, then presented it to the client as a completed withdrawal.
+  return json(
+    { error: 'Withdrawals are temporarily unavailable until a payout provider is configured.', code: 'PAYOUT_UNAVAILABLE' },
+    503,
+  );
 }
 
 export async function handleWalletSend ( request: Request, requestedUserId: string ) {

@@ -142,7 +142,9 @@ async function fetchSubscriptionViaBackend(userId: string): Promise<WalletSubscr
 
 export function getWalletCapabilities(): WalletCapabilities {
   const secureEdgeReady = canUseEdgeApi();
-  return { topUp: secureEdgeReady, rewardClaim: secureEdgeReady, subscription: secureEdgeReady, pin: secureEdgeReady, send: secureEdgeReady, withdraw: secureEdgeReady, autoTopUp: secureEdgeReady };
+  // Withdrawals remain disabled until a configured payout provider can execute
+  // and reconcile them; a database debit alone is not a completed withdrawal.
+  return { topUp: secureEdgeReady, rewardClaim: secureEdgeReady, subscription: secureEdgeReady, pin: secureEdgeReady, send: secureEdgeReady, withdraw: false, autoTopUp: secureEdgeReady };
 }
 
 export const walletApi = {
@@ -195,10 +197,11 @@ export const walletApi = {
   },
 
   async withdraw(userId: string, amount: number, bankAccount: string, opts: { method?: string; pin?: string } = {}) {
-    const { method = 'bank_transfer', pin } = opts;
-    return runSecureWalletOperation(
-      () => requestWalletJson(userId, '/withdraw', 'Withdraw wallet funds', { method: 'POST', body: { amount, bankAccount, method, ...(pin ? { pin } : {}) } }),
-    );
+    void userId;
+    void amount;
+    void bankAccount;
+    void opts;
+    throw new Error('Withdrawals are temporarily unavailable until a payout provider is configured.');
   },
 
   async sendMoney(userId: string, recipientId: string, amount: number, optsOrNote?: { note?: string; pin?: string } | string, maybePin?: string) {

@@ -26,9 +26,32 @@ import {
 import { toNumber } from '../_shared/pricing.ts';
 import {
     hasPermission,
+    isHighPrivilegeRole,
     resolveAccessRole,
     type AccessPermission,
 } from '../_shared/rbac.ts';
+import {
+  buildSubscriptionRecord,
+  firstStringValue,
+  formatDate,
+  formatTime,
+  isExpired,
+  isFailedProviderStatus,
+  isOlderThanHours,
+  isPhoneNumberUniqueViolation,
+  isPlainObject,
+  isSuccessfulProviderStatus,
+  isWebhookRoute,
+  mapBookingRow,
+  mapPackageRow,
+  mapSubscriptionPlan,
+  normalizeProviderStatus,
+  parseEntityRoute,
+  parseWalletRoute,
+  sanitizePlainText,
+  toIsoFromUnix,
+  WEBHOOK_PATH_PREFIXES,
+} from '../_shared/pure-helpers.ts';
 
 
 // â”€â”€ Runtime barrel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -77,6 +100,40 @@ export {
 
 export { calculateDirectPrice, toNumber } from '../_shared/pricing.ts';
 export { normalizePhoneNumber, isValidE164Phone } from '../_shared/phone.ts';
+
+export {
+  buildSubscriptionRecord,
+  firstStringValue,
+  formatDate,
+  formatTime,
+  isExpired,
+  isFailedProviderStatus,
+  isOlderThanHours,
+  isPhoneNumberUniqueViolation,
+  isPlainObject,
+  isSuccessfulProviderStatus,
+  isWebhookRoute,
+  mapBookingRow,
+  mapPackageRow,
+  mapSubscriptionPlan,
+  normalizeProviderStatus,
+  parseWalletRoute,
+  parseEntityRoute,
+  sanitizePlainText,
+  toIsoFromUnix,
+  WEBHOOK_PATH_PREFIXES,
+};
+
+export {
+  checkRateLimit,
+  getRateLimitKey,
+  createRateLimitMiddleware,
+  checkDbRateLimit,
+  type RateLimitConfig,
+  type DbRateLimitConfig,
+} from '../_shared/rate-limiter.ts';
+
+export { idempotencyMiddleware } from '../_shared/idempotency-middleware.ts';
 
 export {
   hasPermission,
@@ -526,30 +583,6 @@ export function isOriginAllowed ( request: Request ): boolean {
   return !origin || Boolean( resolveAllowedOrigin( origin, APP_BASE_URL, ADDITIONAL_ALLOWED_ORIGINS, ALLOW_LOCAL_ORIGINS ) );
 }
 
-// Webhook routes are authenticated by provider signatures, not bearer/CSRF tokens.
-export const WEBHOOK_PATH_PREFIXES = [
-  '/stripe/webhook',
-  '/cliq/webhook',
-  '/communications/webhook',
-  // Canonical routes registered in index.ts. The legacy prefixes above are kept
-  // for backward compatibility, but these are the paths providers actually call;
-  // without them every payment/KYC callback was rejected by the CSRF gate (403).
-  '/payments/webhooks/',
-  '/trust/webhooks/',
-  '/webhooks/',
-  '/auth/hooks/',
-  // Machine-to-machine event sink drained by outbox-worker. It carries no user
-  // session and no browser CSRF token; it is authenticated by a constant-time
-  // comparison against SUPABASE_SERVICE_ROLE_KEY inside handleEventRequest().
-  '/events',
-];
-
-export function isWebhookRoute ( path: string ): boolean {
-  // resolveRoute() strips a leading /v1; the security gate must see the same path.
-  const normalized = path.startsWith( '/v1/' ) ? path.slice( 3 ) : path;
-  return WEBHOOK_PATH_PREFIXES.some( prefix => normalized.startsWith( prefix ) );
-}
-
 // Server-side CSRF / request-security gate for state-changing requests.
 // This API is bearer-token authenticated (not cookie based), so the primary
 // CSRF defense is the Authorization header + same-origin enforcement. We
@@ -561,6 +594,11 @@ export function enforceRequestSecurity ( request: Request, path: string ): Respo
   const isMutating =
     method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
   if ( !isMutating || isWebhookRoute( path ) ) {return null;}
+
+  // Price calculation is a public, deterministic read operation exposed as
+  // POST only to keep its structured input out of the URL. It performs no
+  // writes and does not access user data, so it must work without a session.
+  if ( method === 'POST' && path === '/trips/calculate-price' ) {return null;}
 
   const authHeader = request.headers.get( 'authorization' ) ?? '';
   const csrfToken = request.headers.get( 'x-csrf-token' );
@@ -578,6 +616,21 @@ export function getAdminClient () {
   return createClient( SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   } );
+}
+
+/**
+ * Asserts that SUPABASE_DB_URL is configured before any code that requires a
+ * direct Postgres connection (finalizeTopUpTransaction, executeSqlStatements).
+ * Called at the top of those functions so the failure is explicit and logged
+ * rather than surfacing as a cryptic "client.connect() failed" deep in the stack.
+ */
+export function requireDbUrl ( context: string ): string {
+  if ( !SUPABASE_DB_URL ) {
+    const msg = `${ context }: SUPABASE_DB_URL is required but not configured. Set it in the edge function secrets.`;
+    console.error( msg );
+    throw new Error( msg );
+  }
+  return SUPABASE_DB_URL;
 }
 
 export async function authenticateRequest ( request: Request ): Promise<AuthResult> {
@@ -618,6 +671,28 @@ export async function authenticateRequest ( request: Request ): Promise<AuthResu
 
   if ( userError || !canonicalUser ) {
     return { error: json( { error: 'Canonical user profile was not found' }, 404 ) };
+  }
+
+  const role = resolveAccessRole(canonicalUser.role);
+  if (isHighPrivilegeRole(role)) {
+    const { data: claimsData, error: claimsError } = await admin.auth.getClaims(token);
+    if (claimsError) {
+      console.error('[auth] privileged assurance verification failed', claimsError.message);
+      return {
+        error: json(
+          { error: 'Unable to verify privileged authentication. Please try again.' },
+          503,
+        ),
+      };
+    }
+    if (claimsData?.claims.aal !== 'aal2') {
+      return {
+        error: json(
+          { error: 'Multi-factor authentication is required', code: 'AAL2_REQUIRED' },
+          403,
+        ),
+      };
+    }
   }
 
   return { admin, authUser: authData.user, canonicalUser };
@@ -746,11 +821,8 @@ export function getFunctionBaseUrl ( request: Request ): string {
 }
 
 export async function executeSqlStatements ( sql: string ) {
-  if ( !SUPABASE_DB_URL ) {
-    throw new Error( 'SUPABASE_DB_URL is not configured' );
-  }
-
-  const client = new Client( SUPABASE_DB_URL );
+  const dbUrl = requireDbUrl( 'executeSqlStatements' );
+  const client = new Client( dbUrl );
   await client.connect();
   try {
     await client.queryObject( sql );
@@ -781,59 +853,6 @@ export function matchesAuthenticatedUser (
   return requestedUserId === auth.canonicalUser.id || requestedUserId === auth.authUser.id;
 }
 
-export function parseWalletRoute ( path: string ) {
-  const match = /^\/wallet\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/.exec( path );
-  if ( !match ) {return null;}
-  return {
-    userId: decodeURIComponent( match[ 1 ] ),
-    action: match[ 2 ] ? decodeURIComponent( match[ 2 ] ) : '',
-    resourceId: match[ 3 ] ? decodeURIComponent( match[ 3 ] ) : null,
-  };
-}
-
-export function parseEntityRoute ( path: string, prefix: string ) {
-  const escapedPrefix = prefix.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' );
-  const match = new RegExp( `^/${ escapedPrefix }/([^/]+)(?:/([^/]+))?$` ).exec( path );
-  if ( !match ) {return null;}
-  return {
-    id: decodeURIComponent( match[ 1 ] ),
-    action: match[ 2 ] ? decodeURIComponent( match[ 2 ] ) : null,
-  };
-}
-
-export function formatDate ( value: unknown, fallback = new Date().toISOString().slice( 0, 10 ) ): string {
-  const date = new Date( String( value ?? '' ) );
-  if ( Number.isNaN( date.getTime() ) ) {return fallback;}
-  return date.toISOString().slice( 0, 10 );
-}
-
-export function formatTime ( value: unknown ): string {
-  const date = new Date( String( value ?? '' ) );
-  if ( Number.isNaN( date.getTime() ) ) {return String( value ?? '' ).slice( 0, 5 ) || '08:00';}
-  return date.toISOString().slice( 11, 16 );
-}
-
-export function isPlainObject ( value: unknown ): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray( value );
-}
-
-/**
- * Strip markup and control characters from user-supplied text before it is
- * persisted or echoed back. The public.notifications trigger chain only covers
- * users/trips/packages/bookings, so free-text fields written by the edge
- * function (notification titles, review comments) have to be cleaned here.
- * Length is clamped so a single request cannot bloat a row.
- */
-export function sanitizePlainText ( value: unknown, maxLength = 500 ): string {
-  return String( value ?? '' )
-    .replace( /<[^>]*>/g, '' )
-    .replace( /(javascript:|data:|vbscript:)/gi, '' )
-    .replace( /\p{Cc}/gu, ' ' )
-    .replace( /\s+/g, ' ' )
-    .trim()
-    .slice( 0, maxLength );
-}
-
 export async function authenticateAuthUser ( request: Request ) {
   const authorization = request.headers.get( 'Authorization' ) ?? '';
   const token = authorization.startsWith( 'Bearer ' ) ? authorization.slice( 7 ) : '';
@@ -847,7 +866,7 @@ export async function authenticateAuthUser ( request: Request ) {
     return { error: json( { error: 'Invalid auth token' }, 401 ) };
   }
 
-  return { admin, authUser: data.user };
+  return { admin, authUser: data.user, token };
 }
 
  
@@ -1074,32 +1093,6 @@ export function mapTripRow ( row: Record<string, unknown>, driverProfile?: Recor
   };
 }
 
-export function mapBookingRow ( row: Record<string, unknown> ) {
-  const amount = toNumber( row.amount ?? row.total_price, 0 );
-  return {
-    ...row,
-    id: String( row.booking_id ?? row.id ?? '' ),
-    booking_id: String( row.booking_id ?? row.id ?? '' ),
-    seats_requested: toNumber( row.seats_requested, 1 ),
-    price_per_seat: toNumber( row.price_per_seat, amount ),
-    total_price: amount,
-    amount,
-    status: String( row.booking_status ?? row.status ?? 'pending' ),
-    booking_status: String( row.booking_status ?? row.status ?? 'pending' ),
-  };
-}
-
-export function mapPackageRow ( row: Record<string, unknown> ) {
-  return {
-    ...row,
-    id: String( row.package_id ?? row.id ?? '' ),
-    package_id: String( row.package_id ?? row.id ?? '' ),
-    tracking_number: String( row.tracking_number ?? '' ),
-    status: String( row.status ?? 'posted' ),
-    delivery_fee: toNumber( row.delivery_fee, 0 ),
-  };
-}
-
 export async function fetchDriverProfiles (
   admin: ReturnType<typeof getAdminClient>,
   driverIds: string[],
@@ -1207,54 +1200,6 @@ export function joinProviderUrl ( baseUrl: string, endpoint: string ): string {
   if ( !baseUrl ) {return '';}
   if ( /^https?:\/\//i.test( endpoint ) ) {return endpoint;}
   return `${ baseUrl }${ endpoint.startsWith( '/' ) ? endpoint : `/${ endpoint }` }`;
-}
-
-export function normalizeProviderStatus ( value: unknown ): string {
-  return String( value ?? '' ).trim().toLowerCase().replace( /[\s_-]+/g, '_' );
-}
-
-export function isSuccessfulProviderStatus ( value: unknown ): boolean {
-  const status = normalizeProviderStatus( value );
-  return [ 'success', 'succeeded', 'paid', 'posted', 'completed', 'complete', 'approved', 'verified' ].includes( status );
-}
-
-export function isFailedProviderStatus ( value: unknown ): boolean {
-  const status = normalizeProviderStatus( value );
-  return [ 'failed', 'failure', 'rejected', 'declined', 'cancelled', 'canceled', 'expired' ].includes( status );
-}
-
-export function firstStringValue ( source: Record<string, unknown>, keys: string[] ): string {
-  for ( const key of keys ) {
-    const value = source[ key ];
-    if ( typeof value === 'string' && value.trim() ) {return value.trim();}
-    if ( typeof value === 'number' && Number.isFinite( value ) ) {return String( value );}
-  }
-  return '';
-}
-
-export function mapSubscriptionPlan ( planName: string ): 'basic' | 'premium' | 'enterprise' {
-  const normalized = planName.trim().toLowerCase();
-  if ( normalized.includes( 'enterprise' ) ) {return 'enterprise';}
-  if ( normalized.includes( 'basic' ) || normalized.includes( 'starter' ) ) {return 'basic';}
-  return 'premium';
-}
-
-export function toIsoFromUnix ( value: unknown ): string | null {
-  const seconds = Number( value );
-  if ( !Number.isFinite( seconds ) || seconds <= 0 ) {return null;}
-  return new Date( seconds * 1000 ).toISOString();
-}
-
-export function isPhoneNumberUniqueViolation ( error: unknown ): boolean {
-  if ( !error || typeof error !== 'object' ) {return false;}
-
-  const record = error as { code?: unknown; message?: unknown; details?: unknown };
-  const message = String( record.message ?? record.details ?? '' );
-  return (
-    record.code === '23505' ||
-    message.includes( 'users_phone_number_key' ) ||
-    message.includes( 'duplicate key value violates unique constraint' )
-  );
 }
 
 export function generateOtpCode (): string {
@@ -1426,20 +1371,6 @@ export async function hashOtpCode ( code: string ): Promise<string> {
   return Array.from( new Uint8Array( digest ) )
     .map( ( chunk ) => chunk.toString( 16 ).padStart( 2, '0' ) )
     .join( '' );
-}
-
-export function isExpired ( isoValue?: string | null ): boolean {
-  if ( !isoValue ) {return false;}
-  const expiresAt = new Date( isoValue ).getTime();
-  if ( Number.isNaN( expiresAt ) ) {return false;}
-  return expiresAt <= Date.now();
-}
-
-export function isOlderThanHours ( isoValue: string | null | undefined, hours: number ): boolean {
-  if ( !isoValue ) {return false;}
-  const timestamp = new Date( isoValue ).getTime();
-  if ( Number.isNaN( timestamp ) ) {return false;}
-  return Date.now() - timestamp >= hours * 60 * 60 * 1000;
 }
 
 export function computeTrustStepSummary ( steps: Record<string, { id: string; state: string }> ) {
@@ -1799,48 +1730,6 @@ export function fetchStripeSubscription ( subscriptionId: string ) {
     method: 'GET',
     params,
   } );
-}
-
-export function buildSubscriptionRecord (
-  userId: string,
-  subscription: Record<string, unknown>,
-  planOverride?: string | null,
-) {
-  const items = Array.isArray( ( subscription.items as { data?: unknown[] } | undefined )?.data )
-    ? ( subscription.items as { data: Array<Record<string, unknown>> } ).data
-    : [];
-  const firstItem = items[ 0 ] ?? {};
-  const price = ( firstItem.price as Record<string, unknown> | undefined ) ?? {};
-  const metadata = ( subscription.metadata as Record<string, unknown> | undefined ) ?? {};
-  const plan = mapSubscriptionPlan(
-    String( planOverride ?? metadata.plan ?? metadata.plan_name ?? 'premium' ),
-  );
-
-  return {
-    user_id: userId,
-    stripe_subscription_id: String( subscription.id ?? '' ),
-    stripe_customer_id: String( subscription.customer ?? '' ),
-    stripe_price_id: String( price.id ?? '' ),
-    stripe_product_id:
-      typeof price.product === 'string'
-        ? price.product
-        : typeof ( price.product as Record<string, unknown> | undefined )?.id === 'string'
-          ? String( ( price.product as Record<string, unknown> ).id )
-          : null,
-    status: String( subscription.status ?? 'incomplete' ),
-    plan,
-    // Stripe API versions from 2025-03-31 (basil) onward moved the billing period
-    // from the subscription to its items; read the item when the top-level field
-    // is absent. STRIPE_API_VERSION defaults to 2026-02-25.clover.
-    current_period_start: toIsoFromUnix( subscription.current_period_start ?? firstItem.current_period_start ),
-    current_period_end: toIsoFromUnix( subscription.current_period_end ?? firstItem.current_period_end ),
-    cancel_at_period_end: Boolean( subscription.cancel_at_period_end ),
-    cancelled_at: toIsoFromUnix( subscription.canceled_at ),
-    ended_at: toIsoFromUnix( subscription.ended_at ),
-    trial_start: toIsoFromUnix( subscription.trial_start ),
-    trial_end: toIsoFromUnix( subscription.trial_end ),
-    updated_at: new Date().toISOString(),
-  };
 }
 
 export async function getCanonicalUserIdForSubscription (
@@ -2439,11 +2328,9 @@ async function recordTopUpMismatch( opts: RecordTopUpMismatchOpts ): Promise<voi
 
 export async function finalizeTopUpTransaction ( opts: FinalizeTopUpOptions ) {
   const { transactionId, externalReference, providerPayload, provider = 'stripe', expected } = opts;
-  if ( !SUPABASE_DB_URL ) {
-    throw new Error( 'SUPABASE_DB_URL is not configured' );
-  }
+  const dbUrl = requireDbUrl( 'finalizeTopUpTransaction' );
 
-  const client = new Client( SUPABASE_DB_URL );
+  const client = new Client( dbUrl );
   await client.connect();
 
   try {
