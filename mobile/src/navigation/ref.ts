@@ -1,4 +1,4 @@
-import { createNavigationContainerRef } from '@react-navigation/native';
+import { createNavigationContainerRef } from '@react-navigation/core';
 
 export const navigationRef = createNavigationContainerRef<Record<string, object | undefined>>();
 

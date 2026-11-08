@@ -84,10 +84,12 @@ describe('MobileChatService API contract', () => {
 
   it('authorizes through history before subscribing by deployed conversation id', async () => {
     let onChange: ((payload: { new?: { message_id?: string } }) => void) | undefined;
-    const channel = {
-      on: jest.fn((_event, _filter, handler) => { onChange = handler; return channel; }),
-      subscribe: jest.fn().mockReturnThis(),
+    const channel: { on: jest.Mock; subscribe: jest.Mock } = {
+      on: jest.fn(),
+      subscribe: jest.fn(),
     };
+    channel.on.mockImplementation((_event, _filter, handler) => { onChange = handler; return channel; });
+    channel.subscribe.mockReturnValue(channel);
     realtime.channel.mockReturnValue(channel);
     api.get.mockResolvedValueOnce(history([], 'conversation-7'))
       .mockResolvedValueOnce(history([rawMessage({ id: 'live-1' })], 'conversation-7'));

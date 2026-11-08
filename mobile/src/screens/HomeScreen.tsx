@@ -158,7 +158,7 @@ const SmartSearch = React.memo(({ onPress }: { onPress: () => void }) => {
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.searchContainer, pressed && styles.searchContainerPressed]}
+      style={({ pressed }: { pressed: boolean }) => [styles.searchContainer, pressed && styles.searchContainerPressed]}
       onPress={onPress}
       accessible
       accessibilityRole="button"
@@ -233,7 +233,7 @@ const QuickActionCard = React.memo(({
   onPress: () => void;
 }) => (
   <Pressable
-    style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]}
+    style={({ pressed }: { pressed: boolean }) => [styles.quickAction, pressed && styles.quickActionPressed]}
     onPress={onPress}
     accessible
     accessibilityRole="button"
