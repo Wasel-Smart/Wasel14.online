@@ -37,7 +37,7 @@ export const safetyExpanded = {
   },
   ar: {
     verifiedIdentity: 'هوية موثقة',
-    identityDetail: 'تم التحقق من هويتك عبر سند، مما يبني الثقة عبر المنصة.',
+    identityDetail: 'تعتمد الثقة بالحساب على بيانات الاتصال المؤكدة والوثائق المطلوبة.',
     step: 'خطوة',
     emergencyHelp: 'مساعدة طارئة',
     emergencyDetail: 'ضغطة واحدة تربطك بخدمات الطوارئ وتشارك موقعك الحي.',

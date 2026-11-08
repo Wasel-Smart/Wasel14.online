@@ -772,66 +772,6 @@ paths:
       responses:
         '200':
           description: Phone confirmed
-  /v1/trust/identity/submit:
-    post:
-      summary: Submit identity verification
-      operationId: submitIdentityVerification
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '202':
-          description: Identity reference accepted and awaiting manual review
-        '400':
-          description: Invalid identity reference
-        '409':
-          description: An identity submission is already pending
-  /v1/admin/identity/pending:
-    get:
-      summary: List pending identity verification submissions
-      operationId: listPendingIdentityVerifications
-      responses:
-        '200':
-          description: Pending submissions
-        '403':
-          description: Insufficient permissions
-  /v1/admin/identity/{verificationId}/review:
-    post:
-      summary: Approve or reject an identity verification submission
-      operationId: reviewIdentityVerification
-      parameters:
-        - name: verificationId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [decision]
-              properties:
-                decision:
-                  type: string
-                  enum: [approve, reject]
-                failureReason:
-                  type: string
-                  maxLength: 500
-      responses:
-        '200':
-          description: Review saved
-        '400':
-          description: Invalid review request
-        '403':
-          description: Insufficient permissions
-        '409':
-          description: Submission is not pending
   /v1/trust/driver-mode/enable:
     post:
       summary: Enable driver mode

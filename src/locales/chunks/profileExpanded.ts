@@ -91,7 +91,7 @@ export const profileExpanded = {
     profileCompleteness: 'اكتمال الملف',
     profileCompletenessDetail: 'كلما اكتمل الملف تحسنت الثقة وسهولة الحجز.',
     verificationLevel: 'مستوى التحقق',
-    verificationLevelDetail: 'مرتبط بالبريد والهاتف والهوية أو سند.',
+    verificationLevelDetail: 'يرتبط بالبريد والهاتف والوثائق المطلوبة.',
     walletStatus: 'حالة المحفظة',
     walletStatusDetail: 'يعكس جاهزية الدفع والتحصيل داخل واصل.',
     alerts: 'التنبيهات',

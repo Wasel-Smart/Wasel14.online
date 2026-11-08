@@ -107,7 +107,6 @@ import {
   handleConfirmPhoneVerification,
   handleGetTrustStatus,
   handleStartPhoneVerification,
-  handleSubmitIdentityVerification,
 } from './_handlers/trust.ts';
 
 import {
@@ -400,12 +399,6 @@ const ROUTES: RouteDescriptor[] = [
     methods: [ 'POST' ],
     test: ( path ) => path === '/trust/driver-documents/submit',
     handle: ( request ) => handleSubmitDriverDocuments( request ),
-  },
-  {
-    id: 'trust-identity-submit',
-    methods: [ 'POST' ],
-    test: ( path ) => path === '/trust/identity/submit',
-    handle: ( request ) => handleSubmitIdentityVerification( request ),
   },
   {
     id: 'auth-2fa-setup',

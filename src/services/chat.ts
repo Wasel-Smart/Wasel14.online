@@ -71,38 +71,60 @@ class ChatService {
       }
     }
 
-    const channel = sb
-      .channel(channelName, {
-        config: { broadcast: { self: false } },
-      })
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `trip_id=eq.${tripId}`,
-        },
-        async (payload: { new: { id: string } }) => {
-          try {
-            const messages = await this.getMessages(tripId, 100);
-            const message = messages.find(item => item.id === payload.new.id);
-            if (message) {onMessage(message);}
-          } catch {
-            // Non-fatal: message fetch failed after realtime insert.
-          }
-        },
-      )
-      .subscribe((status: string) => {
-        if (status === 'SUBSCRIPTION_ERROR' && onError) {
-          onError(new Error('Subscription failed'));
-        }
-      });
+    let channel: RealtimeChannel | null = null;
+    let cancelled = false;
+    void (async () => {
+      try {
+        // Read through the authenticated API first. This also ensures the
+        // participant's conversation membership before subscribing to RLS-
+        // protected Postgres changes.
+        const data = await apiGet<{ messages: Message[]; conversationId: string }>(
+          `/v1/chat/trips/${encodeURIComponent(tripId)}/messages`,
+          { limit: 1 },
+        );
+        const conversationId = data?.conversationId;
+        if (cancelled || !conversationId) {return;}
 
-    this.channels.set(channelName, channel);
+        channel = sb
+          .channel(channelName, { config: { broadcast: { self: false } } })
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+              filter: `conversation_id=eq.${conversationId}`,
+            },
+            async (payload: { new: { message_id?: string } }) => {
+              const messageId = payload.new?.message_id;
+              if (!messageId) {return;}
+              try {
+                const messages = await this.getMessages(tripId, 100);
+                const message = messages.find(item => item.id === messageId);
+                if (message) {onMessage(message);}
+              } catch {
+                // A failed refresh is recoverable on the next history load.
+              }
+            },
+          )
+          .subscribe((status: string) => {
+            if ((status === 'SUBSCRIPTION_ERROR' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && onError) {
+              onError(new Error('Subscription failed'));
+            }
+          });
+        if (cancelled && channel) {
+          void channel.unsubscribe();
+          return;
+        }
+        if (channel) {this.channels.set(channelName, channel);}
+      } catch (error) {
+        onError?.(error instanceof Error ? error : new Error('Subscription failed'));
+      }
+    })();
 
     return () => {
-      void channel.unsubscribe();
+      cancelled = true;
+      if (channel) {void channel.unsubscribe();}
       this.channels.delete(channelName);
     };
   }

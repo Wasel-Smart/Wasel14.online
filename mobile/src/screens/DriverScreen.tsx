@@ -92,7 +92,7 @@ const DriverScreen = React.memo(function DriverScreen() {
         <SectionHeader
           eyebrow="إجراءات التجهيز"
           title="اضغط لتحديد الخطوات المكتملة"
-          body="بالإنتاج هاي بتفتح رفع الوثائق والتحقق عبر سند."
+          body="أكمل متطلبات السائق وراجع حالة المستندات قبل بدء الرحلات."
         />
 
         {steps
@@ -116,12 +116,6 @@ const DriverScreen = React.memo(function DriverScreen() {
           testID="offer-ride-driver-button"
         />
 
-        <InfoCard
-          icon="shield-checkmark"
-          title="الهوية عبر سند"
-          body="واصل يستخدم نظام سند الأردني للتحقق من هوية السائق قبل تفعيل المشاوير."
-          tone={colors.green}
-        />
         <InfoCard
           icon="cube"
           title="ميزة حمل الطرود"

@@ -384,7 +384,6 @@ export const API_ENDPOINTS = {
   CHAT_READ: '/v1/chat/messages/read',
   CHAT_UNREAD: ( tripId: string ) => `/v1/chat/trips/${ tripId }/unread-count`,
   TRUST_STATUS: '/v1/trust/status',
-  TRUST_IDENTITY: '/v1/trust/identity/submit',
   TRUST_PHONE_START: '/v1/trust/phone/start',
   TRUST_PHONE_CONFIRM: '/v1/trust/phone/confirm',
   TRUST_DRIVER_MODE: '/v1/trust/driver-mode/enable',
