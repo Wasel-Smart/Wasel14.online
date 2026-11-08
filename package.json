@@ -2,6 +2,7 @@
   "name": "wasel-web",
   "private": true,
   "overrides": {
+    "express": "^5.1.0",
     "bl": "^2.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "glob": "^14.0.2",

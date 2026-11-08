@@ -80,14 +80,19 @@ interface AuthProviderProps {
 }
 
 function isE2ELocalAuthMode(): boolean {
-  // Set by scripts/start-playwright-dev.mjs for every Playwright run.
+  // Set by scripts/start-playwright-dev.mjs for every Playwright run (dev server).
   // Allows E2E tests to seed a localStorage session even when a real
   // Supabase project is configured in the environment.
+  // Never honoured in a production bundle: a stray VITE_E2E_LOCAL_AUTH=true in a
+  // deploy environment must not let anyone forge a signed-in UI state.
+  if (import.meta.env.PROD) {return false;}
   return import.meta.env.VITE_E2E_LOCAL_AUTH === 'true';
 }
 
 function readLocalE2ESession(): WaselUser | null {
   if (typeof window === 'undefined') {return null;}
+  // Production builds always authenticate against Supabase.
+  if (import.meta.env.PROD) {return null;}
   const storageKey = (import.meta?.env?.VITE_LOCAL_AUTH_STORAGE_KEY) || 'wasel_user_session';
   try {
     const raw = window.localStorage.getItem(storageKey);

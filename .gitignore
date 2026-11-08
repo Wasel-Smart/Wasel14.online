@@ -112,6 +112,11 @@ review-screenshots/
 .codex_tmp/
 .codex/
 .kilo/
+# Per-developer AI assistant state/skill copies (not part of the product)
+.agents/
+.aider-desk/
+.continue/
+.commandcode/
 actions-runner/
 review-artifacts/
 artifacts/

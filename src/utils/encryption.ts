@@ -145,10 +145,18 @@ export const secureStorage = {
   },
 
   clear(): void {
-    // Robust clearing that works across browsers, jsdom shims, and mocked storages.
+    // Storage keys are exposed through key()/length, not enumerable properties.
+    // Object.keys(localStorage) sees implementation fields in test shims and may
+    // miss the actual stored entries in browsers as well.
     if (typeof localStorage === 'undefined') {return;}
 
-    for (const key of Object.keys(localStorage)) {
+    const keys: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key !== null) { keys.push(key); }
+    }
+
+    for (const key of keys) {
       if (key.startsWith('secure_')) {
         localStorage.removeItem(key);
       }

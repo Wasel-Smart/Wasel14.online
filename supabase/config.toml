@@ -285,6 +285,12 @@ verify_jwt = false
 [functions.outbox-worker]
 verify_jwt = true
 
+# Stripe Sync setup and teardown are operator-only. The handler verifies the
+# service-role bearer key; DELETE also requires a Management API token header.
+# Never call this from browser/mobile clients.
+[functions.stripe-setup]
+verify_jwt = true
+
 # ============================================================
 # END OF WASEL CONFIGURATION
 # ============================================================

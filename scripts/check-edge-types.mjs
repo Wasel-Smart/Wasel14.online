@@ -52,7 +52,10 @@ let total = 0;
 let broken = 0;
 console.log(`deno ${DENO.version} (${DENO.bin})`);
 for (const fn of fns) {
-  const res = spawnSync(DENO.bin, ['check', '--no-lock', join(fn, 'index.ts')], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  // Keep npm specifier resolution in Deno's managed cache. The repository's
+  // root package.json contains browser/dev dependencies unrelated to Edge
+  // Functions; `auto` would eagerly materialize that entire dependency graph.
+  const res = spawnSync(DENO.bin, ['check', '--no-lock', '--node-modules-dir=none', join(fn, 'index.ts')], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
   const text = `${res.stdout || ''}${res.stderr || ''}`.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
 
   // The regex below only matches diagnostics carrying a

@@ -38,11 +38,12 @@ export default defineConfig( {
   test: {
     globals: true,
     environment: 'jsdom',
-    // 'threads' and 'forks' pools both fail on Windows paths with spaces
-    // (e.g. OneDrive\Desktop) because the worker spawn times out waiting for
-    // the IPC channel. 'vmForks' runs each test file in a VM context inside
-    // the same process, avoiding the worker spawn entirely.
-    pool: 'vmForks',
+    // Use isolated worker processes. The vm pools disable isolation, which lets
+    // vi.mock registrations and imported modules leak across test files; that
+    // made tests pass or fail depending on file order. Keep concurrency bounded
+    // on Windows/OneDrive workspaces to avoid starving jsdom suites.
+    pool: 'forks',
+    maxWorkers: 2,
     environmentOptions: { url: 'http://localhost/' },
     // A filter that matches nothing exits 0, which let an entire suite silently
     // disappear from CI without anyone noticing. Tests that are deliberately

@@ -130,13 +130,16 @@ export function sanitizeHTMLStrict(html: string): string {
 export function sanitizeURL(url: string): string {
   if (!url) {return '';}
 
-  const trimmed = url.trim().toLowerCase();
+  // Browsers ignore tabs, newlines and other control characters inside a URL
+  // scheme ("java\tscript:" still runs), so strip them before comparing.
+  // eslint-disable-next-line no-control-regex
+  const normalized = url.replace(/[\u0000-\u0020\u007f-\u009f\u200b-\u200d\ufeff]/g, '').toLowerCase();
 
   // Block dangerous protocols
   if (
-    trimmed.startsWith('javascript:') ||
-    trimmed.startsWith('data:') ||
-    trimmed.startsWith('vbscript:')
+    normalized.startsWith('javascript:') ||
+    normalized.startsWith('data:') ||
+    normalized.startsWith('vbscript:')
   ) {
     return '';
   }

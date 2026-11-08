@@ -1,0 +1,10 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "npm:papaparse": "npm:papaparse@5.4.1",
+    "npm:pg": "npm:pg@8.16.3",
+    "npm:postgres": "npm:postgres@4.1.0",
+    "npm:stripe": "npm:stripe@17.7.0",
+    "npm:yesql": "npm:yesql@7.0.0"
+  }
+}

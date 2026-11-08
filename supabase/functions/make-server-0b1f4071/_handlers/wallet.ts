@@ -103,6 +103,12 @@ const MAX_WALLET_AUTO_TOPUP_THRESHOLD_JOD = 1000;
 const WITHDRAW_METHODS = new Set( [ 'bank_transfer', 'instant' ] );
 const PIN_MAX_ATTEMPTS = 5;
 const PIN_LOCKOUT_SECONDS = 15 * 60;
+// A wallet with no PIN has no second factor on money-out. Until a PIN is set, a
+// stolen session may move only a small amount per request; larger transfers and
+// withdrawals require the owner to set a PIN first.
+const MAX_NO_PIN_MONEY_OUT_JOD = 25;
+const PAYMENT_PROVIDER_PATTERN = /^[a-z0-9_-]{2,32}$/i;
+const PAYMENT_TOKEN_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 function pinAttemptKey ( userId: string ): string {
   return `wallet-pin:${ userId }`;
@@ -147,13 +153,25 @@ function walletOperationFailed ( scope: string, error: unknown ): Response {
  *
  * Returns null when the operation may proceed.
  */
-async function enforceWalletPin (
+export async function enforceWalletPin (
   admin: Parameters<typeof consumeRateLimit>[ 0 ],
   userId: string,
   wallet: { pin_hash?: string | null },
   rawPin: unknown,
+  amountJod = 0,
 ): Promise<Response | null> {
-  if ( !wallet.pin_hash ) {return null;}
+  if ( !wallet.pin_hash ) {
+    if ( amountJod > MAX_NO_PIN_MONEY_OUT_JOD ) {
+      return json(
+        {
+          error: `Set a wallet PIN to move more than JOD ${ MAX_NO_PIN_MONEY_OUT_JOD } at a time.`,
+          code: 'PIN_SETUP_REQUIRED',
+        },
+        403,
+      );
+    }
+    return null;
+  }
 
   const pin = typeof rawPin === 'string' ? rawPin.trim() : '';
   if ( !/^\d{4}$/.test( pin ) ) {
@@ -203,7 +221,7 @@ export async function handleWalletWithdraw ( request: Request, requestedUserId: 
 
   try {
     const wallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
-    const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, wallet, body.pin );
+    const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, wallet, body.pin, amountJod );
     if ( pinDenied ) {return pinDenied;}
     if ( toNumber( wallet.balance, 0 ) < amountJod ) {
       return json( { error: 'Insufficient wallet balance.' }, 400 );
@@ -247,7 +265,7 @@ export async function handleWalletSend ( request: Request, requestedUserId: stri
 
   try {
     const senderWallet = await ensureWalletForUser( auth.admin, auth.canonicalUser.id );
-    const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, senderWallet, body.pin );
+    const pinDenied = await enforceWalletPin( auth.admin, auth.canonicalUser.id, senderWallet, body.pin, amountJod );
     if ( pinDenied ) {return pinDenied;}
 
     const recipientUserId = await resolveWalletRecipient( auth.admin, recipientId );
@@ -370,6 +388,14 @@ export async function handleAddWalletPaymentMethod ( request: Request, requested
 
   const body = await request.json().catch( () => ( {} ) );
   const provider = String( body.provider ?? 'manual' ).trim() || 'manual';
+  const tokenReference = String( body.token_reference ?? body.last4 ?? `pm-${ crypto.randomUUID() }` ).trim();
+  // Client-supplied strings are stored verbatim, so constrain their shape.
+  if ( !PAYMENT_PROVIDER_PATTERN.test( provider ) ) {
+    return json( { error: 'Payment provider is invalid.' }, 400 );
+  }
+  if ( !PAYMENT_TOKEN_PATTERN.test( tokenReference ) ) {
+    return json( { error: 'Payment method reference is invalid.' }, 400 );
+  }
   try {
     const { data, error } = await auth.admin
       .from( 'payment_methods' )
@@ -377,7 +403,7 @@ export async function handleAddWalletPaymentMethod ( request: Request, requested
         user_id: auth.canonicalUser.id,
         provider,
         method_type: normalizeWalletPaymentMethod( body.type ?? body.method_type ),
-        token_reference: String( body.token_reference ?? body.last4 ?? `pm-${ crypto.randomUUID() }` ),
+        token_reference: tokenReference,
         is_default: Boolean( body.is_default ),
         status: 'active',
       } )
@@ -537,7 +563,7 @@ export async function handleWalletTopUp ( request: Request, requestedUserId: str
   }
 
   // Each call creates a pending transaction row and a provider checkout session.
-  const throttled = await consumeRateLimit( auth.admin, `wallet-topup:${ auth.canonicalUser.id }`, 10, { windowSeconds: 3600 } );
+  const throttled = await consumeRateLimit( auth.admin, `wallet-topup:${ auth.canonicalUser.id }`, 10, { windowSeconds: 3600, failClosed: true } );
   if ( throttled ) {return throttled;}
 
   const { data: wallet, error: walletError } = await auth.admin
@@ -705,6 +731,9 @@ export async function handleWalletSubscribe ( request: Request, requestedUserId:
   }
 }
 
+// Package and bus records carry a single `status`; none of these may be settled again.
+const NON_PAYABLE_STATUSES = new Set( [ 'paid', 'completed', 'settled', 'cancelled', 'canceled', 'rejected', 'refunded' ] );
+
 type PayableAmount =
   | { amountJod: number; metadata: Record<string, unknown> }
   | { error: Response };
@@ -775,6 +804,9 @@ async function resolvePayableAmount (
     if ( data.sender_id !== callerUserId ) {
       return { error: json( { error: 'This package does not belong to you.' }, 403 ) };
     }
+    if ( NON_PAYABLE_STATUSES.has( String( data.status ?? '' ).toLowerCase() ) ) {
+      return { error: json( { error: 'This package is not payable (already paid or cancelled).' }, 409 ) };
+    }
 
     const amountJod = toMoneyNumber( data.price );
     if ( amountJod <= 0 ) {
@@ -795,6 +827,9 @@ async function resolvePayableAmount (
     if ( !data ) {return { error: json( { error: 'Bus booking not found.' }, 404 ) };}
     if ( data.user_id !== callerUserId ) {
       return { error: json( { error: 'This booking does not belong to you.' }, 403 ) };
+    }
+    if ( NON_PAYABLE_STATUSES.has( String( data.status ?? '' ).toLowerCase() ) ) {
+      return { error: json( { error: 'This booking is not payable (already paid or cancelled).' }, 409 ) };
     }
 
     const amountJod = toMoneyNumber( data.total_price );

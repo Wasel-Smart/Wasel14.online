@@ -1,0 +1,17 @@
+-- Restore the pre-hardening defaults for objects created by supabase_admin.
+BEGIN;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
+  GRANT INSERT, SELECT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN
+  ON TABLES TO anon, authenticated;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
+  GRANT SELECT, UPDATE, USAGE ON SEQUENCES TO anon, authenticated;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public
+  GRANT EXECUTE ON FUNCTIONS TO anon, authenticated;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin
+  GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+
+COMMIT;

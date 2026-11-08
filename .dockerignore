@@ -16,7 +16,8 @@ npm-debug.log
 supabase/.temp/
 .devcontainer/
 docs/
-scripts/
+# scripts/ is NOT ignored: `npm run build` runs scripts/verify-supabase-key.mjs,
+# generate-pwa-manifest.mjs and version-sw.mjs, so the image build needs them.
 mobile/
 .kilo/
 artifacts/

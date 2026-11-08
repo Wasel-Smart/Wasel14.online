@@ -142,21 +142,15 @@
       fetchpriority="high"
     />
 
-    <!-- Brand fonts: display=optional avoids invisible text on slow connections.
-         Plus Jakarta Sans covers Latin; Cairo/Tajawal cover Arabic.
+    <!-- Brand fonts: Plus Jakarta Sans covers Latin; Cairo/Tajawal cover Arabic.
+         Loaded as a plain stylesheet: the previous media="print" + inline onload
+         trick is blocked by the CSP (script-src 'self'), which left the fonts
+         permanently unapplied in production. display=swap keeps text visible.
          TODO: self-host under /public/fonts for offline/PWA (see brand/FONTS.md). -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=optional"
-      media="print"
-      onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap"
     />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap"
-      />
-    </noscript>
 
     <!-- Critical pre-render styles (extracted to avoid Vite 6 html-proxy conflict) -->
     <link rel="stylesheet" href="/src/styles/critical.css" />

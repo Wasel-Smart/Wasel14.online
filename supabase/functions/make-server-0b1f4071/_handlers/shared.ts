@@ -75,6 +75,17 @@ export { calculateDirectPrice, toNumber } from '../_shared/pricing.ts';
 export { normalizePhoneNumber, isValidE164Phone } from '../_shared/phone.ts';
 
 export {
+  checkRateLimit,
+  getRateLimitKey,
+  createRateLimitMiddleware,
+  checkDbRateLimit,
+  type RateLimitConfig,
+  type DbRateLimitConfig,
+} from '../_shared/rate-limiter.ts';
+
+export { idempotencyMiddleware } from '../_shared/idempotency-middleware.ts';
+
+export {
   hasPermission,
   resolveAccessRole,
   getRolePermissions,

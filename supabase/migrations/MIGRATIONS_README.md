@@ -117,6 +117,14 @@ result on a disposable project restored from a production backup. Only then prep
 a separate reviewed deployment plan. `supabase db push` is deliberately not part of
 this development task.
 
+Migration `20261108025826_harden_supabase_admin_default_privileges.sql` is prepared
+but not applied. It changes defaults for objects created by `supabase_admin`, so it
+must be applied by a role authorized to alter that role's default privileges. Apply
+it only after the migration-history reconciliation above; it revokes implicit
+`anon`/`authenticated` access to future tables, sequences, and functions, plus the
+global default `PUBLIC` function execution grant. Existing object grants are
+unchanged and required access must be granted explicitly.
+
 ### Post-migration validation
 
 ```sql
