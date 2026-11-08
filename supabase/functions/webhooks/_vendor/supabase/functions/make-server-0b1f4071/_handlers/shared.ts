@@ -2111,7 +2111,7 @@ export async function verifyWalletPinHash ( pin: string, storedHash?: string | n
   const iterations = Number.parseInt( parts[ 1 ] ?? '', 10 );
   const salt = fromHex( parts[ 2 ] ?? '' );
   const expected = fromHex( parts[ 3 ] ?? '' );
-  if ( !Number.isFinite( iterations ) || iterations < 100_000 || salt.length < 16 || expected.length !== 32 ) {
+  if ( !Number.isFinite( iterations ) || iterations < 100_000 || iterations > 1_000_000 || salt.length < 16 || expected.length !== 32 ) {
     return false;
   }
 
@@ -2813,7 +2813,7 @@ async function computeHmacBase64 ( secret: string, payload: string, algorithm: '
 }
 
 // Parses a `t=<ts>,v1=<hex>` style header (Stripe/Resend/Standard-Webhooks).
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function _parseTimestampedSignature ( header: string ): { timestamp: string; candidates: string[] } | null {
   if ( !header ) {return null;}
   const segments = header.split( ',' ).map( ( segment ) => segment.trim() ).filter( Boolean );

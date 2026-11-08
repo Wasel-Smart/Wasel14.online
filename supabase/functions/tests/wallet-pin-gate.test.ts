@@ -19,6 +19,7 @@ Deno.env.set('SUPABASE_URL', 'https://example.supabase.co');
 Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key');
 
 const { enforceWalletPin } = await import('../make-server-0b1f4071/_handlers/wallet.ts');
+const { hashWalletPin, verifyWalletPinHash } = await import('../make-server-0b1f4071/_handlers/shared.ts');
 
 type Admin = Parameters<typeof enforceWalletPin>[0];
 
@@ -60,4 +61,15 @@ Deno.test('enforceWalletPin — a wallet with a PIN refuses a missing or malform
   const malformed = await enforceWalletPin(untouchedAdmin, 'user-1', { pin_hash: 'pbkdf2_sha256$x' }, '12ab', 5);
   assertEquals(malformed?.status, 403);
   assertEquals((await malformed?.json()).code, 'PIN_REQUIRED');
+});
+
+Deno.test('verifyWalletPinHash — rejects excessive PBKDF2 work factors without deriving a key', async () => {
+  const hash = `pbkdf2_sha256$1000001$${'00'.repeat(16)}$${'00'.repeat(32)}`;
+  assertEquals(await verifyWalletPinHash('1234', hash), false);
+});
+
+Deno.test('verifyWalletPinHash — verifies generated PIN hashes and rejects a wrong PIN', async () => {
+  const hash = await hashWalletPin('1234');
+  assertEquals(await verifyWalletPinHash('1234', hash), true);
+  assertEquals(await verifyWalletPinHash('4321', hash), false);
 });

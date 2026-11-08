@@ -22,7 +22,9 @@ const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "https://wasel14.onl
   .filter(Boolean);
 
 if (!STRIPE_SECRET) {throw new Error("Missing STRIPE_SECRET_KEY");}
-// Supabase persistence is optional; payments are still processed without it.
+// Supabase is required for authenticating checkout requests. Payment intents are
+// created only by the canonical booking and wallet flows, which persist their
+// business references before returning client secrets.
 
 const stripe = new Stripe(STRIPE_SECRET, { apiVersion: "2024-11-20" });
 const supabase = SUPABASE_URL && SUPABASE_KEY

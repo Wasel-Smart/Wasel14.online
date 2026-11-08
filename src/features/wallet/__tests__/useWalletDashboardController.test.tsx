@@ -48,12 +48,13 @@ const walletApiMocks = vi.hoisted( () => ( {
   setAutoTopUp: vi.fn(),
   subscribe: vi.fn(),
 } ) );
+const walletCapabilitiesMock = vi.hoisted( () => ( {
+  topUp: true, rewardClaim: true, subscription: true, pin: true,
+  send: true, withdraw: true, autoTopUp: true,
+} ) );
 vi.mock( '../../../services/wallet/walletApi', () => ( {
   walletApi: walletApiMocks,
-  getWalletCapabilities: vi.fn( () => ( {
-    topUp: true, rewardClaim: true, subscription: true, pin: true,
-    send: true, withdraw: true, autoTopUp: true,
-  } ) ),
+  getWalletCapabilities: vi.fn( () => walletCapabilitiesMock ),
 } ) );
 
 function makeWallet ( overrides: Partial<WalletData> = {} ): WalletData {
@@ -83,6 +84,7 @@ function renderController ( initialPath = '/app/wallet' ) {
 describe( 'useWalletDashboardController', () => {
   beforeEach( () => {
     vi.clearAllMocks();
+    walletCapabilitiesMock.withdraw = true;
     mockAuthUser = { id: 'user-1' };
     walletApiMocks.getWallet.mockResolvedValue( makeWallet() );
     walletApiMocks.getInsights.mockResolvedValue( { totalTransactions: 0 } );
@@ -243,6 +245,23 @@ describe( 'useWalletDashboardController', () => {
   } );
 
   describe( 'handleWithdraw', () => {
+    it( 'does not call the API and explains when payout is unavailable', async () => {
+      walletCapabilitiesMock.withdraw = false;
+      const { result } = renderController();
+      await waitFor( () => expect( result.current.loading ).toBe( false ) );
+
+      act( () => {
+        result.current.setWithdrawAmount( '50' );
+        result.current.setWithdrawBank( 'JO00BANK123' );
+      } );
+      await act( async () => { await result.current.handleWithdraw(); } );
+
+      expect( walletApiMocks.withdraw ).not.toHaveBeenCalled();
+      expect( toastMock.error ).toHaveBeenCalledWith(
+        'Withdrawals are temporarily unavailable until a payout provider is configured.',
+      );
+    } );
+
     it( 'requires both an amount and a bank account before calling the API', async () => {
       const { result } = renderController();
       await waitFor( () => expect( result.current.loading ).toBe( false ) );
