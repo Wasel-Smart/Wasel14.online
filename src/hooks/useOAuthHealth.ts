@@ -32,14 +32,13 @@ export function useOAuthHealth (
   providers: OAuthProvider[] = [ 'google', 'facebook' ],
 ): UseOAuthHealthResult {
   const [ statuses, setStatuses ] = useState<OAuthProviderStatus[]>( [] );
-  const [ loading, setLoading ] = useState( true );
+  const [ loading, setLoading ] = useState( Boolean( client ) );
   const [ error, setError ] = useState<string | null>( null );
 
   const [ trigger, setTrigger ] = useState( 0 );
 
   useEffect( () => {
     if ( !client ) {
-      setLoading( false );
       return;
     }
 

@@ -19,16 +19,16 @@ vi.mock('@/utils/supabase/client', () => ({
 }));
 
 import WaselAuthCallback from '@/pages/WaselAuthCallback';
-import { setCurrentLang } from '@/locales/tx';
+import { loadLanguageTranslations, setCurrentLang } from '@/locales/tx';
 
 function setSearch(search: string) {
   window.history.replaceState({}, '', `/app/auth/callback${search}`);
 }
 
 describe('WaselAuthCallback - cancelled or failed social sign-in', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    // tx() defaults to Arabic (locales/tx.ts); pin it so assertions are stable.
+    await loadLanguageTranslations('en');
     setCurrentLang('en');
     getSession.mockResolvedValue({ data: { session: null }, error: null });
   });

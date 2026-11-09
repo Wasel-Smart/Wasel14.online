@@ -72,7 +72,7 @@ describe('phoneSchema', () => {
 
 describe('jordanPhoneSchema', () => {
   it('accepts +962 format', () => {
-    expect(jordanPhoneSchema.safeParse('+96279123456').success).toBe(true);
+    expect(jordanPhoneSchema.safeParse('+962791234567').success).toBe(true);
   });
   it('accepts 07x format', () => {
     expect(jordanPhoneSchema.safeParse('0791234567').success).toBe(true);
@@ -316,7 +316,23 @@ describe('packageTrackingSchema', () => {
 
 describe('notificationPreferencesSchema', () => {
   it('accepts defaults', () => {
-    expect(notificationPreferencesSchema.safeParse({}).success).toBe(true);
+    const result = notificationPreferencesSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        email: true,
+        sms: true,
+        push: true,
+        whatsapp: false,
+        categories: {
+          rideUpdates: true,
+          packageUpdates: true,
+          paymentUpdates: true,
+          promotions: false,
+          systemUpdates: true,
+        },
+      });
+    }
   });
   it('accepts explicit values', () => {
     expect(

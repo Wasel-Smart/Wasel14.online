@@ -22,7 +22,19 @@ vi.mock('../../src/utils/monitoring', () => ({
   trackAPICall: vi.fn(),
 }));
 
-import { apiGet, apiPost, apiPut } from '../../src/utils/api';
+import {
+  API_ENDPOINTS,
+  APIError,
+  NetworkError,
+  TimeoutError,
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiPut,
+  apiRequest,
+  getApiHeaders,
+} from '../../src/utils/api';
 
 const fetchMock = vi.fn();
 
@@ -85,5 +97,95 @@ describe('api auth header propagation', () => {
       throw new Error('fetch was not called with a URL string');
     }
     expect(String(firstCall[0])).toBe(`${API_URL}/v1/admin/users`);
+  });
+});
+
+describe('API request behavior', () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ success: true, data: { ok: true } }),
+      text: () => Promise.resolve('ok'),
+    });
+  });
+
+  it('serializes filtered query values and exposes endpoint helpers', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'text/plain' },
+      text: () => Promise.resolve('ok'),
+    });
+    await apiGet('/v1/items', { page: 2, active: true, unused: null });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('page=2&active=true');
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('unused');
+    expect(API_ENDPOINTS.BOOKINGS_ID('b-1')).toBe('/v1/bookings/b-1');
+
+    await apiPatch('/v1/items/1', { active: false });
+    await apiDelete('/v1/items/1');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('normalizes JSON API errors and rejects unauthorized destinations', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ error: 'Invalid payload', code: 'invalid_payload', details: { field: 'name' } }),
+    });
+    await expect(apiRequest('/v1/items', {}, 0)).rejects.toMatchObject({
+      name: 'APIError',
+      statusCode: 400,
+      code: 'invalid_payload',
+      message: 'Invalid payload',
+    });
+
+    await expect(apiRequest('https://attacker.invalid/collect', {}, 0)).rejects.toMatchObject({
+      name: 'APIError',
+      statusCode: 403,
+      code: 'invalid_url',
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('retries transient status codes and converts rejected fetches into network errors', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Unavailable',
+        headers: { get: () => 'text/plain' },
+        text: () => Promise.resolve('try again'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: { get: () => 'application/json' },
+        json: () => Promise.resolve({ success: true, data: { ready: true } }),
+      });
+
+    await expect(apiRequest('/v1/items', {}, 1)).resolves.toEqual({ ready: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    fetchMock.mockRejectedValueOnce(new TypeError('connection refused'));
+    await expect(apiRequest('/v1/items', {}, 0)).rejects.toBeInstanceOf(NetworkError);
+  });
+
+  it('serializes API errors and keeps timeout errors distinct', () => {
+    const error = new APIError('Failure', 418, 'teapot', { retry: false });
+    expect(error.toJSON()).toEqual({
+      error: 'Failure', code: 'teapot', details: { retry: false }, statusCode: 418,
+    });
+    expect(new NetworkError().name).toBe('NetworkError');
+    expect(new TimeoutError().name).toBe('TimeoutError');
+    expect(getApiHeaders('user-token', 'request-1')).toMatchObject({
+      Authorization: 'Bearer user-token',
+      'X-Request-Id': 'request-1',
+    });
   });
 });

@@ -96,7 +96,7 @@ describe('walletApi — edge transport NOT configured (read-only/local tiers)', 
       const wallet = await walletApi.getWallet('user-123');
 
       expect(walletDirectMocks.fetchWalletDirect).toHaveBeenCalledWith('user-123');
-      expect(wallet.transactions[0]!.description).toBe(
+      expect(wallet.transactions[0]?.description).toBe(
         '&lt;script&gt;alert(1)&lt;&#x2F;script&gt;',
       );
     });

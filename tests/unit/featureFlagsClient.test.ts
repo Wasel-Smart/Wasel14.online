@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Mock useAuth so the module can be imported without a React context
 vi.mock('@/contexts/AuthContext', () => ({
@@ -6,6 +6,12 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 
 import { isFeatureEnabled, FEATURE_FLAGS } from '@/utils/featureFlags';
+
+function firstFeatureFlagKey() {
+  const firstFlag = FEATURE_FLAGS[0];
+  if (!firstFlag) { throw new Error('Feature flag registry is empty'); }
+  return firstFlag.key;
+}
 
 describe('isFeatureEnabled', () => {
   afterEach(() => {
@@ -21,7 +27,7 @@ describe('isFeatureEnabled', () => {
   });
 
   it('works without window.__WASEL_AUTH__', () => {
-    expect(() => isFeatureEnabled(FEATURE_FLAGS[0].key)).not.toThrow();
+    expect(() => isFeatureEnabled(firstFeatureFlagKey())).not.toThrow();
   });
 
   it('reads userId and role from window.__WASEL_AUTH__ when present', () => {
@@ -29,7 +35,7 @@ describe('isFeatureEnabled', () => {
       userId: 'user-123',
       role: 'admin',
     };
-    expect(() => isFeatureEnabled(FEATURE_FLAGS[0].key)).not.toThrow();
+    expect(() => isFeatureEnabled(firstFeatureFlagKey())).not.toThrow();
   });
 
   it('handles malformed window.__WASEL_AUTH__ gracefully', () => {
@@ -38,7 +44,7 @@ describe('isFeatureEnabled', () => {
       get() { throw new Error('access denied'); },
       configurable: true,
     });
-    expect(() => isFeatureEnabled(FEATURE_FLAGS[0].key)).not.toThrow();
+    expect(() => isFeatureEnabled(firstFeatureFlagKey())).not.toThrow();
     // Restore
     delete (window as unknown as Record<string, unknown>).__WASEL_AUTH__;
   });

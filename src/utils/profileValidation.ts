@@ -24,9 +24,10 @@ export const profileValidationSchemas = {
 
   email: z
     .string()
+    .trim()
     .email('Please enter a valid email address')
     .max(255, 'Email cannot exceed 255 characters')
-    .transform(val => val.toLowerCase().trim()),
+    .transform(val => val.toLowerCase()),
 
   avatar: z.object({
     size: z.number().max(2 * 1024 * 1024, 'Image must be smaller than 2MB'),
@@ -61,7 +62,7 @@ export function normalizePhoneNumber(phone: string): string | null {
   const cleaned = phone.replace(/[\s()-]/g, '');
 
   // Jordan number without country code
-  if (/^(077|078|079)\d{7}$/.test(cleaned)) {
+  if (/^07[789][0-9]{7}$/.test(cleaned)) {
     return `+962${cleaned}`;
   }
 

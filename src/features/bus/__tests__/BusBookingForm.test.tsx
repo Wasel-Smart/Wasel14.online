@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { BusBookingForm } from '../components/BusBookingForm';
-import { setCurrentLang } from '../../../locales/tx';
+import { loadLanguageTranslations, setCurrentLang } from '../../../locales/tx';
 import type { BusRoute } from '../../../services/bus';
 
 const ROUTE: BusRoute = {
@@ -58,7 +58,8 @@ function renderForm(overrides: Partial<Parameters<typeof BusBookingForm>[0]> = {
 }
 
 describe('BusBookingForm schedule-later date', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await loadLanguageTranslations('en');
     setCurrentLang('en');
   });
 
@@ -80,7 +81,8 @@ describe('BusBookingForm schedule-later date', () => {
 });
 
 describe('BusBookingForm localisation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await loadLanguageTranslations('ar');
     setCurrentLang('ar');
   });
 

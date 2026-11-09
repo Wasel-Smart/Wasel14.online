@@ -36,9 +36,12 @@ export function maskCustomerName ( fullName: string ): string {
 
   const parts = fullName.trim().split( /\s+/ );
   if ( parts.length === 1 ) {
-    return parts[ 0 ]!;
+    return parts[ 0 ] ?? 'Customer';
   }
-
-  return `${ parts[ 0 ]! } ${ parts[ parts.length - 1 ]![ 0 ]!.toUpperCase() }.`;
+  const firstName = parts[ 0 ];
+  const lastName = parts.at( -1 );
+  const initial = lastName?.[ 0 ];
+  if ( !firstName || !initial ) { return 'Customer'; }
+  return `${ firstName } ${ initial.toUpperCase() }.`;
 }
 

@@ -75,7 +75,7 @@ function buildWalletPayload(
     total_spent: Number(totalSpent.toFixed(2)),
     total_deposited: Number(totalDeposited.toFixed(2)),
     currency: currencyFromWallet(wallet),
-    pinSet: Boolean((wallet as any)?.pin_set ?? (wallet as any)?.pin_hash),
+    pinSet: Boolean(wallet?.pin_set ?? wallet?.pin_hash),
     autoTopUp: Boolean(wallet?.auto_top_up_enabled),
     transactions: normalizedTransactions,
     activeEscrows: [],

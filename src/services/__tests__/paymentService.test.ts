@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type * as BackendWorkflowModule from '../backendWorkflow';
 
 // ── Hoisted mocks (vi.mock factories are hoisted before const declarations) ──
 
@@ -13,7 +14,7 @@ vi.mock('@/utils/supabase/client', () => ({
 }));
 
 vi.mock('../backendWorkflow', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../backendWorkflow')>();
+  const actual = await importOriginal<typeof BackendWorkflowModule>();
   return { ...actual, requestEdgeJson: vi.fn() };
 });
 

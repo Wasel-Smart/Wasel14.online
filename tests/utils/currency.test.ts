@@ -5,7 +5,7 @@
  * Covers: money(), CurrencyService conversions, formatting, exchange rates
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   money,
   PLATFORM_CURRENCY,
@@ -22,6 +22,20 @@ describe('currency utils', () => {
   beforeEach(() => {
     CurrencyService['_instance'] = null;
   });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    [ 'ar-JO', 'JOD' ],
+    [ 'ar-AE', 'AED' ],
+    [ 'ar-EG', 'EGP' ],
+    [ 'en-GB', 'GBP' ],
+    [ 'en-US', 'USD' ],
+  ] as const)( 'detects %s browser currency', ( language, currency ) => {
+    vi.stubGlobal( 'navigator', { language } );
+    expect( CurrencyService.getInstance().current ).toBe( currency );
+  } );
 
   // ── money() factory ───────────────────────────────────────────────────────────
 

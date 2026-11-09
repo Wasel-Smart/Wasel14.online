@@ -47,8 +47,10 @@ function getClientContext(): EvaluationContext {
   return {};
 }
 
+const EMPTY_USER_METADATA: Record<string, unknown> = Object.freeze({});
+
 function getUserMetadata(user: { user_metadata?: Record<string, unknown> } | null): Record<string, unknown> {
-  return user?.user_metadata ?? {};
+  return user?.user_metadata ?? EMPTY_USER_METADATA;
 }
 
 export function useFeatureFlag(key: FeatureFlagKey): EvaluationResult {
@@ -63,7 +65,7 @@ export function useFeatureFlag(key: FeatureFlagKey): EvaluationResult {
     country: (userMeta.country as string) ?? undefined,
     plan: (userMeta.plan as string) ?? undefined,
     customAttributes: userMeta as Record<string, string>,
-  }), [user, profile]);
+  }), [user, profile, userMeta]);
 
   return useMemo(() => evaluateFeatureFlagWithAudit(key, context, { environment: 'client' }), [key, context]);
 }
@@ -85,7 +87,7 @@ export function useAllFeatureFlags(): Record<FeatureFlagKey, boolean> {
     country: (userMeta.country as string) ?? undefined,
     plan: (userMeta.plan as string) ?? undefined,
     customAttributes: userMeta as Record<string, string>,
-  }), [user, profile]);
+  }), [user, profile, userMeta]);
 
   return useMemo(() => {
     const results = FEATURE_FLAGS.map(flag => evaluateFeatureFlagWithAudit(flag.key, context, { environment: 'client' }));

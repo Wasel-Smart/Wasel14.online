@@ -88,6 +88,47 @@ type BookingSuccessState = {
   ticketCode?: string;
 };
 
+type RideSearchForm = {
+  search: string;
+  from: string;
+  to: string;
+  date: string;
+  searched: boolean;
+};
+
+function parseRideSearchForm(search: string): RideSearchForm {
+  const params = new URLSearchParams(search);
+  const fromParam = params.get('from') ?? '';
+  const toParam = params.get('to') ?? '';
+  return {
+    search,
+    from: CITIES.includes(fromParam) ? fromParam : 'Amman',
+    to: CITIES.includes(toParam) ? toParam : 'Aqaba',
+    date: params.get('date') ?? '',
+    searched: params.get('search') === '1',
+  };
+}
+
+function useRideSearchForm(search: string) {
+  const [storedForm, setStoredForm] = useState(() => parseRideSearchForm(search));
+  const form = storedForm.search === search ? storedForm : parseRideSearchForm(search);
+  const updateForm = useCallback((patch: Partial<RideSearchForm>) => {
+    setStoredForm(previous => ({
+      ...(previous.search === search ? previous : parseRideSearchForm(search)),
+      ...patch,
+      search,
+    }));
+  }, [search]);
+
+  return {
+    ...form,
+    setFrom: (from: string) => updateForm({ from }),
+    setTo: (to: string) => updateForm({ to }),
+    setDate: (date: string) => updateForm({ date }),
+    setSearched: (searched: boolean) => updateForm({ searched }),
+  };
+}
+
 export function FindRidePage() {
   const nav = useIframeSafeNavigate();
   const location = useLocation();
@@ -95,17 +136,12 @@ export function FindRidePage() {
   const { language } = useLanguage();
   const ar = language === 'ar';
   const { notifyTripConfirmed, requestPermission, permission } = usePushNotifications();
-  const { initialFrom, initialTo, initialDate, initialSearched } = parseFindRideParams(
-    location.search,
-  );
+  const searchForm = useRideSearchForm(location.search);
   const t = createFindRideCopy(ar);
   const copy = getFindRideStaticCopy(ar);
 
   const [tab, setTab] = useState<'ride' | 'package'>('ride');
-  const [from, setFrom] = useState(initialFrom);
-  const [to, setTo] = useState(initialTo);
-  const [date, setDate] = useState(initialDate);
-  const [searched, setSearched] = useState(initialSearched);
+  const { from, to, date, searched, setFrom, setTo, setDate, setSearched } = searchForm;
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [selected, setSelected] = useState<Ride | null>(null);
   const [bookingInFlightId, setBookingInFlightId] = useState<string | null>(null);
@@ -134,7 +170,7 @@ export function FindRidePage() {
   const featuredSignals = routeIntelligence.featuredSignals.slice(0, 4);
   const recurringSuggestions = useMemo(
     () => getRecurringRouteSuggestions(3),
-    [routeIntelligence.updatedAt],
+    [],
   );
   const bookingByRideId = useMemo(() => {
     const next = new Map<string, RideBookingRecord>();
@@ -163,7 +199,7 @@ export function FindRidePage() {
       lookup.set(`${signal.to}::${signal.from}`, signal);
     }
     return lookup;
-  }, [routeIntelligence.updatedAt]);
+  }, [routeIntelligence.allSignals]);
   const demandStats = getDemandStats();
 
   const searchFromCoord = resolveCityCoord(from);
@@ -212,9 +248,12 @@ export function FindRidePage() {
       })
       : null);
 
-  const resolveSignalForRoute = (routeFrom: string, routeTo: string) =>
-    signalLookup.get(`${routeFrom}::${routeTo}`) ??
-    getLiveCorridorSignal(routeFrom, routeTo, routeIntelligence.membership);
+  const resolveSignalForRoute = useCallback(
+    (routeFrom: string, routeTo: string) =>
+      signalLookup.get(`${routeFrom}::${routeTo}`) ??
+      getLiveCorridorSignal(routeFrom, routeTo, routeIntelligence.membership),
+    [routeIntelligence.membership, signalLookup],
+  );
   const openMyTrips = useCallback(() => nav('/app/my-trips?tab=rides'), [nav]);
   const selectedBooking = selected ? (bookingByRideId.get(selected.id) ?? null) : null;
   const getRideBookingStatus = useCallback((rideId: string): 'pending_driver' | 'confirmed' | null => {
@@ -242,23 +281,11 @@ export function FindRidePage() {
     void syncRouteReminders(user ?? undefined).then(delivered => {
       if (delivered.length > 0) {refresh();}
     });
-  }, [routeIntelligence.updatedAt, user?.email, user?.phone]);
+  }, [routeIntelligence.updatedAt, user]);
 
   useEffect(() => {
     writeStoredStringList(RIDE_SEARCHES_KEY, recentSearches);
   }, [recentSearches]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const nextFrom = CITIES.includes(params.get('from') ?? '') ? (params.get('from') as string) : 'Amman';
-    const nextTo = CITIES.includes(params.get('to') ?? '') ? (params.get('to') as string) : 'Aqaba';
-    const nextDate = params.get('date') ?? '';
-    const nextSearched = params.get('search') === '1';
-    setFrom(nextFrom);
-    setTo(nextTo);
-    setDate(nextDate);
-    setSearched(nextSearched);
-  }, [location.search]);
 
   const handleSearch = () => {
     if (from === to) {
@@ -308,30 +335,38 @@ export function FindRidePage() {
         driverName: ride.driver.name,
       },
     });
-  }, [routeIntelligence.membership, user?.id]);
+  }, [resolveSignalForRoute, routeIntelligence.membership, user?.id]);
 
-  const handleBook = useCallback(async (ride: Ride) => {
-    if (bookingInFlightId) {return;}
+  const showExistingBooking = useCallback((ride: Ride) => {
     const existingBooking = bookingByRideId.get(ride.id);
-    if (existingBooking) {
-      setBookingMessage(
-        existingBooking.status === 'pending_driver'
-          ? `${ride.from} to ${ride.to} is already waiting for driver confirmation in My Trips.`
-          : `${ride.from} to ${ride.to} is already confirmed in My Trips.`,
-      );
-      openMyTrips();
-      return;
-    }
+    if (!existingBooking) { return false; }
+    setBookingMessage(
+      existingBooking.status === 'pending_driver'
+        ? `${ride.from} to ${ride.to} is already waiting for driver confirmation in My Trips.`
+        : `${ride.from} to ${ride.to} is already confirmed in My Trips.`,
+    );
+    openMyTrips();
+    return true;
+  }, [bookingByRideId, openMyTrips]);
 
+  const verifyBookingEligibility = useCallback((ride: Ride) => {
     if (!user) {
       nav('/app/auth');
-      return;
+      return null;
     }
     if (ride.seatsAvailable <= 0) {
       setBookingMessage(t.rideFullMessage(ride.from, ride.to, t.openBusFallback));
       setSelected(null);
-      return;
+      return null;
     }
+    return user;
+  }, [nav, t, user]);
+
+  const handleBook = useCallback(async (ride: Ride) => {
+    if (bookingInFlightId) {return;}
+    if (showExistingBooking(ride)) { return; }
+    const bookingUser = verifyBookingEligibility(ride);
+    if (!bookingUser) { return; }
 
     const rideSignal = resolveSignalForRoute(ride.from, ride.to);
     const ridePriceQuote = getMovementPriceQuote({
@@ -348,13 +383,13 @@ export function FindRidePage() {
       const booking = await createRideBooking({
         rideId: ride.id,
         ownerId: ride.ownerId,
-        passengerId: user.id,
+        passengerId: bookingUser.id,
         from: ride.from,
         to: ride.to,
         date: ride.date,
         time: ride.time,
         driverName: ride.driver.name,
-        passengerName: user.name,
+        passengerName: bookingUser.name,
         seatsRequested: 1,
         pricePerSeatJod: finalPrice,
         routeMode: ride.routeMode === 'live_post' ? 'live_post' : 'network_inventory',
@@ -377,7 +412,7 @@ export function FindRidePage() {
 
       if (booking.status === 'confirmed') {
         try {
-          await walletApi.pay(user.id, finalPrice, 'ride_booking', {
+          await walletApi.pay(bookingUser.id, finalPrice, 'ride_booking', {
             referenceId: booking.id,
             metadata: { rideId: ride.id, from: ride.from, to: ride.to, seats: 1 },
           });
@@ -391,7 +426,7 @@ export function FindRidePage() {
         }
       } else {
         walletApi
-          .pay(user.id, finalPrice, 'ride_booking', {
+          .pay(bookingUser.id, finalPrice, 'ride_booking', {
             referenceId: booking.id,
             metadata: { rideId: ride.id, from: ride.from, to: ride.to, seats: 1 },
           })
@@ -437,7 +472,7 @@ export function FindRidePage() {
     } finally {
       setBookingInFlightId(null);
     }
-  }, [bookingInFlightId, bookingByRideId, nav, openMyTrips, t, ar, user, routeIntelligence.membership, corridorPlan, permission, requestPermission, notifyTripConfirmed]);
+  }, [bookingInFlightId, showExistingBooking, verifyBookingEligibility, t, ar, resolveSignalForRoute, routeIntelligence.membership, corridorPlan, permission, requestPermission, notifyTripConfirmed]);
 
   const handleDemandCapture = () => {
     const alert = createDemandAlert({
@@ -1573,7 +1608,7 @@ export function FindRidePage() {
             signal={resolveSignalForRoute(selected.from, selected.to)}
             isBooking={bookingInFlightId === selected.id}
             onClose={() => setSelected(null)}
-            onBook={() => handleBook(selected)}
+            onBook={() => { void handleBook(selected); }}
             onOpenBooking={openMyTrips}
           />
         )}

@@ -13,13 +13,15 @@ const { mockInstance } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@microsoft/applicationinsights-web', () => {
-  return {
-    ApplicationInsights: vi.fn(function MockApplicationInsights() { return mockInstance; }),
+vi.mock('@microsoft/applicationinsights-web', () => ({
+    ApplicationInsights: vi.fn(class MockApplicationInsights {
+      constructor() {
+        Object.assign(this, mockInstance);
+      }
+    }),
     DistributedTracingModes: { AI: 'AI' },
     __mockInstance: mockInstance,
-  };
-});
+}));
 
 vi.mock('web-vitals', () => ({
   onCLS: vi.fn(),

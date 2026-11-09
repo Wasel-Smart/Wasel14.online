@@ -16,6 +16,12 @@ Local variable names requiring immediate provider-side review:
 
 Remote stores including Vercel, Supabase, Google Cloud, Meta, Stripe, Twilio, CliQ, Resend, SendGrid, AWS, Sentry, database, and Redis were not inspected. Their status is unknown. See docs/CREDENTIAL_ROTATION_RUNBOOK.md and run npm run credentials:inventory; the inventory command never prints values.
 
+The 2026-11-09 Google Cloud access check found two active, non-expiring user-managed keys on the historical `fb-service-account` in project `wasel-planning-with-ai`. The authenticated account has Viewer access only, so neither key was revoked. Complete revocation with a Google Cloud IAM administrator or an operator granted `roles/iam.serviceAccountKeyAdmin`; details and safe follow-up steps are in the runbook. Credential rotation remains unverified.
+
+## Browser Session and XSS Boundary
+
+The browser client in `src/utils/supabase/client.ts` persists the Supabase session in a browser cookie through `@supabase/ssr`'s browser client. JavaScript can access this client-managed session; it is not an `HttpOnly` server-issued session. `HttpOnly` cannot be applied by browser JavaScript. The production CSP in `vercel.json` restricts script sources and omits `unsafe-inline`/`unsafe-eval` from `script-src`; React escapes normal text rendering, and JSON-LD passes through an escaping serializer. Search before adding any HTML sink, and sanitize any unavoidable untrusted HTML. Moving the session to an `HttpOnly` cookie requires a server-side auth/BFF flow that owns cookie creation and refresh; this repository currently has no such flow, so that architectural risk remains open.
+
 ## Required Environment Variables
 
 Before running the app locally or deploying to production, ensure these variables are set.

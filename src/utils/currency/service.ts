@@ -9,6 +9,24 @@ export function money(amount: number, currency: SupportedCurrency = PLATFORM_CUR
 // ─── Currency service ─────────────────────────────────────────────────────────
 
 const STORAGE_KEY = import.meta.env.VITE_CURRENCY_STORAGE_KEY || 'wasel-preferred-currency';
+const LOCALE_CURRENCY_PREFIXES = [
+  [ 'ar-ae', 'AED' ],
+  [ 'ar-sa', 'SAR' ],
+  [ 'ar-eg', 'EGP' ],
+  [ 'ar-kw', 'KWD' ],
+  [ 'ar-bh', 'BHD' ],
+  [ 'ar-qa', 'QAR' ],
+  [ 'ar-om', 'OMR' ],
+  [ 'ar-ma', 'MAD' ],
+  [ 'ar-tn', 'TND' ],
+  [ 'ar-iq', 'IQD' ],
+  [ 'ar-jo', 'JOD' ],
+  [ 'en-gb', 'GBP' ],
+  [ 'de', 'EUR' ],
+  [ 'fr', 'EUR' ],
+  [ 'ar', 'JOD' ],
+  [ 'en', 'USD' ],
+] as const satisfies readonly ( readonly [ string, SupportedCurrency ] )[];
 
 export class CurrencyService {
   private static _instance: CurrencyService | null = null;
@@ -45,24 +63,8 @@ export class CurrencyService {
       // localStorage unavailable (SSR / private mode)
     }
 
-    // Infer from browser locale — Jordan is primary, so JOD first.
     const lang = typeof navigator === 'undefined' ? 'ar-jo' : navigator.language.toLowerCase();
-    if (lang.startsWith('ar-jo') || lang.startsWith('ar')) {return 'JOD';}
-    if (lang.startsWith('en-gb')) {return 'GBP';}
-    if (lang.startsWith('ar-ae')) {return 'AED';}
-    if (lang.startsWith('ar-sa')) {return 'SAR';}
-    if (lang.startsWith('ar-eg')) {return 'EGP';}
-    if (lang.startsWith('ar-kw')) {return 'KWD';}
-    if (lang.startsWith('ar-bh')) {return 'BHD';}
-    if (lang.startsWith('ar-qa')) {return 'QAR';}
-    if (lang.startsWith('ar-om')) {return 'OMR';}
-    if (lang.startsWith('ar-ma')) {return 'MAD';}
-    if (lang.startsWith('ar-tn')) {return 'TND';}
-    if (lang.startsWith('ar-iq')) {return 'IQD';}
-    if (lang.startsWith('de') || lang.startsWith('fr')) {return 'EUR';}
-    if (lang.startsWith('en')) {return 'USD';}
-
-    return PLATFORM_CURRENCY;
+    return LOCALE_CURRENCY_PREFIXES.find( ( [ prefix ] ) => lang.startsWith( prefix ) )?.[ 1 ] ?? PLATFORM_CURRENCY;
   }
 
   // ── Getters / setters ─────────────────────────────────────────────────────

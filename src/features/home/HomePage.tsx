@@ -164,8 +164,9 @@ function useCookieConsent ( language: Language, setLanguage: ( lang: Language ) 
         banner.querySelectorAll<HTMLElement>( 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])' )
       );
       if ( focusable.length === 0 ) { return; }
-      const first = focusable[ 0 ]!;
-      const last = focusable[ focusable.length - 1 ]!;
+      const first = focusable.at( 0 );
+      const last = focusable.at( -1 );
+      if ( !first || !last ) { return; }
       if ( e.shiftKey ) {
         if ( document.activeElement === first ) {
           e.preventDefault();
@@ -349,11 +350,13 @@ function useHomeQuickActions ( role: string | undefined, t: ( key: string ) => s
       },
     ];
 
+    const [ first, second, third, fourth, fifth ] = base;
+    if ( !first || !second || !third || !fourth || !fifth ) { return base; }
     if ( role === 'driver' || role === 'both' ) {
-      return [ base[ 1 ]!, base[ 0 ]!, base[ 2 ]!, base[ 3 ]!, base[ 4 ]! ];
+      return [ second, first, third, fourth, fifth ];
     }
     if ( role === 'admin' ) {
-      return [ base[ 0 ]!, base[ 2 ]!, base[ 1 ]!, base[ 3 ]!, base[ 4 ]! ];
+      return [ first, third, second, fourth, fifth ];
     }
     return base;
   }, [ role, t ] );
@@ -361,7 +364,7 @@ function useHomeQuickActions ( role: string | undefined, t: ( key: string ) => s
 
 function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string ) => string ) {
   const [ liveCorridors, setLiveCorridors ] = useState<LiveCorridor[]>( [] );
-  const [ corridorsLoading, setCorridorsLoading ] = useState( true );
+  const [ corridorsLoading, setCorridorsLoading ] = useState( Boolean( API_URL ) );
 
   useEffect( () => {
     let cancelled = false;
@@ -387,8 +390,6 @@ function useCorridorCards ( ar: boolean, svc: CurrencyService, t: ( key: string 
 
     if ( API_URL ) {
       void loadCorridors();
-    } else {
-      setCorridorsLoading( false );
     }
 
     return () => {
@@ -455,6 +456,65 @@ function useHeroTickerItems ( corridorCards: CorridorCard[] ): HeroTickerItem[] 
   );
 }
 
+type HomePageAudienceSectionsProps = {
+  placement: 'before-actions' | 'after-actions' | 'closing';
+  user: ReturnType<typeof useAuth>['user'];
+  role: NonNullable<ReturnType<typeof useAuth>['waselUser']>['role'] | undefined;
+  waselUser: ReturnType<typeof useAuth>['waselUser'];
+  languageIsArabic: boolean;
+  liveStats: ReturnType<typeof useLiveUserStats>['stats'];
+  loading: boolean;
+  formatCurrency: (amount: number) => string;
+  trustScore: number | null;
+  t: ReturnType<typeof useLanguage>['t'];
+  onNavigate: (path: string, source?: string) => void;
+};
+
+function HomePageAudienceSections ( props: HomePageAudienceSectionsProps ) {
+  const {
+    placement,
+    user,
+    role,
+    waselUser,
+    languageIsArabic,
+    liveStats,
+    loading,
+    formatCurrency,
+    trustScore,
+    t,
+    onNavigate,
+  } = props;
+
+  if ( placement === 'before-actions' ) {
+    return <>
+      { !user && <ProofSection ar={ languageIsArabic } onNavigate={ onNavigate } /> }
+      { user && <ActiveTripsBanner onNavigate={ onNavigate } /> }
+      { user && role && <RoleBanner role={ role } t={ t } /> }
+    </>;
+  }
+  if ( placement === 'after-actions' ) {
+    return !user ? <OnboardingDemoSection ar={ languageIsArabic } onNavigate={ onNavigate } /> : null;
+  }
+  return <>
+    { !user && <FinalCtaBanner ar={ languageIsArabic } onNavigate={ onNavigate } /> }
+    { user && (
+      <SignedInUtilitySection
+        ar={ languageIsArabic }
+        loading={ loading }
+        walletBalance={ formatCurrency( liveStats?.walletBalance ?? 0 ) }
+        trustScore={ trustScore }
+        user={ waselUser ? {
+          emailVerified: waselUser.emailVerified,
+          phoneVerified: waselUser.phoneVerified,
+          verified: waselUser.verified,
+          trips: waselUser.trips,
+          rating: waselUser.rating,
+        } : undefined }
+      />
+    ) }
+  </>;
+}
+
 export function HomePage () {
   const { language, dir, setLanguage, t } = useLanguage();
   const { user, waselUser } = useAuth();
@@ -501,6 +561,19 @@ export function HomePage () {
     navigate( path );
   };
 
+  const audienceSectionProps = {
+    user,
+    role,
+    waselUser,
+    languageIsArabic: ar,
+    liveStats,
+    loading,
+    formatCurrency: ( amount: number ) => svc.formatFromJOD( amount ),
+    trustScore,
+    t,
+    onNavigate: handleNavigate,
+  };
+
   return (
     <WaselErrorBoundary>
       <div className="wasel-home-shell" dir={ dir } style={ { color: C.text, fontFamily: F } }>
@@ -535,15 +608,11 @@ export function HomePage () {
 
           <CoverageSection ar={ ar } onNavigate={ handleNavigate } />
 
-          { !user && <ProofSection ar={ ar } onNavigate={ handleNavigate } /> }
-
-          { user && <ActiveTripsBanner onNavigate={ handleNavigate } /> }
-
-          { user && role && <RoleBanner role={ role } t={ t } /> }
+          <HomePageAudienceSections { ...audienceSectionProps } placement="before-actions" />
 
           <QuickActionsSection quickActions={ quickActions } onNavigate={ handleNavigate } />
 
-          { !user && <OnboardingDemoSection ar={ ar } onNavigate={ handleNavigate } /> }
+          <HomePageAudienceSections { ...audienceSectionProps } placement="after-actions" />
 
           <CorridorBetaFocusSection ar={ ar } plan={ corridorBetaPlan } onNavigate={ handleNavigate } />
 
@@ -554,6 +623,8 @@ export function HomePage () {
           </Suspense>
 
           <TrustPagesSection ar={ ar } onNavigate={ handleNavigate } />
+
+          <HomePageAudienceSections { ...audienceSectionProps } placement="closing" />
 
           <LandingSections ar={ ar } onNavigate={ handleNavigate } />
 
@@ -569,27 +640,6 @@ export function HomePage () {
                HowItWorksSection / StatsStrip were removed earlier for restating
                OnboardingDemoSection / ProofSection. FinalCtaBanner's second button
                is "Register", so it stays scoped to !user. */ }
-          { !user && <FinalCtaBanner ar={ ar } onNavigate={ handleNavigate } /> }
-
-          { user ? (
-            <SignedInUtilitySection
-              ar={ ar }
-              loading={ loading }
-              walletBalance={ svc.formatFromJOD( liveStats?.walletBalance ?? 0 ) }
-              trustScore={ trustScore }
-              user={
-                waselUser
-                  ? {
-                    emailVerified: waselUser.emailVerified,
-                    phoneVerified: waselUser.phoneVerified,
-                    verified: waselUser.verified,
-                    trips: waselUser.trips,
-                    rating: waselUser.rating,
-                  }
-                  : undefined
-              }
-            />
-          ) : null }
         </main>
       </div>
     </WaselErrorBoundary>

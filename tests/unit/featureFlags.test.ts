@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   evaluateFeatureFlag,
   evaluateFeatureFlagWithAudit,
@@ -31,7 +31,9 @@ describe('featureFlags/core', () => {
 
   describe('evaluateFeatureFlag', () => {
     it('returns a result with enabled and flag properties', () => {
-      const key = FEATURE_FLAGS[0].key as FeatureFlagKey;
+      const firstFlag = FEATURE_FLAGS[0];
+      if (!firstFlag) { throw new Error('Feature flag registry is empty'); }
+      const key = firstFlag.key as FeatureFlagKey;
       const result = evaluateFeatureFlag(key, {});
       expect(result).toHaveProperty('enabled');
       expect(result).toHaveProperty('flag');
@@ -57,8 +59,10 @@ describe('featureFlags/core', () => {
 
   describe('evaluateFeatureFlagWithAudit', () => {
     it('returns result with audit metadata', () => {
-      const key = FEATURE_FLAGS[0].key as FeatureFlagKey;
-      const result = evaluateFeatureFlagWithAudit(key, {}, { environment: 'test' });
+      const firstFlag = FEATURE_FLAGS[0];
+      if (!firstFlag) { throw new Error('Feature flag registry is empty'); }
+      const key = firstFlag.key as FeatureFlagKey;
+      const result = evaluateFeatureFlagWithAudit(key, {}, { environment: 'client' });
       expect(result).toHaveProperty('enabled');
       expect(result).toHaveProperty('flag');
     });
@@ -69,7 +73,7 @@ describe('featureFlags/core', () => {
           evaluateFeatureFlagWithAudit(
             flag.key as FeatureFlagKey,
             { role: 'admin', userId: 'admin-1' },
-            { environment: 'test' },
+            { environment: 'client' },
           ),
         ).not.toThrow();
       }
@@ -78,7 +82,7 @@ describe('featureFlags/core', () => {
     it('does not throw for unauthenticated context', () => {
       for (const flag of FEATURE_FLAGS) {
         expect(() =>
-          evaluateFeatureFlagWithAudit(flag.key as FeatureFlagKey, {}, { environment: 'test' }),
+          evaluateFeatureFlagWithAudit(flag.key as FeatureFlagKey, {}, { environment: 'client' }),
         ).not.toThrow();
       }
     });

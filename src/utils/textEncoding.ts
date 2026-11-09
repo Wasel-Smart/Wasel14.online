@@ -33,33 +33,13 @@ function getUtf8Decoder() {
 function getWindows1252ByteByChar() {
   if (!windows1252ByteByChar) {
     windows1252ByteByChar = new Map<string, number>([
-      ['â‚¬', 0x80],
-      ['â€š', 0x82],
-      ['Æ’', 0x83],
-      ['â€ž', 0x84],
-      ['â€¦', 0x85],
-      ['â€ ', 0x86],
-      ['â€¡', 0x87],
-      ['Ë†', 0x88],
-      ['â€°', 0x89],
-      ['Å ', 0x8a],
-      ['â€¹', 0x8b],
-      ['Å’', 0x8c],
-      ['Å½', 0x8e],
-      ['â€˜', 0x91],
-      ['â€™', 0x92],
-      ['â€œ', 0x93],
-      ['â€', 0x94],
-      ['â€¢', 0x95],
-      ['â€“', 0x96],
-      ['â€”', 0x97],
-      ['Ëœ', 0x98],
-      ['â„¢', 0x99],
-      ['Å¡', 0x9a],
-      ['â€º', 0x9b],
-      ['Å“', 0x9c],
-      ['Å¾', 0x9e],
-      ['Å¸', 0x9f],
+      ['\u20AC', 0x80], ['\u201A', 0x82], ['\u0192', 0x83], ['\u201E', 0x84],
+      ['\u2026', 0x85], ['\u2020', 0x86], ['\u2021', 0x87], ['\u02C6', 0x88],
+      ['\u2030', 0x89], ['\u0160', 0x8a], ['\u2039', 0x8b], ['\u0152', 0x8c],
+      ['\u017D', 0x8e], ['\u2018', 0x91], ['\u2019', 0x92], ['\u201C', 0x93],
+      ['\u201D', 0x94], ['\u2022', 0x95], ['\u2013', 0x96], ['\u2014', 0x97],
+      ['\u02DC', 0x98], ['\u2122', 0x99], ['\u0161', 0x9a], ['\u203A', 0x9b],
+      ['\u0153', 0x9c], ['\u017E', 0x9e], ['\u0178', 0x9f],
     ]);
   }
 
@@ -68,7 +48,11 @@ function getWindows1252ByteByChar() {
 
 function getMojibakePattern() {
   if (!mojibakePattern) {
-    mojibakePattern = new RegExp(getSuspiciousTokens().map(escapeForRegex).join('|'), 'u');
+    const knownTokens = getSuspiciousTokens().map(escapeForRegex);
+    mojibakePattern = new RegExp(
+      [...knownTokens, 'Ã[\\u0080-\\u00BF]', 'Â[\\u0080-\\u00BF]'].join('|'),
+      'u',
+    );
   }
 
   return mojibakePattern;

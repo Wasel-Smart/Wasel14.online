@@ -12,22 +12,12 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export function PWAInstallPrompt() {
-  const [state, setState] = useState<InstallPromptState>('idle');
+  const [isStandalone] = useState(() => typeof window !== 'undefined' && (
+    (typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches) ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  ));
+  const [state, setState] = useState<InstallPromptState>(isStandalone ? 'installed' : 'idle');
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {return;}
-
-    const isStandaloneMode =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-
-    setIsStandalone(isStandaloneMode);
-    if (isStandaloneMode) {
-      setState('installed');
-    }
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {return;}
@@ -38,16 +28,17 @@ export function PWAInstallPrompt() {
       setDeferredPrompt(promptEvent);
       setState('available');
     };
-
-    window.addEventListener('beforeinstallprompt', handler);
-    window.addEventListener('appinstalled', () => {
+    const onAppInstalled = () => {
       setState('installed');
       setDeferredPrompt(null);
-    });
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', onAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
-      window.removeEventListener('appinstalled', () => {});
+      window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
 
@@ -103,6 +94,11 @@ export function PWAInstallPrompt() {
     return null;
   }
 
+  return <PWAInstallPromptCard onDismiss={ handleDismiss } onInstall={() => { void handleInstall(); }} />;
+}
+
+function PWAInstallPromptCard ( props: { onDismiss: () => void; onInstall: () => void } ) {
+  const { onDismiss, onInstall } = props;
   return (
     <div
       style={{
@@ -172,7 +168,7 @@ export function PWAInstallPrompt() {
           <WaselButton
             variant="ghost"
             size="sm"
-            onClick={handleDismiss}
+            onClick={onDismiss}
             aria-label={tx('pWAInstallPrompt.dismiss_install_prompt')}
             style={{
               minWidth: 36,
@@ -186,7 +182,7 @@ export function PWAInstallPrompt() {
           </WaselButton>
           <WaselButton
             size="sm"
-            onClick={() => handleInstall()}
+            onClick={() => { onInstall(); }}
             aria-label={tx('pWAInstallPrompt.install_wasel_app')}
             style={{
               minHeight: 36,

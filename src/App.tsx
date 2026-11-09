@@ -12,6 +12,8 @@ import { C, F } from './utils/wasel-ds';
 
 import { validateRuntimeConfiguration } from './utils/env';
 import { DEFAULT_QUERY_OPTIONS } from './utils/performance/cacheStrategy';
+import * as monitoring from './utils/monitoring';
+import { warmUpServer } from './services/core';
 import { waselRouter } from './router';
 
 function scheduleWhenIdle(callback: () => void): () => void {
@@ -95,12 +97,8 @@ function AppRuntimeCoordinator() {
             if (cancelled) {return;}
 
             try {
-              void Promise.all([
-                import('./utils/monitoring'),
-                import('./services/core'),
-                import('./platform/event-bus'),
-              ])
-                .then(([monitoring, backend, events]) => {
+              void import('./platform/event-bus')
+                .then(events => {
                   if (cancelled) {return;}
 
                   void monitoring.initSentry();
@@ -112,7 +110,7 @@ function AppRuntimeCoordinator() {
                     }
                   });
 
-                  void backend.warmUpServer().catch(error => {
+                  void warmUpServer().catch(error => {
                     if (import.meta.env.DEV) {
                       console.warn('[Runtime backend warmup failed]', error);
                     }

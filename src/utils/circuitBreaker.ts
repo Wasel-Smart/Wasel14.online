@@ -186,10 +186,11 @@ class CircuitBreakerRegistry {
    * Get or create a circuit breaker
    */
   get(name: string, config?: Partial<CircuitBreakerConfig>): CircuitBreaker {
-    if (!this.breakers.has(name)) {
-      this.breakers.set(name, new CircuitBreaker(name, config));
-    }
-    return this.breakers.get(name)!;
+    const existingBreaker = this.breakers.get(name);
+    if (existingBreaker) { return existingBreaker; }
+    const breaker = new CircuitBreaker(name, config);
+    this.breakers.set(name, breaker);
+    return breaker;
   }
 
   /**

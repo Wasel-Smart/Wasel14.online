@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type * as CoreModule from '../core';
+import type * as BackendWorkflowModule from '../backendWorkflow';
 
 // â”€â”€ Hoisted mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -20,18 +22,18 @@ vi.mock('@/utils/supabase/client', () => ({
 }));
 
 vi.mock('../core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../core')>();
+  const actual = await importOriginal<typeof CoreModule>();
   return { ...actual, getAuthDetails: vi.fn().mockResolvedValue({ token: 'tok', userId: 'user-1' }) };
 });
 
 vi.mock('../backendWorkflow', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../backendWorkflow')>();
+  const actual = await importOriginal<typeof BackendWorkflowModule>();
   return {
     ...actual,
     requestEdgeJson: vi.fn(),
     hasConfiguredEdgeTransport: vi.fn(() => false),
     runBackendWorkflow: vi.fn(async ({ fallback }: { fallback?: (ctx: object) => Promise<unknown> }) => {
-      if (fallback) return fallback({});
+      if (fallback) {return fallback({});}
       throw new Error('no fallback');
     }),
   };
@@ -77,7 +79,10 @@ describe('redactAuthErrorText', () => {
 
   it('strips control characters', () => {
     const out = redactAuthErrorText('bad\x00char\x1fhere');
-    expect(out).not.toMatch(/[\x00-\x1f]/);
+    expect([...out].some(character => {
+      const code = character.charCodeAt(0);
+      return code < 0x20 || code === 0x7f;
+    })).toBe(false);
   });
 
   it('truncates to 200 characters', () => {

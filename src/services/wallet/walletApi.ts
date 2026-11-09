@@ -204,12 +204,11 @@ export const walletApi = {
     return runSecureWalletOperation(() => { throw new Error('Withdrawals are temporarily unavailable until a payout provider is configured.'); });
   },
 
-  async sendMoney(userId: string, recipientId: string, amount: number, optsOrNote?: { note?: string; pin?: string } | string, maybePin?: string) {
+  async sendMoney(userId: string, recipientId: string, amount: number, optsOrNote?: { note?: string; pin?: string } | string) {
     let note: string | undefined;
     let pin: string | undefined;
     if (typeof optsOrNote === 'string') {
       note = optsOrNote;
-      pin = maybePin;
     } else if (optsOrNote && typeof optsOrNote === 'object') {
       note = optsOrNote.note;
       pin = optsOrNote.pin;

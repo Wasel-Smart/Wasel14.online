@@ -47,6 +47,13 @@ describe('CSP', () => {
   it('CSP_DIRECTIVES has frame-ancestors none', () => {
     expect(CSP_DIRECTIVES['frame-ancestors']).toContain("'none'");
   });
+
+  it('production script policy excludes inline and evaluated scripts', () => {
+    const scriptPolicy = CSP_DIRECTIVES['script-src'].join(' ');
+    expect(scriptPolicy).not.toContain("'unsafe-inline'");
+    expect(scriptPolicy).not.toContain("'unsafe-eval'");
+    expect(scriptPolicy).toContain("'self'");
+  });
 });
 
 describe('checkRateLimit', () => {

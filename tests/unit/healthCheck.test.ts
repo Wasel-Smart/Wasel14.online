@@ -64,7 +64,7 @@ describe('performHealthCheck', () => {
 
   it('forces fresh check when force=true', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    const first = await performHealthCheck(true);
+    await performHealthCheck(true);
     await new Promise(r => setTimeout(r, 5));
     const second = await performHealthCheck(true);
     // Timestamps may differ since forced
@@ -112,12 +112,11 @@ describe('verifyBackendConnection', () => {
     expect(result.message).toBeTruthy();
   });
 
-  it('handles thrown errors gracefully', async () => {
-    vi.spyOn(await import('@/utils/healthCheck'), 'performHealthCheck').mockRejectedValueOnce(
-      new Error('unexpected'),
-    );
+  it('returns a generic failure message when health checking is unavailable', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('network unavailable'));
     const result = await verifyBackendConnection();
     expect(result.connected).toBe(false);
+    expect(result.message).toBeTruthy();
   });
 });
 

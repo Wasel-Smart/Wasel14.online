@@ -470,7 +470,7 @@ if ( environmentIsValid ) {
     document.documentElement.classList.add( 'pwa-standalone' );
   }
 
-  type ServiceWorkerMessage = { type: 'NAVIGATE'; url: string } | { type: 'BACKGROUND_SYNC' } | { type: 'SW_UPDATED' }; // eslint-disable-line @typescript-eslint/consistent-type-imports
+  type ServiceWorkerMessage = { type: 'NAVIGATE'; url: string } | { type: 'BACKGROUND_SYNC' } | { type: 'SW_UPDATED' };
 
   const handleServiceWorkerMessage = ( event: MessageEvent<ServiceWorkerMessage> ) => {
     const message = event.data;

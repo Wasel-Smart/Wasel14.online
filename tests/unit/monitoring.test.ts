@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type * as MonitoringModule from '../../src/utils/monitoring';
 
 // Mock Sentry before importing monitoring
 vi.mock('@sentry/react', () => ({
@@ -10,7 +11,7 @@ vi.mock('@sentry/react', () => ({
 }));
 
 // Reset module state between tests
-let monitoring: typeof import('../../src/utils/monitoring');
+let monitoring: typeof MonitoringModule;
 
 describe('monitoring', () => {
   beforeEach(async () => {
@@ -98,13 +99,11 @@ describe('monitoring', () => {
       expect(() =>
         monitoring.trackDomainEvent({
           id: 'evt-1',
-          type: 'rides.requested',
+          type: 'RideRequested',
           traceId: 'trace-1',
           producer: 'ride-matching-service',
-          timestamp: new Date().toISOString(),
+          occurredAt: new Date().toISOString(),
           payload: {} as never,
-          version: '1',
-          correlationId: 'corr-1',
         }),
       ).not.toThrow();
     });

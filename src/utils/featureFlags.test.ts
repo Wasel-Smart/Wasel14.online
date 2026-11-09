@@ -169,8 +169,8 @@ describe('Feature Flags — Core Logic', () => {
       for (let i = 0; i < 1000; i++) {
         const context = { ...driverContext, userId: `user-${i}` };
         const result = evaluateFeatureFlag('syntheticTrips', context);
-        if (result.reason === 'rollout') {
-          buckets.add(result.rolloutBucket!);
+        if (result.reason === 'rollout' && result.rolloutBucket !== undefined) {
+          buckets.add(result.rolloutBucket);
           if (result.enabled) {
             enabledCount++;
           }

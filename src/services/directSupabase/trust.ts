@@ -10,7 +10,7 @@ function isDriverRole ( role?: string | null ): boolean {
 function generateOtpCode (): string {
   const buf = new Uint32Array( 1 );
   crypto.getRandomValues( buf );
-  return String( 100000 + ( buf[ 0 ]! % 900000 ) );
+  return String( 100000 + ( ( buf[ 0 ] ?? 0 ) % 900000 ) );
 }
 
 async function hashOtpCode ( code: string ): Promise<string> {

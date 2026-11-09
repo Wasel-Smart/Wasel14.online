@@ -13,6 +13,12 @@
 | Git history | Prior commits reference `docs/wasel-planning-with-ai.json` | Treat its Google service-account key as compromised until Google Cloud confirms the key is disabled or deleted. |
 | Provider secret stores | Not inspected | Check every provider listed below and record the rotation date, operator, and old-key revocation evidence. |
 
+### Google Cloud access check (2026-11-09)
+
+The authenticated `cloud90.trix@gmail.com` account can view the `wasel-planning-with-ai` project but has only the project-level Viewer role. The project has two active user-managed keys for `fb-service-account@wasel-planning-with-ai.iam.gserviceaccount.com`, both created on 2026-06-02 with no scheduled expiry. The checkout does not contain the historical JSON file, and its Git-history copy has a sanitized key ID, so the exposed key cannot be matched reliably to either active key. The service account has no runtime references in the application source, API, Supabase functions, or scripts. No key was disabled or deleted because the authenticated identity lacks IAM key-management permission.
+
+To complete this item, sign in with an authorized Google Cloud IAM administrator or grant the operator `roles/iam.serviceAccountKeyAdmin` on this service account. Review consumers and audit logs, disable both user-managed keys if neither is required (or replace required credentials first), verify workloads, then delete revoked keys and record non-secret evidence. If restoring the old inactive account, use interactive `gcloud auth login`; its cached refresh token is invalid. Never paste credentials into this repository or chat.
+
 The current checkout resolves outside the historical OneDrive path described in older documentation. Confirm device backup and sync settings independently. `.env` and `.env.local` are not tracked at the current Git revision; that does not prove their values were never copied elsewhere.
 
 ## Safe local inventory

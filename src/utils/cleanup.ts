@@ -180,7 +180,11 @@ export function cleanupLongLivedIntervals(): void {
   cleanupRegistry.runAll();
 }
 
-export function useCleanup(): { cleanup: CleanupFn; runCleanup: () => void } {
+export function useCleanup(): {
+  cleanup: CleanupFn;
+  runCleanup: () => void;
+  addCleanup: (cleanup: CleanupFn) => CleanupFn;
+} {
   const cleanups: CleanupFn[] = [];
 
   const cleanup = () => {
@@ -197,6 +201,15 @@ export function useCleanup(): { cleanup: CleanupFn; runCleanup: () => void } {
   };
 
   return {
+    addCleanup: (fn: CleanupFn) => {
+      cleanups.push(fn);
+      return () => {
+        const index = cleanups.indexOf(fn);
+        if (index > -1) {
+          cleanups.splice(index, 1);
+        }
+      };
+    },
     cleanup: () => {
       cleanup();
     },

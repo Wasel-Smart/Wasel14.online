@@ -35,10 +35,10 @@ const errorMessages = {
 export const emailSchema = z
   .string({ message: errorMessages.required })
   .min(1, errorMessages.required)
-  .email(errorMessages.invalidEmail)
-  .max(255, errorMessages.stringTooLong)
+  .trim()
   .toLowerCase()
-  .trim();
+  .email(errorMessages.invalidEmail)
+  .max(255, errorMessages.stringTooLong);
 
 export const credentialSchema = z
   .string({ message: errorMessages.required })
@@ -56,8 +56,8 @@ export const phoneSchema = z
 export const jordanPhoneSchema = z
   .string({ message: errorMessages.required })
   .min(1, errorMessages.required)
-  .regex(jordanPhoneRegex, errorMessages.invalidJordanPhone)
-  .trim();
+  .trim()
+  .regex(jordanPhoneRegex, errorMessages.invalidJordanPhone);
 
 export const nameSchema = z
   .string({ message: errorMessages.required })
@@ -272,6 +272,12 @@ export const notificationPreferencesSchema = z.object({
     paymentUpdates: z.boolean().default(true),
     promotions: z.boolean().default(false),
     systemUpdates: z.boolean().default(true),
+  }).default({
+    rideUpdates: true,
+    packageUpdates: true,
+    paymentUpdates: true,
+    promotions: false,
+    systemUpdates: true,
   }),
 });
 
