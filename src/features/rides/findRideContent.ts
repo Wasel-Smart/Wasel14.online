@@ -13,6 +13,9 @@ export type FindRideStaticCopy = {
   notifyMe: string;
   noResultsIcon: string;
   packageIcon: string;
+  inventoryErrorTitle: string;
+  inventoryErrorDescription: string;
+  retryInventory: string;
 };
 
 export function getFindRideStaticCopy(ar: boolean): FindRideStaticCopy {
@@ -20,7 +23,7 @@ export function getFindRideStaticCopy(ar: boolean): FindRideStaticCopy {
     return {
       tabRide: 'دوّر على رحلة',
       tabPackage: 'ابعث طرد',
-      pageSub: 'مسارات يومية بين المدن مع حجز واضح وتجربة مناسبة للأردن.',
+      pageSub: 'ابحث عن الرحلات بين المدن واحجز مقعدك عند توفر رحلة.',
       pageAction: 'اعرض رحلة',
       packageTitle: 'خدمة الطرود',
       packageSent: 'انبعث الطلب',
@@ -34,13 +37,16 @@ export function getFindRideStaticCopy(ar: boolean): FindRideStaticCopy {
       notifyMe: 'خبّرني لمّا تفضى رحلة',
       noResultsIcon: 'ما في',
       packageIcon: 'طرد',
+      inventoryErrorTitle: 'تعذّر تحميل الرحلات',
+      inventoryErrorDescription: 'صار في مشكلة مؤقتة أثناء البحث. جرّب مرة ثانية.',
+      retryInventory: 'إعادة المحاولة',
     };
   }
 
   return {
     tabRide: 'Find a Ride',
     tabPackage: 'Send Package',
-    pageSub: '100+ daily intercity routes · Book a seat instantly',
+    pageSub: 'Search intercity routes and book when a ride is available.',
     pageAction: 'Offer a Ride',
     packageTitle: 'Package Delivery',
     packageSent: 'Package request sent',
@@ -54,5 +60,8 @@ export function getFindRideStaticCopy(ar: boolean): FindRideStaticCopy {
     notifyMe: 'Notify me when a ride opens',
     noResultsIcon: 'Empty',
     packageIcon: 'Package',
+    inventoryErrorTitle: 'Could not load rides',
+    inventoryErrorDescription: 'There was a temporary problem searching. Please try again.',
+    retryInventory: 'Try again',
   };
 }

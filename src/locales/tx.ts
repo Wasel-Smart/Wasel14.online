@@ -1,6 +1,27 @@
-﻿import { translations, type Language, type TranslationNode } from './translations';
+﻿import type { Language, TranslationNode } from './translations';
 
 let currentLang: Language = 'ar';
+
+const loadedTranslations: Partial<Record<Language, TranslationNode>> = {};
+const pendingTranslations: Partial<Record<Language, Promise<void>>> = {};
+
+export function loadLanguageTranslations(language: Language): Promise<void> {
+  if (loadedTranslations[language]) {return Promise.resolve();}
+  const pending = pendingTranslations[language];
+  if (pending) {return pending;}
+
+  const loading = (language === 'ar'
+    ? import('./languages/ar.json')
+    : import('./languages/en.json'))
+    .then(module => {
+      loadedTranslations[language] = module.default as TranslationNode;
+    })
+    .finally(() => {
+      delete pendingTranslations[language];
+    });
+  pendingTranslations[language] = loading;
+  return loading;
+}
 
 export function setCurrentLang(lang: Language): void {
   currentLang = lang;
@@ -21,18 +42,21 @@ export function getCurrentLang(): Language {
 function lookup(key: string, lang: Language): string | undefined {
   const keys = key.split('.');
 
-  let nested: TranslationNode | undefined = translations[lang];
+  const table = loadedTranslations[lang];
+  if (!table) {return undefined;}
+
+  let nested: TranslationNode | undefined = table;
   for (const k of keys) {
     nested = typeof nested === 'object' && nested !== null ? nested[k] : undefined;
   }
   if (typeof nested === 'string') {return nested;}
 
   if (keys.length > 1) {
-    const flatTable = translations[lang];
     const tail = keys[keys.length - 1];
+    if (!tail) {return undefined;}
     const flatValue =
-      typeof flatTable === 'object' && flatTable !== null
-        ? (flatTable as Record<string, unknown>)[tail!]
+      typeof table === 'object' && table !== null
+        ? (table as Record<string, unknown>)[tail]
         : undefined;
     if (typeof flatValue === 'string') {return flatValue;}
   }

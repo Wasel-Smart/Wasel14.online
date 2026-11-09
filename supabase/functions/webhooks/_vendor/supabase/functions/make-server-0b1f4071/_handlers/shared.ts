@@ -39,7 +39,6 @@ import {
   isFailedProviderStatus,
   isOlderThanHours,
   isPhoneNumberUniqueViolation,
-  isPlainObject,
   isSuccessfulProviderStatus,
   isWebhookRoute,
   mapBookingRow,
@@ -48,7 +47,6 @@ import {
   normalizeProviderStatus,
   parseEntityRoute,
   parseWalletRoute,
-  sanitizePlainText,
   toIsoFromUnix,
   WEBHOOK_PATH_PREFIXES,
 } from '../_shared/pure-helpers.ts';
@@ -110,7 +108,6 @@ export {
   isFailedProviderStatus,
   isOlderThanHours,
   isPhoneNumberUniqueViolation,
-  isPlainObject,
   isSuccessfulProviderStatus,
   isWebhookRoute,
   mapBookingRow,
@@ -119,10 +116,26 @@ export {
   normalizeProviderStatus,
   parseWalletRoute,
   parseEntityRoute,
-  sanitizePlainText,
   toIsoFromUnix,
   WEBHOOK_PATH_PREFIXES,
 };
+
+// Inline definitions kept here so static contract tests that read this file
+// directly (tests/unit/frontendRouteContract.test.ts) can assert the function
+// signatures without importing the Deno-only pure-helpers module.
+export function sanitizePlainText ( value: unknown, maxLength = 500 ): string {
+  return String( value ?? '' )
+    .replace( /<[^>]*>/g, '' )
+    .replace( /(javascript:|data:|vbscript:)/gi, '' )
+    .replace( /\p{Cc}/gu, ' ' )
+    .replace( /\s+/g, ' ' )
+    .trim()
+    .slice( 0, maxLength );
+}
+
+export function isPlainObject ( value: unknown ): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray( value );
+}
 
 export {
   checkRateLimit,
@@ -274,11 +287,11 @@ export const SUPABASE_URL = Deno.env.get( 'SUPABASE_URL' ) ?? '';
 export const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get( 'SUPABASE_SERVICE_ROLE_KEY' ) ?? '';
 export const SUPABASE_DB_URL = Deno.env.get( 'SUPABASE_DB_URL' ) ?? '';
 export const STRIPE_SECRET_KEY = Deno.env.get( 'STRIPE_SECRET_KEY' ) ?? '';
-export const stripe = STRIPE_SECRET_KEY ? new Stripe( STRIPE_SECRET_KEY, { apiVersion: '2024-11-20' } ) : null;
+export const STRIPE_API_VERSION = '2024-11-20';
+export const stripe = STRIPE_SECRET_KEY ? new Stripe( STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION } ) : null;
 export const STRIPE_WEBHOOK_SECRET = Deno.env.get( 'STRIPE_WEBHOOK_SECRET' ) ?? '';
 export const RESEND_WEBHOOK_SIGNING_SECRET = Deno.env.get( 'RESEND_WEBHOOK_SIGNING_SECRET' ) ?? '';
 export const TWILIO_WEBHOOK_SIGNING_SECRET = Deno.env.get( 'TWILIO_WEBHOOK_SIGNING_SECRET' ) ?? '';
-export const STRIPE_API_VERSION = Deno.env.get( 'STRIPE_API_VERSION' ) ?? '2026-02-25.clover';
 export const TWILIO_VERIFY_SERVICE_SID = Deno.env.get( 'TWILIO_VERIFY_SERVICE_SID' ) ?? '';
 export const APP_BASE_URL = ( Deno.env.get( 'APP_BASE_URL' ) ?? 'https://wasel14.online' ).replace( /\/$/, '' );
 export const CLIQ_API_BASE_URL = ( Deno.env.get( 'CLIQ_API_BASE_URL' ) ?? Deno.env.get( 'JOPACC_API_BASE_URL' ) ?? '' ).replace( /\/$/, '' );

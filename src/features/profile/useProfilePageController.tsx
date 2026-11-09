@@ -97,6 +97,11 @@ function getJoinedText(joinedAt: string | undefined, ar: boolean) {
 function getRoleLabel(role: WaselUser['role'], ar: boolean) {
   if (role === 'driver') {return ar ? 'سائق' : 'Driver';}
   if (role === 'both') {return ar ? 'سائق + راكب' : 'Driver + Rider';}
+  if (role === 'admin') {return ar ? 'مسؤول النظام' : 'Administrator';}
+  if (role === 'support') {return ar ? 'الدعم' : 'Support';}
+  if (role === 'operator') {return ar ? 'مشغّل' : 'Operator';}
+  if (role === 'finance') {return ar ? 'المالية' : 'Finance';}
+  if (role === 'trust') {return ar ? 'الثقة والسلامة' : 'Trust & Safety';}
   return ar ? 'راكب' : 'Rider';
 }
 

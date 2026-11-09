@@ -219,7 +219,7 @@ export interface Database {
         full_name: string | null;
         phone: string | null;
         phone_number: string | null;
-        role: 'rider' | 'driver' | 'both' | 'passenger' | 'admin' | null;
+        role: 'rider' | 'driver' | 'both' | 'passenger' | 'admin' | 'support' | null;
         wallet_balance: number | null;
         balance: number | null;
         rating: number | null;
@@ -328,7 +328,7 @@ export interface Database {
         national_id_hash: string | null;
         national_id_last4: string | null;
         profile_status: 'pending' | 'active' | 'suspended' | 'blocked';
-        role: 'passenger' | 'driver' | 'admin';
+        role: 'passenger' | 'driver' | 'admin' | 'support' | 'operator' | 'finance' | 'trust';
         verification_level: 'level_0' | 'level_1' | 'level_2' | 'level_3';
         phone_verified_at: string | null;
         avatar_url: string | null;
@@ -743,7 +743,7 @@ export interface Database {
         | 'hold'
         | 'release';
       trip_status_v2: 'draft' | 'open' | 'booked' | 'in_progress' | 'completed' | 'cancelled';
-      user_role_v2: 'passenger' | 'driver' | 'admin';
+      user_role_v2: 'passenger' | 'driver' | 'admin' | 'support' | 'operator' | 'finance' | 'trust';
       verification_level_v2: 'level_0' | 'level_1' | 'level_2' | 'level_3';
       verification_status_v2: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
       wallet_status_v2: 'active' | 'limited' | 'frozen' | 'closed';

@@ -5,10 +5,11 @@ import {
   useState,
   useMemo,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import type { Language } from '../locales/translations';
-import { interpolateSingleBrace, resolve, setCurrentLang } from '../locales/tx';
+import { interpolateSingleBrace, loadLanguageTranslations, resolve, setCurrentLang } from '../locales/tx';
 
 interface LanguageContextType {
   language: Language;
@@ -42,22 +43,32 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
       return 'ar';
     }
   });
+  const [readyLanguage, setReadyLanguage] = useState<Language | null>(null);
+  const [initialLoadError, setInitialLoadError] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const languageRequestRef = useRef(0);
 
   const setLanguage = useCallback((lang: Language) => {
-    setLanguageState(lang);
-    // Defer localStorage write to avoid blocking render (e.g. Safari private mode)
-    setTimeout(() => {
-      try {
-        localStorage.setItem('wasel-language', lang);
-      } catch (error) {
-        console.error('Failed to save language to localStorage:', error);
-      }
-    }, 0);
-
-    // Update HTML dir attribute
-    setCurrentLang(lang);
-    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = lang;
+    const requestId = ++languageRequestRef.current;
+    void loadLanguageTranslations(lang)
+      .then(() => {
+        if (requestId !== languageRequestRef.current) {return;}
+        setCurrentLang(lang);
+        document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = lang;
+        setReadyLanguage(lang);
+        setLanguageState(lang);
+        try {
+          localStorage.setItem('wasel-language', lang);
+        } catch (error) {
+          console.error('Failed to save language to localStorage:', error);
+        }
+      })
+      .catch(error => {
+        if (import.meta.env?.DEV) {
+          console.warn('Failed to load the selected language:', error);
+        }
+      });
   }, []);
 
   const toggleLanguage = useCallback(() => {
@@ -65,11 +76,27 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
   }, [language, setLanguage]);
 
   useEffect(() => {
-    // Set initial dir attribute
-    setCurrentLang(language);
-    document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
-    document.documentElement.lang = language;
-  }, [language]);
+    const requestId = ++languageRequestRef.current;
+    void loadLanguageTranslations(language)
+      .then(() => {
+        if (requestId !== languageRequestRef.current) {return;}
+        setCurrentLang(language);
+        document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = language;
+        setReadyLanguage(language);
+      })
+      .catch(error => {
+        if (requestId !== languageRequestRef.current) {return;}
+        setInitialLoadError(true);
+        if (import.meta.env?.DEV) {
+          console.warn('Failed to load the saved language:', error);
+        }
+      });
+
+    return () => {
+      if (requestId === languageRequestRef.current) {languageRequestRef.current += 1;}
+    };
+  }, [language, retryAttempt]);
 
   // Delegates to the shared resolver in locales/tx. It MUST NOT be a second,
   // hand-rolled walk of the translation table: chunks are merged into one FLAT
@@ -81,7 +108,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
     [language],
   );
 
-  const dir: LanguageContextType['dir'] = language === 'ar' ? 'rtl' : 'ltr';
+  const dir: LanguageContextType['dir'] = (readyLanguage ?? language) === 'ar' ? 'rtl' : 'ltr';
 
   // Memoize the context value
   const value = useMemo(
@@ -94,6 +121,42 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
     }),
     [language, setLanguage, toggleLanguage, t, dir],
   );
+
+  if (!readyLanguage) {
+    const isArabic = language === 'ar';
+    return (
+      <div
+        role={initialLoadError ? 'alert' : 'status'}
+        aria-live={initialLoadError ? 'assertive' : 'polite'}
+        lang={isArabic ? 'ar' : 'en'}
+        dir={isArabic ? 'rtl' : 'ltr'}
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          background: '#081D39',
+          color: '#F4F8FF',
+          fontFamily: 'Cairo, sans-serif',
+          textAlign: 'center',
+          padding: 24,
+        }}
+      >
+        <div>
+          <p>{initialLoadError
+            ? isArabic ? 'تعذر تحميل اللغة. تحقق من اتصالك وحاول مجدداً.' : 'Could not load the language. Check your connection and try again.'
+            : isArabic ? 'جارٍ تحميل واصل…' : 'Loading Wasel…'}</p>
+          {initialLoadError && (
+            <button type="button" onClick={() => {
+              setInitialLoadError(false);
+              setRetryAttempt(attempt => attempt + 1);
+            }}>
+              {isArabic ? 'إعادة المحاولة' : 'Try again'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

@@ -168,6 +168,7 @@ export function BusBookingForm({
         </div>
         <div>
           <label
+            id="bus-departure-time-label"
             style={{
               display: 'block',
               color: DS.sub,
@@ -177,11 +178,12 @@ export function BusBookingForm({
           >
             {tx('busPage.departure_time')}
           </label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div role="group" aria-labelledby="bus-departure-time-label" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {departureTimes.map(time => (
               <button
                 key={time}
                 type="button"
+                aria-pressed={selectedDeparture === time}
                 onClick={() => { void setSelectedDeparture(time); }}
                 style={{
                   height: 36,
@@ -264,6 +266,8 @@ export function BusBookingForm({
               {tx('trips.passengers')}
             </label>
             <div
+              role="group"
+              aria-label={tx('trips.passengers')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -276,6 +280,8 @@ export function BusBookingForm({
               <button
                 onClick={() => setPassengers(value => Math.max(1, value - 1))}
                 type="button"
+                aria-label={ar ? 'تقليل عدد الركاب' : 'Decrease passenger count'}
+                disabled={passengers <= 1}
                 style={{
                   width: 42,
                   height: 46,
@@ -289,7 +295,7 @@ export function BusBookingForm({
                 -
               </button>
               <div style={{ flex: 1, textAlign: 'center', color: C.text, fontWeight: 800 }}>
-                {passengers}
+                <output aria-live="polite">{passengers}</output>
               </div>
               <button
                 onClick={() => {
@@ -298,6 +304,7 @@ export function BusBookingForm({
                   }
                 }}
                 type="button"
+                aria-label={ar ? 'زيادة عدد الركاب' : 'Increase passenger count'}
                 disabled={activeBus.seats === 0 || passengers >= activeBus.seats}
                 style={{
                   width: 42,
@@ -320,6 +327,7 @@ export function BusBookingForm({
           </div>
           <div>
             <label
+              htmlFor="bus-seat-preference"
               style={{
                 display: 'block',
                 color: DS.sub,
@@ -330,6 +338,7 @@ export function BusBookingForm({
               {tx('busPage.seat_preference')}
             </label>
             <select
+              id="bus-seat-preference"
               value={seatPreference}
               onChange={event => {
                 setSeatPreference(event.target.value as typeof seatPreference);

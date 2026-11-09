@@ -384,8 +384,9 @@ export function SchedulePage() {
           <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
             {/* Type */}
             <div>
-              <label style={labelStyle}>{t('scheduleExpanded.type')}</label>
+              <label htmlFor="schedule-type" style={labelStyle}>{t('scheduleExpanded.type')}</label>
               <select
+                id="schedule-type"
                 value={form.item_type}
                 onChange={e =>
                   setForm({ ...form, item_type: e.target.value as ScheduleItem['item_type'] })
@@ -400,8 +401,9 @@ export function SchedulePage() {
 
             {/* Pickup location */}
             <div>
-              <label style={labelStyle}>{t('scheduleExpanded.pickupLocation')}</label>
+              <label htmlFor="schedule-pickup-location" style={labelStyle}>{t('scheduleExpanded.pickupLocation')}</label>
               <input
+                id="schedule-pickup-location"
                 value={form.pickup_location}
                 onChange={e => setForm({ ...form, pickup_location: e.target.value })}
                 placeholder={t('scheduleExpanded.enterPickupLocation')}
@@ -453,8 +455,9 @@ export function SchedulePage() {
 
             {/* Dropoff */}
             <div>
-              <label style={labelStyle}>{t('scheduleExpanded.dropoffLocation')}</label>
+              <label htmlFor="schedule-dropoff-location" style={labelStyle}>{t('scheduleExpanded.dropoffLocation')}</label>
               <input
+                id="schedule-dropoff-location"
                 value={form.dropoff_location}
                 onChange={e => setForm({ ...form, dropoff_location: e.target.value })}
                 placeholder={t('scheduleExpanded.enterDropoffLocation')}
@@ -464,8 +467,9 @@ export function SchedulePage() {
 
             {/* Date & time */}
             <div>
-              <label style={labelStyle}>{t('scheduleExpanded.dateAndTime')}</label>
+              <label htmlFor="schedule-date-time" style={labelStyle}>{t('scheduleExpanded.dateAndTime')}</label>
               <input
+                id="schedule-date-time"
                 type="datetime-local"
                 value={form.scheduled_at}
                 onChange={e => setForm({ ...form, scheduled_at: e.target.value })}
@@ -475,8 +479,9 @@ export function SchedulePage() {
 
             {/* Recurrence */}
             <div>
-              <label style={labelStyle}>{t('scheduleExpanded.recurrence')}</label>
+              <label htmlFor="schedule-recurrence" style={labelStyle}>{t('scheduleExpanded.recurrence')}</label>
               <select
+                id="schedule-recurrence"
                 value={form.recurring_pattern}
                 onChange={e => setForm({ ...form, recurring_pattern: e.target.value })}
                 style={inputStyle}
@@ -491,8 +496,9 @@ export function SchedulePage() {
 
             {/* Notes */}
             <div>
-              <label style={labelStyle}>{t('scheduleExpanded.notes')}</label>
+              <label htmlFor="schedule-notes" style={labelStyle}>{t('scheduleExpanded.notes')}</label>
               <textarea
+                id="schedule-notes"
                 value={form.notes}
                 onChange={e => setForm({ ...form, notes: e.target.value })}
                 rows={2}

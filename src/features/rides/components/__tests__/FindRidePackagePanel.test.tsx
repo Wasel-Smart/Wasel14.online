@@ -41,6 +41,9 @@ function Harness() {
     notifyMe: '',
     noResultsIcon: '',
     packageIcon: 'Parcel',
+    inventoryErrorTitle: 'Could not load rides',
+    inventoryErrorDescription: 'Temporary search issue',
+    retryInventory: 'Try again',
   };
   const t = {
     from: 'From',

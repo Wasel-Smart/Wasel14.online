@@ -112,3 +112,28 @@ Deno.test('/events rejects a malformed body before touching the database', async
     assertEquals(response.status, 400, `expected 400 for ${label}`);
   }
 });
+
+Deno.test('/events does not acknowledge a notification missing its required content', async () => {
+  const response = await handleEventRequest(
+    makeEventRequest({
+      ...validDispatch,
+      payload: { userId: 'user-1', title: '', message: '' },
+    }, SUPABASE_SERVICE_ROLE_KEY),
+  );
+
+  assertEquals(response.status, 422);
+  assertEquals((await response.json() as { ok?: boolean }).ok, undefined);
+});
+
+Deno.test('/events retries a topic without a registered side-effect handler', async () => {
+  const response = await handleEventRequest(
+    makeEventRequest({
+      id: 'payment-auth-test',
+      topic: 'payments.authorized',
+      payload: { amount: 500 },
+    }, SUPABASE_SERVICE_ROLE_KEY),
+  );
+
+  assertEquals(response.status, 500);
+  assertEquals((await response.json() as { error: string }).error, 'Event handler failed');
+});

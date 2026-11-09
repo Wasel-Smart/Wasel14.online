@@ -116,6 +116,8 @@ Every migration has a corresponding rollback script:
 | `20261101000001_ledger_drift_alert_and_schema_health.sql` | `rollback/20261101000001_ledger_drift_alert_and_schema_health_rollback.sql` |
 | `20261102000000_schema_hygiene_completeness.sql` | `rollback/20261102000000_schema_hygiene_completeness_rollback.sql` |
 | `20261107231309_align_chat_runtime_contract.sql` | `rollback/20261107231309_align_chat_runtime_contract_rollback.sql` |
+| `20261108222428_event_notification_idempotency.sql` | `rollback/20261108222428_event_notification_idempotency_rollback.sql` |
+| `20261110000000_outbox_persistent_claims.sql` | `rollback/20261110000000_outbox_persistent_claims_rollback.sql` |
 
 ---
 

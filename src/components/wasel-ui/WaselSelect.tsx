@@ -190,6 +190,7 @@ export function WaselSelect({
       ? `0 0 0 3px ${C.cyanGlow}`
       : 'none';
   const describedBy = [
+    rest['aria-describedby'],
     description ? `${selectId}-description` : null,
     hasError ? `${selectId}-error` : null,
   ].filter(Boolean).join(' ') || undefined;

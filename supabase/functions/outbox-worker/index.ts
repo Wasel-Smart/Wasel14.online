@@ -14,6 +14,7 @@ type OutboxRow = {
   trace_id: string;
   attempts: number;
   created_at: string;
+  claim_token: string;
 };
 
 // Topic → edge function path for fan-out dispatch.
@@ -68,11 +69,14 @@ async function dispatchEvent ( event: OutboxRow ): Promise<{ ok: boolean; reason
         occurredAt: event.created_at,
         attempts: event.attempts,
       } ),
+      signal: AbortSignal.timeout( 15_000 ),
     } );
 
     if ( !response.ok ) {
-      const text = await response.text().catch( () => '' );
-      return { ok: false, reason: `http_${ response.status }: ${ text.slice( 0, 200 ) }` };
+      // Keep upstream bodies out of the outbox and logs: they may contain
+      // internal implementation details or reflected request data.
+      await response.body?.cancel().catch( () => undefined );
+      return { ok: false, reason: `http_${ response.status }` };
     }
 
     return { ok: true };
@@ -84,9 +88,8 @@ async function dispatchEvent ( event: OutboxRow ): Promise<{ ok: boolean; reason
 async function drainOutbox (): Promise<{ processed: number; succeeded: number; failed: number; skipped: number }> {
   const admin = getAdminClient();
 
-  // Atomically claim a batch with SKIP LOCKED — concurrent worker invocations
-  // (cron overlap, manual trigger) each get a disjoint set of rows and never
-  // dispatch the same event twice.
+  // Persisted claims survive the RPC transaction. Expired claims are recovered
+  // automatically if an invocation dies before it finishes the batch.
   const { data, error } = await admin.rpc( 'consume_outbox_batch', { p_batch_size: BATCH_SIZE } );
 
   if ( error ) {throw new Error( `outbox batch claim failed: ${ error.message }` );}
@@ -100,19 +103,38 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
     const result = await dispatchEvent( event );
 
     if ( result.reason === 'no_worker_registered' ) {
-      await admin
+      const { data: failedEvent, error: failError } = await admin
         .from( 'event_outbox' )
-        .update( { status: 'processed', processed_at: new Date().toISOString() } )
-        .eq( 'id', event.id );
-      skipped++;
+        .update( {
+          status: 'failed',
+          last_error: `no_worker_registered:${ event.topic }`,
+          claim_token: null,
+          locked_until: null,
+        } )
+        .eq( 'id', event.id )
+        .eq( 'claim_token', event.claim_token )
+        .select( 'id' )
+        .maybeSingle();
+      if ( failError || !failedEvent ) {throw new Error( `outbox unroutable-event update failed for ${ event.id }: ${ failError?.message ?? 'claim lost' }` );}
+      console.error( JSON.stringify( {
+        message: 'outbox event has no registered worker',
+        eventId: event.id,
+        topic: event.topic,
+        traceId: event.trace_id,
+      } ) );
+      failed++;
       continue;
     }
 
     if ( result.ok ) {
-      await admin
+      const { data: completed, error: completeError } = await admin
         .from( 'event_outbox' )
-        .update( { status: 'processed', processed_at: new Date().toISOString() } )
-        .eq( 'id', event.id );
+        .update( { status: 'processed', processed_at: new Date().toISOString(), claim_token: null, locked_until: null } )
+        .eq( 'id', event.id )
+        .eq( 'claim_token', event.claim_token )
+        .select( 'id' )
+        .maybeSingle();
+      if ( completeError || !completed ) {throw new Error( `outbox completion failed for ${ event.id }: ${ completeError?.message ?? 'claim lost' }` );}
       succeeded++;
     } else {
       // Delegate backoff scheduling and DLQ transition to the DB function so the
@@ -121,6 +143,7 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
         p_id:           event.id,
         p_max_attempts: MAX_ATTEMPTS,
         p_error:        result.reason ?? null,
+        p_claim_token:  event.claim_token,
       } );
 
       if ( failError ) {
@@ -131,6 +154,7 @@ async function drainOutbox (): Promise<{ processed: number; succeeded: number; f
           eventId: event.id,
           rpcError: failError.message,
         } ) );
+        throw new Error( `outbox failure update failed for ${ event.id }: ${ failError.message }` );
       }
 
       console.error( JSON.stringify( {

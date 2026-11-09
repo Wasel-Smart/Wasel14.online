@@ -36,6 +36,7 @@ Deno.env.set('RESEND_WEBHOOK_SIGNING_SECRET', RESEND_SECRET);
 // an unknown event, so no network access and no real credentials are required.
 Deno.env.set('SUPABASE_URL', 'https://example.supabase.co');
 Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key');
+Deno.env.set('STRIPE_SECRET_KEY', 'sk_test_local_only');
 
 function makeRequest(path: string, body: string, headers: Record<string, string> = {}): Request {
   return new Request(`https://example.supabase.co/functions/v1/webhooks${path}`, {
@@ -63,9 +64,24 @@ async function signStripe(payload: string, secret: string): Promise<string> {
 const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook, handleTwilioWebhook, handleResendWebhook } = await import(
   '../make-server-0b1f4071/_handlers/webhooks.ts'
 );
-const { toStripeMinorUnits, verifyResendWebhookSignature } = await import(
+const { STRIPE_API_VERSION, stripeApiRequest, toStripeMinorUnits, verifyResendWebhookSignature } = await import(
   '../make-server-0b1f4071/_handlers/shared.ts'
 );
+
+Deno.test('stripeApiRequest — uses the SDK-supported API version', async () => {
+  const originalFetch = globalThis.fetch;
+  let observedVersion: string | null = null;
+  globalThis.fetch = async (_input, init) => {
+    observedVersion = new Headers(init?.headers).get('Stripe-Version');
+    return Response.json({ id: 'sub_test' });
+  };
+  try {
+    await stripeApiRequest('/v1/subscriptions/sub_test');
+    assertEquals(observedVersion, STRIPE_API_VERSION);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 async function signResend(payload: string, secret: string, id = 'msg_test_123', timestamp = Math.floor(Date.now() / 1000)) {
   const keyBytes = Uint8Array.from(atob(secret.slice('whsec_'.length)), (char) => char.charCodeAt(0));

@@ -85,7 +85,7 @@ export async function handleProfileRequest ( request: Request, path: string ) {
     if ( isAdmin ) {
       if ( typeof body.role === 'string' ) {
         const normalizedRole = body.role.toLowerCase();
-        if ( [ 'passenger', 'driver', 'operator', 'admin' ].includes( normalizedRole ) ) {
+        if ( [ 'passenger', 'driver', 'operator', 'admin', 'support', 'finance', 'trust' ].includes( normalizedRole ) ) {
           patch.role = normalizedRole;
         }
       }
@@ -262,9 +262,8 @@ export async function handleEnableDriverMode ( request: Request ) {
     return json( { enabled: true, role: currentRole } );
   }
 
-  // This endpoint used to overwrite ANY role with 'driver', silently demoting an
-  // admin or operator who pressed it and locking them out of the console.
-  if ( currentRole === 'admin' || currentRole === 'operator' ) {
+  // This endpoint must not demote any staff role into a driver account.
+  if ( [ 'admin', 'support', 'operator', 'finance', 'trust' ].includes( currentRole ) ) {
     return json(
       { error: 'Staff accounts cannot switch to Driver mode. Use a separate rider account to drive.' },
       409,

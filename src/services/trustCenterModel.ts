@@ -21,7 +21,7 @@ export interface PhoneStepMeta {
 }
 
 export interface DriverDocumentsStepMeta {
-  role: 'rider' | 'driver' | 'both' | 'admin';
+  role: 'rider' | 'driver' | 'both' | 'admin' | 'support' | 'operator' | 'finance' | 'trust';
   licenseNumber: string | null;
 }
 
@@ -57,7 +57,7 @@ export interface TrustCenterStatus {
 }
 
 type FallbackTrustUser = {
-  role: 'rider' | 'driver' | 'both' | 'admin';
+  role: 'rider' | 'driver' | 'both' | 'admin' | 'support' | 'operator' | 'finance' | 'trust';
   verificationLevel: string;
   driverStatus?: string;
   email?: string;

@@ -4,11 +4,6 @@ import {
   requestEdgeJson,
   runBackendWorkflow,
 } from './backendWorkflow';
-import {
-  getDirectProfile,
-  getDirectVerificationRecord,
-  updateDirectProfile,
-} from './directSupabase';
 import { getAuthCallbackUrl, resolveAuthRedirectOrigin } from '../utils/env';
 import { isUsingLegacySupabaseKey, supabase } from '../utils/supabase/client';
 
@@ -253,6 +248,7 @@ async function enrichProfileWithVerification(
   profile: Record<string, unknown> | null,
 ) {
   try {
+    const { getDirectVerificationRecord } = await import('./directSupabase');
     const verification = await getDirectVerificationRecord(userId);
     return mergeVerificationIntoProfile(profile, verification);
   } catch {
@@ -262,6 +258,7 @@ async function enrichProfileWithVerification(
 
 async function loadProfileViaFallback(userId: string) {
   try {
+    const { getDirectProfile } = await import('./directSupabase');
     const profile = (await getDirectProfile(userId)) as Record<string, unknown> | null;
     const enrichedProfile = await enrichProfileWithVerification(userId, profile);
     return { profile: enrichedProfile };
@@ -330,6 +327,7 @@ export const authAPI = {
     // direct-Supabase path as a fallback so new sign-ups never get a null
     // profile regardless of edge function availability.
     if (!hasConfiguredEdgeTransport('required')) {
+      const { updateDirectProfile } = await import('./directSupabase');
       return updateDirectProfile(userId, directUpdates);
     }
 
@@ -352,6 +350,7 @@ export const authAPI = {
     } catch {
       // Edge function unavailable or returned an error — fall back to direct
       // Supabase unconditionally so sign-up always produces a valid profile.
+      const { updateDirectProfile } = await import('./directSupabase');
       return updateDirectProfile(userId, directUpdates);
     }
   },
@@ -425,7 +424,10 @@ export const authAPI = {
         authMode: 'required',
         fallbackPolicy: 'always',
         operationType: 'write',
-        fallback: ({ userId }) => updateDirectProfile(userId ?? '', updates),
+        fallback: async ({ userId }) => {
+          const { updateDirectProfile } = await import('./directSupabase');
+          return updateDirectProfile(userId ?? '', updates);
+        },
         edge: context =>
           requestEdgeJson<Record<string, unknown>>({
             path: `/v1/profile/${context.userId}`,

@@ -114,11 +114,13 @@ export function CorporatePage() {
               >
                 <div>
                   <label
+                    htmlFor="corporate-company-name"
                     style={{ display: 'block', marginBottom: 8, fontSize: 13, color: '#9ca3af' }}
                   >
                     {ar ? 'اسم الشركة' : 'Company Name'}
                   </label>
                   <input
+                    id="corporate-company-name"
                     required
                     style={{
                       width: '100%',
@@ -132,11 +134,13 @@ export function CorporatePage() {
                 </div>
                 <div>
                   <label
+                    htmlFor="corporate-work-email"
                     style={{ display: 'block', marginBottom: 8, fontSize: 13, color: '#9ca3af' }}
                   >
                     {ar ? 'البريد الإلكتروني للعمل' : 'Work Email'}
                   </label>
                   <input
+                    id="corporate-work-email"
                     required
                     type="email"
                     style={{
@@ -160,11 +164,13 @@ export function CorporatePage() {
               >
                 <div>
                   <label
+                    htmlFor="corporate-passenger-count"
                     style={{ display: 'block', marginBottom: 8, fontSize: 13, color: '#9ca3af' }}
                   >
                     {ar ? 'عدد الموظفين المتوقع نقلهم' : 'Estimated Passengers'}
                   </label>
                   <select
+                    id="corporate-passenger-count"
                     style={{
                       width: '100%',
                       padding: 12,
@@ -182,11 +188,13 @@ export function CorporatePage() {
                 </div>
                 <div>
                   <label
+                    htmlFor="corporate-schedule-mode"
                     style={{ display: 'block', marginBottom: 8, fontSize: 13, color: '#9ca3af' }}
                   >
                     {ar ? 'الجدول الزمني المطلوب' : 'Schedule Mode'}
                   </label>
                   <select
+                    id="corporate-schedule-mode"
                     style={{
                       width: '100%',
                       padding: 12,

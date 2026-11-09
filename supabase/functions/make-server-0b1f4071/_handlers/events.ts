@@ -55,6 +55,7 @@ function readString ( source: Record<string, unknown>, key: string ): string {
  */
 async function notifyUser (
   admin: ReturnType<typeof getAdminClient>,
+  eventId: string,
   userId: string,
   input: { title: string; message: string; type: string; priority: string; actionUrl: string }
 ): Promise<void> {
@@ -68,6 +69,7 @@ async function notifyUser (
       message: input.message,
       metadata: {
         priority,
+        outbox_event_id: eventId,
         action_url: input.actionUrl,
         channels: [],
       },
@@ -76,9 +78,19 @@ async function notifyUser (
       is_read: false,
     } );
 
-  if ( error ) {
-    console.error( '[events] notification insert failed', error.message );
-  }
+  // A unique constraint on (user_id, metadata->>'outbox_event_id') makes a
+  // retried delivery safe. Other database errors must reach the outbox worker
+  // so it retries instead of acknowledging a lost notification.
+  const isEventDuplicate = error?.code === '23505' &&
+    [ error.message, error.details ?? '' ].some( ( detail ) => detail.includes( 'idx_notifications_outbox_event_user' ) );
+  if ( error && !isEventDuplicate ) {throw new Error( `notification insert failed: ${ error.message }` );}
+}
+
+function safeInternalActionUrl ( value: string ): string {
+  const path = sanitizePlainText( value, 512 );
+  return path.startsWith( '/' ) && !path.startsWith( '//' ) && !path.includes( '\\' )
+    ? path
+    : '';
 }
 
 async function handleNotificationsDispatch (
@@ -97,12 +109,12 @@ async function handleNotificationsDispatch (
     return { handled: false, reason: 'missing_title_or_message' };
   }
 
-  await notifyUser( admin, userId, {
+  await notifyUser( admin, eventId, userId, {
     title,
     message,
     type: readString( payload, 'type' ) || 'general',
     priority: readString( payload, 'priority' ) || 'medium',
-    actionUrl: sanitizePlainText( readString( payload, 'actionUrl' ) || readString( payload, 'action_url' ), 512 ),
+    actionUrl: safeInternalActionUrl( readString( payload, 'actionUrl' ) || readString( payload, 'action_url' ) ),
   } );
 
   return { handled: true, eventId, recipients: 1 };
@@ -131,7 +143,7 @@ async function handleRidesAssigned (
     return { handled: false, reason: 'booking_not_found' };
   }
 
-  await notifyUser( admin, String( booking.passenger_id ), {
+  await notifyUser( admin, eventId, String( booking.passenger_id ), {
     title: 'Driver assigned',
     message: 'A driver has been assigned to your ride.',
     type: 'booking',
@@ -168,7 +180,7 @@ async function handlePackagesDelivered (
 
   await Promise.all(
     recipients.map( ( userId ) =>
-      notifyUser( admin, userId, {
+      notifyUser( admin, eventId, userId, {
         title: 'Package delivered',
         message: 'Your package has been delivered successfully.',
         type: 'booking',
@@ -285,11 +297,9 @@ export async function handleEventRequest ( request: Request ) {
         result = await handleRidesCompleted( admin, eventId, payload );
         break;
       case 'payments.authorized':
+        throw new Error( `No server handler registered for ${ topic }` );
       default:
-        // Accepted and acknowledged so the queue drains; no durable side effect
-        // is defined for this topic in the server runtime yet.
-        result = { handled: false, reason: 'no_server_handler', eventId };
-        break;
+        throw new Error( `No event handler registered for ${ topic }` );
     }
   } catch ( error ) {
     const message = error instanceof Error ? error.message : String( error );
@@ -299,8 +309,11 @@ export async function handleEventRequest ( request: Request ) {
     return json( { error: 'Event handler failed' }, 500 );
   }
 
-  // A row that cannot be actioned is still acknowledged. Retrying it forever
-  // cannot create the missing booking or package, and a permanently failing
-  // event blocks the queue behind it.
+  if ( result.handled === false ) {
+    // Acknowledge malformed or stale business events as an explicit terminal
+    // response. The outbox worker records these as failures for operator review.
+    return json( { error: 'Event could not be handled', topic, ...result }, 422 );
+  }
+
   return json( { ok: true, topic, ...result } );
 }

@@ -1,12 +1,11 @@
 import { supabase } from '../../utils/supabase/client';
-import { getDb, getWalletByCanonicalUserId, mapCanonicalRole } from './helpers';
+import { getDb, getWalletByCanonicalUserId } from './helpers';
 import type { DriverRow, RawVerificationRecord, UserContext, UserRow } from './types';
 
 type UserSeed = {
   email?: string | null;
   full_name?: string | null;
   phone_number?: string | null;
-  role?: string | null;
 };
 
 export async function resolveCanonicalUser(userKey: string): Promise<UserRow | null> {
@@ -25,7 +24,7 @@ export async function resolveCanonicalUser(userKey: string): Promise<UserRow | n
 
 function resolveAuthUserProperty(
   authUser: { email?: string | null; user_metadata?: Record<string, unknown>; phone?: string | null },
-  key: 'email' | 'full_name' | 'phone_number' | 'role',
+  key: 'email' | 'full_name' | 'phone_number',
   fallback: string | null,
 ): string | null {
   if (key === 'email') {
@@ -46,9 +45,6 @@ function resolveAuthUserProperty(
       ).trim();
     return phone || null;
   }
-  if (key === 'role') {
-    return String(authUser.user_metadata?.role ?? '').trim() || null;
-  }
   return fallback;
 }
 
@@ -57,7 +53,6 @@ async function resolveAuthSeed(userKey: string, seed?: UserSeed): Promise<UserSe
     email: seed?.email?.trim() || null,
     full_name: seed?.full_name?.trim() || null,
     phone_number: seed?.phone_number?.trim() || null,
-    role: seed?.role ?? null,
   };
 
   if ((!mergedSeed.email || !mergedSeed.full_name || !mergedSeed.phone_number) && supabase) {
@@ -75,8 +70,6 @@ async function resolveAuthSeed(userKey: string, seed?: UserSeed): Promise<UserSe
         mergedSeed.phone_number ||
         resolveAuthUserProperty(authUser, 'phone_number', null) ||
         null;
-      mergedSeed.role =
-        mergedSeed.role || resolveAuthUserProperty(authUser, 'role', null) || null;
     }
   }
 
@@ -102,7 +95,9 @@ export async function ensureCanonicalUser(userKey: string, seed?: UserSeed): Pro
       email: resolvedSeed.email,
       full_name: resolvedSeed.full_name,
       phone_number: resolvedSeed.phone_number,
-      role: mapCanonicalRole(resolvedSeed.role) || 'passenger',
+      // Role is always initialized to the least-privileged canonical value.
+      // Auth user_metadata is user-editable and must never choose authorization.
+      role: 'passenger',
     })
     .select('*')
     .single();

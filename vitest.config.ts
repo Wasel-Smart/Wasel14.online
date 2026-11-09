@@ -42,7 +42,7 @@ export default defineConfig( {
     // vi.mock registrations and imported modules leak across test files; that
     // made tests pass or fail depending on file order. Keep concurrency bounded
     // on Windows/OneDrive workspaces to avoid starving jsdom suites.
-    pool: 'forks',
+    pool: 'vmForks',
     maxWorkers: 2,
     environmentOptions: { url: 'http://localhost/' },
     // A filter that matches nothing exits 0, which let an entire suite silently

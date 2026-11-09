@@ -282,7 +282,3 @@ export function stopAvailabilityPolling(): void {
     document.removeEventListener('visibilitychange', onVisibilityChange);
   }
 }
-
-warmUpServer().catch(() => {
-  markEdgeFunctionUnavailable();
-});

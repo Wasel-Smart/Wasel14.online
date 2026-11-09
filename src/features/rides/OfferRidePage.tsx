@@ -132,7 +132,7 @@ export function OfferRidePage() {
   };
 
   const moveToStep = (targetStep: number) => {
-    const nextError = validateOfferRideStep(form, targetStep - 1);
+    const nextError = validateOfferRideStep(form, targetStep - 1, ar);
     if (nextError) {
       setFormError(nextError);
       return;
@@ -155,7 +155,7 @@ export function OfferRidePage() {
       return;
     }
 
-    const nextError = validateOfferRideStep(form, 3);
+    const nextError = validateOfferRideStep(form, 3, ar);
     if (nextError) {
       setFormError(nextError);
       return;
@@ -184,7 +184,7 @@ export function OfferRidePage() {
       });
 
       setSubmitted(true);
-      setDraftMessage('Ride posted. Draft cleared.');
+      setDraftMessage(ar ? 'تم نشر الرحلة وحذف المسودة.' : 'Ride posted. Draft cleared.');
       setNetworkStats(getConnectedStats());
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(OFFER_RIDE_DRAFT_KEY);
@@ -192,10 +192,14 @@ export function OfferRidePage() {
 
       notificationsAPI
         .createNotification({
-          title: 'Ride offer posted',
+          title: ar ? 'تم نشر عرض الرحلة' : 'Ride offer posted',
           message: form.acceptsPackages
-            ? `Your ${form.from} to ${form.to} route is live for riders and packages.`
-            : `Your ${form.from} to ${form.to} route is now live.`,
+            ? ar
+              ? `أصبح مسارك من ${city(form.from)} إلى ${city(form.to)} متاحاً للركاب والطرود.`
+              : `Your ${form.from} to ${form.to} route is live for riders and packages.`
+            : ar
+              ? `أصبح مسارك من ${city(form.from)} إلى ${city(form.to)} متاحاً الآن.`
+              : `Your ${form.from} to ${form.to} route is now live.`,
           type: 'booking',
           priority: 'high',
           action_url: '/app/offer-ride',
@@ -208,9 +212,9 @@ export function OfferRidePage() {
       notifyTripConfirmed('Wasel Network', `${createdRide.from} to ${createdRide.to}`);
       void recordMovementActivity('route_published', driverPlan?.corridor.id ?? null);
     } catch (error) {
-      setFormError(
-        error instanceof Error ? error.message : 'We could not post the route right now.',
-      );
+      setFormError(ar
+        ? 'تعذّر نشر الرحلة الآن. تحقّق من اتصالك وحاول مرة أخرى.'
+        : error instanceof Error ? error.message : 'We could not post the route right now.');
     } finally {
       setBusyState('idle');
     }

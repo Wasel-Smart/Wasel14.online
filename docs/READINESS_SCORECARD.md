@@ -34,8 +34,8 @@ Last independent review: 2026-10-17 (file-level; nothing executed).
   Unknown currencies (IQD) now fail closed instead of guessing.
 - Twilio delivery receipts now verify `X-Twilio-Signature`. Before, the handler required a
   URL token that the StatusCallback URL no longer carries, so receipts were rejected.
-  Set `TWILIO_WEBHOOK_REQUIRE_SIGNATURE=true` once receipts verify in production, and
-  `TWILIO_WEBHOOK_PUBLIC_URL` if the proxy rewrites the URL.
+  Signature verification is mandatory; configure the signing secret and set
+  `TWILIO_WEBHOOK_PUBLIC_URL` if a proxy rewrites the URL.
 - Added Deno tests for both changes in `supabase/functions/tests/webhooks.test.ts`.
 
 ## Open: needs the owner
@@ -48,9 +48,26 @@ Last independent review: 2026-10-17 (file-level; nothing executed).
 ## Open: code
 
 - Pin `@supabase/supabase-js` and the Stripe SDK; commit a `deno.lock`.
-- Align Stripe API versions (SDK uses 2024-11-20, raw calls use 2026-02-25.clover).
 - Pool Postgres connections in `finalizeTopUpTransaction` (one new client per webhook).
 - Retire or document the legacy per-domain edge functions that overlap `make-server`.
 - Add a test that every non-public route rejects an anonymous request.
 - Review RLS migrations against `is_anonymous` and role tables.
 - Fix mojibake in comments (`shared.ts` has `â”€â”€` where `──` was intended).
+
+## Changed on 2026-11-08
+
+- Stripe SDK calls and raw API requests now share the SDK-supported `2024-11-20`
+  API version. A Deno regression test verifies the raw request header.
+
+## Changed on 2026-11-09
+
+- Outbox batches now persist expiring claim tokens across RPC calls. The worker
+  verifies claims on completion, enforces a dispatch timeout, avoids storing
+  upstream response bodies, and surfaces events that have no worker route.
+- Notification event handling now deduplicates by recipient and outbox event,
+  retries database write failures, rejects external action URLs, and returns a
+  non-success response when a supported event has no completed side effect.
+- These changes are code-reviewed only: migrations have not been applied and
+  the linked Supabase project is inactive. Do not raise production readiness
+  scores until the database migration, Deno suites, and deployed worker are
+  verified.

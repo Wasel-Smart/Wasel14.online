@@ -63,6 +63,8 @@ export function OfferRideFormPanel({
   const capacity = (value: string) => packageCapacityLabel(value, language);
   const errorDisplay = formError ? (
     <div
+      role="alert"
+      aria-live="assertive"
       style={{
         marginBottom: 16,
         display: 'flex',
@@ -234,6 +236,7 @@ export function OfferRideFormPanel({
           ].map(field => (
             <div key={field.label}>
               <label
+                htmlFor={`offer-ride-${field.key}`}
                 style={{
                   display: 'block',
                   color: DS.muted,
@@ -247,6 +250,7 @@ export function OfferRideFormPanel({
                 {field.label}
               </label>
               <select
+                id={`offer-ride-${field.key}`}
                 value={form[field.key]}
                 onChange={event => onUpdate(field.key, event.target.value)}
                 style={{
@@ -272,6 +276,7 @@ export function OfferRideFormPanel({
           ))}
           <div>
             <label
+              htmlFor="offer-ride-date"
               style={{
                 display: 'block',
                 color: DS.muted,
@@ -285,6 +290,7 @@ export function OfferRideFormPanel({
               {tx('common.date')}
             </label>
             <input
+              id="offer-ride-date"
               type="date"
               value={form.date}
               onChange={event => onUpdate('date', event.target.value)}
@@ -305,6 +311,7 @@ export function OfferRideFormPanel({
           </div>
           <div>
             <label
+              htmlFor="offer-ride-time"
               style={{
                 display: 'block',
                 color: DS.muted,
@@ -318,6 +325,7 @@ export function OfferRideFormPanel({
               {tx('common.time')}
             </label>
             <input
+              id="offer-ride-time"
               type="time"
               value={form.time}
               onChange={event => onUpdate('time', event.target.value)}
@@ -428,6 +436,7 @@ export function OfferRideFormPanel({
           ].map(field => (
             <div key={field.label}>
               <label
+                htmlFor={`offer-ride-${field.key}`}
                 style={{
                   display: 'block',
                   color: DS.muted,
@@ -441,6 +450,7 @@ export function OfferRideFormPanel({
                 {field.label}
               </label>
               <input
+                id={`offer-ride-${field.key}`}
                 type="number"
                 min={field.min}
                 max={field.max}
@@ -489,6 +499,7 @@ export function OfferRideFormPanel({
           )}
           <div>
             <label
+              htmlFor="offer-ride-car-model"
               style={{
                 display: 'block',
                 color: DS.muted,
@@ -502,6 +513,7 @@ export function OfferRideFormPanel({
               {tx('services.ridesharing.carModel')}
             </label>
             <input
+              id="offer-ride-car-model"
               placeholder={tx('offerRideFormPanel.e_g_toyota_camry_2023')}
               value={form.carModel}
               onChange={event => onUpdate('carModel', event.target.value)}
@@ -520,6 +532,8 @@ export function OfferRideFormPanel({
             />
           </div>
           <button
+            type="button"
+            aria-pressed={form.acceptsPackages}
             onClick={() => { void onUpdate('acceptsPackages', !form.acceptsPackages); }}
             style={{
               padding: '12px 18px',
@@ -534,11 +548,14 @@ export function OfferRideFormPanel({
             }}
           >
             {tx('offerRideFormPanel.package_network')}{' '}
-            {form.acceptsPackages ? 'Accepting packages on this ride' : 'Passengers only'}
+            {form.acceptsPackages
+              ? local('Accepting packages on this ride', 'يقبل الطرود في هذه الرحلة')
+              : local('Passengers only', 'للركاب فقط')}
           </button>
           {form.acceptsPackages && (
             <div>
               <label
+                htmlFor="offer-ride-package-capacity"
                 style={{
                   display: 'block',
                   color: DS.muted,
@@ -552,6 +569,7 @@ export function OfferRideFormPanel({
                 {tx('offerRideFormPanel.package_capacity')}
               </label>
               <select
+                id="offer-ride-package-capacity"
                 value={form.packageCapacity}
                 onChange={event => onUpdate('packageCapacity', event.target.value)}
                 style={{
@@ -622,6 +640,7 @@ export function OfferRideFormPanel({
           </h3>
           <div>
             <label
+              id="offer-ride-gender-label"
               style={{
                 display: 'block',
                 color: DS.muted,
@@ -634,10 +653,12 @@ export function OfferRideFormPanel({
             >
               {tx('profileExpanded.genderPreference')}
             </label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div role="group" aria-labelledby="offer-ride-gender-label" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {Object.entries(genderMeta).map(([key, value]) => (
                 <button
                   key={key}
+                  type="button"
+                  aria-pressed={form.gender === key}
                   onClick={() => { void onUpdate('gender', key); }}
                   style={{
                     padding: '8px 16px',
@@ -657,6 +678,8 @@ export function OfferRideFormPanel({
             </div>
           </div>
           <button
+            type="button"
+            aria-pressed={form.prayer}
             onClick={() => { void onUpdate('prayer', !form.prayer); }}
             style={{
               padding: '12px 18px',
@@ -671,11 +694,12 @@ export function OfferRideFormPanel({
             }}
           >
             {tx('offerRideFormPanel.prayer_stops')}
-            {form.prayer ? 'Enabled' : 'Optional'}
+            {form.prayer ? local('Enabled', 'مفعّلة') : local('Optional', 'اختيارية')}
           </button>
           {form.acceptsPackages && (
             <div>
               <label
+                htmlFor="offer-ride-package-note"
                 style={{
                   display: 'block',
                   color: DS.muted,
@@ -689,6 +713,7 @@ export function OfferRideFormPanel({
                 {tx('offerRideFormPanel.package_note')}
               </label>
               <input
+                id="offer-ride-package-note"
                 placeholder={tx('offerRideFormPanel.example_compact_parcels_only')}
                 value={form.packageNote}
                 onChange={event => onUpdate('packageNote', event.target.value)}
@@ -709,6 +734,7 @@ export function OfferRideFormPanel({
           )}
           <div>
             <label
+              htmlFor="offer-ride-passenger-note"
               style={{
                 display: 'block',
                 color: DS.muted,
@@ -722,6 +748,7 @@ export function OfferRideFormPanel({
               {tx('offerRideFormPanel.note_for_passengers')}
             </label>
             <textarea
+              id="offer-ride-passenger-note"
               rows={2}
               placeholder={tx('offerRideFormPanel.anything_passengers_should_know')}
               value={form.note}

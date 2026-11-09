@@ -229,6 +229,7 @@ export function PackageSendPanel({
         ].map(field => (
           <div key={field.l}>
             <label
+              htmlFor={`package-${field.k}`}
               style={{
                 display: 'block',
                 color: DS.muted,
@@ -242,6 +243,7 @@ export function PackageSendPanel({
               {field.l}
             </label>
             <select
+              id={`package-${field.k}`}
               value={pkg[field.k]}
               onChange={event =>
                 setPkg(previous => ({ ...previous, [field.k]: event.target.value }))
@@ -269,6 +271,7 @@ export function PackageSendPanel({
         ))}
         <div>
           <label
+            htmlFor="package-weight"
             style={{
               display: 'block',
               color: DS.muted,
@@ -282,6 +285,7 @@ export function PackageSendPanel({
             {tx('packageSendPanel.weight')}
           </label>
           <select
+            id="package-weight"
             value={pkg.weight}
             onChange={event => setPkg(previous => ({ ...previous, weight: event.target.value }))}
             style={{
@@ -306,6 +310,7 @@ export function PackageSendPanel({
         </div>
         <div>
           <label
+            htmlFor="package-recipient-name"
             style={{
               display: 'block',
               color: DS.muted,
@@ -319,6 +324,7 @@ export function PackageSendPanel({
             {tx('packageSendPanel.recipient')}
           </label>
           <input
+            id="package-recipient-name"
             data-testid="package-recipient-name"
             placeholder={tx('packageSendPanel.full_recipient_name')}
             value={pkg.recipientName}
@@ -341,6 +347,7 @@ export function PackageSendPanel({
         </div>
         <div>
           <label
+            htmlFor="package-recipient-phone"
             style={{
               display: 'block',
               color: DS.muted,
@@ -354,6 +361,7 @@ export function PackageSendPanel({
             {tx('common.phone')}
           </label>
           <input
+            id="package-recipient-phone"
             data-testid="package-recipient-phone"
             placeholder={tx('packageSendPanel.recipient_phone')}
             value={pkg.recipientPhone}
@@ -376,6 +384,7 @@ export function PackageSendPanel({
         </div>
         <div>
           <label
+            htmlFor="package-note"
             style={{
               display: 'block',
               color: DS.muted,
@@ -389,6 +398,7 @@ export function PackageSendPanel({
             {tx('packageSendPanel.note')}
           </label>
           <input
+            id="package-note"
             placeholder={tx('packageSendPanel.fragile_or_handling_notes')}
             value={pkg.note}
             onChange={event => setPkg(previous => ({ ...previous, note: event.target.value }))}

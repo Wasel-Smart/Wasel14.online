@@ -27,10 +27,17 @@ file does not do that.
 Suggested priority: Supabase service role and DB password, Stripe, Twilio, Google service
 account key, Vercel token, then OAuth providers, email providers, and worker secrets.
 
-Webhook URLs in this project live under the edge function, for example:
-`https://<project-ref>.supabase.co/functions/v1/make-server-0b1f4071/payments/webhooks/stripe`
-(other routes: `/communications/webhooks/twilio`, `/communications/webhooks/resend`,
-`/payments/webhooks/cliq`, `/auth/hooks/send-sms`).
+Provider webhooks are served by the dedicated `webhooks` Edge Function:
+
+- Stripe: `https://<project-ref>.supabase.co/functions/v1/webhooks/payments/webhooks/stripe`
+- CliQ: `https://<project-ref>.supabase.co/functions/v1/webhooks/payments/webhooks/cliq`
+- Twilio: `https://<project-ref>.supabase.co/functions/v1/webhooks/communications/webhooks/twilio`
+- Resend: `https://<project-ref>.supabase.co/functions/v1/webhooks/communications/webhooks/resend`
+- Supabase Auth SMS hook: `https://<project-ref>.supabase.co/functions/v1/webhooks/auth/hooks/send-sms`
+
+Do not add shared query-string tokens to callback URLs. Twilio and Resend rely on
+provider signature verification. Set `TWILIO_WEBHOOK_PUBLIC_URL` to the exact
+Twilio callback URL if a proxy rewrites the request URL.
 
 ---
 
@@ -46,7 +53,7 @@ Webhook URLs in this project live under the edge function, for example:
 
 ### 1.2 Webhook signing secret (`STRIPE_WEBHOOK_SECRET`)
 1. Open [Stripe Webhooks](https://dashboard.stripe.com/webhooks) and select the Wasel endpoint
-   (the URL above, not a generic `/v1/webhooks/stripe` path).
+   under the dedicated `webhooks` Edge Function.
 2. **Roll secret**, set an expiry for the old one, copy the new `whsec_...` value.
 3. Update it in Supabase secrets and redeploy the function.
 4. Test with `stripe trigger checkout.session.completed` (section 8).

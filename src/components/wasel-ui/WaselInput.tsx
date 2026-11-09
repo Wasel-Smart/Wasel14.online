@@ -79,6 +79,7 @@ export function WaselInput({
 }: WaselInputProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
+  const descriptionId = `${inputId}-description`;
   const errorId = `${inputId}-error`;
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
@@ -111,7 +112,7 @@ export function WaselInput({
             </label>
           )}
           {description && (
-            <span style={{ fontSize: TYPE.size.xs, color: C.textMuted, fontFamily: F }}>
+            <span id={descriptionId} style={{ fontSize: TYPE.size.xs, color: C.textMuted, fontFamily: F }}>
               {description}
             </span>
           )}
@@ -144,7 +145,11 @@ export function WaselInput({
           id={inputId}
           type={resolvedType}
           aria-invalid={hasError || undefined}
-          aria-describedby={hasError ? errorId : rest['aria-describedby']}
+          aria-describedby={[
+            rest['aria-describedby'],
+            description ? descriptionId : null,
+            hasError ? errorId : null,
+          ].filter(Boolean).join(' ') || undefined}
           onChange={e => onChange?.(e.target.value)}
           style={{
             flex: 1,

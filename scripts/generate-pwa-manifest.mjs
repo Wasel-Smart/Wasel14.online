@@ -67,6 +67,17 @@ for (const url of staticAssets) {
 // download and makes service-worker updates slow on mobile networks. Assets
 // referenced by the initial HTML are already included above; later routes use
 // the runtime cache once visited.
+// Locale chunks are the exception: LanguageProvider waits for the active locale
+// before mounting the app, so both languages must be available offline after
+// the worker installs even if the first locale request raced worker activation.
+const jsAssetDir = path.join(distDir, 'assets', 'js');
+if (fs.existsSync(jsAssetDir)) {
+  for (const fileName of fs.readdirSync(jsAssetDir)) {
+    if (/^(ar|en)-[^/]+\.js$/.test(fileName)) {
+      assetUrls.add(`/assets/js/${fileName}`);
+    }
+  }
+}
 
 const manifest = {
   version: buildVersion,

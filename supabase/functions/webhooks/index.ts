@@ -28,6 +28,7 @@ import {
   handleTwilioWebhook,
   handleSendSmsHook,
 } from './_vendor/supabase/functions/make-server-0b1f4071/_handlers/webhooks.ts';
+import { getWebhookRequestPath } from './_shared/route.ts';
 
 Deno.serve(async (request: Request) => {
   // Webhook callers (Stripe, Twilio, etc.) send from their own origins, not
@@ -39,8 +40,7 @@ Deno.serve(async (request: Request) => {
   }
 
   const url = new URL(request.url);
-  // Strip the function prefix so paths match the same patterns as in the main function.
-  const path = url.pathname.replace(/^.*\/webhooks/, '') || '/';
+  const path = getWebhookRequestPath(url.pathname);
 
   try {
     if (request.method === 'POST') {

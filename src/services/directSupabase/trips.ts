@@ -8,9 +8,7 @@ import {
   buildTripNotes,
   normalizePackageCapacity,
   normalizeTripStatus,
-  getWalletByCanonicalUserId,
   toNumber,
-  mapCanonicalRole,
 } from './helpers.js';
 import { buildUserContext, ensureDriverForUser, getLatestVerificationRecord } from './userContext';
 import type {
@@ -95,6 +93,17 @@ export async function getDirectVerificationRecord(userId: string) {
 }
 
 export async function updateDirectProfile(userId: string, updates: Record<string, unknown>) {
+  const selfServiceFields = new Set([
+    'email',
+    'full_name',
+    'phone',
+    'phone_number',
+    'avatar_url',
+  ]);
+  if (Object.keys(updates).some(field => !selfServiceFields.has(field))) {
+    throw new Error('This profile change requires a trusted server workflow.');
+  }
+
   // For new users the canonical row may not exist yet. Seed it from auth metadata
   // so ensureCanonicalUser can create it, then proceed with the update.
   let context;
@@ -108,7 +117,6 @@ export async function updateDirectProfile(userId: string, updates: Record<string
           : typeof updates.phone === 'string'
             ? updates.phone
             : null,
-      role: typeof updates.role === 'string' ? updates.role : null,
     });
   } catch (seedError) {
     // If the canonical user row still can’t be created (e.g. missing required
@@ -124,8 +132,9 @@ export async function updateDirectProfile(userId: string, updates: Record<string
   }
 
   const db = getDb();
+  // This client fallback only persists ordinary self-service profile fields.
+  // Roles, verification state, and wallet data are changed through trusted APIs.
   const userPatch: Record<string, unknown> = {};
-  const walletPatch: Record<string, unknown> = {};
 
   if (typeof updates.email === 'string') {userPatch.email = updates.email.trim();}
   if (typeof updates.full_name === 'string') {userPatch.full_name = updates.full_name.trim();}
@@ -139,27 +148,11 @@ export async function updateDirectProfile(userId: string, updates: Record<string
   ) {
     userPatch.phone_verified_at = null;
   }
-  if (typeof updates.role === 'string') {userPatch.role = mapCanonicalRole(updates.role) ?? updates.role;}
-  if (typeof updates.verification_level === 'string')
-    {userPatch.verification_level = updates.verification_level;}
   if (typeof updates.avatar_url === 'string') {userPatch.avatar_url = updates.avatar_url;}
-  if (updates.wallet_balance !== undefined)
-    {walletPatch.balance = toNumber(updates.wallet_balance, 0);}
-  if (typeof updates.wallet_status === 'string') {walletPatch.wallet_status = updates.wallet_status;}
 
   if (Object.keys(userPatch).length > 0) {
     const { error } = await db.from('users').update(userPatch).eq('id', context.user.id);
     if (error) {throw error;}
-  }
-  if (Object.keys(walletPatch).length > 0) {
-    const wallet = context.wallet ?? (await getWalletByCanonicalUserId(context.user.id));
-    if (wallet?.wallet_id) {
-      const { error } = await db
-        .from('wallets')
-        .update(walletPatch)
-        .eq('wallet_id', wallet.wallet_id);
-      if (error) {throw error;}
-    }
   }
   return getDirectProfile(userId);
 }
@@ -168,8 +161,10 @@ export async function searchDirectTrips(
   from?: string,
   to?: string,
   date?: string,
-  seats?: number,
+  seatsOrOptions?: number | { seats?: number; signal?: AbortSignal },
 ): Promise<TripSearchResult[]> {
+  const seats = typeof seatsOrOptions === 'number' ? seatsOrOptions : seatsOrOptions?.seats;
+  const signal = typeof seatsOrOptions === 'number' ? undefined : seatsOrOptions?.signal;
   const db = getDb();
   let query = db
     .from('trips')
@@ -186,11 +181,13 @@ export async function searchDirectTrips(
       .lt('departure_time', `${date}T23:59:59.999`);}
   if (seats) {query = query.gte('available_seats', seats);}
   query = query.in('trip_status', ['open', 'booked', 'in_progress']).order('departure_time');
+  if (signal) {query = query.abortSignal(signal);}
 
   const { data, error } = await query;
   if (error) {throw error;}
 
   const rows = (Array.isArray(data) ? data : []) as TripRow[];
+  if (signal?.aborted) {return [];}
   const profiles = await fetchProfilesByDriverIds(rows.map(r => String(r.driver_id ?? '')));
   return rows.map(row => mapTripRow(row, profiles[String(row.driver_id ?? '')] ?? null));
 }

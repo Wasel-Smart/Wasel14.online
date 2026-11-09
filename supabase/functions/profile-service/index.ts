@@ -212,7 +212,7 @@ async function handleProfileRequest(request: Request, path: string) {
     if (isAdmin) {
       if (typeof body.role === 'string') {
         const normalizedRole = body.role.toLowerCase();
-        if (['passenger', 'driver', 'operator', 'admin'].includes(normalizedRole)) {patch.role = normalizedRole;}
+        if (['passenger', 'driver', 'operator', 'admin', 'support', 'finance', 'trust'].includes(normalizedRole)) {patch.role = normalizedRole;}
       }
       if (typeof body.verification_level === 'string') {patch.verification_level = body.verification_level;}
     }

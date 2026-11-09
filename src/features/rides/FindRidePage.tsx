@@ -106,6 +106,7 @@ export function FindRidePage() {
   const [to, setTo] = useState(initialTo);
   const [date, setDate] = useState(initialDate);
   const [searched, setSearched] = useState(initialSearched);
+  const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [selected, setSelected] = useState<Ride | null>(null);
   const [bookingInFlightId, setBookingInFlightId] = useState<string | null>(null);
   const [rideBookings, setRideBookings] = useState<RideBookingRecord[]>(() => getRideBookings());
@@ -168,7 +169,11 @@ export function FindRidePage() {
   const searchFromCoord = resolveCityCoord(from);
   const searchToCoord = resolveCityCoord(to);
   // Live inventory from Supabase, merged with locally posted rides.
-  const { rides: allAvailableRides, loading: inventoryLoading } = useRideInventory({ from, to, date, searched });
+  const {
+    rides: allAvailableRides,
+    loading: inventoryLoading,
+    error: inventoryError,
+  } = useRideInventory({ from, to, date, searched, refreshKey: inventoryRefreshKey });
   const corridorRides = allAvailableRides.filter(ride => ride.from === from && ride.to === to);
   const nearbyCorridors = allAvailableRides
     .filter(
@@ -323,7 +328,7 @@ export function FindRidePage() {
       return;
     }
     if (ride.seatsAvailable <= 0) {
-      setBookingMessage(`That ride is full. ${t.openBusFallback}.`);
+      setBookingMessage(t.rideFullMessage(ride.from, ride.to, t.openBusFallback));
       setSelected(null);
       return;
     }
@@ -359,15 +364,15 @@ export function FindRidePage() {
       setSelected(null);
       setBookingSuccess({
         status: booking.status === 'pending_driver' ? 'pending_driver' : 'confirmed',
-        routeLabel: `${ride.from} to ${ride.to}`,
+        routeLabel: t.routeLabel(ride.from, ride.to),
         driverName: ride.driver.name,
         priceJod: finalPrice,
         ticketCode: booking.ticketCode,
       });
       setBookingMessage(
         booking.status === 'pending_driver'
-          ? `Request sent for ${ride.from} to ${ride.to}.`
-          : `Seat confirmed for ${ride.from} to ${ride.to}.`,
+          ? t.bookingRequestSent(ride.from, ride.to)
+          : t.seatConfirmed(ride.from, ride.to),
       );
 
       if (booking.status === 'confirmed') {
@@ -381,9 +386,7 @@ export function FindRidePage() {
           await updateRideBooking(booking.id, { status: 'cancelled' }).catch(() => {});
           setRideBookings(getRideBookings());
           setBookingSuccess(null);
-          setBookingMessage(
-            `Booking for ${ride.from} to ${ride.to} was cancelled because payment could not be processed. Please check your wallet balance and try again.`,
-          );
+          setBookingMessage(t.paymentFailed(ride.from, ride.to));
           return;
         }
       } else {
@@ -399,11 +402,18 @@ export function FindRidePage() {
 
       notificationsAPI
         .createNotification({
-          title: booking.status === 'pending_driver' ? 'Route request sent' : t.bookingStarted,
+          title: booking.status === 'pending_driver'
+            ? (ar ? 'تم إرسال طلب الرحلة' : 'Route request sent')
+            : t.bookingStarted,
           message:
             booking.status === 'pending_driver'
-              ? `${ride.from} to ${ride.to} is waiting for driver approval at ${finalPrice} JOD.`
-              : `${ride.from} to ${ride.to} at ${ride.time} is now in your trips at ${finalPrice} JOD with boarding reminders.`,
+              ? t.routeRequestNotification(ride.from, ride.to, t.formatCurrency(finalPrice))
+              : t.seatConfirmedNotification(
+                ride.from,
+                ride.to,
+                ride.time,
+                t.formatCurrency(finalPrice),
+              ),
           type: 'booking',
           priority: 'high',
           action_url: '/app/my-trips?tab=rides',
@@ -414,20 +424,20 @@ export function FindRidePage() {
         requestPermission().catch(() => {});
       }
 
-      notifyTripConfirmed(ride.driver.name, `${ride.from} to ${ride.to}`);
+      notifyTripConfirmed(ride.driver.name, t.routeLabel(ride.from, ride.to));
       void recordMovementActivity('ride_booked', corridorPlan?.id ?? null);
     } catch (error) {
       setSelected(null);
       setBookingSuccess(null);
       const message = error instanceof Error ? error.message : 'Unknown error';
-      setBookingMessage(
-        `Could not complete booking for ${ride.from} to ${ride.to}. ${message}. Please check your connection and try again.`,
-      );
+      setBookingMessage(ar
+        ? t.bookingFailed(ride.from, ride.to)
+        : `${t.bookingFailed(ride.from, ride.to)} ${message}.`);
       console.error('[FindRide] Booking failed:', error);
     } finally {
       setBookingInFlightId(null);
     }
-  }, [bookingInFlightId, bookingByRideId, nav, openMyTrips, t, user, routeIntelligence.membership, corridorPlan, permission, requestPermission, notifyTripConfirmed]);
+  }, [bookingInFlightId, bookingByRideId, nav, openMyTrips, t, ar, user, routeIntelligence.membership, corridorPlan, permission, requestPermission, notifyTripConfirmed]);
 
   const handleDemandCapture = () => {
     const alert = createDemandAlert({
@@ -545,11 +555,12 @@ export function FindRidePage() {
                 }}
               >
                 {[
-                  { label: t.from, value: from, setter: setFrom, icon: DS.green },
-                  { label: t.to, value: to, setter: setTo, icon: DS.cyan },
+                  { label: t.from, value: from, setter: setFrom, icon: DS.green, key: 'from' as const },
+                  { label: t.to, value: to, setter: setTo, icon: DS.cyan, key: 'to' as const },
                 ].map(field => (
                   <div key={field.label}>
                     <label
+                      htmlFor={`find-ride-${field.key}`}
                       style={{
                         display: 'block',
                         fontSize: '0.7rem',
@@ -561,6 +572,7 @@ export function FindRidePage() {
                       {field.label}
                     </label>
                     <WaselSelect
+                      id={`find-ride-${field.key}`}
                       value={field.value}
                       onChange={field.setter}
                       options={CITIES.map(city => ({ value: city, label: city }))}
@@ -571,6 +583,7 @@ export function FindRidePage() {
                 ))}
                 <div>
                   <label
+                    htmlFor="find-ride-date"
                     style={{
                       display: 'block',
                       fontSize: '0.7rem',
@@ -582,6 +595,7 @@ export function FindRidePage() {
                     {t.date}
                   </label>
                   <WaselInput
+                    id="find-ride-date"
                     type="date"
                     value={date}
                     onChange={setDate}
@@ -594,6 +608,8 @@ export function FindRidePage() {
 
               {searchError && (
                 <div
+                  role="alert"
+                  aria-live="assertive"
                   style={{
                     marginBottom: 14,
                     display: 'flex',
@@ -617,6 +633,8 @@ export function FindRidePage() {
                 data-testid="find-ride-search"
                 fullWidth
                 size="lg"
+                disabled={inventoryLoading}
+                aria-busy={inventoryLoading}
                 style={{
                   gap: 10,
                 }}
@@ -636,8 +654,41 @@ export function FindRidePage() {
                 ) : (
                   <Search size={18} />
                 )}
-                {inventoryLoading ? t.searching : 'Search rides'}
+                {inventoryLoading ? t.searching : t.searchRides}
               </WaselButton>
+
+              {inventoryError && (
+                <div
+                  role="alert"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    marginTop: 12,
+                    padding: '12px 14px',
+                    borderRadius: r(14),
+                    border: `1px solid ${DS.gold}55`,
+                    background: `${DS.gold}12`,
+                    color: C.text,
+                  }}
+                >
+                  <span>
+                    <strong>{copy.inventoryErrorTitle}.</strong>{' '}
+                    {copy.inventoryErrorDescription}
+                  </span>
+                  <WaselButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={inventoryLoading}
+                    onClick={() => setInventoryRefreshKey(key => key + 1)}
+                  >
+                    {inventoryLoading ? t.searching : copy.retryInventory}
+                  </WaselButton>
+                </div>
+              )}
 
               <div
                 style={{
@@ -667,17 +718,21 @@ export function FindRidePage() {
                         margin: '0 0 4px',
                       }}
                     >
-                      Route preview
+                      {t.routePreview}
                     </p>
                     <p style={{ color: DS.sub, fontSize: '0.8rem', margin: 0 }}>
                       {selectedSignal
-                        ? `Your activity on this route: ${selectedSignal.liveSearches} searches · ${selectedSignal.liveBookings} bookings · ${selectedSignal.activeDemandAlerts} alerts`
-                        : 'Select a route above to see demand signals.'}
+                        ? t.routeActivity(
+                          selectedSignal.liveSearches,
+                          selectedSignal.liveBookings,
+                          selectedSignal.activeDemandAlerts,
+                        )
+                        : t.selectRouteSignals}
                     </p>
                   </div>
                   {selectedSignal && (
                     <span style={{ ...pill(DS.green), fontSize: '0.72rem' }}>
-                      {selectedSignal.forecastDemandScore}/100 demand score
+                      {selectedSignal.forecastDemandScore}/100 {t.demandScore}
                     </span>
                   )}
                 </div>
@@ -697,8 +752,8 @@ export function FindRidePage() {
                 retentionMessage={retentionMessage}
                 onDismissSuccess={() => setBookingSuccess(null)}
                 onOpenMyTrips={openMyTrips}
-                openMyTripsLabel="Open My Trips"
-                keepBrowsingLabel="Keep Browsing"
+                openMyTripsLabel={t.openMyTrips}
+                keepBrowsingLabel={t.keepBrowsing}
               />
               <div
                 className="sp-4col"
@@ -711,39 +766,39 @@ export function FindRidePage() {
               >
                 {[
                   {
-                    label: 'Available departures',
-                    value: `${corridorRides.length} departures`,
-                    sub: 'Departures listed on this route',
+                    label: t.availableDepartures,
+                    value: t.departureCount(corridorRides.length),
+                    sub: t.departuresOnRoute,
                     tone: DS.cyan,
                   },
                   {
-                    label: 'Shared seat price',
-                    value: selectedPriceQuote ? `${selectedPriceQuote.finalPriceJod} JOD` : '--',
+                    label: t.sharedSeatPrice,
+                    value: selectedPriceQuote ? t.formatCurrency(selectedPriceQuote.finalPriceJod) : '--',
                     sub: selectedPriceQuote
-                      ? `You save ${selectedPriceQuote.discountJod} JOD vs solo`
-                      : 'Price shown after search',
+                      ? t.savingsVsSolo(selectedPriceQuote.discountJod)
+                      : t.priceAfterSearch,
                     tone: DS.green,
                   },
                   {
-                    label: 'Next departure window',
+                    label: t.nextDepartureWindow,
                     value:
                       selectedSignal?.nextWaveWindow ??
                       corridorPlan?.autoGroupWindow ??
-                      'Check after search',
+                      t.checkAfterSearch,
                     sub:
                       selectedSignal?.recommendedPickupPoint ??
                       corridorPlan?.pickupPoints[0] ??
-                      'Pickup point shown here',
+                      t.pickupPointShown,
                     tone: DS.gold,
                   },
                   {
-                    label: 'Route reliability',
+                    label: t.routeReliability,
                     value: selectedSignal
                       ? `${selectedSignal.routeOwnershipScore}/100`
-                      : (corridorPlan?.routeMoat ?? 'Growing'),
+                      : (corridorPlan?.routeMoat ?? t.growing),
                     sub: selectedSignal
                       ? selectedSignal.productionSources.slice(0, 2).join(' · ')
-                      : `${demandStats.active} saved alerts`,
+                      : t.savedAlerts(demandStats.active),
                     tone: DS.cyan,
                   },
                 ].map(item => (
@@ -801,12 +856,12 @@ export function FindRidePage() {
             >
               <h2 style={{ color: C.text, fontWeight: 800, fontSize: '0.95rem', margin: 0 }}>
                 {searched
-                  ? `${from} → ${to} · ${results.length} ride${results.length !== 1 ? 's' : ''} found`
-                  : `Popular routes · ${results.length} departures`}
+                  ? t.resultsTitle(from, to, results.length)
+                  : t.popularRoutesTitle(results.length)}
               </h2>
               {selectedSignal ? (
                 <div style={{ color: DS.muted, fontSize: '0.74rem' }}>
-                  Best price {selectedSignal.priceQuote.finalPriceJod} JOD · Next departure {selectedSignal.nextWaveWindow}
+                  {t.bestPrice(selectedSignal.priceQuote.finalPriceJod)} · {t.nextDeparture(selectedSignal.nextWaveWindow)}
                 </div>
               ) : null}
               <div className="sp-sort-bar" style={{ display: 'flex', gap: 6 }}>
@@ -831,7 +886,26 @@ export function FindRidePage() {
 
             <div className="sp-results-list" style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 18 }}>
               <AnimatePresence>
-                {results.length === 0 ? (
+                {inventoryLoading ? (
+                  <motion.div
+                    key="ride-inventory-loading"
+                    role="status"
+                    aria-live="polite"
+                    aria-label={t.searching}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{
+                      background: DS.card,
+                      borderRadius: r(20),
+                      padding: '32px 24px',
+                      textAlign: 'center',
+                      border: `1px solid ${DS.border}`,
+                      color: DS.sub,
+                    }}
+                  >
+                    {t.searching}
+                  </motion.div>
+                ) : results.length === 0 ? (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -845,11 +919,12 @@ export function FindRidePage() {
                   >
                     <div style={{ fontSize: '3rem', marginBottom: 16 }}>{copy.noResultsIcon}</div>
                     <h3 style={{ color: C.text, fontWeight: 800, marginBottom: 8 }}>
-                      {t.noRidesFound}
+                      {inventoryError ? copy.inventoryErrorTitle : t.noRidesFound}
                     </h3>
                     <p style={{ color: DS.sub, fontSize: '0.875rem' }}>
-                      No ride found yet. Save this route and get alerted when one opens
-                      {selectedSignal ? ` around ${selectedSignal.nextWaveWindow}` : ''}.
+                      {inventoryError
+                        ? copy.inventoryErrorDescription
+                        : t.noRideYet(selectedSignal?.nextWaveWindow)}
                     </p>
                     <div
                       className="sp-empty-actions"
@@ -901,7 +976,7 @@ export function FindRidePage() {
                         }}
                       >
                         {waitlistMessage ??
-                          `${demandStats.active} active alert${demandStats.active === 1 ? '' : 's'}.`}
+                          t.activeAlerts(demandStats.active)}
                       </div>
                     )}
                     {nearbyCorridors.length > 0 && (
@@ -947,8 +1022,8 @@ export function FindRidePage() {
                                   style={{ ...pill(ride.seatsAvailable > 0 ? DS.cyan : DS.gold) }}
                                 >
                                   {ride.seatsAvailable > 0
-                                    ? `${getMovementPriceQuote({ basePriceJod: ride.pricePerSeat, corridorId: resolveSignalForRoute(ride.from, ride.to)?.id, forecastDemandScore: resolveSignalForRoute(ride.from, ride.to)?.forecastDemandScore, membership: routeIntelligence.membership }).finalPriceJod} JOD`
-                                    : 'Sold out'}
+                                    ? t.formatCurrency(getMovementPriceQuote({ basePriceJod: ride.pricePerSeat, corridorId: resolveSignalForRoute(ride.from, ride.to)?.id, forecastDemandScore: resolveSignalForRoute(ride.from, ride.to)?.forecastDemandScore, membership: routeIntelligence.membership }).finalPriceJod)
+                                    : t.soldOut}
                                 </span>
                               </div>
                             </WaselButton>
@@ -1005,9 +1080,9 @@ export function FindRidePage() {
                     <Brain size={18} color={DS.cyan} />
                   </div>
                   <div>
-                    <div style={{ color: C.text, fontWeight: 800 }}>Why this route fits</div>
+                    <div style={{ color: C.text, fontWeight: 800 }}>{t.whyRouteFits}</div>
                     <div style={{ color: DS.muted, fontSize: '0.76rem', marginTop: 2 }}>
-                      Demand signals for {from} → {to}.
+                      {t.demandSignalsFor(from, to)}
                     </div>
                   </div>
                 </div>
@@ -1015,13 +1090,13 @@ export function FindRidePage() {
                   {(selectedSignal
                     ? [
                       selectedSignal.recommendedReason,
-                      `Next wave: ${selectedSignal.nextWaveWindow} from ${selectedSignal.recommendedPickupPoint}.`,
-                      `Based on: ${selectedSignal.productionSources.slice(0, 3).join(' | ')}.`,
+                      t.nextWaveFrom(selectedSignal.nextWaveWindow, selectedSignal.recommendedPickupPoint),
+                      t.basedOn(selectedSignal.productionSources.slice(0, 3).join(' | ')),
                     ]
                     : (corridorPlan?.intelligenceSignals ?? [
-                      'Demand builds before departure.',
-                      'Pickup points stay simple.',
-                      'Shared rides stay cheaper.',
+                      t.demandBuildsBeforeDeparture,
+                      t.pickupPointsStaySimple,
+                      t.sharedRidesStayCheaper,
                     ])
                   ).map(line => (
                     <div
@@ -1073,9 +1148,9 @@ export function FindRidePage() {
                       <TrendingUp size={18} color={DS.gold} />
                     </div>
                     <div>
-                      <div style={{ color: C.text, fontWeight: 800 }}>Popular routes</div>
+                      <div style={{ color: C.text, fontWeight: 800 }}>{t.popularRoutesHeading}</div>
                       <div style={{ color: DS.muted, fontSize: '0.76rem', marginTop: 2 }}>
-                        Routes with the strongest demand outlook.
+                        {t.strongestDemandOutlook}
                       </div>
                     </div>
                   </div>
@@ -1110,9 +1185,9 @@ export function FindRidePage() {
                               {corridor.label}
                             </div>
                             <div style={{ color: DS.muted, fontSize: '0.74rem', marginTop: 4 }}>
-                              Demand {corridor.forecastDemandScore} |{' '}
-                              {corridor.priceQuote.finalPriceJod} JOD | Owns{' '}
-                              {corridor.routeOwnershipScore}
+                              {t.demandScore} {corridor.forecastDemandScore} |{' '}
+                              {t.formatCurrency(corridor.priceQuote.finalPriceJod)} |{' '}
+                              {corridor.routeOwnershipScore} {t.ownershipScore}
                             </div>
                           </div>
                           <span style={pill(DS.cyan)}>{corridor.pricePressure}</span>
@@ -1145,9 +1220,9 @@ export function FindRidePage() {
                       <Network size={18} color={DS.green} />
                     </div>
                     <div>
-                      <div style={{ color: C.text, fontWeight: 800 }}>Rides that also carry packages</div>
+                      <div style={{ color: C.text, fontWeight: 800 }}>{t.ridesCarryPackages}</div>
                       <div style={{ color: DS.muted, fontSize: '0.76rem', marginTop: 2 }}>
-                        Some rides accept parcels on the same route.
+                        {t.ridesAcceptParcels}
                       </div>
                     </div>
                   </div>
@@ -1200,7 +1275,7 @@ export function FindRidePage() {
                 }}
               >
                 <div style={{ color: C.text, fontWeight: 800, marginBottom: 12 }}>
-                  Suggested reminders
+                  {t.suggestedReminders}
                 </div>
                 {recurringSuggestions.length > 0 ? (
                   <div style={{ display: 'grid', gap: 10 }}>
@@ -1233,8 +1308,8 @@ export function FindRidePage() {
                               </div>
                               <div style={{ color: DS.muted, fontSize: '0.74rem', marginTop: 4 }}>
                                 {suggestion.confidenceScore}/100 |{' '}
-                                {suggestion.priceQuote.finalPriceJod} JOD |{' '}
-                                {suggestion.weeklyFrequency} signals
+                                {t.formatCurrency(suggestion.priceQuote.finalPriceJod)} |{' '}
+                                {t.weeklySignals(suggestion.weeklyFrequency)}
                               </div>
                             </div>
                             <span style={pill(DS.green)}>{suggestion.recommendedFrequency}</span>
@@ -1259,14 +1334,14 @@ export function FindRidePage() {
                               variant="outline"
                               size="sm"
                             >
-                              Search route
+                              {t.searchRouteButton}
                             </WaselButton>
                             <WaselButton
                               onClick={() => { void handleSaveReminder(suggestion.corridorId); }}
                               variant={alreadySaved ? 'gold' : 'primary'}
                               size="sm"
                             >
-                              {alreadySaved ? 'Reminder active' : 'Save reminder'}
+                              {alreadySaved ? t.reminderActive : t.saveReminder}
                             </WaselButton>
                           </div>
                         </div>
@@ -1275,7 +1350,7 @@ export function FindRidePage() {
                   </div>
                 ) : (
                   <div style={{ color: DS.muted, fontSize: '0.8rem' }}>
-                    Book more rides to unlock reminders.
+                    {t.bookMoreForReminders}
                   </div>
                 )}
               </div>
@@ -1289,7 +1364,7 @@ export function FindRidePage() {
                 }}
               >
                 <div style={{ color: C.text, fontWeight: 800, marginBottom: 12 }}>
-                  Saved reminders
+                  {t.savedReminders}
                 </div>
                 {savedReminders.length > 0 ? (
                   <div style={{ display: 'grid', gap: 10 }}>
@@ -1314,7 +1389,7 @@ export function FindRidePage() {
                   </div>
                 ) : (
                   <div style={{ color: DS.muted, fontSize: '0.8rem', lineHeight: 1.55 }}>
-                    Save a route to see reminders here.
+                    {t.saveRouteForReminders}
                   </div>
                 )}
               </div>
@@ -1338,7 +1413,7 @@ export function FindRidePage() {
                 }}
               >
                 <div style={{ color: C.text, fontWeight: 800, marginBottom: 12 }}>
-                  Best ride matches
+                  {t.bestRideMatches}
                 </div>
                 <div style={{ display: 'grid', gap: 10 }}>
                   {recommendedRides.map(ride => {
@@ -1378,7 +1453,7 @@ export function FindRidePage() {
                             <div style={{ color: DS.muted, fontSize: '0.74rem', marginTop: 4 }}>
                               {ride.time} | {ride.driver.name} |{' '}
                               {rideSignal
-                                ? `${rideSignal.routeOwnershipScore}/100 ownership`
+                                ? `${rideSignal.routeOwnershipScore}/100 ${t.ownershipScore}`
                                 : ride.car}
                             </div>
                           </div>
@@ -1386,8 +1461,8 @@ export function FindRidePage() {
                             style={{ ...pill(bookedRideIds.has(ride.id) ? DS.green : DS.cyan) }}
                           >
                             {bookedRideIds.has(ride.id)
-                              ? 'Booked'
-                              : `${ridePriceQuote.finalPriceJod} JOD`}
+                              ? t.booked
+                              : t.formatCurrency(ridePriceQuote.finalPriceJod)}
                           </span>
                         </div>
                       </WaselButton>

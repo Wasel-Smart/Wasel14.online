@@ -201,7 +201,7 @@ export const walletApi = {
     void amount;
     void bankAccount;
     void opts;
-    throw new Error('Withdrawals are temporarily unavailable until a payout provider is configured.');
+    return runSecureWalletOperation(() => { throw new Error('Withdrawals are temporarily unavailable until a payout provider is configured.'); });
   },
 
   async sendMoney(userId: string, recipientId: string, amount: number, optsOrNote?: { note?: string; pin?: string } | string, maybePin?: string) {

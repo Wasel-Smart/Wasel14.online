@@ -347,11 +347,13 @@ export function BusPage() {
           >
             <div>
               <label
+                htmlFor="bus-origin"
                 style={{ display: 'block', color: DS.sub, fontSize: '0.76rem', marginBottom: 8 }}
               >
                 {tx('common.from')}
               </label>
               <select
+                id="bus-origin"
                 value={origin}
                 onChange={event => {
                   setOrigin(event.target.value);
@@ -378,11 +380,13 @@ export function BusPage() {
             </div>
             <div>
               <label
+                htmlFor="bus-destination"
                 style={{ display: 'block', color: DS.sub, fontSize: '0.76rem', marginBottom: 8 }}
               >
                 {tx('common.to')}
               </label>
               <select
+                id="bus-destination"
                 value={destination}
                 onChange={event => {
                   setDestination(event.target.value);
@@ -409,11 +413,13 @@ export function BusPage() {
             </div>
             <div>
               <label
+                htmlFor="bus-travel-date"
                 style={{ display: 'block', color: DS.sub, fontSize: '0.76rem', marginBottom: 8 }}
               >
                 {tx('busPage.travel_date')}
               </label>
               <input
+                id="bus-travel-date"
                 type="date"
                 min={today}
                 value={tripDate}

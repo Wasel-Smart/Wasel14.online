@@ -104,15 +104,17 @@ CLIQ_WEBHOOK_SECRET
 
 ### Stripe
 1. Go to [dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks)
-2. Endpoint must be: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/payments/webhooks/stripe`
+2. Endpoint must be: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/webhooks/payments/webhooks/stripe`
 3. Send test event: `payment_intent.succeeded` → must return 200
 4. If still pointing to `stripe-payments-v2/webhook` → update it (that endpoint returns 410)
 
 ### Twilio
-- Status callback URL: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/communications/webhooks/twilio?token=<COMMUNICATION_WEBHOOK_TOKEN>`
+- Status callback URL: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/webhooks/communications/webhooks/twilio`
+- Set `TWILIO_WEBHOOK_SIGNING_SECRET`; set `TWILIO_WEBHOOK_PUBLIC_URL` to this exact URL if a proxy rewrites it.
 
 ### Resend
-- Webhook URL: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/communications/webhooks/resend?token=<COMMUNICATION_WEBHOOK_TOKEN>`
+- Webhook URL: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/webhooks/communications/webhooks/resend`
+- Set `RESEND_WEBHOOK_SIGNING_SECRET`; do not use a query-string token.
 
 ---
 

@@ -13,9 +13,6 @@ import { C, F } from './utils/wasel-ds';
 import { validateRuntimeConfiguration } from './utils/env';
 import { DEFAULT_QUERY_OPTIONS } from './utils/performance/cacheStrategy';
 import { waselRouter } from './router';
-import { initSentry, logger as monitoringLogger, trackDomainEvent } from './utils/monitoring';
-import { warmUpServer } from './services/core';
-import { domainEventBus } from './platform/event-bus';
 
 function scheduleWhenIdle(callback: () => void): () => void {
   if (typeof window === 'undefined') {
@@ -98,25 +95,39 @@ function AppRuntimeCoordinator() {
             if (cancelled) {return;}
 
             try {
-              void initSentry();
+              void Promise.all([
+                import('./utils/monitoring'),
+                import('./services/core'),
+                import('./platform/event-bus'),
+              ])
+                .then(([monitoring, backend, events]) => {
+                  if (cancelled) {return;}
 
-              validation.issues.forEach(issue => {
-                if (issue.severity === 'error') {
-                  monitoringLogger.error(issue.message);
-                } else {
-                  monitoringLogger.warning(issue.message);
-                }
-              });
+                  void monitoring.initSentry();
+                  validation.issues.forEach(issue => {
+                    if (issue.severity === 'error') {
+                      monitoring.logger.error(issue.message);
+                    } else {
+                      monitoring.logger.warning(issue.message);
+                    }
+                  });
 
-              warmUpServer();
+                  void backend.warmUpServer().catch(error => {
+                    if (import.meta.env.DEV) {
+                      console.warn('[Runtime backend warmup failed]', error);
+                    }
+                  });
 
-              const stopEvents = domainEventBus.subscribeAll(event => {
-                trackDomainEvent(event);
-              });
-
-              cleanup = () => {
-                stopEvents?.();
-              };
+                  const stopEvents = events.domainEventBus.subscribeAll(event => {
+                    monitoring.trackDomainEvent(event);
+                  });
+                  cleanup = stopEvents;
+                })
+                .catch(error => {
+                  if (import.meta.env.DEV) {
+                    console.warn('[Runtime deferred modules failed]', error);
+                  }
+                });
             } catch (e) {
               if (import.meta.env.DEV) {
                 console.warn('[Runtime deferred tasks failed]', e);

@@ -133,6 +133,7 @@ export function PackageReturnsPanel({
       >
         <div>
           <label
+            htmlFor="package-return-recipient-name"
             style={{
               display: 'block',
               color: DS.muted,
@@ -145,6 +146,7 @@ export function PackageReturnsPanel({
             {ar ? 'اسم المستلم' : 'Recipient name'}
           </label>
           <input
+            id="package-return-recipient-name"
             data-testid="package-return-recipient-name"
             value={pkg.recipientName}
             onChange={event =>
@@ -166,6 +168,7 @@ export function PackageReturnsPanel({
         </div>
         <div>
           <label
+            htmlFor="package-return-recipient-phone"
             style={{
               display: 'block',
               color: DS.muted,
@@ -178,6 +181,7 @@ export function PackageReturnsPanel({
             {ar ? 'هاتف المستلم' : 'Recipient phone'}
           </label>
           <input
+            id="package-return-recipient-phone"
             data-testid="package-return-recipient-phone"
             value={pkg.recipientPhone}
             onChange={event =>

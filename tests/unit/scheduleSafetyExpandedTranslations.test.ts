@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { setCurrentLang, tx } from '../../src/locales/tx';
+import { loadLanguageTranslations, setCurrentLang, tx } from '../../src/locales/tx';
 
 // Every scheduleExpanded.* key used in SchedulePage.tsx and ScheduleItemCard.tsx.
 // tx() returns the requested key itself when a lookup misses, so a value equal
@@ -88,7 +88,8 @@ const SAFETY_KEYS = [
 describe('scheduleExpanded & safetyExpanded translation keys resolve', () => {
   for (const lang of ['en', 'ar'] as const) {
     describe(lang, () => {
-      beforeEach(() => {
+      beforeEach(async () => {
+        await loadLanguageTranslations(lang);
         setCurrentLang(lang);
       });
 

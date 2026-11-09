@@ -155,7 +155,6 @@ export default defineConfig(({ mode }) => ({
       'lucide-react',
       'sonner',
       'framer-motion',
-      'motion/react',
       'recharts',
       'leaflet',
       'zod',

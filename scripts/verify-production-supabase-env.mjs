@@ -16,8 +16,8 @@ const variables = Object.fromEntries(
 
 const expected = {
   VITE_SUPABASE_URL: 'https://zexlxabdcsjefptmjhuq.supabase.co',
-  VITE_SUPABASE_ANON_KEY: 'sb_publishable_mmpnEORTSVIa3K-l3jiz6Q_wYVDEdkP',
-  VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_mmpnEORTSVIa3K-l3jiz6Q_wYVDEdkP',
+  VITE_SUPABASE_ANON_KEY: 'sb_publishable_mmpnEORTSVIa3K-l3jiz6Q_wYVDEdkP', // secretscan:allow - anon/publishable keys are public; RLS protects data.
+  VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_mmpnEORTSVIa3K-l3jiz6Q_wYVDEdkP', // secretscan:allow - publishable keys are public; RLS protects data.
 };
 let failed = false;
 for (const [name, value] of Object.entries(expected)) {

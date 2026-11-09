@@ -30,6 +30,7 @@ interface UseRideInventoryOptions {
   to: string;
   date: string;
   searched: boolean;
+  refreshKey?: number;
 }
 
 interface UseRideInventoryResult {
@@ -43,15 +44,16 @@ export function useRideInventory ( {
   to,
   date,
   searched,
+  refreshKey = 0,
 }: UseRideInventoryOptions ): UseRideInventoryResult {
   const [ rides, setRides ] = useState<Ride[]>( () => [
     ...getConnectedRides().map( buildRideFromPostedRide ),
     ...SEED_RIDES,
   ] );
-  const [ error, setError ] = useState<string | null>( null );
+  const [ requestError, setRequestError ] = useState<{ key: string; message: string } | null>( null );
 
   // A search is identified by its inputs; `null` means no search is requested.
-  const requestKey = searched ? JSON.stringify( [ from, to, date ] ) : null;
+  const requestKey = searched ? JSON.stringify( [ from, to, date, refreshKey ] ) : null;
   const [ loading, setLoading ] = useState( requestKey !== null );
   const [ trackedRequestKey, setTrackedRequestKey ] = useState<string | null>( requestKey );
 
@@ -76,18 +78,22 @@ export function useRideInventory ( {
     // response can never overwrite a newer one.
     const controller = new AbortController();
 
-    searchDirectTrips( from || undefined, to || undefined, date || undefined )
+    searchDirectTrips(
+      from || undefined,
+      to || undefined,
+      date || undefined,
+      { signal: controller.signal },
+    )
       .then( results => {
         if ( controller.signal.aborted ) { return; }
         const dbRides = results.map( buildRideFromTripSearchResult );
         const merged = deduplicateRides( [ ...localRides, ...dbRides, ...SEED_RIDES ] );
-        setError( null );
         setRides( merged );
       } )
       .catch( err => {
         if ( controller.signal.aborted ) { return; }
         console.warn( '[useRideInventory] DB fetch failed:', sanitizeLogMessage( err ) );
-        setError( 'Could not load rides right now. Please try again.' );
+        setRequestError( { key: requestKey, message: 'Could not load rides right now. Please try again.' } );
         setRides( [ ...localRides, ...SEED_RIDES ] );
       } )
       .finally( () => {
@@ -97,7 +103,11 @@ export function useRideInventory ( {
     return () => { controller.abort(); };
   }, [ from, to, date, requestKey ] );
 
-  return { rides, loading, error };
+  return {
+    rides,
+    loading,
+    error: requestKey && requestError?.key === requestKey ? requestError.message : null,
+  };
 }
 
 /** Deduplicate by id, preferring earlier entries (local > db > demo seed). */

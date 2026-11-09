@@ -212,6 +212,7 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
             ].map(field => (
               <div key={field.label}>
                 <label
+                  htmlFor={`package-${field.key}`}
                   style={{
                     display: 'block',
                     color: DS.muted,
@@ -225,6 +226,7 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
                   {field.label}
                 </label>
                 <select
+                  id={`package-${field.key}`}
                   value={field.value}
                   onChange={event =>
                     setPkg(previous => ({ ...previous, [field.key]: event.target.value }))
@@ -251,6 +253,7 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
             ))}
             <div>
               <label
+                htmlFor="package-weight"
                 style={{
                   display: 'block',
                   color: DS.muted,
@@ -264,6 +267,7 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
                 {t.weight}
               </label>
               <select
+                id="package-weight"
                 value={pkg.weight}
                 onChange={event =>
                   setPkg(previous => ({ ...previous, weight: event.target.value }))
@@ -289,6 +293,7 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
             </div>
             <div>
               <label
+                htmlFor="package-note"
                 style={{
                   display: 'block',
                   color: DS.muted,
@@ -302,6 +307,7 @@ export function FindRidePackagePanel({ ar, copy, t, pkg, setPkg }: FindRidePacka
                 {t.note}
               </label>
               <input
+                id="package-note"
                 placeholder={t.notePh}
                 value={pkg.note}
                 onChange={event => setPkg(previous => ({ ...previous, note: event.target.value }))}

@@ -103,14 +103,15 @@ export function RateDriverModal({
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">
+          <label id="driver-rating-tags-label" className="block text-sm font-medium mb-2">
             {tx('rateDriverModal.what_did_you_like_optional')}
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div role="group" aria-labelledby="driver-rating-tags-label" className="flex flex-wrap gap-2">
             {RATING_TAG_KEYS.map(tag => (
               <button
                 key={tag}
                 type="button"
+                aria-pressed={selectedTags.includes(tag)}
                 onClick={() => { void toggleTag(tag); }}
                 className={`px-3 py-1 rounded-full text-sm transition-colors ${
                   selectedTags.includes(tag)
@@ -126,10 +127,11 @@ export function RateDriverModal({
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">
+          <label htmlFor="driver-review" className="block text-sm font-medium mb-2">
             {tx('rateDriverModal.additional_comments_optional')}
           </label>
           <textarea
+            id="driver-review"
             value={review}
             onChange={e => setReview(e.target.value)}
             placeholder={tx('rateDriverModal.share_more_about_your_experience')}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { setCurrentLang, tx } from '../../src/locales/tx';
+import { loadLanguageTranslations, setCurrentLang, tx } from '../../src/locales/tx';
 
 // Every key the landing sections render. tx() returns the requested key itself
 // when a lookup misses, so a value equal to the key is a raw leak into the UI
@@ -87,7 +87,8 @@ const KEYS = [
 describe('landing page translation keys resolve', () => {
   for (const lang of ['en', 'ar'] as const) {
     describe(lang, () => {
-      beforeEach(() => {
+      beforeEach(async () => {
+        await loadLanguageTranslations(lang);
         setCurrentLang(lang);
       });
 
