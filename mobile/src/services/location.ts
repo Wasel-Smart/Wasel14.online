@@ -16,30 +16,8 @@
 import Geolocation from 'react-native-geolocation-service';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { io, Socket } from 'socket.io-client';
-  import { mobileAuth } from './auth';
-  import { sanitizeLogValue } from '../utils/sanitize';
-
-const ALLOWED_API_DOMAINS = ['supabase.co', 'supabase.net', 'wasel14.online', 'localhost'];
-
-function isValidApiUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
-    if (parsed.hostname === 'localhost') return true;
-    const privateRanges = [/^127\./, /^10\./, /^172\.(1[6-9]|2[0-9]|3[01])\./, /^192\.168\./, /^169\.254\./];
-    if (privateRanges.some(p => p.test(parsed.hostname))) return false; // Good: block private IPs
-    // Dot-anchored suffix match: allows real subdomains (xyz.supabase.co,
-    // api.wasel14.online) while still rejecting a hijack like
-    // "evil-supabase.co.attacker.com" (which does not end with ".supabase.co").
-    // A bare `.endsWith(domain)` without the leading dot would wrongly allow
-    // that hijack; a bare exact match wrongly rejects every real subdomain.
-    return ALLOWED_API_DOMAINS.some(
-      domain => parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`),
-    );
-  } catch {
-    return false;
-  }
-}
+import { mobileAuth } from './auth';
+import { isValidApiUrl, sanitizeLogValue } from '../utils/sanitize';
 
 // ── Geo-stream throttle (ported from src/platform/geo-stream.ts) ─────────────
 

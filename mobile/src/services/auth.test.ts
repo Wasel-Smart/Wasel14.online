@@ -18,6 +18,7 @@ jest.mock('../lib/config', () => ({
       signInWithOtp: jest.fn(),
       signInWithOAuth: jest.fn(),
       setSession: jest.fn(),
+      exchangeCodeForSession: jest.fn(),
       getSession: jest.fn().mockResolvedValue({ data: { session: null } }),
       onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }),
       verifyOtp: jest.fn(),
@@ -47,6 +48,7 @@ const mockSupabaseAuth = supabase.auth as unknown as {
   signInWithOtp: jest.Mock;
   signInWithOAuth: jest.Mock;
   setSession: jest.Mock;
+  exchangeCodeForSession: jest.Mock;
   getSession: jest.Mock;
   onAuthStateChange: jest.Mock;
   verifyOtp: jest.Mock;
@@ -55,8 +57,6 @@ const mockSupabaseAuth = supabase.auth as unknown as {
   updateUser: jest.Mock;
   resetPasswordForEmail: jest.Mock;
 };
-
-const mockFunctionsInvoke = supabase.functions.invoke as jest.Mock;
 
 async function flushMicrotasks() {
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -276,33 +276,38 @@ describe('MobileAuthService', () => {
       ).rejects.toThrow('Something odd');
     });
 
-    it('returns false when there is no error and no tokens in the URL', async () => {
-      const result = await mobileAuth.completeAuthFromUrl('wasel://auth/callback');
+    it('ignores implicit tokens and returns false without a PKCE code', async () => {
+      const result = await mobileAuth.completeAuthFromUrl(
+        'wasel://auth/callback#access_token=abc&refresh_token=def',
+      );
       expect(result).toBe(false);
+      expect(mockSupabaseAuth.exchangeCodeForSession).not.toHaveBeenCalled();
     });
 
-    it('sets the session, persists it for biometrics, and provisions the profile on success', async () => {
-      mockSupabaseAuth.setSession.mockResolvedValue({ data: { session: fakeSession() }, error: null });
+    it('exchanges the PKCE code and persists the resulting session for biometrics', async () => {
+      mockSupabaseAuth.exchangeCodeForSession.mockResolvedValue({
+        data: { session: fakeSession() },
+        error: null,
+      });
 
       const result = await mobileAuth.completeAuthFromUrl(
-        'wasel://auth/callback?access_token=abc&refresh_token=def',
+        'wasel://auth/callback?code=one-time-code',
       );
 
       expect(result).toBe(true);
-      expect(mockSupabaseAuth.setSession).toHaveBeenCalledWith({
-        access_token: 'abc',
-        refresh_token: 'def',
-      });
+      expect(mockSupabaseAuth.exchangeCodeForSession).toHaveBeenCalledWith('one-time-code');
       expect(biometricAuth.storeSessionForBiometric).toHaveBeenCalledWith('access-tok', 'refresh-tok');
-      expect(mockFunctionsInvoke).toHaveBeenCalledWith('get-or-create-profile');
       expect(mobileAuth.isAuthenticated()).toBe(true);
     });
 
-    it('throws when setSession itself returns an error', async () => {
-      mockSupabaseAuth.setSession.mockResolvedValue({ data: { session: null }, error: new Error('bad token') });
+    it('throws when the PKCE code exchange returns an error', async () => {
+      mockSupabaseAuth.exchangeCodeForSession.mockResolvedValue({
+        data: { session: null },
+        error: new Error('bad token'),
+      });
 
       await expect(
-        mobileAuth.completeAuthFromUrl('wasel://auth/callback?access_token=abc&refresh_token=def'),
+        mobileAuth.completeAuthFromUrl('wasel://auth/callback?code=invalid-code'),
       ).rejects.toThrow('bad token');
     });
   });

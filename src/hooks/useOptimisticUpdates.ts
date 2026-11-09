@@ -28,7 +28,19 @@ export function useOptimisticUpdates<T extends object>({
   const [pendingUpdates, setPendingUpdates] = useState<Map<keyof T, OptimisticUpdate<T>>>(
     new Map(),
   );
+  const pendingUpdatesRef = useRef(pendingUpdates);
   const rollbackTimers = useRef<Map<keyof T, NodeJS.Timeout>>(new Map());
+
+  const updatePending = useCallback(
+    (update: (current: Map<keyof T, OptimisticUpdate<T>>) => Map<keyof T, OptimisticUpdate<T>>) => {
+      setPendingUpdates(current => {
+        const next = update(current);
+        pendingUpdatesRef.current = next;
+        return next;
+      });
+    },
+    [],
+  );
 
   const applyOptimisticUpdate = useCallback(
     (field: keyof T, value: unknown) => {
@@ -42,7 +54,7 @@ export function useOptimisticUpdates<T extends object>({
 
       // Apply optimistically
       setOptimisticData(prev => applyFieldValue(prev, field, value));
-      setPendingUpdates(prev => new Map(prev).set(field, update));
+      updatePending(prev => new Map(prev).set(field, update));
 
       // Clear existing rollback timer for this field
       const existingTimer = rollbackTimers.current.get(field);
@@ -57,7 +69,7 @@ export function useOptimisticUpdates<T extends object>({
             // Rollback on error
             const previousValue = data[field];
             setOptimisticData(prev => applyFieldValue(prev, field, previousValue));
-            setPendingUpdates(prev => {
+            updatePending(prev => {
               const next = new Map(prev);
               next.delete(field);
               return next;
@@ -65,7 +77,7 @@ export function useOptimisticUpdates<T extends object>({
             onRollback?.(field, previousValue);
           } else {
             // Success - remove pending update
-            setPendingUpdates(prev => {
+            updatePending(prev => {
               const next = new Map(prev);
               next.delete(field);
               return next;
@@ -86,10 +98,10 @@ export function useOptimisticUpdates<T extends object>({
 
       // Set automatic rollback timer
       const timer = setTimeout(() => {
-        if (pendingUpdates.has(field)) {
+        if (pendingUpdatesRef.current.get(field)?.id === updateId) {
           const previousValue = data[field];
           setOptimisticData(prev => applyFieldValue(prev, field, previousValue));
-          setPendingUpdates(prev => {
+          updatePending(prev => {
             const next = new Map(prev);
             next.delete(field);
             return next;
@@ -100,7 +112,7 @@ export function useOptimisticUpdates<T extends object>({
 
       rollbackTimers.current.set(field, timer);
     },
-    [data, onUpdate, onRollback, rollbackDelay, pendingUpdates],
+    [data, onUpdate, onRollback, rollbackDelay, updatePending],
   );
 
   const isPending = useCallback((field: keyof T) => pendingUpdates.has(field), [pendingUpdates]);

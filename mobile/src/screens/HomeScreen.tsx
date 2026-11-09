@@ -98,16 +98,31 @@ const HomeHeader = React.memo(({
   onTrustPress: () => void;
 }) => {
   const greeting = useMemo(() => getTimeBasedGreeting(), []);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [avatarUrl]);
 
   return (
     <View style={styles.homeHeader}>
-      <Image
-        style={styles.avatar}
-        source={avatarUrl ? { uri: avatarUrl } : require('../../assets/default-avatar.png')}
-        onError={() => { /* handled by default source fallback */ }}
-        accessible
-        accessibilityLabel={`صورة ${displayName}`}
-      />
+      {avatarUrl && !avatarLoadFailed ? (
+        <Image
+          style={styles.avatar}
+          source={{ uri: avatarUrl }}
+          onError={() => setAvatarLoadFailed(true)}
+          accessible
+          accessibilityLabel={`صورة ${displayName}`}
+        />
+      ) : (
+        <View
+          style={[styles.avatar, styles.avatarPlaceholder]}
+          accessible
+          accessibilityLabel={`صورة ${displayName}`}
+        >
+          <Ionicons name="person" size={24} color={colors.textSecondary} />
+        </View>
+      )}
       <View style={styles.headerText}>
         <Text style={styles.welcomeText}>{greeting}</Text>
         <View style={styles.displayNameRow}>
@@ -454,6 +469,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.primary,
     backgroundColor: colors.surface,
+  },
+  avatarPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerText: {
     flex: 1,

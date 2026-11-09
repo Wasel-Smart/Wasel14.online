@@ -213,13 +213,14 @@ export function PackageSendPanel({
 
   return (
     <div
+      className="pkg-send-layout"
       style={{
         display: 'grid',
         gap: 16,
-        gridTemplateColumns: 'minmax(0, 1.5fr) minmax(320px, 1fr)',
+        gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)',
       }}
     >
-      <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr 1fr' }}>
+      <div className="pkg-form-grid" style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
         <h3 style={{ color: C.text, fontWeight: 800, gridColumn: '1/-1', margin: '0 0 4px' }}>
           {tx('packageSendPanel.send_through_the_shared_network')}
         </h3>
@@ -441,6 +442,7 @@ export function PackageSendPanel({
             gap: 10,
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
           }}
+          className="pkg-steps-grid"
         >
           {sendSteps.map(item => (
             <div

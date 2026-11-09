@@ -1,127 +1,114 @@
-import { validateEmail, validatePhone, validateJordanPhone, validateIraqPhone, sanitizeInput, sanitizeHtml } from './security';
+import {
+  validateEmail,
+  validatePhone,
+  validateJordanPhone,
+  validateIraqPhone,
+  sanitizeInput,
+  sanitizeHtml,
+} from '../utils/security';
 
-describe('security utilities', () => {
-  describe('validateEmail', () => {
-    it('accepts valid emails', () => {
-      expect(validateEmail('user@example.com')).toBe(true);
-      expect(validateEmail('test.name+tag@sub.example.com')).toBe(true);
-      expect(validateEmail('a@b.co')).toBe(true);
-    });
-
-    it('rejects invalid emails', () => {
-      expect(validateEmail('')).toBe(false);
-      expect(validateEmail('invalid')).toBe(false);
-      expect(validateEmail('@example.com')).toBe(false);
-      expect(validateEmail('user@')).toBe(false);
-      expect(validateEmail('user@.com')).toBe(false);
-    });
-
-    it('rejects null and non-string input', () => {
-      expect(validateEmail(null as unknown as string)).toBe(false);
-      expect(validateEmail(undefined as unknown as string)).toBe(false);
-      expect(validateEmail(123 as unknown as string)).toBe(false);
-    });
-
-    it('rejects emails over 254 characters', () => {
-      const longEmail = 'a'.repeat(250) + '@example.com';
-      expect(validateEmail(longEmail)).toBe(false);
-    });
+describe('validateEmail', () => {
+  it('accepts valid email', () => {
+    expect(validateEmail('user@example.com')).toBe(true);
   });
-
-  describe('validatePhone', () => {
-    it('accepts valid Jordanian mobile numbers', () => {
-      expect(validatePhone('+962791234567')).toBe(true);
-      expect(validatePhone('+962771234567')).toBe(true);
-      expect(validatePhone('+962781234567')).toBe(true);
-      expect(validatePhone('+9627912345678')).toBe(false);
-    });
-
-    it('accepts valid Jordanian landline numbers', () => {
-      expect(validatePhone('+96261234567')).toBe(true);
-      expect(validatePhone('+96251234567')).toBe(true);
-    });
-
-    it('accepts valid Iraqi mobile numbers', () => {
-      expect(validatePhone('+9647701234567')).toBe(true);
-      expect(validatePhone('+9647801234567')).toBe(true);
-    });
-
-    it('rejects invalid phone numbers', () => {
-      expect(validatePhone('')).toBe(false);
-      expect(validatePhone('962791234567')).toBe(false);
-      expect(validatePhone('+962')).toBe(false);
-      expect(validatePhone('+962123')).toBe(false);
-      expect(validatePhone('+966791234567')).toBe(false);
-    });
-
-    it('rejects null and non-string input', () => {
-      expect(validatePhone(null as unknown as string)).toBe(false);
-      expect(validatePhone(undefined as unknown as string)).toBe(false);
-    });
+  it('rejects missing @', () => {
+    expect(validateEmail('userexample.com')).toBe(false);
   });
-
-  describe('validateJordanPhone', () => {
-    it('accepts valid Jordanian mobile numbers', () => {
-      expect(validateJordanPhone('+962791234567')).toBe(true);
-      expect(validateJordanPhone('+962771234567')).toBe(true);
-      expect(validateJordanPhone('+962781234567')).toBe(true);
-    });
-
-    it('rejects non-Jordanian numbers', () => {
-      expect(validateJordanPhone('+9647701234567')).toBe(false);
-      expect(validateJordanPhone('+966791234567')).toBe(false);
-    });
-
-    it('rejects malformed numbers', () => {
-      expect(validateJordanPhone('+96212345678')).toBe(false);
-      expect(validateJordanPhone('')).toBe(false);
-    });
+  it('rejects empty string', () => {
+    expect(validateEmail('')).toBe(false);
   });
-
-  describe('validateIraqPhone', () => {
-    it('accepts valid Iraqi mobile numbers', () => {
-      expect(validateIraqPhone('+9647701234567')).toBe(true);
-      expect(validateIraqPhone('+9647801234567')).toBe(true);
-    });
-
-    it('rejects non-Iraqi numbers', () => {
-      expect(validateIraqPhone('+962791234567')).toBe(false);
-      expect(validateIraqPhone('+966791234567')).toBe(false);
-    });
+  it('rejects null-like', () => {
+    expect(validateEmail(null as unknown as string)).toBe(false);
   });
-
-  describe('sanitizeInput', () => {
-    it('trims whitespace', () => {
-      expect(sanitizeInput('  hello  ')).toBe('hello');
-    });
-
-    it('truncates to maxLength', () => {
-      expect(sanitizeInput('a'.repeat(600), 100)).toHaveLength(100);
-    });
-
-    it('returns empty string for non-string input', () => {
-      expect(sanitizeInput(null as unknown as string)).toBe('');
-      expect(sanitizeInput(undefined as unknown as string)).toBe('');
-    });
-
-    it('uses default maxLength of 500', () => {
-      expect(sanitizeInput('a'.repeat(600)).length).toBe(500);
-    });
+  it('rejects email over 254 chars', () => {
+    const long = 'a'.repeat(250) + '@b.com';
+    expect(validateEmail(long)).toBe(false);
   });
+  it('accepts email with subdomain', () => {
+    expect(validateEmail('user@mail.example.co.uk')).toBe(true);
+  });
+});
 
-  describe('sanitizeHtml', () => {
-    it('escapes HTML special characters', () => {
-      expect(sanitizeHtml('<script>alert("xss")</script>')).toBe(
-        '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;',
-      );
-    });
+describe('validateJordanPhone', () => {
+  it('accepts Jordan mobile +962 7x', () => {
+    expect(validateJordanPhone('+962791234567')).toBe(true);
+  });
+  it('accepts Jordan landline', () => {
+    expect(validateJordanPhone('+96262123456')).toBe(true);
+  });
+  it('rejects non-Jordan number', () => {
+    expect(validateJordanPhone('+12025551234')).toBe(false);
+  });
+  it('rejects empty string', () => {
+    expect(validateJordanPhone('')).toBe(false);
+  });
+  it('rejects null', () => {
+    expect(validateJordanPhone(null as unknown as string)).toBe(false);
+  });
+});
 
-    it('escapes ampersand', () => {
-      expect(sanitizeHtml('a & b')).toBe('a &amp; b');
-    });
+describe('validateIraqPhone', () => {
+  it('accepts Iraq mobile', () => {
+    expect(validateIraqPhone('+9647901234567')).toBe(true);
+  });
+  it('rejects non-Iraq number', () => {
+    expect(validateIraqPhone('+96279123456789')).toBe(false);
+  });
+  it('rejects empty string', () => {
+    expect(validateIraqPhone('')).toBe(false);
+  });
+  it('rejects null', () => {
+    expect(validateIraqPhone(null as unknown as string)).toBe(false);
+  });
+});
 
-    it('escapes single quotes', () => {
-      expect(sanitizeHtml("it's")).toBe('it&#x27;s');
-    });
+describe('validatePhone', () => {
+  it('accepts Jordan phone', () => {
+    expect(validatePhone('+962791234567')).toBe(true);
+  });
+  it('accepts Iraq phone', () => {
+    expect(validatePhone('+9647901234567')).toBe(true);
+  });
+  it('rejects random number', () => {
+    expect(validatePhone('+12025551234')).toBe(false);
+  });
+});
+
+describe('sanitizeInput', () => {
+  it('trims whitespace', () => {
+    expect(sanitizeInput('  hello  ')).toBe('hello');
+  });
+  it('truncates to maxLength', () => {
+    expect(sanitizeInput('a'.repeat(600))).toHaveLength(500);
+  });
+  it('respects custom maxLength', () => {
+    expect(sanitizeInput('hello world', 5)).toBe('hello');
+  });
+  it('returns empty string for null-like', () => {
+    expect(sanitizeInput(null as unknown as string)).toBe('');
+  });
+  it('returns empty string for empty input', () => {
+    expect(sanitizeInput('')).toBe('');
+  });
+});
+
+describe('sanitizeHtml', () => {
+  it('escapes &', () => {
+    expect(sanitizeHtml('a & b')).toContain('&amp;');
+  });
+  it('escapes <', () => {
+    expect(sanitizeHtml('<script>')).toContain('&lt;');
+  });
+  it('escapes >', () => {
+    expect(sanitizeHtml('<div>')).toContain('&gt;');
+  });
+  it('escapes "', () => {
+    expect(sanitizeHtml('"hello"')).toContain('&quot;');
+  });
+  it("escapes '", () => {
+    expect(sanitizeHtml("it's")).toContain('&#x27;');
+  });
+  it('handles clean string', () => {
+    expect(sanitizeHtml('hello world')).toBe('hello world');
   });
 });

@@ -79,10 +79,6 @@
       "expo-secure-store",
       "expo-font"
     ],
-    "extra": {
-      "eas": {
-        "projectId": "wasel-mobile-project"
-      }
-    }
+    "extra": {}
   }
 }

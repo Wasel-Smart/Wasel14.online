@@ -1,37 +1,20 @@
 # Security & Secrets Management
 
-## CRITICAL: OneDrive Sync Exposure Risk
+## Credential Rotation Status - Not Verified
 
-**This repository is located inside a OneDrive-synced folder (`C:\Users\user\OneDrive\Desktop\`).**
-If OneDrive syncs your Desktop folder, any file in this repo — especially `.env`, `.env.local`, or any file containing credentials — may be **uploaded to OneDrive cloud storage**. This is a **credential leakage risk**.
+**Do not treat provider credentials as rotated.** The local audit inspected variable names only; it did not print values or access provider secret stores. The current working tree contains ignored local environment files, and Git history contains prior entries for docs/wasel-planning-with-ai.json. Confirm provider-side revocation before production use. The older OneDrive path warning was stale for this checkout; confirm device backup settings separately.
 
-### Immediate Actions Required (choose ONE):
+Local variable names requiring immediate provider-side review:
 
-**Option A (Recommended): Exclude the project folder from OneDrive sync**
-1. Right-click the `Wdoubleme-master` folder ? "Free up space" (removes it from OneDrive sync while keeping it local)
-2. Or open OneDrive Settings ? Sync and backup ? Manage backup ? Uncheck "Desktop"
+| Local source | Variable names or evidence | Required action |
+|---|---|---|
+| .env | SUPABASE_AUTH_GOOGLE_CLIENT_SECRET, SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET | Rotate at Google and Meta, update Supabase Auth provider settings, and test sign-in. |
+| .env.local | VERCEL_OIDC_TOKEN, AI_GATEWAY_API_KEY | Confirm source and lifetime; rotate active credentials and update deployment consumers. |
+| .env.production | VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_PUBLISHABLE_KEY, VITE_GOOGLE_MAPS_API_KEY | Migrate from the legacy anon key and confirm Maps API restrictions. These client keys are public by design. |
+| Process environment | NPM_TOKEN, OPENAI_API_KEY | Identify owners and scope; rotate if active and avoid inheriting these into unrelated build jobs. |
+| Git history | docs/wasel-planning-with-ai.json | Revoke the historical Google service-account key, then coordinate history cleanup. |
 
-**Option B: Store secrets outside OneDrive**
-1. Create `C:\Users\user\.env` (outside OneDrive tree)
-2. Move real credentials from `Wdoubleme-master\.env` to `C:\Users\user\.env`
-3. Update `vite.config.ts` to load env from `C:\Users\user\` (see `envDir` option)
-4. Replace `Wdoubleme-master\.env` contents with placeholders only
-
-**Option C: Use managed secret stores (Production)**
-- Vercel Environment Variables
-- Azure Key Vault
-- Supabase Secrets (`supabase secrets set`)
-
-### CI Guard
-A pre-merge check scans for `.env` files containing non-placeholder values. Any `.env` file found inside the repo with real secret patterns will **block CI**.
-
-### Verification
-After applying any option above:
-```bash
-# Scan for .env files with real secrets in the repo
-git ls-files | grep '\.env' || echo "No tracked .env files"
-# Verify no real secrets in OneDrive sync tree
-```
+Remote stores including Vercel, Supabase, Google Cloud, Meta, Stripe, Twilio, CliQ, Resend, SendGrid, AWS, Sentry, database, and Redis were not inspected. Their status is unknown. See docs/CREDENTIAL_ROTATION_RUNBOOK.md and run npm run credentials:inventory; the inventory command never prints values.
 
 ## Required Environment Variables
 
@@ -93,63 +76,6 @@ supabase secrets set CLIQ_MERCHANT_ID="<your-cliq-merchant-id>"
 
 ## Credential Rotation Guide
 
-### Google OAuth Client Secret (Supabase Auth)
-**Status**: A client secret was found in a local-only quarantine directory (`_SECRETS_NEEDS_ROTATION_THEN_DELETE/`). It was **never committed to git**.
+Follow [the credential rotation runbook](docs/CREDENTIAL_ROTATION_RUNBOOK.md). Provider-side replacement and revocation must be confirmed before this document is marked complete.
 
-**Rotation steps**:
-1. Open [Google Cloud Console ? Credentials](https://console.cloud.google.com/apis/credentials)
-2. Find the OAuth 2.0 Client ID used for Wasel (project: `wasel-planning-with-ai`)
-3. Click **Create Credentials ? OAuth client ID** to generate a new pair
-4. Copy the new **Client ID** and **Client secret**
-5. Update Supabase Auth Google provider:
-   ```bash
-   supabase secrets set SUPABASE_AUTH_GOOGLE_CLIENT_ID="new-client-id"
-   supabase secrets set SUPABASE_AUTH_GOOGLE_CLIENT_SECRET="new-client-secret"
-   ```
-6. Update Vercel environment variables if the client ID is used there
-7. Update `.env` / `.env.local` with the new values
-8. Delete the old OAuth client in Google Cloud Console
-
-### Google Service Account Private Key (`docs/wasel-planning-with-ai.json`)
-**Status**: A service account private key is committed in `docs/wasel-planning-with-ai.json`. This is a **critical exposure**.
-
-**Rotation steps**:
-1. Open [Google Cloud Console ? IAM ? Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
-2. Find the service account `fb-service-account@wasel-planning-with-ai.iam.gserviceaccount.com`
-3. Go to the **Keys** tab ? **Add Key ? Create new key** (JSON)
-4. Download the new key and replace `docs/wasel-planning-with-ai.json` content
-5. **Delete the old key** from Google Cloud Console
-6. **Remove the old key from git history**:
-   ```bash
-   git filter-repo --path docs/wasel-planning-with-ai.json --invert-paths
-   ```
-   Or use BFG Repo-Cleaner:
-   ```bash
-   bfg --delete-files docs/wasel-planning-with-ai.json
-   git reflog expire --expire=now --all && git gc --prune=now --aggressive
-   git push --force
-   ```
-7. Update any code that reads this file with the new key path/content
-
-### Local Communication Worker Secrets (`.env`)
-**Status**: Real secrets were found in `.env` inside OneDrive sync tree.
-
-**Rotation steps**:
-1. Generate new secrets:
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-   ```
-2. Replace `COMMUNICATION_WORKER_SECRET` and `COMMUNICATION_WEBHOOK_TOKEN` in `.env`
-3. Update Supabase secrets if these are used by edge functions:
-   ```bash
-   supabase secrets set COMMUNICATION_WORKER_SECRET="new-secret"
-   supabase secrets set COMMUNICATION_WEBHOOK_TOKEN="new-token"
-   ```
-4. Move `.env` outside OneDrive sync or exclude the project folder from OneDrive
-
-### General Rotation Checklist
-- [ ] All secrets in `.env` are replaced with placeholders or moved to a secret store
-- [ ] `git ls-files | grep -E '\.(pem|key|p12|pfx|json)'` shows no private key files
-- [ ] `scripts/validate-no-secrets.mjs` passes locally
-- [ ] CI secret scanning (`secret-scan.yml`) passes on PR
-- [ ] No secrets appear in GitHub Actions logs
+Run npm run credentials:inventory to list variable names only. Run npm run secrets:check and npm run env:check after updating approved secret stores.

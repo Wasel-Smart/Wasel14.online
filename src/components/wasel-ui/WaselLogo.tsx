@@ -21,11 +21,11 @@ const SYMBOL_W_RATIO = 273 / 193;
 // brand/assets/logos/primary/logo-light-512.webp by `node scripts/apply-new-logo.mjs`.
 // Bump when the artwork changes. Brand files keep stable names, and browsers/CDNs that cached the
 // previous logo would otherwise keep showing it.
-const ASSET_V = '?v=20261031';
+const ASSET_V = '?v=20261109';
 
 const LOGO_ASSETS: Record<'dark' | 'light', { webp: string; png: string }> = {
   dark:  { webp: `/brand/assets/logos/primary/logo-dark.webp${ASSET_V}`,  png: `/brand/assets/logos/primary/logo-dark.png${ASSET_V}`  },
-  light: { webp: `/brand/assets/logos/primary/logo-light.webp${ASSET_V}`, png: `/brand/assets/logos/primary/logo-light.png${ASSET_V}` },
+  light: { webp: `/brand/assets/logos/primary/logo-light-512.webp${ASSET_V}`, png: `/brand/assets/logos/primary/logo-light-512.png${ASSET_V}` },
 };
 
 // Symbol-only mark (transparent background). Its colours read on light and dark surfaces,

@@ -41,6 +41,19 @@ import { mobileAuth } from '../services/auth';
 import { offlineService } from '../services/offline';
 
 const QUEUE_KEY = '@wasel:offline_queue';
+let actionId = 0;
+
+function seedQueuedAction(type: string, payload: Record<string, unknown>, retries = 0) {
+  const action = {
+    id: `offline-test-${++actionId}`,
+    type,
+    payload,
+    timestamp: Date.now(),
+    retries,
+  };
+  mockMmkvStore.set(QUEUE_KEY, JSON.stringify([action]));
+  return action;
+}
 
 function goOnline() {
   mockNetInfoListener?.({ isConnected: true, isInternetReachable: true });
@@ -57,15 +70,17 @@ describe('OfflineService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     mockMmkvStore.clear();
+    actionId = 0;
     process.env.EXPO_PUBLIC_API_URL = 'https://api.wasel14.online';
     (mobileAuth.getAccessToken as jest.Mock).mockReturnValue('token-123');
     (mobileAuth.getUser as jest.Mock).mockReturnValue({ id: 'user-1' });
+    await flushMicrotasks();
     goOnline();
-    await Promise.resolve();
   });
 
   describe('queueOfflineAction', () => {
     it('skips a duplicate action already in the persisted dedup cache', async () => {
+      goOffline();
       await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'pothole' } });
       await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'pothole' } });
 
@@ -73,6 +88,7 @@ describe('OfflineService', () => {
     });
 
     it('drops the oldest queued action once the queue is full', async () => {
+      goOffline();
       const seeded = Array.from({ length: 100 }, (_, i) => ({
         id: `seed-${i}`,
         type: 'ISSUE_REPORT',
@@ -109,7 +125,7 @@ describe('OfflineService', () => {
     });
 
     it('removes an action from the queue once it syncs successfully', async () => {
-      await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'broken light' } });
+      seedQueuedAction('ISSUE_REPORT', { note: 'broken light' });
       global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
 
       await offlineService.syncOfflineQueue();
@@ -128,7 +144,7 @@ describe('OfflineService', () => {
     });
 
     it('treats a 409 idempotent replay as success', async () => {
-      await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'dup' } });
+      seedQueuedAction('ISSUE_REPORT', { note: 'dup' });
       global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 409 });
 
       await offlineService.syncOfflineQueue();
@@ -137,7 +153,7 @@ describe('OfflineService', () => {
     });
 
     it('keeps a failed action in the queue with an incremented retry count', async () => {
-      await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'server down' } });
+      seedQueuedAction('ISSUE_REPORT', { note: 'server down' });
       global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error' });
 
       await offlineService.syncOfflineQueue();
@@ -146,10 +162,7 @@ describe('OfflineService', () => {
     });
 
     it('discards an action once it exceeds the max retry count', async () => {
-      const nearlyExhausted = [
-        { id: 'a1', type: 'ISSUE_REPORT', payload: { note: 'x' }, timestamp: 1, retries: 5 },
-      ];
-      mockMmkvStore.set(QUEUE_KEY, JSON.stringify(nearlyExhausted));
+      seedQueuedAction('ISSUE_REPORT', { note: 'x' }, 5);
       global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error' });
 
       await offlineService.syncOfflineQueue();
@@ -158,18 +171,15 @@ describe('OfflineService', () => {
     });
 
     it('builds a normalized trip payload for a queued ride request lacking from/to', async () => {
-      await offlineService.queueOfflineAction({
-        type: 'RIDE_REQUEST',
-        payload: {
-          origin_address: 'Amman',
-          dest_address: 'Zarqa',
-          origin_lat: 31.9,
-          origin_lng: 35.9,
-          dest_lat: 32.0,
-          dest_lng: 36.0,
-          seats: 2,
-          notes: 'n',
-        },
+      seedQueuedAction('RIDE_REQUEST', {
+        origin_address: 'Amman',
+        dest_address: 'Zarqa',
+        origin_lat: 31.9,
+        origin_lng: 35.9,
+        dest_lat: 32.0,
+        dest_lng: 36.0,
+        seats: 2,
+        notes: 'n',
       });
 
       const tripsResponse = {
@@ -204,7 +214,7 @@ describe('OfflineService', () => {
     });
 
     it('fails and retries a RIDE_CANCEL queued without a bookingId or rideId', async () => {
-      await offlineService.queueOfflineAction({ type: 'RIDE_CANCEL', payload: { reason: 'changed my mind' } });
+      seedQueuedAction('RIDE_CANCEL', { reason: 'changed my mind' });
       global.fetch = jest.fn();
 
       await offlineService.syncOfflineQueue();
@@ -215,7 +225,7 @@ describe('OfflineService', () => {
 
     it('fails a queued PROFILE_UPDATE when there is no authenticated user', async () => {
       (mobileAuth.getUser as jest.Mock).mockReturnValue(null);
-      await offlineService.queueOfflineAction({ type: 'PROFILE_UPDATE', payload: { name: 'New Name' } });
+      seedQueuedAction('PROFILE_UPDATE', { name: 'New Name' });
       global.fetch = jest.fn();
 
       await offlineService.syncOfflineQueue();
@@ -225,7 +235,7 @@ describe('OfflineService', () => {
 
     it('fails every queued action when there is no access token', async () => {
       (mobileAuth.getAccessToken as jest.Mock).mockReturnValue(null);
-      await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'x' } });
+      seedQueuedAction('ISSUE_REPORT', { note: 'x' });
       global.fetch = jest.fn();
 
       await offlineService.syncOfflineQueue();
@@ -236,7 +246,18 @@ describe('OfflineService', () => {
 
     it('refuses to sync against a disallowed API host', async () => {
       process.env.EXPO_PUBLIC_API_URL = 'http://169.254.169.254';
-      await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'x' } });
+      seedQueuedAction('ISSUE_REPORT', { note: 'x' });
+      global.fetch = jest.fn();
+
+      await offlineService.syncOfflineQueue();
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect((await offlineService.getStats()).queueSize).toBe(1);
+    });
+
+    it('refuses cleartext API URLs outside localhost', async () => {
+      process.env.EXPO_PUBLIC_API_URL = 'http://api.wasel14.online';
+      seedQueuedAction('ISSUE_REPORT', { note: 'x' });
       global.fetch = jest.fn();
 
       await offlineService.syncOfflineQueue();
@@ -283,6 +304,7 @@ describe('OfflineService', () => {
 
   describe('clearCache / clearOfflineQueue', () => {
     it('removes only cache entries, not the offline queue, on clearCache', async () => {
+      goOffline();
       await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'x' } });
       await offlineService.cacheData('foo', { a: 1 });
 
@@ -294,6 +316,7 @@ describe('OfflineService', () => {
     });
 
     it('empties the offline queue on clearOfflineQueue', async () => {
+      goOffline();
       await offlineService.queueOfflineAction({ type: 'ISSUE_REPORT', payload: { note: 'x' } });
 
       await offlineService.clearOfflineQueue();

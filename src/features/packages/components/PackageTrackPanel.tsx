@@ -82,7 +82,7 @@ export function PackageTrackPanel({
   const ar = language === 'ar';
 
   return (
-    <div style={{ textAlign: 'center', maxWidth: 560, margin: '0 auto', padding: '20px 0' }}>
+    <div style={{ textAlign: 'center', width: '100%', maxWidth: 560, margin: '0 auto', padding: '20px 0' }}>
       <div style={{ fontSize: '2.5rem', marginBottom: 16 }}>{tx('packageTrackPanel.track')}</div>
       <h3 style={{ color: C.text, fontWeight: 800, margin: '0 0 8px' }}>
         {tx('packageTrackPanel.track_your_package')}
@@ -90,13 +90,16 @@ export function PackageTrackPanel({
       <p style={{ color: DS.sub, marginBottom: 20 }}>
         {tx('packageTrackPanel.enter_your_tracking_id_to_see_ride_and_package_status_together')}
       </p>
-      <div style={{ display: 'flex', gap: 10 }}>
+      <div className="pkg-track-search" style={{ display: 'flex', gap: 10 }}>
         <input
+          aria-label={ar ? 'رقم تتبع الطرد' : 'Package tracking ID'}
           placeholder={tx('packageTrackPanel.pkg_xxxxx')}
           value={trackId}
           onChange={event => setTrackId(event.target.value)}
           style={{
             flex: 1,
+            minWidth: 0,
+            boxSizing: 'border-box',
             padding: '14px 18px',
             borderRadius: r(12),
             border: `1px solid ${DS.border}`,
@@ -108,6 +111,8 @@ export function PackageTrackPanel({
           }}
         />
         <button
+          type="button"
+          aria-label={ar ? 'ابحث عن الطرد' : 'Find package'}
           disabled={busyState === 'tracking'}
           onClick={() => { void onSearch(); }}
           style={{
@@ -177,6 +182,7 @@ export function PackageTrackPanel({
                 : `Still searching for a posted ride from ${trackedPackage.from} to ${trackedPackage.to}.`}
           </div>
           <div
+            className="pkg-track-three-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -313,6 +319,7 @@ export function PackageTrackPanel({
             ))}
           </div>
           <div
+            className="pkg-track-three-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
@@ -366,7 +373,7 @@ export function PackageTrackPanel({
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
+          <div className="pkg-track-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
             <button
               onClick={() => { onVerificationAction('share_code'); }}
               disabled={Boolean(trackedPackage.verification.senderCodeSharedAt)}
@@ -463,7 +470,7 @@ export function PackageTrackPanel({
                   : 'Confirm receiver handoff'}
             </button>
           </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+          <div className="pkg-track-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
             <button
               onClick={() => { void onOpenSupport(); }}
               style={{

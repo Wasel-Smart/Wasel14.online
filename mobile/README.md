@@ -13,7 +13,7 @@ Supabase backend.
 
 ## Tech stack
 
-- **Framework:** React Native 0.74 (Expo SDK 51)
+- **Framework:** React Native 0.83 (Expo SDK 55)
 - **Language:** TypeScript 5.x (strict)
 - **Navigation:** React Navigation (bottom tabs + native stack)
 - **Server state:** TanStack Query
@@ -55,7 +55,7 @@ mobile/
 
 ### Prerequisites
 
-- Node.js 20+ (Expo SDK 51)
+- Node.js version supported by Expo SDK 55
 - Yarn 1.22+
 - For iOS: macOS + Xcode 15+ + CocoaPods
 - For Android: Android Studio + JDK 17+ + SDK 33+
@@ -101,6 +101,18 @@ yarn lint         # eslint (0 warnings allowed)
 yarn test         # jest unit tests (services, stores, utils)
 yarn test:e2e     # detox end-to-end (requires a built native app)
 ```
+
+## Production release setup
+
+The repository does not contain an EAS project ID or store credentials. Before creating
+production builds, authenticate with the Wasel Expo account and run
+`npx eas-cli@latest build:configure` to link this app to its real EAS project. Do not use a
+placeholder project ID.
+
+Store submission also requires account-specific configuration: an Apple App Store Connect
+app record and ID, plus the Google Play service-account key at the path configured in
+`eas.json`. Keep the key file out of source control. Configure these values before running
+`eas submit`; they cannot be generated from this repository.
 
 ## Documentation
 

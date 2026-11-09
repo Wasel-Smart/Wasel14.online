@@ -1,26 +1,28 @@
 # Mobile App Audit Report
 
-## Status: UNVERIFIED — do not trust the scores below without re-running CI
+## Status: Mobile code gates verified; native release and overall score unverified
 
 A previous version of this file claimed an overall score of 9.3/10 with every category
-rated "Excellent" (9–9.5/10). Those numbers were not backed by a passing build at the
-repo root — `test-results/.last-run.json` at the repo root currently reports
-`"status": "failed"`. Mobile has its own build/test pipeline (Jest, Detox) and has not
-been independently re-verified.
+rated "Excellent" (9–9.5/10). Those numbers were not backed by a passing build and should
+not be used.
 
-**No score in this document is valid until someone has actually run, in order, and
-pasted the real output of:**
+The mobile package was independently verified on Windows:
 
 ```
-yarn install
-yarn type-check
-yarn lint
-yarn test
+npm run type-check                 # passed
+npm run lint                       # passed
+npx jest --runInBand               # 21 suites, 266 tests passed
+npx expo config --type public      # passed; Expo SDK 55
 ```
+
+The JS bundle export and native device/store release still require validation. This
+repository has no real EAS project ID or store credentials, so builds and submissions
+cannot be certified from the current configuration. The root web workspace also has
+separate failing test type-checks; mobile results do not imply a web or overall score.
 
 ## Overview
 
-React Native (Expo SDK 51) client. 78+ source files, 25+ product screens per prior
+React Native (Expo SDK 55) client. 78+ source files, 25+ product screens per prior
 (unverified) documentation — file counts are checkable, behavior is not, without running
 the app.
 
@@ -74,9 +76,9 @@ the app.
    (delegating to `signInWithEmail`) and `resetPassword` (delegating to Supabase's
    `resetPasswordForEmail`).
 
-7. **Offline URL validation bug** — `offline.ts` used `Array.includes()` for hostname matching,
-   which rejected subdomain Supabase URLs like `xyz.supabase.co`. Fixed to use `endsWith()`
-   matching the pattern in `api.ts`.
+7. **Offline URL validation** — offline actions and location polling now share the API URL
+   validator. It allows HTTPS on approved hosts and their dot-boundary subdomains, permits
+   HTTP only for `localhost`, and rejects look-alike hostnames.
 
 8. **Dead code** — Removed `Tabs.tsx`, an unused placeholder file. The production tab navigation
    lives in `AppNavigator.tsx`'s `TabNavigator`, which references real screen components.
@@ -98,9 +100,9 @@ the app.
 
 ## What this document is NOT
 
-Not a certification of release-readiness. Scores return once `yarn test` output is
-pasted and reviewed, not before.
+Not a certification of release-readiness or a numeric score. Real-device testing and
+account-linked EAS builds/submissions remain outstanding.
 
 ## Last edited
 
-August 2026 — scores removed pending real verification.
+Updated after mobile package validation.

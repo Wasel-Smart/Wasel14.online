@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { Shield } from 'lucide-react';
+import { RotateCcw, Shield } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { DS, r } from '../../../pages/waselServiceShared';
 import { C } from '../../../utils/wasel-ds';
@@ -20,12 +20,52 @@ type ReturnComposerState = {
 type PackageReturnsPanelProps = {
   pkg: ReturnComposerState;
   setPkg: Dispatch<SetStateAction<ReturnComposerState>>;
-  /** Tracking ID of the return this panel actually created, if any. */
   trackingId: string | null;
   createError: string | null;
   busyState: 'idle' | 'creating' | 'tracking';
   onCreateReturn: () => void;
   onReset: () => void;
+};
+
+const CITY_LABELS_AR: Record<string, string> = {
+  Amman: 'عمّان',
+  Aqaba: 'العقبة',
+  Irbid: 'إربد',
+  Zarqa: 'الزرقاء',
+  'Dead Sea': 'البحر الميت',
+  Karak: 'الكرك',
+  Madaba: 'مادبا',
+  Petra: 'البتراء',
+  Jerash: 'جرش',
+  Mafraq: 'المفرق',
+  Salt: 'السلط',
+};
+
+function cityLabel(city: string, ar: boolean): string {
+  return ar ? (CITY_LABELS_AR[city] ?? city) : city;
+}
+
+const fieldStyle = {
+  width: '100%',
+  padding: '12px 14px',
+  borderRadius: r(10),
+  border: `1px solid ${DS.border}`,
+  background: DS.card2,
+  color: C.text,
+  fontFamily: DS.F,
+  fontSize: '0.9rem',
+  outline: 'none',
+  boxSizing: 'border-box' as const,
+};
+
+const labelStyle = {
+  display: 'block',
+  color: C.textMuted,
+  fontSize: '0.7rem',
+  fontWeight: 700,
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.04em',
+  marginBottom: 6,
 };
 
 export function PackageReturnsPanel({
@@ -39,209 +79,177 @@ export function PackageReturnsPanel({
 }: PackageReturnsPanelProps) {
   const { language } = useLanguage();
   const ar = language === 'ar';
-  const cityName = (value: string) => {
-    if (!ar) {return value;}
-    const labels: Record<string, string> = {
-      Amman: 'عمّان', Aqaba: 'العقبة', Irbid: 'إربد', Zarqa: 'الزرقاء',
-      'Dead Sea': 'البحر الميت', Karak: 'الكرك', Madaba: 'مادبا',
-      Petra: 'البتراء', Jerash: 'جرش', Mafraq: 'المفرق', Salt: 'السلط',
-    };
-    return labels[value] ?? value;
-  };
   const returnSteps = ar ? PACKAGE_RETURN_STEPS_AR : PACKAGE_RETURN_STEPS;
   const phoneDigits = pkg.recipientPhone.replace(/[^\d]/g, '').length;
-  const canCreate =
-    pkg.from !== pkg.to &&
-    pkg.recipientName.trim().length > 0 &&
-    phoneDigits >= 9;
+  const canCreate = pkg.from !== pkg.to && pkg.recipientName.trim().length > 0 && phoneDigits >= 9;
 
   return (
-    <div style={{ textAlign: 'center', padding: '20px 0' }}>
-      <div style={{ fontSize: '2.5rem', marginBottom: 12 }}>{tx('packageReturnsPanel.r')}</div>
-      <h3 style={{ color: C.text, fontWeight: 800, margin: '0 0 8px' }}>
-        {tx('packageReturnsPanel.raje3_returns')}
-      </h3>
-      <p style={{ color: DS.sub, margin: '0 auto 24px', maxWidth: 480 }}>
-        {tx(
-          'packageReturnsPanel.return_e_commerce_items_through_the_same_shared_ride_network_create_a_return_request_match_it_to_a_posted_route_and_keep_one_tracking_id_from_pickup_to_dropoff',
-        )}
-      </p>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: 12,
-          marginBottom: 24,
-          textAlign: 'left',
-        }}
-      >
-        {returnSteps.map(step => (
+    <div style={{ width: '100%', maxWidth: 520, margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: r(16),
+            margin: '0 auto 16px',
+            display: 'grid',
+            placeItems: 'center',
+            background: `${DS.cyan}12`,
+            border: `1px solid ${DS.cyan}28`,
+          }}
+        >
+          <RotateCcw size={24} color={DS.cyan} />
+        </div>
+        <h3 style={{ color: C.text, fontWeight: 800, margin: '0 0 8px', fontSize: '1.1rem' }}>
+          {tx('packageReturnsPanel.raje3_returns')}
+        </h3>
+        <p style={{ color: C.textMuted, margin: 0, lineHeight: 1.6, fontSize: '0.82rem' }}>
+          {tx('packageReturnsPanel.return_e_commerce_items_through_the_same_shared_ride_network_create_a_return_request_match_it_to_a_posted_route_and_keep_one_tracking_id_from_pickup_to_dropoff')}
+        </p>
+      </div>
+
+      {/* Steps */}
+      <div className="pkg-steps-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 24 }}>
+        {returnSteps.map((step, i) => (
           <div
             key={step.title}
             style={{
-              background: DS.card2,
-              borderRadius: r(14),
-              padding: '18px 16px',
-              border: `1px solid ${DS.border}`,
+              background: C.card2,
+              borderRadius: r(12),
+              padding: '14px 12px',
+              border: `1px solid ${C.border}`,
+              textAlign: 'center',
             }}
           >
-            <h4 style={{ color: C.text, fontWeight: 700, fontSize: '0.85rem', margin: '0 0 6px' }}>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                background: `${DS.cyan}14`,
+                border: `1px solid ${DS.cyan}28`,
+                display: 'grid',
+                placeItems: 'center',
+                margin: '0 auto 10px',
+                color: DS.cyan,
+                fontSize: '0.75rem',
+                fontWeight: 800,
+              }}
+            >
+              {i + 1}
+            </div>
+            <div style={{ color: C.text, fontWeight: 700, fontSize: '0.82rem', marginBottom: 4 }}>
               {step.title}
-            </h4>
-            <p style={{ color: DS.muted, fontSize: '0.75rem', margin: 0 }}>{step.desc}</p>
+            </div>
+            <div style={{ color: C.textMuted, fontSize: '0.73rem', lineHeight: 1.5 }}>
+              {step.desc}
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Success state */}
       {trackingId && (
         <div
           style={{
-            maxWidth: 520,
-            margin: '0 auto 18px',
-            background: DS.card2,
+            background: C.card2,
             borderRadius: r(16),
-            padding: '16px 20px',
-            border: `1px solid ${DS.border}`,
-            textAlign: 'left',
+            padding: '18px 20px',
+            border: `1px solid ${DS.cyan}28`,
+            marginBottom: 20,
           }}
         >
-          <p style={{ color: DS.muted, fontSize: '0.72rem', margin: '0 0 4px' }}>
+          <p style={{ color: C.textMuted, fontSize: '0.72rem', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {ar ? 'رقم التتبع' : 'Tracking ID'}
           </p>
           <p
             data-testid="package-return-tracking-id"
-            style={{ color: DS.cyan, fontWeight: 900, fontSize: '1.15rem', margin: 0 }}
+            style={{ color: DS.cyan, fontWeight: 900, fontSize: '1.1rem', margin: '0 0 10px' }}
           >
             {trackingId}
           </p>
-          <p style={{ color: DS.sub, fontSize: '0.8rem', margin: '10px 0 0' }}>
+          <p style={{ color: C.textMuted, fontSize: '0.8rem', margin: 0, lineHeight: 1.55 }}>
             {ar
               ? 'طلب الإرجاع مُنشأ. افتح تبويب "تتبع طرد" لمتابعة الاستلام والتسليم.'
-              : 'The return request is live. Open the Track Package tab to follow pickup and delivery.'}
+              : 'Return request is live. Open the Track tab to follow pickup and delivery.'}
           </p>
         </div>
       )}
 
-      <div
-        style={{
-          maxWidth: 520,
-          margin: '0 auto 18px',
-          display: 'grid',
-          gap: 12,
-          textAlign: 'left',
-        }}
-      >
+      {/* Form */}
+      <div style={{ display: 'grid', gap: 14, marginBottom: 20 }}>
         <div>
-          <label
-            htmlFor="package-return-recipient-name"
-            style={{
-              display: 'block',
-              color: DS.muted,
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              marginBottom: 6,
-            }}
-          >
+          <label htmlFor="pkg-return-recipient-name" style={labelStyle}>
             {ar ? 'اسم المستلم' : 'Recipient name'}
           </label>
           <input
-            id="package-return-recipient-name"
+            id="pkg-return-recipient-name"
             data-testid="package-return-recipient-name"
             value={pkg.recipientName}
-            onChange={event =>
-              setPkg(previous => ({ ...previous, recipientName: event.target.value }))
-            }
+            onChange={e => setPkg(p => ({ ...p, recipientName: e.target.value }))}
             placeholder={ar ? 'مثال: محل نون' : 'e.g. Noon store'}
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              borderRadius: r(10),
-              border: `1px solid ${DS.border}`,
-              background: DS.card2,
-              color: DS.text,
-              fontSize: '0.9rem',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            className="pkg-field"
+            style={fieldStyle}
           />
         </div>
         <div>
-          <label
-            htmlFor="package-return-recipient-phone"
-            style={{
-              display: 'block',
-              color: DS.muted,
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              marginBottom: 6,
-            }}
-          >
+          <label htmlFor="pkg-return-recipient-phone" style={labelStyle}>
             {ar ? 'هاتف المستلم' : 'Recipient phone'}
           </label>
           <input
-            id="package-return-recipient-phone"
+            id="pkg-return-recipient-phone"
             data-testid="package-return-recipient-phone"
             value={pkg.recipientPhone}
-            onChange={event =>
-              setPkg(previous => ({ ...previous, recipientPhone: event.target.value }))
-            }
-            placeholder={ar ? '07xxxxxxxx' : '07xxxxxxxx'}
-            style={{
-              width: '100%',
-              padding: '12px 14px',
-              borderRadius: r(10),
-              border: `1px solid ${DS.border}`,
-              background: DS.card2,
-              color: DS.text,
-              fontSize: '0.9rem',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
+            onChange={e => setPkg(p => ({ ...p, recipientPhone: e.target.value }))}
+            placeholder="07xxxxxxxx"
+            className="pkg-field"
+            style={fieldStyle}
           />
         </div>
-        <p style={{ color: DS.muted, fontSize: '0.75rem', margin: 0, lineHeight: 1.55 }}>
+        <p style={{ color: C.textMuted, fontSize: '0.78rem', margin: 0, lineHeight: 1.55 }}>
           {ar
-            ? `سيتم الإرجاع من ${cityName(pkg.from)} إلى ${cityName(pkg.to)} بنفس الرقم الذي يظهر في التتبّع.`
-            : `The return runs on the ${pkg.from} to ${pkg.to} corridor using the same tracking ID.`}
+            ? `سيتم الإرجاع من ${cityLabel(pkg.from, ar)} إلى ${cityLabel(pkg.to, ar)} بنفس رقم التتبع.`
+            : `The return runs on the ${pkg.from} → ${pkg.to} corridor using the same tracking ID.`}
         </p>
       </div>
 
+      {/* Error */}
       {createError && (
         <div
           style={{
-            maxWidth: 520,
-            margin: '0 auto 18px',
             display: 'flex',
             gap: 10,
             alignItems: 'center',
             background: `${DS.gold}12`,
             border: `1px solid ${DS.gold}30`,
-            borderRadius: r(14),
+            borderRadius: r(12),
             padding: '12px 14px',
             color: C.text,
             fontSize: '0.84rem',
-            textAlign: 'left',
+            marginBottom: 16,
           }}
         >
-          <Shield size={16} color={DS.gold} />
+          <Shield size={15} color={DS.gold} />
           <span>{createError}</span>
         </div>
       )}
 
+      {/* CTA */}
       {trackingId ? (
         <button
           onClick={onReset}
+          className="pkg-btn"
           style={{
-            padding: '14px 32px',
-            borderRadius: '99px',
-            border: `1px solid ${DS.border}`,
-            background: DS.card2,
+            width: '100%',
+            padding: '13px 0',
+            borderRadius: r(14),
+            border: `1px solid ${C.border}`,
+            background: 'transparent',
             color: DS.gold,
             fontWeight: 800,
             fontFamily: DS.F,
-            fontSize: '0.95rem',
+            fontSize: '0.92rem',
             cursor: 'pointer',
           }}
         >
@@ -251,28 +259,30 @@ export function PackageReturnsPanel({
         <button
           disabled={busyState === 'creating' || !canCreate}
           onClick={() => { void onCreateReturn(); }}
+          className="pkg-btn"
           style={{
-            padding: '14px 32px',
-            borderRadius: '99px',
+            width: '100%',
+            padding: '13px 0',
+            borderRadius: r(14),
             border: 'none',
-            background: canCreate ? DS.gradG : DS.card2,
-            color: canCreate ? C.bgDeep : DS.muted,
+            background: canCreate ? DS.gradG : C.card2,
+            color: canCreate ? C.text : C.textMuted,
             fontWeight: 800,
             fontFamily: DS.F,
-            fontSize: '0.95rem',
-            cursor:
-              busyState === 'creating' ? 'wait' : canCreate ? 'pointer' : 'not-allowed',
+            fontSize: '0.92rem',
+            cursor: busyState === 'creating' ? 'wait' : canCreate ? 'pointer' : 'not-allowed',
             opacity: busyState === 'creating' ? 0.75 : 1,
             boxShadow: canCreate ? `0 4px 20px ${DS.gold}30` : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
           }}
         >
+          <RotateCcw size={16} />
           {busyState === 'creating'
-            ? ar
-              ? 'جاري بدء الإرجاع...'
-              : 'Starting return...'
-            : ar
-              ? 'ابدأ إرجاعاً متصلاً'
-              : 'Start a connected return'}
+            ? ar ? 'جاري بدء الإرجاع...' : 'Starting return...'
+            : ar ? 'ابدأ إرجاعاً متصلاً' : 'Start a connected return'}
         </button>
       )}
     </div>

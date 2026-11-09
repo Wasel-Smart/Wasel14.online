@@ -43,7 +43,7 @@ jest.mock('../services/auth', () => ({
   },
 }));
 
-import { RideLifecycleService, type RideRequest } from '../services/ride';
+import { RideLifecycleService, type Ride, type RideRequest } from '../services/ride';
 
 beforeAll(() => {
   process.env.EXPO_PUBLIC_API_URL = 'https://api.test.wasel';
@@ -64,10 +64,24 @@ describe('RideLifecycleService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const { apiClient } = require('../lib/api');
+    apiClient.get.mockReset();
+    apiClient.post.mockReset().mockResolvedValue({ data: {}, error: null, status: 200 });
     service = new RideLifecycleService();
   });
 
   describe('requestRide', () => {
+    const availableTrip = {
+      id: 'trip-1',
+      from: 'Amman',
+      to: 'Aqaba',
+      date: '2026-01-01',
+      time: '08:00',
+      seats: 3,
+      price: 8,
+      driver: { id: 'driver-1', name: 'Driver', rating: 5, verified: true },
+    };
+
     it('returns error when user is not authenticated', async () => {
       const { mobileAuth } = require('../services/auth');
       mobileAuth.getUser.mockReturnValueOnce(null);
@@ -87,39 +101,32 @@ describe('RideLifecycleService', () => {
       );
     });
 
-    it('sends request to API and returns ride on success', async () => {
-      const { apiClient } = require('../lib/api');
-      apiClient.get.mockResolvedValueOnce({
-        data: [{ id: 'trip-1', distance: 100 }],
-        error: null,
-        status: 200,
-      });
-      apiClient.post.mockResolvedValueOnce({
-        data: { booking: { booking_id: 'booking-1', status: 'confirmed', pickup_stop: 'Amman', dropoff_stop: 'Aqaba' } },
-        error: null,
-        status: 200,
-      });
+    it('books the first available trip and returns the ride on success', async () => {
+      const ride: Ride = {
+        id: 'booking-1',
+        riderId: 'user-1',
+        origin: validRequest.origin,
+        destination: validRequest.destination,
+        status: 'requested',
+        requestedAt: '2026-01-01T08:00:00.000Z',
+      };
+      const searchTrips = jest.spyOn(service, 'searchTrips').mockResolvedValue([availableTrip]);
+      const bookTrip = jest.spyOn(service, 'bookTrip').mockResolvedValue({ ride });
 
       const result = await service.requestRide(validRequest);
       expect(result.ride).toBeDefined();
       expect(result.ride?.id).toBe('booking-1');
-      expect(apiClient.post).toHaveBeenCalledWith(
-        '/v1/bookings',
-        expect.objectContaining({ trip_id: 'trip-1', seats_requested: 2, pickup_stop: 'Amman', dropoff_stop: 'Aqaba' }),
-      );
+      expect(searchTrips).toHaveBeenCalledWith('Amman', 'Aqaba', 2, expect.any(String));
+      expect(bookTrip).toHaveBeenCalledWith(availableTrip, 2, 'Amman', 'Aqaba');
     });
 
-    it('returns error on API failure', async () => {
-      const { apiClient } = require('../lib/api');
-      apiClient.get.mockResolvedValueOnce({
-        data: [{ id: 'trip-1', distance: 100 }],
-        error: null,
-        status: 200,
-      });
-      apiClient.post.mockResolvedValueOnce({ data: null, error: new Error('Server error'), status: 500 });
+    it('returns the booking error when booking fails', async () => {
+      const bookingError = new Error('Server error');
+      jest.spyOn(service, 'searchTrips').mockResolvedValue([availableTrip]);
+      jest.spyOn(service, 'bookTrip').mockResolvedValue({ error: bookingError });
 
       const result = await service.requestRide(validRequest);
-      expect(result.error).toBeDefined();
+      expect(result.error).toEqual(bookingError);
     });
   });
 

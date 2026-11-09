@@ -2,7 +2,7 @@
 
 ## Tech Stack
 
-- **Framework:** React Native 0.74 (Expo SDK 51)
+- **Framework:** React Native 0.83 (Expo SDK 55)
 - **Language:** TypeScript 5.x (strict mode)
 - **Navigation:** React Navigation (bottom tabs + native stack)
 - **Server state:** TanStack Query

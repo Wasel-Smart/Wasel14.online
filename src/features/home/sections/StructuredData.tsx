@@ -1,3 +1,5 @@
+import { serializeJsonLd } from '../../../utils/seo';
+
 interface StructuredDataProps {
   ar: boolean;
 }
@@ -160,7 +162,7 @@ export function StructuredData({ ar }: StructuredDataProps) {
         <script
           key={`ld-json-${index}`}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }}
         />
       ))}
       <meta name="description" content={ar

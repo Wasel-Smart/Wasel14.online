@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Brain, Boxes, Network } from 'lucide-react';
+import { Boxes } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useLocalAuth } from '../../contexts/LocalAuth';
 import { useIframeSafeNavigate } from '../../hooks/useIframeSafeNavigate';
@@ -27,50 +27,13 @@ import { recordMovementActivity } from '../../services/movementMembership';
 import { createSupportTicket } from '../../services/supportInbox';
 import { walletApi } from '../../services/wallet/walletApi';
 import { calculateDirectPrice } from '../../shared/pricing/priceCalculator';
-import {
-  getCorridorOpportunity,
-  getFeaturedCorridors,
-  getMarketplaceNodes,
-} from '../../config/wasel-movement-network';
-import { C, R, SH } from '../../utils/wasel-ds';
+import { getCorridorOpportunity } from '../../config/wasel-movement-network';
+import { C, SH } from '../../utils/wasel-ds';
 import { ServiceFlowPlaybook } from '../shared/ServiceFlowPlaybook';
 import { PackageReturnsPanel } from './components/PackageReturnsPanel';
 import { PackageSendPanel } from './components/PackageSendPanel';
 import { PackageTrackPanel } from './components/PackageTrackPanel';
 import { tx } from '../../locales/tx';
-
-const CITY_LABELS_AR: Record<string, string> = {
-  Amman: 'عمّان',
-  Aqaba: 'العقبة',
-  Irbid: 'إربد',
-  Zarqa: 'الزرقاء',
-  'Dead Sea': 'البحر الميت',
-  Karak: 'الكرك',
-  Madaba: 'مادبا',
-  Petra: 'البتراء',
-  Jerash: 'جرش',
-  Mafraq: 'المفرق',
-  Salt: import.meta.env.VITE_PACKAGES_SALT_LABEL || 'السلط',
-};
-
-function cityLabel(city: string, ar: boolean): string {
-  return ar ? (CITY_LABELS_AR[city] ?? city) : city;
-}
-
-function routeLabel(from: string, to: string, ar: boolean): string {
-  return ar ? `${cityLabel(from, ar)} إلى ${cityLabel(to, ar)}` : `${from} to ${to}`;
-}
-
-function corridorLabel(label: string, ar: boolean): string {
-  if (!ar) {return label;}
-  return label
-    .replace(/Amman/g, 'عمّان')
-    .replace(/Aqaba/g, 'العقبة')
-    .replace(/Irbid/g, 'إربد')
-    .replace(/Zarqa/g, 'الزرقاء')
-    .replace(/Karak/g, 'الكرك')
-    .replace(/Madaba/g, 'مادبا');
-}
 
 function packageStatusMessage(
   action: 'share_code' | 'confirm_pickup' | 'confirm_delivery',
@@ -105,17 +68,14 @@ export function PackagesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [trackingMessage, setTrackingMessage] = useState<string | null>(null);
   const [busyState, setBusyState] = useState<'idle' | 'creating' | 'tracking'>('idle');
-  // The returns panel owns its own confirmation state so creating a return does
-  // not leave the Send tab stuck on its success panel (and vice versa).
   const [returnTrackingId, setReturnTrackingId] = useState<string | null>(null);
 
-  const featuredCorridors = useMemo(() => getFeaturedCorridors(3), []);
-  const marketplaceNodes = useMemo(() => getMarketplaceNodes().slice(2), []);
   const corridorPlan = useMemo(() => getCorridorOpportunity(pkg.from, pkg.to), [pkg.from, pkg.to]);
 
   const matchingRideCount = getConnectedRides().filter(
     ride => ride.acceptsPackages && ride.from === pkg.from && ride.to === pkg.to,
   ).length;
+
   const trackedStatusColor =
     trackedPackage?.status === 'delivered'
       ? DS.green
@@ -140,7 +100,7 @@ export function PackagesPage() {
   };
 
   const focusTrackingItem = (item: PackageRequest, activateTrack = false) => {
-    if (activateTrack) {setActiveTab('track');}
+    if (activateTrack) { setActiveTab('track'); }
     setTrackId(item.trackingId);
     setTrackedPackage(item);
     setTrackingMessage(ar ? `التتبع جاهز: ${item.trackingId}.` : `Tracking ready: ${item.trackingId}.`);
@@ -148,10 +108,7 @@ export function PackagesPage() {
 
   const handlePackageCreate = async (packageType: 'delivery' | 'return' = 'delivery') => {
     const validationError = validatePackageComposer(pkg);
-    if (validationError) {
-      setCreateError(validationError);
-      return;
-    }
+    if (validationError) { setCreateError(validationError); return; }
 
     setBusyState('creating');
     setCreateError(null);
@@ -170,16 +127,12 @@ export function PackagesPage() {
         recipientPhone: pkg.recipientPhone,
       });
 
-      // `sent` drives the Send tab's success panel, so it must only flip for a
-      // delivery. The returns panel renders its own tracking confirmation.
       setPkg(previous => ({
         ...previous,
         sent: packageType === 'delivery' ? true : previous.sent,
         trackingId: packageType === 'delivery' ? created.trackingId : previous.trackingId,
       }));
-      if (packageType === 'return') {
-        setReturnTrackingId(created.trackingId);
-      }
+      if (packageType === 'return') { setReturnTrackingId(created.trackingId); }
       setTrackedPackage(created);
       setTrackId(created.trackingId);
       setTrackingMessage(ar ? `التتبع مباشر: ${created.trackingId}.` : `Tracking live: ${created.trackingId}.`);
@@ -190,75 +143,46 @@ export function PackagesPage() {
         try {
           await walletApi.pay(user.id, priceResult.price, 'package_delivery', {
             referenceId: created.id,
-            metadata: {
-              trackingId: created.trackingId,
-              from: created.from,
-              to: created.to,
-              weight: pkg.weight,
-            },
+            metadata: { trackingId: created.trackingId, from: created.from, to: created.to, weight: pkg.weight },
           });
         } catch (paymentError) {
           console.error('[Wallet] package payment failed:', paymentError);
           setTrackingMessage(
             ar
-              ? `التتبع مباشر: ${created.trackingId}. سيتم تسوية الدفع عند التسليم لأن المحفظة غير متاحة الآن.`
-              : `Tracking live: ${created.trackingId}. Payment will be settled on delivery (wallet unavailable).`,
+              ? `التتبع مباشر: ${created.trackingId}. سيتم تسوية الدفع عند التسليم.`
+              : `Tracking live: ${created.trackingId}. Payment will be settled on delivery.`,
           );
         }
       }
 
-      notificationsAPI
-        .createNotification({
-          title:
-            packageType === 'return'
-              ? ar
-                ? 'تم بدء طلب الإرجاع'
-                : 'Return request started'
-              : ar
-                ? 'تم بدء حجز الطرد'
-                : 'Package booking started',
-          message: created.matchedRideId
-            ? ar
-              ? `تمت مطابقة طردك مع مسار مباشر من ${routeLabel(created.from, created.to, ar)}.`
-              : `Your package was matched to a live ${created.from} to ${created.to} route.`
-            : ar
-              ? 'طلب الطرد مباشر وينتظر أقرب مسار مطابق.'
-              : 'Your package request is live and waiting for the next matching route.',
-          type: 'booking',
-          priority: 'high',
-          action_url: '/app/packages',
-        })
-        .catch(() => {});
+      notificationsAPI.createNotification({
+        title: packageType === 'return'
+          ? ar ? 'تم بدء طلب الإرجاع' : 'Return request started'
+          : ar ? 'تم بدء حجز الطرد' : 'Package booking started',
+        message: created.matchedRideId
+          ? ar ? `تمت مطابقة طردك مع مسار مباشر.` : `Your package was matched to a live route.`
+          : ar ? 'طلب الطرد مباشر وينتظر أقرب مسار مطابق.' : 'Your package request is live and waiting for the next matching route.',
+        type: 'booking',
+        priority: 'high',
+        action_url: '/app/packages',
+      }).catch(() => {});
 
-      if (permission === 'default') {
-        requestPermission().catch(() => {});
-      }
+      if (permission === 'default') { requestPermission().catch(() => {}); }
 
       notify({
-        title:
-          packageType === 'return'
-            ? ar
-              ? 'بدأ الإرجاع'
-              : 'Return Started'
-            : ar
-              ? 'تم إنشاء طلب الطرد'
-              : 'Package request created',
+        title: packageType === 'return'
+          ? ar ? 'بدأ الإرجاع' : 'Return Started'
+          : ar ? 'تم إنشاء طلب الطرد' : 'Package request created',
         body: created.matchedRideId
-          ? ar
-            ? `تمت المطابقة مع ${created.matchedDriver || 'مسار متصل'}. رقم التتبع: ${created.trackingId}`
-            : `Matched to ${created.matchedDriver || 'a connected route'}. Tracking ID: ${created.trackingId}`
-          : ar
-            ? `رقم التتبع: ${created.trackingId}. نبحث الآن عن أقرب مطابقة على الممر.`
-            : `Tracking ID: ${created.trackingId}. We are searching for the next corridor match now.`,
+          ? ar ? `تمت المطابقة. رقم التتبع: ${created.trackingId}` : `Matched. Tracking ID: ${created.trackingId}`
+          : ar ? `رقم التتبع: ${created.trackingId}.` : `Tracking ID: ${created.trackingId}.`,
         tag: 'package-created',
       });
     } catch (error) {
       setCreateError(
         error instanceof Error
           ? error.message
-          : ar
-            ? 'لم نتمكن من إنشاء طلب الطرد الآن.'
-            : 'We could not create the package request right now.',
+          : ar ? 'لم نتمكن من إنشاء طلب الطرد الآن.' : 'We could not create the package request right now.',
       );
     } finally {
       setBusyState('idle');
@@ -268,18 +192,13 @@ export function PackagesPage() {
   const handleTrackingSearch = async () => {
     setBusyState('tracking');
     setTrackingMessage(null);
-
     try {
       const found = await getPackageByTrackingId(trackId);
       setTrackedPackage(found);
       setTrackingMessage(
         found
-          ? ar
-            ? `تم تحميل التتبع: ${found.trackingId}.`
-            : `Tracking loaded: ${found.trackingId}.`
-          : ar
-            ? 'لم يتم العثور على طرد.'
-            : 'No package found.',
+          ? ar ? `تم تحميل التتبع: ${found.trackingId}.` : `Tracking loaded: ${found.trackingId}.`
+          : ar ? 'لم يتم العثور على طرد.' : 'No package found.',
       );
       refreshPackageSnapshot();
     } finally {
@@ -290,14 +209,11 @@ export function PackagesPage() {
   const handleVerificationAction = async (
     action: 'share_code' | 'confirm_pickup' | 'confirm_delivery',
   ) => {
-    if (!trackedPackage) {return;}
-
+    if (!trackedPackage) { return; }
     setBusyState('tracking');
-
     try {
       const updated = await updatePackageVerification(trackedPackage.trackingId, action);
-      if (!updated) {return;}
-
+      if (!updated) { return; }
       setTrackedPackage(updated);
       setTrackId(updated.trackingId);
       setTrackingMessage(packageStatusMessage(action, updated.trackingId, ar));
@@ -306,9 +222,7 @@ export function PackagesPage() {
       setTrackingMessage(
         error instanceof Error
           ? error.message
-          : ar
-            ? 'تأكيد الطرد غير متاح الآن.'
-            : 'Package verification is unavailable right now.',
+          : ar ? 'تأكيد الطرد غير متاح الآن.' : 'Package verification is unavailable right now.',
       );
     } finally {
       setBusyState('idle');
@@ -316,8 +230,7 @@ export function PackagesPage() {
   };
 
   const handleOpenSupport = () => {
-    if (!trackedPackage) {return;}
-
+    if (!trackedPackage) { return; }
     void (async () => {
       const ticket = await createSupportTicket(user?.id, {
         topic: 'package_issue',
@@ -326,25 +239,84 @@ export function PackagesPage() {
         relatedId: trackedPackage.trackingId,
         routeLabel: `${trackedPackage.from} to ${trackedPackage.to}`,
       });
-
       setTrackingMessage(ar ? `تم فتح الدعم: ${ticket.id}.` : `Support opened: ${ticket.id}.`);
-      notificationsAPI
-        .createNotification({
-          title: ar ? 'تم فتح دعم الطرد' : 'Package support opened',
-          message: ar
-            ? `الدعم يتابع الآن ${trackedPackage.trackingId}.`
-            : `Support is now following ${trackedPackage.trackingId}.`,
-          type: 'support',
-          priority: 'high',
-          action_url: '/app/profile',
-        })
-        .catch(() => {});
+      notificationsAPI.createNotification({
+        title: ar ? 'تم فتح دعم الطرد' : 'Package support opened',
+        message: ar ? `الدعم يتابع الآن ${trackedPackage.trackingId}.` : `Support is now following ${trackedPackage.trackingId}.`,
+        type: 'support',
+        priority: 'high',
+        action_url: '/app/profile',
+      }).catch(() => {});
     })();
   };
+
+  const tabs = [
+    { key: 'send' as const, en: 'Send', ar: 'أرسل' },
+    { key: 'track' as const, en: 'Track', ar: 'تتبع' },
+    { key: 'raje3' as const, en: 'Returns', ar: 'إرجاع' },
+  ];
+
+  const stats = [
+    {
+      value: String(networkStats.packageEnabledRides),
+      label: ar ? 'مسارات جاهزة' : 'Ready routes',
+      color: DS.green,
+    },
+    {
+      value: corridorPlan ? `${corridorPlan.attachRatePercent}%` : null,
+      label: ar ? 'نسبة المطابقة' : 'Match rate',
+      color: DS.gold,
+    },
+    {
+      value: corridorPlan ? `${corridorPlan.sharedPriceJod} ${ar ? 'د.أ' : 'JOD'}` : null,
+      label: ar ? 'السعر المشترك' : 'Shared price',
+      color: DS.cyan,
+    },
+    {
+      value: String(networkStats.matchedPackages),
+      label: ar ? 'مطابقة' : 'Matched',
+      color: DS.blue,
+    },
+  ];
 
   return (
     <Protected>
       <PageShell>
+        <style>{`
+          .pkg-field:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(0,229,255,0.28); }
+          .pkg-btn:focus-visible   { outline: none; box-shadow: 0 0 0 3px rgba(0,229,255,0.28); }
+          .pkg-stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+          .pkg-send-layout { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+          .pkg-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .pkg-form-grid input, .pkg-form-grid select { box-sizing: border-box; max-width: 100%; }
+          .pkg-send-layout > * { min-width: 0; }
+          .pkg-steps-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+          .pkg-panel-shell { padding: 28px 24px; }
+          @media (max-width: 899px) {
+            .pkg-send-layout { grid-template-columns: minmax(0, 1fr) !important; }
+            .pkg-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            .pkg-panel-shell { padding: 22px 18px !important; }
+          }
+          @media (max-width: 640px) {
+            .pkg-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+            .pkg-steps-grid { grid-template-columns: minmax(0, 1fr) !important; }
+            .pkg-track-search { flex-direction: column; }
+            .pkg-track-search > button { min-height: 46px; }
+            .pkg-track-three-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            .pkg-track-actions { display: grid !important; grid-template-columns: minmax(0, 1fr); }
+            .pkg-track-actions > button { width: 100%; }
+          }
+          @media (max-width: 420px) {
+            .pkg-track-three-grid { grid-template-columns: minmax(0, 1fr) !important; }
+          }
+          @media (max-width: 480px) {
+            .pkg-panel-shell { padding: 18px 14px !important; }
+          }
+          @keyframes pkg-pulse {
+            0%,100% { opacity: 1; } 50% { opacity: 0.35; }
+          }
+          .pkg-stat-dash { animation: pkg-pulse 1.6s ease-in-out infinite; }
+        `}</style>
         <SectionHead
           emoji={<Boxes size={24} />}
           title={tx('packagesPage.send_a_package')}
@@ -356,324 +328,83 @@ export function PackagesPage() {
 
         <CoreExperienceBanner
           title={tx('packagesPage.package_flow_is_tied_to_the_same_live_corridor_graph')}
-          detail={tx(
-            'packagesPage.wasel_matches_parcels_to_live_drivers_first_then_falls_back_to_the_next_trusted_route_on_the_same_corridor',
-          )}
           tone={DS.gold}
         />
 
+        {/* Stats strip */}
         <div
-          className="sp-4col"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-            gap: 14,
-            marginBottom: 18,
-          }}
+          className="pkg-stats-grid"
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}
         >
-          {[
-            {
-              label: ar ? 'مسارات جاهزة' : 'Ready routes',
-              value: String(networkStats.packageEnabledRides),
-              detail: ar ? 'مسارات تقبل الطرود' : 'Routes accepting packages',
-              color: DS.green,
-            },
-            {
-              label: ar ? 'نسبة المطابقة' : 'Match rate',
-              value: corridorPlan ? `${corridorPlan.attachRatePercent}%` : '--',
-              detail: ar ? 'فرصة مطابقة سريعة' : 'Chance of a fast match',
-              color: DS.gold,
-            },
-            {
-              label: ar ? 'السعر المشترك' : 'Shared price',
-              value: corridorPlan ? `${corridorPlan.sharedPriceJod} ${ar ? 'دينار' : 'JOD'}` : '--',
-              detail: ar ? 'سعر المسار المتوقع' : 'Expected route price',
-              color: DS.cyan,
-            },
-            {
-              label: ar ? 'مطابقة' : 'Matched',
-              value: String(networkStats.matchedPackages),
-              detail: ar ? 'مرتبطة برحلات حالياً' : 'Already linked to rides',
-              color: DS.blue,
-            },
-          ].map(item => (
+          {stats.map(s => (
             <div
-              key={item.label}
+              key={s.label}
               style={{
                 background: C.card,
                 borderRadius: r(16),
-                border: `1px solid ${DS.border}`,
-                padding: '18px 18px 16px',
+                border: `1px solid ${C.border}`,
+                padding: '16px 18px',
                 boxShadow: SH.sm,
               }}
             >
-              <div
-                style={{ color: item.color, fontWeight: 900, fontSize: '1.2rem', marginBottom: 4 }}
-              >
-                {item.value}
+              <div style={{ color: s.color, fontWeight: 900, fontSize: '1.25rem', marginBottom: 4 }}>
+                {s.value ?? <span className="pkg-stat-dash" style={{ color: C.textMuted, fontSize: '0.9rem' }}>—</span>}
               </div>
-              <div style={{ color: C.text, fontWeight: 800, fontSize: '0.84rem' }}>
-                {item.label}
-              </div>
-              <div style={{ color: DS.muted, fontSize: '0.74rem', marginTop: 4, lineHeight: 1.45 }}>
-                {item.detail}
+              <div style={{ color: C.textMuted, fontSize: '0.78rem', fontWeight: 600 }}>
+                {s.label}
               </div>
             </div>
           ))}
         </div>
 
+        {/* Tab switcher */}
         <div
-          className="sp-2col"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1.15fr 0.85fr',
-            gap: 14,
-            marginBottom: 18,
-          }}
-        >
-          <div
-            style={{
-              background: DS.card,
-              borderRadius: r(18),
-              padding: '18px 18px 16px',
-              border: `1px solid ${DS.border}`,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: r(12),
-                  background: `${DS.cyan}12`,
-                  border: `1px solid ${DS.cyan}28`,
-                  display: 'grid',
-                  placeItems: 'center',
-                }}
-              >
-                <Brain size={18} color={DS.cyan} />
-              </div>
-              <div>
-                <div style={{ color: C.text, fontWeight: 800 }}>{tx('packagesPage.route_fit')}</div>
-                <div style={{ color: DS.muted, fontSize: '0.76rem', marginTop: 2 }}>
-                  {tx('packagesPage.match_pickup_and_price')}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {[
-                corridorPlan
-                  ? ar
-                    ? `${routeLabel(pkg.from, pkg.to, ar)} أوفر بنسبة ${corridorPlan.savingsPercent}% من التوصيل المنفرد.`
-                    : `${corridorPlan.label} is ${corridorPlan.savingsPercent}% cheaper than solo delivery.`
-                  : ar
-                    ? 'اختار مساراً لعرض السعر وتفاصيل المطابقة.'
-                    : 'Choose a route to see price and match details.',
-                corridorPlan
-                  ? ar
-                    ? 'الاستلام من نقطة موثوقة على المسار المختار. ستظهر تفاصيل التنسيق بعد تأكيد الطلب.'
-                    : `Pickup: ${corridorPlan.pickupPoints[0] ?? 'Trusted point'}. ${corridorPlan.autoGroupWindow}`
-                  : ar
-                    ? 'نقاط الاستلام تظهر هنا.'
-                    : 'Pickup points show here.',
-                corridorPlan
-                  ? ar
-                    ? 'الطلب على هذا المسار يدعم الحركة المشتركة والطرود والتسليم المتكرر.'
-                    : `Demand: ${corridorPlan.businessDemand.join(', ')}.`
-                  : ar
-                    ? 'الإرجاعات والوثائق تساعد على تقوية المسارات الضعيفة.'
-                    : 'Returns and documents can improve weak routes.',
-              ].map(line => (
-                <div
-                  key={line}
-                  style={{
-                    borderRadius: r(14),
-                    border: `1px solid ${DS.border}`,
-                    background: DS.card2,
-                    padding: '12px 14px',
-                    color: C.text,
-                    fontSize: '0.82rem',
-                    lineHeight: 1.65,
-                  }}
-                >
-                  {line}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: DS.card,
-              borderRadius: r(18),
-              padding: '18px 18px 16px',
-              border: `1px solid ${DS.border}`,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: r(12),
-                  background: `${DS.green}12`,
-                  border: `1px solid ${DS.green}28`,
-                  display: 'grid',
-                  placeItems: 'center',
-                }}
-              >
-                <Network size={18} color={DS.green} />
-              </div>
-              <div>
-                <div style={{ color: C.text, fontWeight: 800 }}>
-                  {tx('packagesPage.extra_demand')}
-                </div>
-                <div style={{ color: DS.muted, fontSize: '0.76rem', marginTop: 2 }}>
-                  {tx('packagesPage.returns_and_repeat_lanes_help')}
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {marketplaceNodes.map(node => (
-                <div
-                  key={node.id}
-                  style={{
-                    borderRadius: r(14),
-                    border: `1px solid ${DS.border}`,
-                    background: DS.card2,
-                    padding: '12px 14px',
-                  }}
-                >
-                  <div style={{ color: C.text, fontWeight: 700, fontSize: '0.82rem' }}>
-                    {ar ? 'نقطة طلب ضمن الشبكة' : node.title}
-                  </div>
-                  <div
-                    style={{ color: DS.muted, fontSize: '0.74rem', lineHeight: 1.55, marginTop: 4 }}
-                  >
-                    {ar ? 'تدعم هذه النقطة الطلب المتكرر والطرود والحركة المشتركة على المسار.' : node.summary}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="sp-3col"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 14,
-            marginBottom: 24,
-          }}
-        >
-          {featuredCorridors.map(corridor => (
-            <div
-              key={corridor.id}
-              style={{
-                background: DS.card,
-                borderRadius: r(18),
-                padding: '18px 18px 16px',
-                border: `1px solid ${DS.border}`,
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                }}
-              >
-                <div style={{ color: C.text, fontWeight: 800, fontSize: '0.86rem' }}>
-                  {corridorLabel(corridor.label, ar)}
-                </div>
-                <span style={{ color: DS.cyan, fontSize: '0.72rem', fontWeight: 700 }}>
-                  {corridor.predictedDemandScore}/100
-                </span>
-              </div>
-              <div style={{ color: DS.muted, fontSize: '0.74rem', lineHeight: 1.55, marginTop: 8 }}>
-                {ar
-                  ? 'مسار نشط يجمع الركاب والطرود والطلب المتكرر ضمن شبكة واحدة.'
-                  : corridor.routeMoat}
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-                {corridor.movementLayers.slice(0, 3).map(layer => (
-                  <span
-                    key={layer}
-                    style={{
-                      padding: '5px 9px',
-                      borderRadius: '999px',
-                      background: C.elevated,
-                      border: `1px solid ${DS.border}`,
-                      color: DS.sub,
-                      fontSize: '0.69rem',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {ar ? 'حركة متكررة' : layer}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div
+          className="pkg-tab-list"
           style={{
             display: 'flex',
-            gap: 8,
-            background: C.elevated,
-            borderRadius: R.xl,
-            padding: 6,
-            border: `1px solid ${DS.border}`,
-            marginBottom: 24,
-            boxShadow: SH.card,
+            gap: 6,
+            background: C.card2,
+            borderRadius: r(16),
+            padding: 5,
+            border: `1px solid ${C.border}`,
+            marginBottom: 20,
           }}
         >
-          {(
-            [
-              ['send', 'Send Package'],
-              ['track', 'Track Package'],
-              ['raje3', 'Raje3 Returns'],
-            ] as const
-          ).map(([key, label]) => (
+          {tabs.map(tab => (
             <button
-              key={key}
-              onClick={() => { void setActiveTab(key); }}
+              key={tab.key}
+              onClick={() => { void setActiveTab(tab.key); }}
+              className="pkg-btn"
               style={{
                 flex: 1,
-                height: 44,
+                height: 42,
                 borderRadius: r(12),
                 border: 'none',
                 cursor: 'pointer',
                 fontFamily: DS.F,
-                fontWeight: activeTab === key ? 800 : 600,
-                fontSize: '0.82rem',
-                letterSpacing: 0,
-                background: activeTab === key ? DS.gradG : 'transparent',
-                color: activeTab === key ? C.text : DS.muted,
+                fontWeight: activeTab === tab.key ? 800 : 600,
+                fontSize: '0.85rem',
+                background: activeTab === tab.key ? DS.gradG : 'transparent',
+                color: activeTab === tab.key ? C.text : C.textMuted,
                 transition: 'all 0.18s',
+                position: 'relative',
               }}
             >
-              {ar
-                ? key === 'send'
-                  ? 'أرسل طرد'
-                  : key === 'track'
-                    ? 'تتبع طرد'
-                    : 'إرجاعات راجع'
-                : label}
+              {ar ? tab.ar : tab.en}
             </button>
           ))}
         </div>
 
+        {/* Panel */}
         <div
+          className="pkg-panel-shell"
           style={{
             background: C.card,
             borderRadius: r(22),
-            padding: '28px 28px',
-            border: `1px solid ${DS.border}`,
+            padding: '28px 24px',
+            border: `1px solid ${C.border}`,
             boxShadow: SH.card,
+            marginBottom: 24,
           }}
         >
           {activeTab === 'send' && (
@@ -691,7 +422,6 @@ export function PackagesPage() {
               onOpenRecent={item => focusTrackingItem(item, true)}
             />
           )}
-
           {activeTab === 'track' && (
             <PackageTrackPanel
               trackId={trackId}
@@ -707,7 +437,6 @@ export function PackagesPage() {
               onOpenRecent={item => focusTrackingItem(item)}
             />
           )}
-
           {activeTab === 'raje3' && (
             <PackageReturnsPanel
               pkg={pkg}
@@ -716,35 +445,9 @@ export function PackagesPage() {
               createError={createError}
               busyState={busyState}
               onCreateReturn={() => handlePackageCreate('return')}
-              onReset={() => {
-                setReturnTrackingId(null);
-                setCreateError(null);
-              }}
+              onReset={() => { setReturnTrackingId(null); setCreateError(null); }}
             />
           )}
-        </div>
-
-        <div style={{ marginTop: 18, display: 'grid', gap: 10 }}>
-          <div
-            style={{
-              borderRadius: r(16),
-              border: `1px solid ${DS.border}`,
-              background: DS.card,
-              padding: '16px 18px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <Boxes size={18} color={DS.gold} />
-              <div style={{ color: C.text, fontWeight: 800 }}>
-                {tx('packagesPage.why_this_works')}
-              </div>
-            </div>
-            <div style={{ color: DS.sub, fontSize: '0.8rem', lineHeight: 1.65 }}>
-              {tx(
-                'packagesPage.every_package_request_improves_route_matching_handoff_clarity_and_corridor_coverage_senders_get_simpler_delivery_and_the_network_gets_better_at_moving_parcels_on_real_daily_routes',
-              )}
-            </div>
-          </div>
         </div>
 
         <ServiceFlowPlaybook
