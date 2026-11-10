@@ -294,6 +294,7 @@ export const CLIQ_API_BASE_URL = ( Deno.env.get( 'CLIQ_API_BASE_URL' ) ?? Deno.e
 export const CLIQ_MERCHANT_ID = Deno.env.get( 'CLIQ_MERCHANT_ID' ) ?? Deno.env.get( 'JOPACC_MERCHANT_ID' ) ?? '';
 export const CLIQ_API_KEY = Deno.env.get( 'CLIQ_API_KEY' ) ?? Deno.env.get( 'JOPACC_API_KEY' ) ?? '';
 export const CLIQ_WEBHOOK_SECRET = Deno.env.get( 'CLIQ_WEBHOOK_SECRET' ) ?? Deno.env.get( 'JOPACC_WEBHOOK_SECRET' ) ?? '';
+export const CLIQ_WEBHOOK_AMOUNT_UNIT = Deno.env.get( 'CLIQ_WEBHOOK_AMOUNT_UNIT' )?.trim().toLowerCase() ?? '';
 export const CLIQ_CHECKOUT_URL_TEMPLATE = Deno.env.get( 'CLIQ_CHECKOUT_URL_TEMPLATE' ) ?? Deno.env.get( 'JOPACC_CHECKOUT_URL_TEMPLATE' ) ?? '';
 export const CLIQ_CHECKOUT_ENDPOINT = Deno.env.get( 'CLIQ_CHECKOUT_ENDPOINT' ) ?? '/payments';
 export const STRIPE_WASEL_PLUS_PRICE_ID = Deno.env.get( 'STRIPE_WASEL_PLUS_PRICE_ID' ) ?? '';

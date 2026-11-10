@@ -19,7 +19,7 @@ Each bounded context becomes independently deployable:
 | Phone Service | `supabase/functions/phone-service` | `supabase functions deploy phone-service` |
 | Outbox Worker | `supabase/functions/outbox-worker` | `supabase functions deploy outbox-worker` |
 | CLIQ Payments | `supabase/functions/cliq-payments` | `supabase functions deploy cliq-payments` |
-| Stripe Payments | `supabase/functions/stripe-payments-v2` | `supabase functions deploy stripe-payments-v2` |
+| Stripe Payments | `supabase/functions/make-server-0b1f4071/_handlers/payments.ts` | Deployed with `make-server-0b1f4071`; `stripe-payments-v2` is a 410 compatibility stub |
 | GDPR Scheduler | `supabase/functions/gdpr-deletion-scheduler` | `supabase functions deploy gdpr-deletion-scheduler` |
 | Webhooks | `supabase/functions/webhooks` | `supabase functions deploy webhooks` |
 | Event Broker Proxy | `supabase/functions/event-broker-proxy` | `supabase functions deploy event-broker-proxy` |

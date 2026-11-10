@@ -1,16 +1,22 @@
 # Wasel Quality & Release-Readiness Review
 
-**Last verified:** 2026-10-02 (file-level review; nothing was executed)
-**Status: not release-ready.** An independent file-level review on 2026-10-28 scored the
-project 6.5/10 (the earlier self-grade of 9/10 here was not supported by the evidence).
-The code-level security work below is solid; the gaps are provider-side credential rotation
-(none confirmed), measured test coverage of ~14–21% against a 75/80/85/85 target, and
-observability env values that are still placeholders. Nothing here has been executed or
-measured by CI; treat every item as unverified until `npm run verify` is green.
+**Updated:** 2026-11-10. This is a local code review; no production deployment or live-provider verification was performed.
+**Status: code remediation in progress; production readiness is not verified.** The local fixes below close the profile Data API exposure, prevent fictitious Mobility OS booking success, retire the duplicate Stripe implementation, and strengthen CI gates. Live database replay is unavailable in this environment because the local Docker daemon is not running. CliQ's amount unit still requires a signed sandbox payload and provider configuration before top-ups can be credited.
+
+## 2026-11-10 follow-up
+
+| Area | Change | Verification state |
+|---|---|---|
+| **Database privacy** | New migration revokes client access to `public.profiles`, removes broad policies, and adds a restrictive self-read policy. The RLS SQL gate now checks profile table and column privileges. | Migration and live SQL gate not applied locally or in production; Docker unavailable. |
+| **Mobility OS** | Booking UI is disabled until payment authorization/confirmation exists; the endpoint fails closed and client errors no longer create local success records. | E2E regression updated; execution pending. |
+| **CliQ** | Webhook amount conversion now requires an explicit `CLIQ_WEBHOOK_AMOUNT_UNIT` (`jod` or `fils`) and reports held/mismatched payments accurately. | Unit conversion cases added; actual unit must be confirmed in CliQ sandbox. |
+| **Stripe** | `stripe-payments-v2` is reduced to a 410 compatibility endpoint; the deploy workflow publishes the stub, while the main backend remains authoritative. | Local source updated; deploy workflow has not run. |
+| **CI** | Added mobile type/lint/unit checks and raised the regular web coverage gate to 30/25/20/28, matching the current Vitest ratchet. | Workflow not run in this session. |
+| **Docs** | Updated wiring, Stripe endpoint, Mobility OS, and deployment guidance. | File review only. |
 
 ---
 
-## What was fixed in this session
+## Historical changes (October 2026)
 
 | Area | Fix |
 |---|---|
@@ -30,7 +36,7 @@ measured by CI; treat every item as unverified until `npm run verify` is green.
 
 ---
 
-## Still open (requires human action with provider/repo access)
+## Remaining production work
 
 1. **Rotate all credentials at the providers.** No code change can invalidate a live key.
    Rotate: Stripe, Twilio, Supabase service role, Google OAuth, Facebook OAuth, Resend,
@@ -39,11 +45,9 @@ measured by CI; treat every item as unverified until `npm run verify` is green.
    then enable GitHub Secret Scanning + Push Protection.
 3. **Move real env files out of OneDrive** — set `WASEL_ENV_DIR` to a path outside the
    OneDrive sync tree (e.g. `%USERPROFILE%\.wasel-secrets`).
-4. **Verify the webhooks function is deployed** — run `supabase functions deploy webhooks`
-   and confirm with `stripe trigger checkout.session.completed` that the Stripe webhook
-   returns 200 (not 401).
-5. **Set all `<SET_REAL_*_IN_VERCEL>` values** in Vercel Dashboard → Settings →
-   Environment Variables to activate Sentry, App Insights, Twilio, and Resend.
+4. **Deploy the migration and edge-function changes** through the protected deployment workflow, then verify profile reads/writes as anon and authenticated users and run payment smoke tests.
+5. **Configure `CLIQ_WEBHOOK_AMOUNT_UNIT` only after checking an actual signed sandbox event.** Until then, amount-less or unrecognized values remain uncredited for manual review.
+6. **Verify production observability and provider settings** in Vercel and Supabase; this repository review cannot inspect those account values.
 
 ---
 
@@ -54,10 +58,6 @@ measured by CI; treat every item as unverified until `npm run verify` is green.
   provider-side signature URL and secret.
 - Confirm `finalizeTopUpTransaction` dedupes on Stripe `event.id` and that
   `verifyStripeWebhookSignature` enforces a timestamp tolerance.
-- Keep one payment implementation — consolidate `make-server` handlers and
-  `stripe-payments-v2` into a single authoritative path.
-- Review `supabase/migrations/*` RLS policies for anonymous-user edge cases
-  (now that `enable_anonymous_sign_ins = false`, verify no policy relies on
-  `to authenticated` without also checking `is_anonymous`).
-- Expand E2E coverage to 90% (currently ~70% of user journeys covered).
+- Keep the 30/25/20/28 coverage ratchet moving toward the 85% release target; current coverage remains substantially below target.
+- Add end-to-end payment authorization and settlement for Mobility OS before re-enabling its booking action.
 - Add OTLP distributed tracing export via `VITE_OTEL_EXPORTER_OTLP_ENDPOINT`.

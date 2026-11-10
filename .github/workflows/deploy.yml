@@ -112,6 +112,9 @@ jobs:
       - name: Deploy edge function
         if: steps.creds.outputs.ready == 'true'
         run: npm run edge:deploy
+      - name: Retire legacy Stripe payment function
+        if: steps.creds.outputs.ready == 'true'
+        run: supabase functions deploy stripe-payments-v2
 
   # ── Frontend (Vercel) ────────────────────────────────────────────────────────
   deploy-frontend:

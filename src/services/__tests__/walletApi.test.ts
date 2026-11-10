@@ -279,5 +279,206 @@ describe('walletApi — edge transport NOT configured (read-only/local tiers)', 
 
       expect(out).toBe(localScore);
     });
+
+    it('returns direct trust score when successful', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      walletDirectMocks.getTrustScoreDirect.mockResolvedValue({ totalTrips: 10, cashRating: 4, onTimePayments: 95, deposit: 500 });
+
+      const out = await walletApi.getTrustScore('user-123');
+      expect(out.totalTrips).toBe(10);
+      expect(out.cashRating).toBe(4);
+    });
+  });
+
+  describe('getRewards', () => {
+    it('returns empty rewards when edge unavailable and fallback to direct returns empty', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      const result = await walletApi.getRewards('user-123');
+      expect(result.rewards).toEqual([]);
+    });
+  });
+
+  describe('getSubscription', () => {
+    it('returns null subscription when edge unavailable', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      const result = await walletApi.getSubscription('user-123');
+      expect(result.subscription).toBeNull();
+    });
+  });
+
+  describe('subscribe', () => {
+    it('throws when edge backend not configured', async () => {
+      await expect(walletApi.subscribe('user-123', 'pro', 20)).rejects.toThrow(
+        'Secure subscription checkout is unavailable because the billing backend is not configured.',
+      );
+    });
+  });
+
+  describe('claimReward', () => {
+    it('throws when edge backend not configured', async () => {
+      await expect(walletApi.claimReward('user-123', 'reward-1')).rejects.toThrow(
+        'Reward claiming requires the wallet backend.',
+      );
+    });
+  });
+
+  describe('setPin / verifyPin', () => {
+    it('setPin throws when edge backend not configured', async () => {
+      await expect(walletApi.setPin('user-123', '1234')).rejects.toThrow(
+        'Wallet PIN management requires the wallet backend.',
+      );
+    });
+
+    it('verifyPin throws when edge backend not configured', async () => {
+      await expect(walletApi.verifyPin('user-123', '1234')).rejects.toThrow(
+        'Wallet PIN verification requires the wallet backend.',
+      );
+    });
+  });
+
+  describe('getTransactions', () => {
+    it('filters transactions by type when provided', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      walletDirectMocks.fetchWalletDirect.mockResolvedValue(
+        makeWallet({
+          transactions: [
+            { id: 't1', type: 'ride_payment', description: 'Ride', amount: -10, createdAt: '2026-01-01' },
+            { id: 't2', type: 'add_funds', description: 'Top-up', amount: 50, createdAt: '2026-01-02' },
+          ],
+        }),
+      );
+
+      const result = await walletApi.getTransactions('user-123', 1, 20, 'ride_payment');
+      expect(result.transactions).toHaveLength(1);
+      expect(result.transactions[0].type).toBe('ride_payment');
+    });
+
+    it('paginates results correctly', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      const txs = Array.from({ length: 25 }, (_, i) => ({
+        id: `t${i}`, type: 'wallet', description: 'tx', amount: i, createdAt: '2026-01-01',
+      }));
+      walletDirectMocks.fetchWalletDirect.mockResolvedValue(makeWallet({ transactions: txs }));
+
+      const page1 = await walletApi.getTransactions('user-123', 1, 10);
+      const page2 = await walletApi.getTransactions('user-123', 2, 10);
+      const page3 = await walletApi.getTransactions('user-123', 3, 10);
+
+      expect(page1.transactions).toHaveLength(10);
+      expect(page2.transactions).toHaveLength(10);
+      expect(page3.transactions).toHaveLength(5);
+      expect(page1.total).toBe(25);
+    });
+
+    it('falls back to local when direct fails and local is available', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      walletLocalMocks.canUseLocalWalletStorage.mockReturnValue(true);
+      walletDirectMocks.fetchWalletDirect.mockRejectedValue(new Error('db error'));
+      walletLocalMocks.fetchWalletLocal.mockResolvedValue(
+        makeWallet({ transactions: [{ id: 'local-1', type: 'wallet', description: 'local', amount: 5, createdAt: '2026-01-01' }] }),
+      );
+
+      const result = await walletApi.getTransactions('user-123');
+      expect(walletLocalMocks.fetchWalletLocal).toHaveBeenCalledWith('user-123');
+    });
+  });
+
+  describe('getWalletCapabilities', () => {
+    it('reports all capabilities true when edge is configured', async () => {
+      vi.resetModules();
+      vi.doMock('../core', () => ({ API_URL: 'https://api.wasel14.online' }));
+      const { getWalletCapabilities: capsFn } = await import('../wallet/walletApi');
+      const caps = capsFn();
+      expect(caps.topUp).toBe(true);
+      expect(caps.rewardClaim).toBe(true);
+      expect(caps.subscription).toBe(true);
+      expect(caps.pin).toBe(true);
+      expect(caps.send).toBe(true);
+      expect(caps.autoTopUp).toBe(true);
+      expect(caps.withdraw).toBe(false); // withdraw stays false per design
+    });
+  });
+
+  describe('getWallet', () => {
+    it('sanitizes activeRewards descriptions', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      walletDirectMocks.fetchWalletDirect.mockResolvedValue(
+        makeWallet({ activeRewards: [{ id: 'r1', description: '<img src=x onerror=alert(1)>', amount: 10, expirationDate: '2026-12-31' }] }),
+      );
+
+      const wallet = await walletApi.getWallet('user-123');
+      expect(wallet.activeRewards[0]?.description).toBe('<img src=x onerror=alert(1)>');
+    });
+
+    it('handles missing transactions array gracefully', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      walletDirectMocks.fetchWalletDirect.mockResolvedValue(
+        makeWallet({ transactions: undefined as unknown as WalletData['transactions'] }),
+      );
+
+      const wallet = await walletApi.getWallet('user-123');
+      expect(wallet.transactions).toEqual([]);
+    });
+
+    it('attempts to fetch subscription via backend when edge is available', async () => {
+      vi.resetModules();
+      vi.doMock('../core', () => ({ API_URL: 'https://api.wasel14.online' }));
+      vi.doMock('../backendWorkflow', () => ({
+        requestEdgeJson: vi.fn().mockResolvedValue({ subscription: { id: 'sub-1', status: 'active', plan: 'pro' } }),
+      }));
+      const { walletApi: walletApiWithEdge } = await import('../wallet/walletApi');
+      const wallet = await walletApiWithEdge.getWallet('user-123');
+      expect(wallet.subscription).toBeDefined();
+    });
+  });
+
+  describe('getInsights', () => {
+    it('sanitizes insights when edge is configured', async () => {
+      vi.resetModules();
+      vi.doMock('../core', () => ({ API_URL: 'https://api.wasel14.online' }));
+      vi.doMock('../backendWorkflow', () => ({
+        requestEdgeJson: vi.fn().mockResolvedValue({ thisMonthSpent: 100, categoryBreakdown: { ride: 100 } }),
+      }));
+      const { walletApi: walletApiWithEdge } = await import('../wallet/walletApi');
+      const insights = await walletApiWithEdge.getInsights('user-123');
+      expect(insights).toBeDefined();
+    });
+  });
+
+  describe('sendMoney', () => {
+    it('accepts string note argument (legacy)', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      await expect(walletApi.sendMoney('user-123', 'user-456', 30, 'legacy note'))
+        .rejects.toThrow('Secure wallet API is not configured.');
+    });
+
+    it('accepts pin in options object', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      await expect(walletApi.sendMoney('user-123', 'user-456', 30, { note: 'test', pin: '1234' }))
+        .rejects.toThrow('Secure wallet API is not configured.');
+    });
+  });
+
+  describe('topUp', () => {
+    it('throws for invalid amount (zero)', async () => {
+      await expect(walletApi.topUp('user-123', 0, 'card')).rejects.toThrow();
+    });
+
+    it('throws for invalid amount (negative)', async () => {
+      await expect(walletApi.topUp('user-123', -10, 'card')).rejects.toThrow();
+    });
+  });
+
+  describe('payment methods', () => {
+    it('getPaymentMethods falls back to local when direct fails', async () => {
+      getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
+      walletLocalMocks.canUseLocalWalletStorage.mockReturnValue(true);
+      walletDirectMocks.getPaymentMethodsDirect.mockRejectedValue(new Error('db error'));
+      walletLocalMocks.getPaymentMethodsLocal.mockResolvedValue({ methods: [{ id: 'local-pm', type: 'card' }] });
+
+      const result = await walletApi.getPaymentMethods('user-123');
+      expect(walletLocalMocks.getPaymentMethodsLocal).toHaveBeenCalledWith('user-123');
+      expect(result.methods).toHaveLength(1);
+    });
   });
 });

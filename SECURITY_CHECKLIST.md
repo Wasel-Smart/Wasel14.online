@@ -116,7 +116,7 @@ The secrets were redacted from `.env` and `.env.production` but are **still vali
 
 ### Gap 10 — Stripe webhook endpoint (dual handler consolidated)
 
-The `stripe-payments-v2/webhook` endpoint now returns **410 Gone**.
+Every route on `stripe-payments-v2` now returns **410 Gone**. Payment intents and refunds use the primary Wasel backend; Stripe webhooks use the dedicated `webhooks` function.
 Your Stripe webhook destination must point to the canonical handler:
 
 ```
@@ -125,7 +125,7 @@ https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/make-server-0b1f4071/payme
 
 To verify:
 1. [dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks) → check the endpoint URL
-2. If it still points to `stripe-payments-v2/webhook`, update it to the URL above
+2. If it still points to `stripe-payments-v2`, update it to the `webhooks` function URL above
 3. Stripe Dashboard → Webhooks → your endpoint → **Send test webhook** → `payment_intent.succeeded` → should return 200
 
 ---

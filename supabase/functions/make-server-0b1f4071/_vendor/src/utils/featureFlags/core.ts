@@ -330,6 +330,48 @@ export function readEnvFlag(definition: FeatureFlagDefinition): { value: boolean
   return { value, source: 'env' };
 }
 
+function getRestrictionResult(flag: FeatureFlagDefinition, isServer: boolean): EvaluationResult | null {
+  if (flag.killSwitch?.enabled) {
+    return { enabled: false, flag, reason: 'kill_switch' };
+  }
+  if (flag.serverOnly && !isServer) {
+    return { enabled: false, flag, reason: 'server_only' };
+  }
+  if (flag.clientOnly && isServer) {
+    return { enabled: false, flag, reason: 'client_only' };
+  }
+  return null;
+}
+
+function getTargetingResult(
+  flag: FeatureFlagDefinition,
+  context: EvaluationContext,
+  enabled: boolean,
+): EvaluationResult | null {
+  if (!flag.targeting?.length || !matchesAllTargeting(flag.targeting, context)) { return null; }
+  return {
+    enabled,
+    flag,
+    reason: 'targeting',
+    matchedTargeting: flag.targeting.find(rule => matchesTargetingRule(rule, context)),
+  };
+}
+
+function getRolloutResult(
+  flag: FeatureFlagDefinition,
+  context: EvaluationContext,
+): EvaluationResult | null {
+  if (!flag.rollout || flag.rollout.percentage <= 0) { return null; }
+  const bucketKey = context.userId || context.sessionId || 'anonymous';
+  const bucket = hashToBucket(bucketKey, flag.rollout.salt);
+  return {
+    enabled: bucket < flag.rollout.percentage,
+    flag,
+    reason: 'rollout',
+    rolloutBucket: bucket,
+  };
+}
+
 /**
  * Core feature flag evaluation function.
  * Can be used on both client and server (Deno).
@@ -346,30 +388,8 @@ export function evaluateFeatureFlag(
 
   const { isServer = false } = options;
 
-  // 1. Check kill switch first (highest priority)
-  if (flag.killSwitch?.enabled) {
-    return {
-      enabled: false,
-      flag,
-      reason: 'kill_switch',
-    };
-  }
-
-  // 2. Check server/client only restrictions
-  if (flag.serverOnly && !isServer) {
-    return {
-      enabled: false,
-      flag,
-      reason: 'server_only',
-    };
-  }
-  if (flag.clientOnly && isServer) {
-    return {
-      enabled: false,
-      flag,
-      reason: 'client_only',
-    };
-  }
+  const restrictionResult = getRestrictionResult(flag, isServer);
+  if (restrictionResult) { return restrictionResult; }
 
   // 3. Read from environment
   const { value: envValue, source } = readEnvFlag(flag);
@@ -386,33 +406,12 @@ export function evaluateFeatureFlag(
   }
 
   // 4. Check targeting rules (if defined)
-  if (flag.targeting && flag.targeting.length > 0) {
-    const matches = matchesAllTargeting(flag.targeting, context);
-    if (matches) {
-      // Targeting matched - return enabled (or envValue if explicitly set)
-      return {
-        enabled: envValue, // Use env value as base, targeting just gates access
-        flag,
-        reason: 'targeting',
-        matchedTargeting: flag.targeting.find(r => matchesTargetingRule(r, context)),
-      };
-    }
-    // Targeting didn't match - fall through to rollout or default
-  }
+  const targetingResult = getTargetingResult(flag, context, envValue);
+  if (targetingResult) { return targetingResult; }
 
   // 5. Check rollout (if defined)
-  if (flag.rollout && flag.rollout.percentage > 0) {
-    const bucketKey = context.userId || context.sessionId || 'anonymous';
-    const bucket = hashToBucket(bucketKey, flag.rollout.salt);
-    const inRollout = bucket < flag.rollout.percentage;
-
-    return {
-      enabled: inRollout,
-      flag,
-      reason: 'rollout',
-      rolloutBucket: bucket,
-    };
-  }
+  const rolloutResult = getRolloutResult(flag, context);
+  if (rolloutResult) { return rolloutResult; }
 
   // 6. Fall back to environment/default value
   return {
@@ -498,7 +497,7 @@ export interface FlagAuditEntry {
  */
 export function auditFlagEvaluation(entry: FlagAuditEntry): void {
   if (readRuntimeEnv('DEV') === 'true' || readRuntimeEnv('MODE') === 'development') {
-    console.debug('[FeatureFlag]', entry);
+    console.info('[FeatureFlag]', entry);
   }
   // In production: send to logging service
   // await fetch('/api/feature-flags/audit', { method: 'POST', body: JSON.stringify(entry) });

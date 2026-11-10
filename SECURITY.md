@@ -73,7 +73,7 @@ supabase secrets set CLIQ_MERCHANT_ID="<your-cliq-merchant-id>"
 1. [ ] Run `npm run verify:ci` locally
 2. [ ] Apply pending Supabase migrations (`supabase db push`)
 3. [ ] Set all required secrets in Supabase (`supabase secrets set ...`)
-4. [ ] Verify Stripe webhook points to deployed `stripe-payments-v2/webhook`
+4. [ ] Verify Stripe webhook points to the dedicated `webhooks` function at `/payments/webhooks/stripe`
 5. [ ] Verify `.env.local` is not being cloud-synced
 6. [ ] Confirm `CLIQ_WEBHOOK_SECRET` is set and matches CliQ dashboard
 7. [ ] Confirm `VITE_ALLOW_DIRECT_SUPABASE_FALLBACK=false` in production

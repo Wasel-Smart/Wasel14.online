@@ -21,13 +21,14 @@ export const WASEL_EDGE_FUNCTION: EdgeFunctionConfig = {
 };
 
 /**
- * Payment processing edge function
+ * Retired compatibility edge function. All payment operations belong to the
+ * primary backend; this endpoint now returns 410 for old clients.
  */
 export const STRIPE_PAYMENTS_FUNCTION: EdgeFunctionConfig = {
   name: 'stripe-payments',
-  version: 'v2.0.0',
+  version: 'retired',
   hash: 'stripe-payments-v2',
-  description: 'Stripe payment processing and webhook handling',
+  description: 'Retired compatibility endpoint; use the primary Wasel backend',
 };
 
 /**

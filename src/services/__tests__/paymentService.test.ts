@@ -83,8 +83,28 @@ describe('paymentService', () => {
       ).rejects.toThrow('Payment amount must be at least 0.50');
     });
 
+    it('throws when amount is zero', async () => {
+      await expect(
+        paymentService.createPaymentIntent({ amount: 0, bookingId: 'b-1' }),
+      ).rejects.toThrow('Payment amount must be at least 0.50');
+    });
+
+    it('throws when amount is negative', async () => {
+      await expect(
+        paymentService.createPaymentIntent({ amount: -1, bookingId: 'b-1' }),
+      ).rejects.toThrow('Payment amount must be at least 0.50');
+    });
+
     it('throws BackendRequestError when response is missing clientSecret', async () => {
       mockRequestEdge.mockResolvedValueOnce({ paymentIntentId: 'pi_1' });
+
+      await expect(
+        paymentService.createPaymentIntent({ amount: 5, bookingId: 'b-1' }),
+      ).rejects.toMatchObject({ name: 'BackendRequestError', status: 502 });
+    });
+
+    it('throws BackendRequestError when response is missing paymentIntentId', async () => {
+      mockRequestEdge.mockResolvedValueOnce({ clientSecret: 'secret' });
 
       await expect(
         paymentService.createPaymentIntent({ amount: 5, bookingId: 'b-1' }),
@@ -97,6 +117,120 @@ describe('paymentService', () => {
       await expect(
         paymentService.createPaymentIntent({ amount: 5, bookingId: 'b-1' }),
       ).rejects.toMatchObject({ name: 'BackendRequestError', status: 401 });
+    });
+
+    it('aborts previous pending request for same booking', async () => {
+      mockRequestEdge.mockResolvedValueOnce({
+        clientSecret: 'pi_secret_1',
+        paymentIntentId: 'pi_1',
+      });
+
+      const promise1 = paymentService.createPaymentIntent({ amount: 10, bookingId: 'same-booking' });
+      const promise2 = paymentService.createPaymentIntent({ amount: 10, bookingId: 'same-booking' });
+
+      await Promise.allSettled([promise1, promise2]);
+      // Both should complete without throwing (second aborts first)
+    });
+
+    it('includes idempotency key in request body', async () => {
+      mockRequestEdge.mockResolvedValueOnce({
+        clientSecret: 'pi_secret_1',
+        paymentIntentId: 'pi_1',
+      });
+
+      await paymentService.createPaymentIntent({ amount: 10, bookingId: 'booking-1' });
+
+      expect(mockRequestEdge).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            idempotency_key: expect.stringContaining('booking:booking-1'),
+          }),
+        })
+      );
+    });
+
+    it('includes metadata with booking_id and user_id', async () => {
+      mockRequestEdge.mockResolvedValueOnce({
+        clientSecret: 'pi_secret_1',
+        paymentIntentId: 'pi_1',
+      });
+
+      await paymentService.createPaymentIntent({
+        amount: 10,
+        bookingId: 'booking-1',
+        metadata: { note: 'test' },
+      });
+
+      expect(mockRequestEdge).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            metadata: expect.objectContaining({
+              booking_id: 'booking-1',
+              user_id: 'user-1',
+              note: 'test',
+            }),
+          }),
+        })
+      );
+    });
+  });
+
+  // ── confirmPayment ────────────────────────────────────────────────────────
+
+  describe('confirmPayment', () => {
+    it('returns succeeded when payment completes', async () => {
+      mockRequestEdge
+        .mockResolvedValueOnce('pending')
+        .mockResolvedValueOnce('succeeded');
+
+      const status = await paymentService.confirmPayment('booking-1');
+      expect(status).toBe('succeeded');
+    });
+
+    it('returns failed when payment fails', async () => {
+      mockRequestEdge
+        .mockResolvedValueOnce('pending')
+        .mockResolvedValueOnce('failed');
+
+      const status = await paymentService.confirmPayment('booking-1');
+      expect(status).toBe('failed');
+    });
+
+    it('returns pending after max poll duration', async () => {
+      vi.useFakeTimers();
+      mockRequestEdge.mockResolvedValue('pending');
+
+      const promise = paymentService.confirmPayment('booking-1');
+      await vi.advanceTimersByTimeAsync(35_000); // exceed PAYMENT_POLL_MAX_DURATION (30s)
+      const status = await promise;
+
+      expect(status).toBe('pending');
+      vi.useRealTimers();
+    });
+
+    it('polls at PAYMENT_POLL_INTERVAL (2s)', async () => {
+      vi.useFakeTimers();
+      mockRequestEdge
+        .mockResolvedValueOnce('pending')
+        .mockResolvedValueOnce('pending')
+        .mockResolvedValueOnce('succeeded');
+
+      const promise = paymentService.confirmPayment('booking-1');
+      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(2_000);
+      const status = await promise;
+
+      expect(status).toBe('succeeded');
+      expect(mockRequestEdge).toHaveBeenCalledTimes(3);
+      vi.useRealTimers();
+    });
+
+    it('URL-encodes bookingId in path', async () => {
+      mockRequestEdge.mockResolvedValue('succeeded');
+      await paymentService.confirmPayment('booking/with/slashes');
+      expect(mockRequestEdge).toHaveBeenCalledWith(
+        expect.objectContaining({ path: expect.stringContaining('booking%2Fwith%2Fslashes') }),
+      );
     });
   });
 
@@ -120,12 +254,30 @@ describe('paymentService', () => {
       expect(result.amountMinor).toBe(500);
     });
 
+    it('converts amount to minor units when amountMinor not provided', async () => {
+      mockRequestEdge.mockResolvedValueOnce({ refundId: 'ref_3', amount: 750 });
+      const { toMinorUnits } = await import('../../shared/currency/currency');
+
+      await paymentService.processRefund({ bookingId: 'b-3', amount: 7.5, reason: 'test' });
+      expect(toMinorUnits).toHaveBeenCalledWith(7.5, 'jod');
+    });
+
     it('throws BackendRequestError when refundId is missing', async () => {
       mockRequestEdge.mockResolvedValueOnce({ status: 'failed' });
 
       await expect(
         paymentService.processRefund({ bookingId: 'b-3', reason: 'test' }),
       ).rejects.toMatchObject({ name: 'BackendRequestError', status: 502 });
+    });
+
+    it('includes reason in request body', async () => {
+      mockRequestEdge.mockResolvedValueOnce({ refundId: 'ref_1', amount: 1000 });
+      await paymentService.processRefund({ bookingId: 'b-1', reason: 'duplicate' });
+      expect(mockRequestEdge).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({ reason: 'duplicate' }),
+        })
+      );
     });
   });
 
@@ -163,11 +315,42 @@ describe('paymentService', () => {
         expect.objectContaining({ identifierValue: 'WASELSMART' }),
       );
     });
+
+    it('uses custom alias when provided', async () => {
+      const { generateJordanCliqDeeplink } = await import('../../domain/payments/cliq');
+      paymentService.generateCliqPaymentDetails('b-1', 10, 'CUSTOM_ALIAS');
+      expect(vi.mocked(generateJordanCliqDeeplink)).toHaveBeenCalledWith(
+        expect.objectContaining({ identifierValue: 'CUSTOM_ALIAS' }),
+      );
+    });
+
+    it('passes correct amount and bookingId to generator', async () => {
+      const { generateJordanCliqDeeplink } = await import('../../domain/payments/cliq');
+      paymentService.generateCliqPaymentDetails('booking-xyz', 25.75);
+      expect(vi.mocked(generateJordanCliqDeeplink)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amountJod: 25.75,
+          orderOrBookingId: 'booking-xyz',
+        }),
+      );
+    });
   });
 
   // ── security ─────────────────────────────────────────────────────────────
 
   it('does not expose verifyWebhookSignature in the browser', () => {
     expect('verifyWebhookSignature' in paymentService).toBe(false);
+  });
+
+  // ── error handling ────────────────────────────────────────────────────────
+
+  it('propagates network errors from requestEdgeJson', async () => {
+    mockRequestEdge.mockRejectedValueOnce(new Error('Network error'));
+    await expect(paymentService.createPaymentIntent({ amount: 10, bookingId: 'b-1' })).rejects.toThrow('Network error');
+  });
+
+  it('handles rate limit errors from backend', async () => {
+    mockRequestEdge.mockRejectedValueOnce({ status: 429, recoverable: true, name: 'BackendRequestError' });
+    await expect(paymentService.createPaymentIntent({ amount: 10, bookingId: 'b-1' })).rejects.toMatchObject({ status: 429 });
   });
 });

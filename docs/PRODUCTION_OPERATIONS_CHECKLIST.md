@@ -106,7 +106,7 @@ CLIQ_WEBHOOK_SECRET
 1. Go to [dashboard.stripe.com/webhooks](https://dashboard.stripe.com/webhooks)
 2. Endpoint must be: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/webhooks/payments/webhooks/stripe`
 3. Send test event: `payment_intent.succeeded` → must return 200
-4. If still pointing to `stripe-payments-v2/webhook` → update it (that endpoint returns 410)
+4. Point Stripe callbacks to `/functions/v1/webhooks/payments/webhooks/stripe`. The legacy `stripe-payments-v2` function now returns 410 for every route.
 
 ### Twilio
 - Status callback URL: `https://zexlxabdcsjefptmjhuq.supabase.co/functions/v1/webhooks/communications/webhooks/twilio`

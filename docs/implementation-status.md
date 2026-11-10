@@ -20,7 +20,7 @@ These capabilities are fully implemented and running in the current deployment.
 - Driver onboarding and availability UI
 - In-app and push notification surfaces
 - Safety surface
-- Operator-facing Mobility OS surface
+- Operator-facing Mobility OS visibility surface; capacity booking is paused until payment authorization and confirmation are wired end to end
 - Wasel Plus subscription tier
 - Arabic and English internationalisation
 

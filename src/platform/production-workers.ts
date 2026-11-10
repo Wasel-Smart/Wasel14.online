@@ -91,12 +91,37 @@ const matchingWorker = createWorker<RideMatchRequest>(
       return;
     }
 
-    const { data: driver } = await client
-      .from('drivers')
-      .select('driver_id, user_id')
-      .in('driver_status', ['online', 'approved', 'busy'])
-      .limit(1)
-      .maybeSingle();
+    // Prefer drivers whose last known location is closest to the trip origin.
+    // Falls back to any available driver when PostGIS geo-proximity is unavailable.
+    let driver: { driver_id: string; user_id: string } | null = null;
+    try {
+      const { data: tripGeo } = await client
+        .from('trips')
+        .select('origin_lat, origin_lng')
+        .or(`trip_id.eq.${payload.rideId},id.eq.${payload.rideId}`)
+        .maybeSingle();
+      if (tripGeo?.origin_lat && tripGeo?.origin_lng) {
+        const { data: nearbyDriver } = await client
+          .rpc('find_nearest_available_driver', {
+            p_lat: tripGeo.origin_lat,
+            p_lng: tripGeo.origin_lng,
+            p_radius_km: 50,
+          })
+          .maybeSingle();
+        driver = nearbyDriver as typeof driver;
+      }
+    } catch {
+      // RPC not available — fall through to simple query
+    }
+    if (!driver) {
+      const { data: fallbackDriver } = await client
+        .from('drivers')
+        .select('driver_id, user_id')
+        .in('driver_status', ['online', 'approved'])
+        .limit(1)
+        .maybeSingle();
+      driver = fallbackDriver as typeof driver;
+    }
 
     if (!driver) {
       // No supply right now — leave the request unassigned; the poll/fallback
@@ -307,6 +332,7 @@ const notificationWorker = createWorker<AnyRecord>(
         return;
       }
       await notificationsAPI.createNotification({
+        user_id: userId,
         title: 'Driver assigned',
         message: `A driver has been assigned to your ride.`,
         type: 'booking',
@@ -323,8 +349,9 @@ const notificationWorker = createWorker<AnyRecord>(
 
       const recipients = [pkg?.sender_id, pkg?.receiver_id].filter(Boolean) as string[];
       await Promise.all(
-        recipients.map(() =>
+        recipients.map((recipientId) =>
           notificationsAPI.createNotification({
+            user_id: recipientId,
             title: 'Package Delivered',
             message: 'Your package has been delivered successfully.',
             type: 'booking',

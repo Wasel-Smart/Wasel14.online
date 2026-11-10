@@ -10,8 +10,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
-import { toast } from 'sonner';
-import { C, F, FM, GRAD, GRAD_AURORA, GRAD_HERO, R, SH } from '../../utils/wasel-ds';
+import { C, F, FM, GRAD_AURORA, GRAD_HERO, R, SH } from '../../utils/wasel-ds';
 import { MobilityOSLandingMap } from '../home/MobilityOSLandingMap';
 import type { BookingType, CorridorProjection } from './model';
 import { useMobilityOSServerState } from './serverState';
@@ -123,7 +122,7 @@ function chip(label: string, value: string, accent: string = C.textSub): JSX.Ele
 
 export default function MobilityOSCore() {
   const { language } = useLanguage();
-  const { snapshot, loading, source, createBooking } = useMobilityOSServerState();
+  const { snapshot, loading, source } = useMobilityOSServerState();
   const [selectedCorridorId, setSelectedCorridorId] = useState('');
   const [bookingMode, setBookingMode] = useState<BookingType>(INITIAL_MODE);
   const [quantity, setQuantity] = useState(1);
@@ -247,32 +246,6 @@ export default function MobilityOSCore() {
       icon: Radio,
     },
   ];
-
-  const submitBooking = async () => {
-    if (!selectedCorridor) {return;}
-
-    try {
-      const response = await createBooking({
-        corridor_id: selectedCorridor.corridor.id,
-        type: bookingMode,
-        quantity,
-        timestamp: new Date().toISOString(),
-      });
-      const bookingType = tx(
-        bookingMode === 'seat' ? 'mobilityOSCore.seat_booking' : 'mobilityOSCore.cargo_booking',
-      );
-      toast.success(
-        tx('mobilityOSCore.booking_queued_toast', {
-          type: bookingType,
-          id: response.booking_id,
-          route: selectedRoute,
-        }),
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Booking failed.');
-      toast.error(error instanceof Error ? error.message : tx('errors.booking_failed'));
-    }
-  };
 
   const controlRail = (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -637,23 +610,29 @@ export default function MobilityOSCore() {
         <button
           data-testid="mobility-os-booking-submit"
           type="button"
-          onClick={() => { void submitBooking(); }}
-          disabled={!selectedAvailability}
+          disabled
+          aria-describedby="mobility-os-booking-payment-note"
           style={{
             marginTop: 16,
             width: '100%',
             height: 54,
             borderRadius: 18,
             border: 'none',
-            background: !selectedAvailability ? C.elevated : GRAD,
-            color: !selectedAvailability ? C.textMuted : C.bgDeep,
+            background: C.elevated,
+            color: C.textMuted,
             fontWeight: 900,
-            cursor: !selectedAvailability ? 'not-allowed' : 'pointer',
-            boxShadow: !selectedAvailability ? 'none' : SH.blue,
+            cursor: 'not-allowed',
+            boxShadow: 'none',
           }}
         >
-          {tx('mobilityOSCore.confirm_capacity_booking')}
+          {tx('mobilityOSCore.booking_paused')}
         </button>
+        <p
+          id="mobility-os-booking-payment-note"
+          style={{ margin: '8px 2px 0', color: C.textMuted, fontSize: '0.82rem', lineHeight: 1.5 }}
+        >
+          {tx('mobilityOSCore.booking_requires_payment')}
+        </p>
 
         <div
           data-testid="mobility-os-runtime-status"

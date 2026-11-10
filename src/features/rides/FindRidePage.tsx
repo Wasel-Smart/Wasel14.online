@@ -56,7 +56,6 @@ import {
 } from '../../pages/waselCoreRideData';
 import {
   createFindRideCopy,
-  parseFindRideParams,
   scoreRideForRecommendation,
 } from '../../pages/waselCorePageHelpers';
 import { readStoredStringList, writeStoredStringList } from '../../pages/waselCoreStorage';

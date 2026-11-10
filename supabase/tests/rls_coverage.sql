@@ -101,6 +101,29 @@ BEGIN
     problems := problems || format('policy "%s" on public.%I allows unrestricted %s for non-service roles', r.policyname, r.tablename, r.cmd);
   END LOOP;
 
+  -- 6. The legacy profiles table contains email/phone, wallet, verification,
+  -- and payment-provider fields. RLS alone is not column-level security, so
+  -- profile access must remain server-only for both anonymous and signed-in
+  -- Data API roles.
+  IF has_table_privilege('anon', 'public.profiles', 'SELECT')
+     OR has_any_column_privilege('anon', 'public.profiles', 'SELECT') THEN
+    problems := problems || 'anon has direct SELECT access to public.profiles';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.profiles', 'SELECT')
+     OR has_any_column_privilege('authenticated', 'public.profiles', 'SELECT') THEN
+    problems := problems || 'authenticated has direct SELECT access to public.profiles';
+  END IF;
+  IF has_table_privilege('anon', 'public.profiles', 'INSERT,UPDATE')
+     OR has_any_column_privilege('anon', 'public.profiles', 'INSERT')
+     OR has_any_column_privilege('anon', 'public.profiles', 'UPDATE') THEN
+    problems := problems || 'anon has direct write access to public.profiles';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.profiles', 'INSERT,UPDATE')
+     OR has_any_column_privilege('authenticated', 'public.profiles', 'INSERT')
+     OR has_any_column_privilege('authenticated', 'public.profiles', 'UPDATE') THEN
+    problems := problems || 'authenticated has direct write access to public.profiles';
+  END IF;
+
   IF array_length(problems, 1) IS NOT NULL THEN
     RAISE EXCEPTION E'RLS coverage check failed (% problem(s)):\n  - %',
       array_length(problems, 1), array_to_string(problems, E'\n  - ');

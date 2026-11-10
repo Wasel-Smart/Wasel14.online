@@ -123,10 +123,10 @@ jobs:
             const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
             const t = summary.total;
             const fail = [];
-            if (t.branches.pct < 14)  fail.push('branches ' + t.branches.pct + '% < 14%');
-            if (t.functions.pct < 17) fail.push('functions ' + t.functions.pct + '% < 17%');
-            if (t.lines.pct < 21)     fail.push('lines ' + t.lines.pct + '% < 21%');
-            if (t.statements.pct < 20) fail.push('statements ' + t.statements.pct + '% < 20%');
+            if (t.branches.pct < 20)  fail.push('branches ' + t.branches.pct + '% < 20%');
+            if (t.functions.pct < 25) fail.push('functions ' + t.functions.pct + '% < 25%');
+            if (t.lines.pct < 30)     fail.push('lines ' + t.lines.pct + '% < 30%');
+            if (t.statements.pct < 28) fail.push('statements ' + t.statements.pct + '% < 28%');
             if (fail.length) { console.error('Coverage gate failed:', fail.join(', ')); process.exit(1); }
             console.log('Coverage gate passed');
           "
@@ -136,6 +136,25 @@ jobs:
           name: coverage
           path: coverage/
           retention-days: 7
+
+  mobile:
+    name: Mobile Type, Lint, and Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm test -- --runInBand
 
   route-contract:
     name: Route Contract
@@ -224,7 +243,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [lint, typecheck, test, oauth-check, edge-functions, route-contract, secrets-check, translations, deno-lint, rls-static]
+    needs: [lint, typecheck, test, mobile, oauth-check, edge-functions, route-contract, secrets-check, translations, deno-lint, rls-static]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

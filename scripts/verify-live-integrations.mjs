@@ -220,8 +220,9 @@ async function verifyStripe() {
   requireFormat(provider, 'VITE_STRIPE_PUBLISHABLE_KEY', /^pk_(test|live)_[A-Za-z0-9]+/, 'Stripe publishable key');
   requireFormat(provider, 'STRIPE_SECRET_KEY', /^sk_(test|live)_[A-Za-z0-9]+/, 'Stripe secret key');
   requireFormat(provider, 'STRIPE_WEBHOOK_SECRET', /^whsec_[A-Za-z0-9]+/, 'Stripe webhook secret');
-  requireSourceToken(provider, 'supabase/functions/stripe-payments-v2/index.ts', 'paymentIntents.create');
-  requireSourceToken(provider, 'supabase/functions/stripe-payments-v2/index.ts', 'refunds.create');
+  requireSourceToken(provider, 'supabase/functions/make-server-0b1f4071/_handlers/payments.ts', 'stripe.paymentIntents.create');
+  requireSourceToken(provider, 'supabase/functions/make-server-0b1f4071/_handlers/payments.ts', 'stripe.refunds.create');
+  requireSourceToken(provider, 'supabase/functions/stripe-payments-v2/index.ts', 'PAYMENT_ENDPOINT_RETIRED');
   requireSourceToken(provider, 'supabase/functions/make-server-0b1f4071/index.ts', 'checkout.session.completed');
 
   if (hasValue('STRIPE_SECRET_KEY')) {

@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestEdgeJson } from '../../services/backendWorkflow';
-import type { BookingRequest, MobilitySystemSnapshot } from './model';
+import type { MobilitySystemSnapshot } from './model';
 import { subscribeToMobilityCorridorChanges } from './mobilityRealtime';
 import { mobilityOSRuntime } from './runtime';
-
-type ServerBookingResponse = {
-  booking_id: string;
-  status: 'accepted';
-  trace_id: string;
-};
 
 const MOBILITY_OS_BASE = '/mobility-os';
 
@@ -20,18 +14,6 @@ async function fetchMobilityServerSnapshot(): Promise<MobilitySystemSnapshot> {
   });
 }
 
-async function createMobilityServerBooking(
-  request: BookingRequest,
-): Promise<ServerBookingResponse> {
-  return requestEdgeJson<ServerBookingResponse>({
-    path: `${MOBILITY_OS_BASE}/booking/create`,
-    operation: 'Create Mobility OS booking',
-    authMode: 'required',
-    method: 'POST',
-    body: request,
-  });
-}
-
 export function useMobilityOSServerState() {
   const [snapshot, setSnapshot] = useState<MobilitySystemSnapshot>(() =>
     mobilityOSRuntime.getSnapshot(),
@@ -39,16 +21,6 @@ export function useMobilityOSServerState() {
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<'server' | 'fallback'>('fallback');
   const activeRef = useRef(true);
-  const reconcileTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearReconcileTimer = useCallback(() => {
-    if (!reconcileTimerRef.current) {
-      return;
-    }
-
-    clearTimeout(reconcileTimerRef.current);
-    reconcileTimerRef.current = null;
-  }, []);
 
   const loadSnapshot = useCallback(async () => {
     try {
@@ -71,8 +43,7 @@ export function useMobilityOSServerState() {
     const timer = setTimeout(() => void loadSnapshot(), 0);
 
     const unsubscribe = subscribeToMobilityCorridorChanges(() => {
-      setSource('server');
-      clearReconcileTimer();
+      if (!activeRef.current) {return;}
       void loadSnapshot();
     });
     const unsubscribeFallback = mobilityOSRuntime.subscribe(() => {
@@ -83,44 +54,14 @@ export function useMobilityOSServerState() {
     return () => {
       activeRef.current = false;
       clearTimeout(timer);
-      clearReconcileTimer();
       unsubscribe();
       unsubscribeFallback();
     };
-  }, [clearReconcileTimer, loadSnapshot]);
-
-  const createBooking = async (request: BookingRequest) => {
-    try {
-      const response = await createMobilityServerBooking(request);
-
-      setSource('server');
-      clearReconcileTimer();
-      reconcileTimerRef.current = setTimeout(() => {
-        reconcileTimerRef.current = null;
-        void loadSnapshot();
-      }, 1500);
-
-      return response;
-    } catch {
-      const bookingId = mobilityOSRuntime.createBooking(request);
-      const nextSnapshot = mobilityOSRuntime.getSnapshot();
-
-      setSnapshot(nextSnapshot);
-      setSource('fallback');
-      setLoading(false);
-
-      return {
-        booking_id: bookingId,
-        status: 'accepted',
-        trace_id: `fallback-${bookingId}`,
-      } satisfies ServerBookingResponse;
-    }
-  };
+  }, [loadSnapshot]);
 
   return {
     snapshot,
     loading,
     source,
-    createBooking,
   };
 }

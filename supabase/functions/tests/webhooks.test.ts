@@ -25,6 +25,7 @@ const AUTH_HOOK_NEW_SECRET = `v1,whsec_${btoa('new-auth-hook-signing-key-32-byte
 
 Deno.env.set('STRIPE_WEBHOOK_SECRET', STRIPE_SECRET);
 Deno.env.set('CLIQ_WEBHOOK_SECRET', 'test-cliq-secret-32-chars-minimum!');
+Deno.env.set('CLIQ_WEBHOOK_AMOUNT_UNIT', 'jod');
 const TWILIO_TEST_SECRET = 'test-twilio-signing-secret-32-chars!';
 Deno.env.set('TWILIO_WEBHOOK_SIGNING_SECRET', TWILIO_TEST_SECRET);
 Deno.env.set('COMMUNICATION_WEBHOOK_TOKEN', 'test-communication-webhook-token-32chars!');
@@ -61,9 +62,10 @@ async function signStripe(payload: string, secret: string): Promise<string> {
   return `t=${timestamp},v1=${hex}`;
 }
 
-const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook, handleTwilioWebhook, handleResendWebhook } = await import(
+const { handleStripeWebhook, handleCliqWebhook, handleSendSmsHook, handleTwilioWebhook, handleResendWebhook, cliqReportedPayment } = await import(
   '../make-server-0b1f4071/_handlers/webhooks.ts'
 );
+const { getWebhookRequestPath } = await import('../webhooks/_shared/route.ts');
 const { STRIPE_API_VERSION, stripeApiRequest, toStripeMinorUnits, verifyResendWebhookSignature } = await import(
   '../make-server-0b1f4071/_handlers/shared.ts'
 );
@@ -188,6 +190,19 @@ Deno.test('handleStripeWebhook — 400 when a correctly signed body is JSON but 
 });
 
 // ── CliQ ──────────────────────────────────────────────────────────────────────
+
+Deno.test('getWebhookRequestPath — strips local and deployed function prefixes', () => {
+  assertEquals(getWebhookRequestPath('/functions/v1/webhooks/payments/webhooks/stripe'), '/payments/webhooks/stripe');
+  assertEquals(getWebhookRequestPath('/webhooks/auth/hooks/send-sms'), '/auth/hooks/send-sms');
+  assertEquals(getWebhookRequestPath('/payments/webhooks/cliq'), '/payments/webhooks/cliq');
+});
+
+Deno.test('cliqReportedPayment — converts only the explicitly configured amount unit', () => {
+  assertEquals(cliqReportedPayment('12.345', 'JOD', 'jod'), { amountJod: 12.345, currency: 'jod' });
+  assertEquals(cliqReportedPayment('12345', 'JOD', 'fils'), { amountJod: 12.345, currency: 'jod' });
+  assertEquals(cliqReportedPayment('12345', 'JOD', ''), { amountJod: null, currency: 'jod' });
+  assertEquals(cliqReportedPayment('12.345', 'USD', 'jod'), { amountJod: null, currency: 'usd' });
+});
 
 Deno.test('handleCliqWebhook — 401 on invalid signature', async () => {
   const res = await handleCliqWebhook(

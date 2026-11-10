@@ -13,7 +13,7 @@ function extractSeatAvailability(text: string): number {
   return Number(match[1]);
 }
 
-test('mobility os renders a corridor book and accepts a capacity booking', async ({ page }) => {
+test('mobility os does not accept a capacity booking before payment is available', async ({ page }) => {
   await page.goto('/app/mobility-os', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
 
@@ -30,14 +30,9 @@ test('mobility os renders a corridor book and accepts a capacity booking', async
   const availability = page.getByTestId('mobility-os-selected-availability');
   const seatsBefore = extractSeatAvailability(await availability.innerText());
   const submit = page.getByTestId('mobility-os-booking-submit');
-  await expect(submit).toBeEnabled();
-  await submit.click();
-
-  await expect
-    .poll(async () => extractSeatAvailability(await availability.innerText()), {
-      timeout: 10_000,
-    })
-    .toBe(Math.max(0, seatsBefore - 1));
+  await expect(submit).toBeDisabled();
+  await expect(page.getByText(/bookings will open when payment authorization and confirmation are available/i)).toBeVisible();
+  await expect(availability).toContainText(`${seatsBefore} seats`);
   await expect(page.getByTestId('mobility-os-runtime-chip')).toContainText(
     /(server-backed stream|local fallback runtime)/i,
   );

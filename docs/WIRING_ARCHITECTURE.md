@@ -36,14 +36,14 @@ This document describes the complete wiring architecture between Wasel's fronten
 
 **Configuration**:
 - `VITE_SUPABASE_URL`: Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: Public anonymous key
+- `VITE_SUPABASE_PUBLISHABLE_KEY`: Public client key (`sb_publishable_...`)
 - Auto-configured from environment with fallbacks
 
 **Features**:
 - Automatic session refresh
 - Auth state synchronization
 - Real-time subscriptions
-- Connection pooling
+- Browser requests use the Supabase HTTP APIs; database connection pooling is handled by Supabase, not by the browser client.
 
 ### 2. Edge Function Transport
 
@@ -71,10 +71,9 @@ This document describes the complete wiring architecture between Wasel's fronten
 **Callback URL**: `/app/auth/callback`
 
 **Session Management**:
-- JWT tokens with 1-hour expiry
-- Automatic refresh 5 minutes before expiry
-- Secure storage in httpOnly cookies (production)
-- localStorage fallback (development)
+- PKCE OAuth and email/password flows through Supabase Auth
+- Session refresh is handled by the Supabase client
+- The browser client uses the configured SSR cookie adapter; the server callback writes the PKCE session cookie with `HttpOnly`, `Secure`, and `SameSite` attributes
 
 ### 4. Health Monitoring
 
@@ -147,7 +146,7 @@ const profile = await runBackendWorkflow({
 ```bash
 # Supabase Connection
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
 
 # Edge Function
 VITE_EDGE_FUNCTION_NAME=make-server-0b1f4071
@@ -240,7 +239,7 @@ docker-compose up --build
 **Symptom**: "Backend not configured" error
 
 **Solutions**:
-1. Verify `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set
+1. Verify `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are set
 2. Check network connectivity to Supabase
 3. Run health check: `performHealthCheck(true)`
 

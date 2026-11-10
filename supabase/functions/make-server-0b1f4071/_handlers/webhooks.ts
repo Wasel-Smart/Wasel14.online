@@ -5,6 +5,7 @@ import {
     deliveryEnv,
     constantTimeEquals,
     CLIQ_WEBHOOK_SECRET,
+    CLIQ_WEBHOOK_AMOUNT_UNIT,
     STRIPE_WEBHOOK_SECRET,
     fetchStripeSubscription,
     finalizeTopUpTransaction,
@@ -39,6 +40,21 @@ function stripeReportedPayment ( amountMinor: unknown, currency: unknown ) {
     amountJod: reportedCurrency === 'jod' && Number.isFinite( minor ) ? minor / 1000 : null,
     currency: reportedCurrency || null,
   };
+}
+
+export function cliqReportedPayment(amount: unknown, currency: unknown, unit: string) {
+  const reportedCurrency = String(currency ?? '').trim().toLowerCase();
+  const rawAmount = Number(amount);
+  const normalizedUnit = unit.trim().toLowerCase();
+  const amountJod = reportedCurrency === 'jod' && Number.isFinite(rawAmount) && rawAmount > 0
+    ? normalizedUnit === 'jod'
+      ? rawAmount
+      : normalizedUnit === 'fils'
+        ? rawAmount / 1000
+        : null
+    : null;
+
+  return { amountJod, currency: reportedCurrency || null };
 }
 
 // The signature is checked before this runs, so a body that still fails to parse
@@ -266,22 +282,25 @@ export async function handleCliqWebhook ( request: Request ) {
     // the amount as a plain query parameter, so the signed webhook is the only
     // trustworthy source. If the provider omits the amount, the finalizer now FAILS
     // CLOSED: the row stays pending and is held as `amount_unverified` for manual
-    // review rather than being credited on trust. VERIFY against the CliQ sandbox payload
-    // that `amount` is in JOD major units (the checkout URL uses toFixed(3) JOD);
-    // if it is sent in fils, legitimate credits would be held as amount_mismatch.
-    const reportedAmount = Number( firstStringValue( eventObject, [ 'amount', 'paidAmount', 'paid_amount', 'amountPaid' ] ) );
+    // review rather than being credited on trust. The provider's signed amount
+    // scale must be explicitly configured after a sandbox payload confirms it.
+    // Unknown/missing units deliberately keep the payment unverified.
+    const reportedAmount = firstStringValue( eventObject, [ 'amount', 'paidAmount', 'paid_amount', 'amountPaid' ] );
     const reportedCurrency = firstStringValue( eventObject, [ 'currency', 'currencyCode' ] );
-    await finalizeTopUpTransaction( {
+    const expected = cliqReportedPayment(reportedAmount, reportedCurrency, CLIQ_WEBHOOK_AMOUNT_UNIT);
+    const result = await finalizeTopUpTransaction( {
       transactionId,
       externalReference: providerReference,
       providerPayload: event,
       provider: 'cliq',
-      expected: {
-        amountJod: Number.isFinite( reportedAmount ) && reportedAmount > 0 ? reportedAmount : null,
-        currency: reportedCurrency || null,
-      },
+      expected,
     } );
-    return json( { received: true, transactionId, finalized: true } );
+    return json( {
+      received: true,
+      transactionId,
+      finalized: result.applied,
+      ...(result.reason ? { reason: result.reason } : {}),
+    } );
   }
 
   if ( isFailedProviderStatus( status ) ) {
