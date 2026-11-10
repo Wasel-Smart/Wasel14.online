@@ -34,6 +34,12 @@ export interface SettlementBatch {
   postings: LedgerPosting[];
 }
 
+function assertValidAmount ( name: string, value: number ): void {
+  if ( !Number.isFinite( value ) || value < 0 ) {
+    throw new RangeError( `${ name } must be a non-negative finite number (received ${ value })` );
+  }
+}
+
 export class SettlementLedger {
   /**
    * Records completed package delivery with Cash-on-Delivery (COD).
@@ -52,6 +58,15 @@ export class SettlementLedger {
     now?: string;
   } ): LedgerPosting[] {
     const timestamp = params.now || new Date().toISOString();
+    assertValidAmount( 'totalCodCollectedJod', params.totalCodCollectedJod );
+    assertValidAmount( 'deliveryFeeJod', params.deliveryFeeJod );
+    if ( params.deliveryFeeJod > params.totalCodCollectedJod ) {
+      // Posting this would leave PLATFORM_ESCROW overdrawn by the difference. The shortfall must be
+      // settled separately (for example, billed to the merchant) rather than silently clamped.
+      throw new RangeError(
+        `deliveryFeeJod (${ params.deliveryFeeJod }) cannot exceed totalCodCollectedJod (${ params.totalCodCollectedJod })`,
+      );
+    }
     const netMerchantShare = Math.max( 0, params.totalCodCollectedJod - params.deliveryFeeJod );
 
     const postings: LedgerPosting[] = [
@@ -107,6 +122,13 @@ export class SettlementLedger {
     platformCommissionJod: number;
     now?: string;
   } ): LedgerPosting[] {
+    assertValidAmount( 'totalFareJod', params.totalFareJod );
+    assertValidAmount( 'platformCommissionJod', params.platformCommissionJod );
+    if ( params.platformCommissionJod > params.totalFareJod ) {
+      throw new RangeError(
+        `platformCommissionJod (${ params.platformCommissionJod }) cannot exceed totalFareJod (${ params.totalFareJod })`,
+      );
+    }
     const timestamp = params.now || new Date().toISOString();
 
     return [
@@ -137,6 +159,19 @@ export class SettlementLedger {
 
     const netDiscrepancy = Object.values( balances ).reduce( ( acc, val ) => acc + val, 0 );
     return Math.abs( netDiscrepancy ) < 0.0001;
+  }
+
+  /**
+   * Verifies that PLATFORM_ESCROW nets to zero across a slice, i.e. everything held in escrow was
+   * released. verifyZeroSum cannot catch this because every posting is individually balanced.
+   */
+  public static verifyEscrowSettled ( postings: LedgerPosting[] ): boolean {
+    let escrow = 0;
+    for ( const p of postings ) {
+      if ( p.debitAccount === 'PLATFORM_ESCROW' ) { escrow += p.amountJod; }
+      if ( p.creditAccount === 'PLATFORM_ESCROW' ) { escrow -= p.amountJod; }
+    }
+    return Math.abs( escrow ) < 0.0001;
   }
 }
 

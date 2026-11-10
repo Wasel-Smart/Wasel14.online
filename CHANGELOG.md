@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Documentation now states the coverage gate CI actually enforces (20/25/30/28 ratchet) separately from the 75/80/85/85 target
 - `REVIEW_REPORT.md` no longer self-grades 9/10
+- `SettlementLedger` now rejects negative or non-finite amounts, a COD fee above the cash collected, and a ride commission above the fare (previously the merchant share was silently clamped and escrow was left overdrawn); added `verifyEscrowSettled`
 
 ### Added
 - Incremental release automation
