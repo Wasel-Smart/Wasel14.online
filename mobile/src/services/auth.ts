@@ -78,8 +78,13 @@ export class MobileAuthService {
 
     // If no deep link was handled, get the session from storage as the final step
     if (this.supabase?.auth?.getSession) {
-      const { data: { session } } = await this.supabase.auth.getSession();
-      this.updateState({ session, user: session?.user || null, loading: false });
+      try {
+        const { data: { session } } = await this.supabase.auth.getSession();
+        this.updateState({ session, user: session?.user || null, loading: false });
+      } catch {
+        // A storage or network failure must not leave the app on the loading screen forever.
+        this.updateState({ loading: false });
+      }
     } else {
       this.updateState({ loading: false });
     }

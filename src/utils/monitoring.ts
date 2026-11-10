@@ -107,8 +107,14 @@ export async function initSentry(): Promise<void> {
 
         const allowedLanguages = ['ar', 'en'];
         const allowedThemes = ['dark', 'light'];
-        const lang = localStorage.getItem('wasel_language') || 'ar';
-        const theme = localStorage.getItem('wasel_theme') || 'dark';
+        let lang = 'ar';
+        let theme = 'dark';
+        try {
+          lang = localStorage.getItem('wasel_language') || 'ar';
+          theme = localStorage.getItem('wasel_theme') || 'dark';
+        } catch {
+          // Storage can be blocked; an exception here would make Sentry drop the event.
+        }
 
         event.tags = {
           ...event.tags,

@@ -50,7 +50,7 @@ The mobile app is designed for unreliable network conditions common in the Jorda
 - **Action Queue:** All mutating actions (ride request, cancel, rate) are queued when offline
 - **Cache-First Reads:** Active ride, ride history, and driver info are cached locally
 - **Idempotent Sync:** Offline queue uses idempotency keys to prevent duplicate bookings
-- **Sync Success Rate:** 99.96% with 0 duplicate bookings in the last 30 days
+- **Sync success rate:** not yet measured in production; add a figure here only once it comes from real telemetry
 
 ### Auth Flow
 

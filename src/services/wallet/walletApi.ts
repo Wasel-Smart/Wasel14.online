@@ -174,9 +174,11 @@ export const walletApi = {
       return { ...result, transactions: sanitizeTransactions(result.transactions) };
     };
     const directFn = async () => {
+      // The direct tier is sanitized like getWallet() does; the local tier sanitizes in
+      // walletLocalStorage, so it is not sanitized again here (that would double-escape).
       const wallet = canUseLocalWalletStorage()
-        ? await fetchWalletDirect(userId).catch(() => fetchWalletLocal(userId))
-        : await fetchWalletDirect(userId);
+        ? await fetchWalletDirect(userId).then(sanitizeWalletData).catch(() => fetchWalletLocal(userId))
+        : sanitizeWalletData(await fetchWalletDirect(userId));
       const filtered = type ? wallet.transactions.filter(tx => tx.type === type) : wallet.transactions;
       const start = (page - 1) * limit;
       return { transactions: filtered.slice(start, start + limit), page, limit, total: filtered.length };

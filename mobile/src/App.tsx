@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -14,8 +14,6 @@ import { OfflineBanner } from './components/OfflineBanner';
 import { MobileErrorBoundary } from './components/MobileErrorBoundary';
 import { RTLProvider } from './utils/rtl';
 import { colors } from './theme';
-import { mobileAuth } from './services/auth';
-import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import {
   useFonts,
@@ -56,7 +54,9 @@ const linking = {
 };
 
 const App = () => {
-  const [deepLinkUrl, setDeepLinkUrl] = useState<string | null>(null);
+  // Auth deep links (OAuth callbacks) are handled once, inside MobileAuthService.initialize(),
+  // which covers both cold start (getInitialURL) and warm start (url event). A second listener
+  // here would exchange the same one-time PKCE code twice.
   const [fontsLoaded, fontError] = useFonts({
     Cairo_400Regular,
     Cairo_500Medium,
@@ -71,21 +71,6 @@ const App = () => {
       void SplashScreen.hideAsync().catch(() => undefined);
     }
   }, [fontsLoaded, fontError]);
-
-  useEffect(() => {
-    const subscription = Linking.addEventListener('url', ({ url }) => {
-      setDeepLinkUrl(url);
-    });
-    return () => subscription.remove();
-  }, []);
-
-  useEffect(() => {
-    if (deepLinkUrl) {
-      void mobileAuth.completeAuthFromUrl(deepLinkUrl).catch(() => {
-        console.warn('[App] Deep link auth handling failed');
-      });
-    }
-  }, [deepLinkUrl]);
 
   if (!fontsLoaded && !fontError) {
     return null;
