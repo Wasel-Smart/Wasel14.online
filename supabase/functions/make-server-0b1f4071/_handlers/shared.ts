@@ -2767,27 +2767,49 @@ export function normalizePaymentAmount ( value: unknown ): number | null {
   return amount;
 }
 
-export async function assertTripParticipant ( admin: ReturnType<typeof getAdminClient>, tripId: string, userId: string ) {
-  // tripId comes from the URL and is interpolated into a PostgREST `or()` filter
-  // below. Without this check a crafted value (e.g. `x,driver_id.eq.<my id>`)
-  // injects extra filter clauses and can make the participant check pass for a
-  // trip the caller is not on. Only canonical UUIDs may reach the query.
+export async function assertTripParticipant ( admin: ReturnType<typeof getAdminClient>, tripId: string, userId: string ): Promise<boolean> {
+  // tripId comes from the URL. Without this UUID guard a crafted value
+  // (e.g. `x,driver_id.eq.<my-id>`) injects extra PostgREST filter clauses
+  // and can make the participant check pass for a trip the caller is not on.
   if ( !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test( tripId ) ) {
     return false;
   }
+
+  // Run passenger and trip lookups in parallel.
+  // bookings.passenger_id references users.id (not drivers.driver_id).
   const [ { data: trip, error: tripError }, { data: booking, error: bookingError } ] = await Promise.all( [
-    admin.from( 'trips' ).select( 'id, trip_id, driver_id' ).or( `id.eq.${ tripId },trip_id.eq.${ tripId }` ).maybeSingle(),
+    admin
+      .from( 'trips' )
+      .select( 'trip_id, driver_id' )
+      .eq( 'trip_id', tripId )
+      .maybeSingle(),
     admin
       .from( 'bookings' )
-      .select( 'id, user_id' )
+      .select( 'booking_id' )
       .eq( 'trip_id', tripId )
-      .eq( 'user_id', userId )
+      .eq( 'passenger_id', userId )
+      .limit( 1 )
       .maybeSingle(),
   ] );
 
   if ( tripError ) {throw tripError;}
   if ( bookingError ) {throw bookingError;}
-  return Boolean( ( trip && trip.driver_id === userId ) || booking );
+
+  // Fast path: caller is a confirmed passenger.
+  if ( booking ) {return true;}
+
+  // Driver path: trips.driver_id references drivers.driver_id, not users.id.
+  // Resolve the indirection via the drivers table.
+  if ( !trip?.driver_id ) {return false;}
+
+  const { data: driver, error: driverError } = await admin
+    .from( 'drivers' )
+    .select( 'user_id' )
+    .eq( 'driver_id', trip.driver_id )
+    .maybeSingle();
+
+  if ( driverError ) {throw driverError;}
+  return driver?.user_id === userId;
 }
 
 export function cityCoord ( city: string | null | undefined ) {
@@ -2932,7 +2954,8 @@ export async function finalizeBookingPayment ( args: {
   }
 
   const row = booking as Record<string, unknown>;
-  const bookingId = String( row.id ?? '' );
+  // bookings PK is booking_id (not id) in the production schema.
+  const bookingId = String( row.booking_id ?? '' );
   const expectedCurrency = String( row.currency ?? 'jod' ).toLowerCase();
   // Must mirror deriveBookingAmountMinor() in payments.ts exactly: the intent is
   // created for per-seat price x seats when both are present, so the success
@@ -2977,9 +3000,9 @@ export async function finalizeBookingPayment ( args: {
   const { data: updated, error: updateError } = await admin
     .from( 'bookings' )
     .update( { payment_status: 'succeeded', updated_at: now } )
-    .eq( 'id', bookingId )
+    .eq( 'booking_id', bookingId )
     .in( 'payment_status', [ 'pending', 'failed', 'paid', 'completed', 'processing', 'partially_refunded' ] )
-    .select( 'id' )
+    .select( 'booking_id' )
     .maybeSingle();
 
   if ( updateError ) {

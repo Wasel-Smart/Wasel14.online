@@ -163,8 +163,8 @@ otp_expiry = 600
 # ============================================================
 
 [auth.sms]
-enable_signup = false
-enable_confirmations = false
+enable_signup = true
+enable_confirmations = true
 template = "Your code is {{ .Code }}"
 max_frequency = "30s"
 
@@ -184,10 +184,10 @@ message_service_sid = ""
 auth_token = ""
 
 [auth.sms.twilio_verify]
-enabled = false
-account_sid = ""
-message_service_sid = ""
-auth_token = ""
+enabled = true
+account_sid = "env(TWILIO_ACCOUNT_SID)"
+message_service_sid = "env(TWILIO_VERIFY_SERVICE_SID)"
+auth_token = "env(TWILIO_AUTH_TOKEN)"
 
 # ============================================================
 # GOOGLE OAUTH
