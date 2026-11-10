@@ -22,6 +22,7 @@ import {
   type OfflineAction,
 } from '../utils/offlineQueue';
 import { isValidApiUrl } from '../utils/sanitize';
+import { CSRF_HEADER, getCsrfToken } from '../utils/csrf';
 
 function sanitizeLogValue(value: unknown): string {
   if (value instanceof Error) {
@@ -380,6 +381,7 @@ export class OfflineService {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
+        [CSRF_HEADER]: getCsrfToken(),
         'X-Idempotency-Key': idempotencyKey,
         ...(options.headers as Record<string, string> | undefined),
       },

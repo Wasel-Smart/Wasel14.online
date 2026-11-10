@@ -1,6 +1,9 @@
 # Wasel Cleanup & Best-Practices Plan
 
-Status: PROPOSAL ONLY. Nothing below has been applied.
+Status: PARTLY APPLIED on 2026-11-10 (see `_CLEANUP_REVIEW_DELETE_ME/MANIFEST.md`): yarn.lock, CHANGES.md,
+the empty root database.types.ts and 18 one-off scripts were moved (not deleted); `cleanup-root.mjs` import bug fixed;
+`scripts/deploy.production.sh` no longer copies .env.production. Section 4 (package.json) is already resolved in the
+current file. Everything else below is still a proposal.
 Method: read-only survey of directory structure, `package.json`, `.gitignore`,
 `.gitleaks.toml`, `ENGINEERING_STANDARDS.md`, `CHANGES.md`, and a few scripts.
 Not reviewed yet: application source code, `.env*` files (deliberately not opened),

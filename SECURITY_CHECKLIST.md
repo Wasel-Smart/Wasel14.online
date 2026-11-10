@@ -36,7 +36,7 @@ sensitive values were found in local environment files.
 
 ## Repository hardening
 
-- [x] Real Supabase project ref (`zexlxabdcsjefptmjhuq`) replaced with placeholder in committed `.env` template
+- [x] Real Supabase project ref replaced with placeholder in committed `.env` template
 - [ ] Run `git log --all --full-history -- .env` to confirm `.env` was never committed
 - [ ] Run `git log --all --full-history -- .env.local` to confirm `.env.local` was never committed
 - [ ] If either command returns commits, run `git filter-repo --invert-paths --path .env` to scrub history

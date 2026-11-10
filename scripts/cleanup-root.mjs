@@ -21,7 +21,7 @@
  */
 
 import { existsSync, renameSync, unlinkSync, copyFileSync } from 'fs';
-import { join, basename } from 'path';
+import { join, basename, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 

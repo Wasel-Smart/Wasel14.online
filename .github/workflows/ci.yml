@@ -154,7 +154,9 @@ jobs:
       - run: npm ci
       - run: npm run type-check
       - run: npm run lint
-      - run: npm test -- --runInBand
+      # Prints the real coverage over every source file (collectCoverageFrom in
+      # jest.config.js). Thresholds apply only with COVERAGE_ENFORCE=1.
+      - run: npm run test:coverage -- --runInBand --coverageReporters=text-summary
 
   route-contract:
     name: Route Contract

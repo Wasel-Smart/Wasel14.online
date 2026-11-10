@@ -344,11 +344,12 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
   if ( denied ) {return denied;}
 
   const body = await request.json().catch( () => ( {} ) );
-  const { payment_intent_id, booking_id, amount, reason } = body as {
+  const { payment_intent_id, booking_id, amount, reason, refund_key } = body as {
     payment_intent_id?: string;
     booking_id?: string;
     amount?: unknown;
     reason?: string;
+    refund_key?: string;
   };
 
   let resolvedPaymentIntentId: string | undefined;
@@ -440,8 +441,13 @@ export async function handlePaymentRefund ( request: Request ): Promise<Response
     }
 
     // Deterministic key: a retried request for the same intent/amount cannot
-    // issue a second refund.
-    const idempotencyKey = `refund:${ resolvedPaymentIntentId }:${ refundAmount ?? 'full' }`;
+    // issue a second refund. A caller that genuinely needs a second refund of the
+    // same amount (two equal partial refunds) must send a distinct `refund_key`;
+    // without it Stripe returns the first refund instead of creating another.
+    const clientRefundKey = typeof refund_key === 'string' && /^[A-Za-z0-9_.:-]{1,64}$/.test( refund_key.trim() )
+      ? `:${ refund_key.trim() }`
+      : '';
+    const idempotencyKey = `refund:${ resolvedPaymentIntentId }:${ refundAmount ?? 'full' }${ clientRefundKey }`;
     const refund = await stripe.refunds.create( params, { idempotencyKey } );
 
     // Reflect the refund on the bound booking. The conditional match on

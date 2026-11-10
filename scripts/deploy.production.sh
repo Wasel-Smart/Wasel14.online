@@ -23,7 +23,8 @@ mkdir -p deploy
 cp -r ./dist ./deploy/dist
 cp -r ./package.json ./deploy/package.json
 cp -r ./package-lock.json ./deploy/package-lock.json
-cp -r .env.production ./deploy/.env
+# SECURITY: never copy .env* files into the deploy payload. This directory is pushed to a git
+# remote; server secrets belong in Vercel / Supabase / Kubernetes secret management.
 
 cd deploy
 

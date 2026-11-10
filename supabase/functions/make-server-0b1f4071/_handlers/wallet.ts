@@ -46,7 +46,7 @@ export async function handleGetWallet ( request: Request, requestedUserId: strin
   try {
     return json( await loadWalletPayload( auth.admin, auth.canonicalUser.id ) );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'get-wallet', error );
   }
 }
 
@@ -79,7 +79,7 @@ export async function handleGetWalletTransactions ( request: Request, requestedU
       total: count ?? 0,
     } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'get-transactions', error );
   }
 }
 
@@ -100,7 +100,7 @@ export async function handleGetWalletInsights ( request: Request, requestedUserI
     if ( error ) {throw new Error( error.message );}
     return json( buildWalletInsights( ( Array.isArray( data ) ? data : [] ).map( toWalletTransaction ) ) );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'get-insights', error );
   }
 }
 
@@ -346,7 +346,7 @@ export async function handleGetWalletPaymentMethods ( request: Request, requeste
     const details = await loadWalletDetails( auth.admin, auth.canonicalUser.id );
     return json( { methods: details.paymentMethods } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'get-payment-methods', error );
   }
 }
 
@@ -398,7 +398,7 @@ export async function handleDeleteWalletPaymentMethod ( request: Request, reques
     if ( error ) {throw new Error( error.message );}
     return json( { success: true } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'delete-payment-method', error );
   }
 }
 
@@ -442,7 +442,7 @@ export async function handleSetDefaultPaymentMethod ( request: Request, requeste
     // "[object Object]" and always answered with the literal 'card_payment'.
     return json( { success: true, method: data } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'set-default-payment-method', error );
   }
 }
 
@@ -474,7 +474,7 @@ export async function handleGetWalletTrustScore ( request: Request, requestedUse
       deposit: toNumber( wallet?.balance, 0 ),
     } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'trust-score', error );
   }
 }
 
@@ -504,7 +504,7 @@ export async function handleGetWalletSubscription ( request: Request, requestedU
     const subscription = await getWalletSubscription( auth.admin, auth.canonicalUser.id );
     return json( { subscription } );
   } catch ( error ) {
-    return json( { error: error instanceof Error ? error.message : String( error ) }, 500 );
+    return walletOperationFailed( 'get-subscription', error );
   }
 }
 

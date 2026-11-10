@@ -5,6 +5,7 @@
 import { mobileAuth } from '../services/auth';
 import { waselMobileConfig } from './config';
 import { CircuitBreaker } from '../utils/circuitBreaker';
+import { CSRF_HEADER, getCsrfToken } from '../utils/csrf';
 
 const apiBreaker = new CircuitBreaker('mobile-api', 5, 1, 5_000);
 
@@ -71,6 +72,7 @@ class ApiClient {
     const token = mobileAuth.getAccessToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      [CSRF_HEADER]: getCsrfToken(),
     };
     if (token) {
       headers.Authorization = `Bearer ${token}`;
