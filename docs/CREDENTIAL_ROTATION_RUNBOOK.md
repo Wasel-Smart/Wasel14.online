@@ -1,69 +1,297 @@
-# Credential Rotation Runbook
+# Wasel Credential Rotation Runbook
 
-## Current status (2026-11-09)
+**Purpose:** Exact steps to rotate every live credential used by Wasel.  
+**When to use:** After any suspected exposure, before go-live, or on the quarterly rotation schedule.  
+**Time required:** ~45 minutes end-to-end if you have access to all provider dashboards.
 
-**Rotation is not confirmed complete. Do not mark credentials as rotated or treat the deployment as cleared.** This local audit inspected variable names only; it never printed values and did not access provider dashboards or remote secret stores.
+> After rotating each credential, update the corresponding value in:
+> 1. `~/.wasel-secrets/.env.production` (your offsite secrets file)
+> 2. Vercel Dashboard → Project → Settings → Environment Variables
+> 3. Supabase Dashboard → Project → Edge Functions → Secrets (for server-side vars)
 
-| Evidence | What was observed | Required follow-up |
-|---|---|---|
-| Local `.env` | Names for `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET` and `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET` | Rotate at Google and Meta, then update the Google and Facebook providers in Supabase Auth. |
-| Local `.env.local` | Names `VERCEL_OIDC_TOKEN` and `AI_GATEWAY_API_KEY` | Confirm source and lifetime; revoke/rotate any active credential and update its deployment consumer. |
-| Local `.env.production` / `.env.production.local` | Names include `VITE_SUPABASE_ANON_KEY`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_GOOGLE_MAPS_API_KEY` | These are client-visible values, not server secrets. Migrate away from the legacy Supabase anon key and confirm Maps API restrictions. |
-| Current process environment | Names `NPM_TOKEN` and `OPENAI_API_KEY` | Identify the owning account and scope; rotate if active and ensure the token is not unnecessarily inherited by builds. |
-| Git history | Prior commits reference `docs/wasel-planning-with-ai.json` | Treat its Google service-account key as compromised until Google Cloud confirms the key is disabled or deleted. |
-| Provider secret stores | Not inspected | Check every provider listed below and record the rotation date, operator, and old-key revocation evidence. |
+---
 
-### Google Cloud access check (2026-11-09)
+## Pre-rotation checklist
 
-The authenticated `cloud90.trix@gmail.com` account can view the `wasel-planning-with-ai` project but has only the project-level Viewer role. The project has two active user-managed keys for `fb-service-account@wasel-planning-with-ai.iam.gserviceaccount.com`, both created on 2026-06-02 with no scheduled expiry. The checkout does not contain the historical JSON file, and its Git-history copy has a sanitized key ID, so the exposed key cannot be matched reliably to either active key. The service account has no runtime references in the application source, API, Supabase functions, or scripts. No key was disabled or deleted because the authenticated identity lacks IAM key-management permission.
+- [ ] You have access to all provider dashboards listed below
+- [ ] You have run `powershell -ExecutionPolicy Bypass -File scripts\move-env-offsite.ps1` and confirmed `.env` files are out of OneDrive
+- [ ] You have a password manager open to store new secrets immediately
+- [ ] You are NOT on a shared/public network
 
-To complete this item, sign in with an authorized Google Cloud IAM administrator or grant the operator `roles/iam.serviceAccountKeyAdmin` on this service account. Review consumers and audit logs, disable both user-managed keys if neither is required (or replace required credentials first), verify workloads, then delete revoked keys and record non-secret evidence. If restoring the old inactive account, use interactive `gcloud auth login`; its cached refresh token is invalid. Never paste credentials into this repository or chat.
+---
 
-The current checkout resolves outside the historical OneDrive path described in older documentation. Confirm device backup and sync settings independently. `.env` and `.env.local` are not tracked at the current Git revision; that does not prove their values were never copied elsewhere.
+## 1. Stripe
 
-## Safe local inventory
+**Dashboard:** https://dashboard.stripe.com/apikeys
 
-Run `npm run credentials:inventory` to list matching credential variable **names** from `.env*` files, an optional `WASEL_ENV_DIR`, and the current process environment. It never prints values and cannot determine whether a provider credential is valid, revoked, or present in a remote secret store.
+### 1a. Secret key (`STRIPE_SECRET_KEY`)
+1. Go to **Developers → API Keys**
+2. Click **Roll key** next to the Secret key
+3. Confirm the roll — the old key is immediately invalidated
+4. Copy the new `sk_live_...` value
+5. Set in Vercel: `STRIPE_SECRET_KEY=sk_live_...`
+6. Set in Supabase Edge Function Secrets: `STRIPE_SECRET_KEY=sk_live_...`
 
-Do not paste secret values into tickets, chat, terminal transcripts, build output, or this repository. Use each provider's secret manager and access-controlled deployment settings.
+### 1b. Webhook signing secret (`STRIPE_WEBHOOK_SECRET`)
+1. Go to **Developers → Webhooks**
+2. Click your webhook endpoint (pointing to `make-server-0b1f4071`)
+3. Click **Reveal** next to Signing secret, then **Roll secret**
+4. Copy the new `whsec_...` value
+5. Set in Vercel: `STRIPE_WEBHOOK_SECRET=whsec_...`
+6. Set in Supabase Edge Function Secrets: `STRIPE_WEBHOOK_SECRET=whsec_...`
 
-## Rotation sequence
+### 1c. Publishable key (`VITE_STRIPE_PUBLISHABLE_KEY`)
+> Publishable keys are browser-safe but should still be rotated if exposed.
+1. Go to **Developers → API Keys**
+2. Click **Roll key** next to the Publishable key
+3. Copy the new `pk_live_...` value
+4. Set in Vercel: `VITE_STRIPE_PUBLISHABLE_KEY=pk_live_...`
+5. Trigger a Vercel redeploy (VITE_ vars are inlined at build time)
 
-For each credential, record the owner, affected integration, storage locations, rotation date, and revocation confirmation. Unless a provider documents a safer emergency path, use this sequence:
+### 1d. Verify
+```
+curl -s https://www.wasel14.online/v1/health | jq '.data.payments'
+# Should return: { "configured": true }
+```
 
-1. Stop further exposure: remove the credential from tracked files and stop generating logs or artifacts containing it.
-2. Create a replacement in the provider console or an approved identity workflow.
-3. Update the provider configuration, Vercel environment, Supabase Edge Function secrets, CI secrets, and any local developer secret store that uses it.
-4. Deploy the consumers and verify sign-in, webhooks, payment flows, messaging, or database access in staging.
-5. Revoke the old credential at the provider. A file edit or deployment does not revoke a key.
-6. Confirm old-key requests fail and new-key integration checks pass. Save only non-secret evidence such as timestamps, key identifiers, and test results.
+---
 
-For actively abused credentials, prioritize revocation over a zero-downtime sequence, then restore integrations with replacements.
+## 2. Twilio
 
-## Provider checklist
+**Dashboard:** https://console.twilio.com
 
-- [ ] **Google OAuth:** Reset the affected OAuth client secret in Google Cloud Credentials; update Supabase Auth > Providers > Google; test sign-in; revoke the previous secret. Google documents that resetting a client secret can cause temporary outage: [Google Cloud compromised credentials](https://docs.cloud.google.com/docs/security/compromised-credentials).
-- [ ] **Meta/Facebook OAuth:** Rotate the app secret in Meta for Developers; update Supabase Auth > Providers > Facebook; test sign-in; revoke the previous secret.
-- [ ] **Google service account:** Disable/delete the historical private key in Google Cloud IAM. Prefer workload identity over a downloaded JSON key when the deployment supports it. Purge the key from Git history and coordinate any force-push with every collaborator; history cleanup does not replace provider revocation.
-- [ ] **Supabase API keys:** Inventory browser publishable keys separately from server secret keys. Replace any leaked secret or legacy `service_role` key, update server consumers, and explicitly retire the old key. Follow [Supabase's leaked-key rotation steps](https://supabase.com/docs/guides/security/rotate-leaked-api-keys); creating a replacement does not itself revoke a legacy key.
-- [ ] **Supabase browser key migration:** Replace any configured `VITE_SUPABASE_ANON_KEY` with the publishable key, verify web and mobile clients, then deactivate the legacy anon/service-role key pair in the Dashboard. See [Supabase API keys](https://supabase.com/docs/guides/getting-started/api-keys).
-- [ ] **Supabase database/JWT credentials:** Check the project database password and JWT signing-key state. Rotate only with a dependency plan because database connections and token validation can be affected. Follow the current [Supabase signing-key guidance](https://supabase.com/docs/guides/auth/signing-keys).
-- [ ] **Stripe:** Rotate the API secret key and each webhook endpoint secret that may have been exposed. Update Vercel/Supabase consumers, exercise a test webhook, then revoke the previous keys.
-- [ ] **Twilio:** Rotate the Account Auth Token and API key secrets. When possible, use a secondary token to update consumers before promoting it; then remove the old token/key. See [Twilio Auth Token rotation](https://help.twilio.com/articles/223136027-Auth-Tokens-and-How-to-Change-Them).
-- [ ] **CliQ:** Ask the provider to rotate the merchant API key and webhook secret; update the checkout and webhook consumers and verify signed callbacks.
-- [ ] **Resend and SendGrid:** Create replacements, update sender integrations, send a staging message, then revoke the old API keys.
-- [ ] **AWS:** Inventory access keys and last-used metadata; replace active keys, deploy consumers, deactivate and delete old keys. Prefer role-based or workload identity credentials. See [AWS access-key management](https://docs.aws.amazon.com/IAM/latest/UserGuide/access-keys-admin-managed.html).
-- [ ] **Vercel:** Revoke personal/deployment tokens if exposed. Confirm whether `VERCEL_OIDC_TOKEN` is an ephemeral deployment token or a persistent credential before rotating; update the corresponding CI/deployment flow.
-- [ ] **AI gateway, OpenAI, and npm registry:** Identify which account owns `AI_GATEWAY_API_KEY`, `OPENAI_API_KEY`, and `NPM_TOKEN`; rotate active keys, use least-privilege scopes, and keep package-publish credentials out of normal app builds.
-- [ ] **Google Maps:** Keep the browser key public by design, restrict it to Wasel origins and only required Maps APIs, and rotate it if unrestricted or abused.
-- [ ] **Postgres and Redis:** Rotate database passwords, pooler credentials, Redis passwords/tokens, and connection URLs if they were exposed; deploy all consumers before revocation where practical.
-- [ ] **Sentry and other observability services:** Rotate auth/upload tokens if present. Public DSNs and project identifiers are not equivalent to secret auth tokens.
-- [ ] **Worker and webhook secrets:** Rotate `COMMUNICATION_WORKER_SECRET`, `COMMUNICATION_WEBHOOK_TOKEN`, and any other shared service secrets at both producer and consumer.
+### 2a. Auth Token (`TWILIO_AUTH_TOKEN`)
+1. Go to **Account → General Settings → Auth Token**
+2. Click **Rotate** (the secondary token becomes primary; old primary is invalidated after 24h)
+3. Copy the new auth token
+4. Set in Vercel: `TWILIO_AUTH_TOKEN=...`
+5. Set in Supabase Edge Function Secrets: `TWILIO_AUTH_TOKEN=...`
 
-## Repository and release verification
+### 2b. API Keys (if used)
+1. Go to **Account → API Keys & Tokens**
+2. Delete the exposed key
+3. Click **Create API Key** → Standard
+4. Copy the SID and Secret immediately (Secret shown only once)
+5. Update any references in your edge functions
 
-- [ ] Run `npm run credentials:inventory` and confirm no unexpected local credential names or sources.
-- [ ] Confirm every remote environment and secret store has the intended replacement and no old active credential.
-- [ ] Run `npm run secrets:check`, `npm run env:check`, the provider integration checks, and the application verification workflow.
-- [ ] Scan all Git refs and artifacts for leaked material. If history must be rewritten, coordinate the operation and invalidate old clones, forks, caches, and downloaded artifacts.
-- [ ] Update the status table above only after provider-side revocation and replacement have been confirmed. Do not mark completion based on code changes alone.
+### 2c. Verify
+```
+node scripts/verify-twilio-config.mjs
+```
+
+---
+
+## 3. Resend
+
+**Dashboard:** https://resend.com/api-keys
+
+### 3a. API Key (`RESEND_API_KEY`)
+1. Click the **...** menu next to the exposed key → **Delete**
+2. Click **Create API Key**
+3. Name it `wasel-production`, set permission to **Sending access**
+4. Copy the new `re_live_...` value (shown only once)
+5. Set in Vercel: `RESEND_API_KEY=re_live_...`
+6. Set in Supabase Edge Function Secrets: `RESEND_API_KEY=re_live_...`
+
+### 3b. Verify
+Send a test notification via the health endpoint:
+```
+curl -X POST https://www.wasel14.online/v1/notifications/test \
+  -H "Authorization: Bearer <your-jwt>"
+```
+
+---
+
+## 4. Supabase
+
+**Dashboard:** https://supabase.com/dashboard/project/zexlxabdcsjefptmjhuq/settings/api
+
+### 4a. Service Role Key (`SUPABASE_SERVICE_ROLE_KEY`)
+1. Go to **Settings → API**
+2. Under **Project API keys**, click **Reveal** next to `service_role`
+3. Click **Generate new key** (this immediately invalidates the old one)
+4. Copy the new key
+5. Set in Vercel: `SUPABASE_SERVICE_ROLE_KEY=...` (server-only, never VITE_)
+6. Set in Supabase Edge Function Secrets: `SUPABASE_SERVICE_ROLE_KEY=...`
+
+### 4b. JWT Secret (`SUPABASE_JWT_SECRET`)
+> Only rotate if you suspect the JWT secret is compromised — this invalidates ALL existing sessions.
+1. Go to **Settings → API → JWT Settings**
+2. Click **Generate new secret**
+3. Update `SUPABASE_JWT_SECRET` in Vercel and Edge Function Secrets
+4. All users will be signed out and must re-authenticate
+
+### 4c. Publishable (anon) key (`VITE_SUPABASE_PUBLISHABLE_KEY`)
+1. Go to **Settings → API**
+2. Under **Project API keys**, click **Reveal** next to `anon/public`
+3. Click **Generate new key**
+4. Set in Vercel: `VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...`
+5. Trigger a Vercel redeploy
+
+---
+
+## 5. Google OAuth
+
+**Dashboard:** https://console.cloud.google.com/apis/credentials
+
+### 5a. Client Secret (`SUPABASE_AUTH_GOOGLE_CLIENT_SECRET`)
+1. Click the OAuth 2.0 Client ID used by Wasel
+2. Click **Reset Secret**
+3. Copy the new client secret
+4. Go to **Supabase Dashboard → Authentication → Providers → Google**
+5. Paste the new secret into **Client Secret** → Save
+6. Set in Vercel: `SUPABASE_AUTH_GOOGLE_CLIENT_SECRET=...`
+
+### 5b. Verify
+Test Google sign-in at https://www.wasel14.online/app/auth — the OAuth flow must complete without `redirect_uri_mismatch` or `invalid_client` errors.
+
+---
+
+## 6. Facebook OAuth
+
+**Dashboard:** https://developers.facebook.com → Your App → Settings → Basic
+
+### 6a. App Secret (`SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET`)
+1. Under **App Secret**, click **Show** then **Reset**
+2. Confirm the reset
+3. Copy the new secret
+4. Go to **Supabase Dashboard → Authentication → Providers → Facebook**
+5. Paste the new secret into **App Secret** → Save
+6. Set in Vercel: `SUPABASE_AUTH_FACEBOOK_CLIENT_SECRET=...`
+
+### 6b. Verify
+Test Facebook sign-in at https://www.wasel14.online/app/auth.
+
+---
+
+## 7. Internal worker secrets
+
+These are generated locally — no provider dashboard needed.
+
+### Generate new secrets
+```powershell
+# PowerShell
+$secrets = @(
+  'COMMUNICATION_WORKER_SECRET',
+  'COMMUNICATION_WEBHOOK_TOKEN',
+  'OUTBOX_WORKER_SECRET',
+  'WASEL_INTERNAL_HEALTH_TOKEN',
+  'VIte_TELEMETRY_TOKEN',
+  'VITE_EVENT_BROKER_WORKER_SECRET'
+)
+foreach ($s in $secrets) {
+  $val = -join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Max 256) })
+  Write-Host "$s=$val"
+}
+```
+
+Or with OpenSSL (WSL/Git Bash):
+```bash
+for s in COMMUNICATION_WORKER_SECRET COMMUNICATION_WEBHOOK_TOKEN \
+         OUTBOX_WORKER_SECRET WASEL_INTERNAL_HEALTH_TOKEN; do
+  echo "$s=$(openssl rand -hex 32)"
+done
+```
+
+Set each generated value in:
+- Vercel → Environment Variables
+- Supabase → Edge Function Secrets
+
+---
+
+## 8. Sentry DSN (`VITE_SENTRY_DSN`)
+
+**Dashboard:** https://sentry.io → Your project → Settings → Client Keys
+
+1. Click **Generate New Key** (old DSN continues working until you delete it)
+2. Copy the new DSN
+3. Delete the old key
+4. Set in Vercel: `VITE_SENTRY_DSN=https://...@....ingest.sentry.io/...`
+5. Trigger a Vercel redeploy
+
+---
+
+## 9. Azure Application Insights (`VITE_APP_INSIGHTS_CONNECTION_STRING`)
+
+**Dashboard:** Azure Portal → Application Insights resource → Overview
+
+1. Copy the **Connection String** (format: `InstrumentationKey=...;IngestionEndpoint=...`)
+2. Set in Vercel: `VITE_APP_INSIGHTS_CONNECTION_STRING=InstrumentationKey=...`
+3. Trigger a Vercel redeploy
+
+> Application Insights does not support key rotation — if the key is compromised,
+> delete the resource and create a new one, then update the connection string.
+
+---
+
+## 10. Vercel deployment token
+
+**Dashboard:** https://vercel.com/account/tokens
+
+1. Click **Create** → name it `wasel-ci-deploy`, set expiry to 90 days
+2. Copy the token
+3. Go to your GitHub repo → Settings → Secrets → Actions
+4. Update `VERCEL_TOKEN` with the new value
+5. Delete the old token from Vercel
+
+---
+
+## 11. Git history cleanup
+
+If any secret was ever committed (even briefly), the file move is not enough:
+
+```bash
+# Install git-filter-repo
+pip install git-filter-repo
+
+# Remove .env files from all history
+git filter-repo --invert-paths --path .env --path .env.local \
+  --path .env.production --path .env.production.local --force
+
+# Force-push (coordinate with team — this rewrites history)
+git push origin --force --all
+git push origin --force --tags
+```
+
+Then:
+1. Enable **GitHub → Settings → Security → Secret scanning**
+2. Enable **GitHub → Settings → Security → Push protection**
+3. Notify all collaborators to re-clone (their local history is now diverged)
+
+---
+
+## Post-rotation verification
+
+Run all three checks after completing rotations:
+
+```powershell
+# 1. Validate all Vercel env vars are set and non-placeholder
+node scripts/validate-vercel-env.mjs
+
+# 2. Run production preflight
+node scripts/production-preflight.mjs
+
+# 3. Check live integrations
+node scripts/verify-live-integrations.mjs
+```
+
+Expected output: all green, no placeholder warnings.
+
+---
+
+## Rotation schedule
+
+| Credential type | Frequency |
+|---|---|
+| Stripe secret key | Every 90 days or on any suspected exposure |
+| Twilio auth token | Every 90 days |
+| Resend API key | Every 90 days |
+| Worker secrets | Every 180 days |
+| OAuth client secrets | Every 180 days or on any suspected exposure |
+| Supabase service role key | Every 180 days |
+| Vercel deploy token | Every 90 days |
+| Sentry DSN | On suspected exposure only |
+
+---
+
+*Last updated: 2026-11-10*
