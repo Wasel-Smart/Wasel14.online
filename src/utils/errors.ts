@@ -380,10 +380,11 @@ export function handleError(error: unknown, context?: ErrorContext): WaselError 
 
   if (error instanceof Error) {
     const isNetwork =
-      error.message.includes('fetch') ||
-      error.message.includes('network') ||
-      error.message.includes('Failed to fetch') ||
-      error.name === 'TypeError';
+      error instanceof TypeError ||
+      error.message === 'Failed to fetch' ||
+      error.message.toLowerCase().includes('network request failed') ||
+      error.message.toLowerCase().includes('networkerror') ||
+      error.name === 'NetworkError';
 
     return new WaselError({
       code: isNetwork ? 'NETWORK_002' : 'SYSTEM_001',
@@ -411,6 +412,13 @@ export function handleError(error: unknown, context?: ErrorContext): WaselError 
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof WaselError) {
     return error.retryable;
+  }
+  if (error instanceof TypeError) {
+    return true; // fetch() network failures
+  }
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    return msg.includes('failed to fetch') || msg.includes('network request failed') || msg.includes('networkerror');
   }
   return false;
 }

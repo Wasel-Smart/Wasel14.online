@@ -229,6 +229,9 @@ export class InMemoryEventBroker implements EventBroker {
     this.listeners.set(topic, group);
     return () => {
       group.delete(handler);
+      if (group.size === 0) {
+        this.listeners.delete(topic);
+      }
     };
   }
 
@@ -355,6 +358,9 @@ class OptimizedSupabaseEventBroker implements EventBroker {
     this.listeners.set(topic, group);
     return () => {
       group.delete(handler);
+      if (group.size === 0) {
+        this.listeners.delete(topic);
+      }
     };
   }
 

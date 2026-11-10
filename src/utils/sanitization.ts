@@ -186,8 +186,6 @@ export function sanitizeSearchQuery(query: string): string {
 export function sanitizeFilename(filename: string): string {
   if (!filename) {return '';}
 
-  const hadInvalid = /[<>:"|?*]/.test(filename);
-
   let safe = filename
     // Replace directory separators first so traversal can't escape.
     .replace(/[\\/]/g, '_')
@@ -200,6 +198,9 @@ export function sanitizeFilename(filename: string): string {
 
   // If the name starts with a dot, make it non-hidden and non-relative by prefixing.
   if (safe.startsWith('.')) {safe = `_${safe}`;}
+
+  // Detect whether the cleaned result differs from the original (invalid chars were present).
+  const hadInvalid = safe !== filename.replace(/[\\/]/g, '_');
 
   const dot = safe.lastIndexOf('.');
   const base = dot > 0 ? safe.slice(0, dot) : safe;

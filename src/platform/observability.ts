@@ -18,7 +18,10 @@ export function createCorrelationId(prefix: string = 'req'): string {
 function sanitizeContext(context?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!context) {return undefined;}
   return Object.fromEntries(
-    Object.entries(context).map(([k, v]) => [k, sanitizeLogMessage(v)]),
+    Object.entries(context).map(([k, v]) => [
+      k,
+      typeof v === 'string' ? sanitizeLogMessage(v) : v,
+    ]),
   );
 }
 

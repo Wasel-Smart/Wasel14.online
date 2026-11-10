@@ -98,7 +98,9 @@ export const EVENT_TYPE_TO_TOPIC: Partial<Record<DomainEventType, QueueTopic>> =
   // RideStarted intentionally omitted: in-progress state is a local lifecycle
   // transition only; no worker action is needed beyond what DriverAssigned already triggered.
   RideCompleted: 'rides.completed',
-  RideCancelled: 'rides.completed',
+  // RideCancelled intentionally omitted: cancellations do not need ops-worker
+  // processing via the rides.completed topic. Cancellation analytics are
+  // captured by the growth engine directly in the rideLifecycle service.
   PackageCreated: 'packages.created',
   // PackageAssigned: no dedicated topic — package-worker handles via packages.created lifecycle
   // PackagePickedUp: no dedicated topic — in-transit state transition only; no worker action needed

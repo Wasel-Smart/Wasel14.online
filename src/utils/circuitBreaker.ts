@@ -85,8 +85,6 @@ export class CircuitBreaker {
    * Handle successful execution
    */
   private onSuccess(): void {
-    this.failures = 0;
-    this.lastFailureTime = 0;
     this.lastSuccessTime = Date.now();
 
     if (this.state === CircuitState.HALF_OPEN) {
@@ -94,11 +92,16 @@ export class CircuitBreaker {
 
       if (this.successes >= this.config.successThreshold) {
         this.state = CircuitState.CLOSED;
+        this.failures = 0;
         this.successes = 0;
+        this.lastFailureTime = 0;
         this.lastStateChange = Date.now();
         logger.info(`Circuit breaker ${sanitizeLogMessage(this.name)} closed after recovery`);
       }
     }
+    // In CLOSED state, do not reset the failure counter on success.
+    // Failures within the monitoring window should accumulate until the
+    // window expires (handled in onFailure), not be wiped by a single success.
   }
 
   /**

@@ -24,9 +24,10 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 function randomJitter(range: number): number {
-  const values = new Uint8Array(1);
+  const values = new Uint32Array(1);
   crypto.getRandomValues(values);
-  return ((values[0] ?? 0) / 255 - 0.5) * range;
+  // Normalize to [-0.5, 0.5] using the full 32-bit range for fine-grained jitter
+  return ((values[0] ?? 0) / 0xffffffff - 0.5) * range;
 }
 
 /**
