@@ -164,7 +164,7 @@ export function getRecurringRouteSuggestions(limit = 4, userId?: string) {
   const snapshot = buildRouteIntelligenceSnapshot({ userId });
   const events = getGrowthEventFeed(userId);
   const bookings = getRideBookings();
-  const alerts = getDemandAlerts();
+  const alerts = getDemandAlerts(userId);
   const usageMap = new Map<string, { count: number; hours: number[] }>();
 
   const addUsage = (signal: LiveCorridorSignal | undefined, timestamp?: string) => {

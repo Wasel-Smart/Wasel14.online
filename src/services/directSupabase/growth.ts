@@ -42,12 +42,14 @@ export async function createDirectDemandAlert(input: {
   seatsOrSlots: number;
   userId?: string;
 }) {
+  if (!input.userId) {throw new Error('A signed-in user is required to create a demand alert.');}
   const db = getDb();
-  const context = input.userId ? await buildUserContext(input.userId).catch(() => null) : null;
+  const context = await buildUserContext(input.userId).catch(() => null);
+  if (!context?.user.id) {throw new Error('Unable to resolve the signed-in user for the demand alert.');}
   const { data, error } = await db
     .from('demand_alerts')
     .insert({
-      user_id: context?.user.id ?? null,
+      user_id: context.user.id,
       origin_city: input.from,
       destination_city: input.to,
       service_type: input.service,
@@ -62,16 +64,16 @@ export async function createDirectDemandAlert(input: {
 }
 
 export async function getDirectDemandAlerts(userId?: string) {
+  if (!userId) {throw new Error('A signed-in user is required to read demand alerts.');}
   const db = getDb();
+  const context = await buildUserContext(userId).catch(() => null);
+  if (!context?.user.id) {throw new Error('Unable to resolve a user scope for demand alerts.');}
   let query = db
     .from('demand_alerts')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(100);
-  if (userId) {
-    const context = await buildUserContext(userId).catch(() => null);
-    if (context?.user.id) {query = query.eq('user_id', context.user.id);}
-  }
+  query = query.eq('user_id', context.user.id);
   const { data, error } = await query;
   if (error) {throw error;}
   return Array.isArray(data) ? (data as RawDemandAlert[]) : [];

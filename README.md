@@ -268,7 +268,7 @@ SLO targets and error-budget rules: [docs/reliability-slos.md](docs/reliability-
 | Load — production | k6 | `npm run test:load:production` |
 | Contract | Vitest | `npm run test:unit -- tests/unit/queue-contracts.test.ts` |
 
-Coverage gate (enforced in `vitest.config.ts` and `ci.yml`): branches 14%, functions 17%, lines 21%, statements 20%. These are ratchet floors set at measured coverage (14.3 / 17.6 / 21.1 / 20.3, Oct 2026); they only ever go up. The long-term target in `ENGINEERING_STANDARDS.md` is 75/80/85/85, and the money, auth and permission paths (wallet, payments, bookings, RBAC) are raised first.
+Coverage gate (enforced in `vitest.config.ts` and `ci.yml`): branches 20%, functions 25%, lines 30%, statements 28%. These are ratchet floors set at measured coverage (20.2 / 25.3 / 30.2 / 29.2, Nov 2026); they only ever go up. The long-term target in `ENGINEERING_STANDARDS.md` is 75/80/85/85, and the money, auth and permission paths (wallet, payments, bookings, RBAC) are raised first.
 Full testing guide: [docs/testing.md](docs/testing.md)
 
 ---

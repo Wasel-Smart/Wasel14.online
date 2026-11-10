@@ -293,7 +293,7 @@ describe('walletApi — edge transport NOT configured (read-only/local tiers)', 
   describe('getRewards', () => {
     it('returns empty rewards when edge unavailable and fallback to direct returns empty', async () => {
       getConfigMock.mockReturnValue({ allowDirectSupabaseFallback: true });
-      const result = await walletApi.getRewards('user-123');
+      const result = await walletApi.getRewards('user-123') as { rewards: unknown[] };
       expect(result.rewards).toEqual([]);
     });
   });
@@ -350,7 +350,7 @@ describe('walletApi — edge transport NOT configured (read-only/local tiers)', 
 
       const result = await walletApi.getTransactions('user-123', 1, 20, 'ride_payment');
       expect(result.transactions).toHaveLength(1);
-      expect(result.transactions[0].type).toBe('ride_payment');
+      expect(result.transactions[0]!.type).toBe('ride_payment');
     });
 
     it('paginates results correctly', async () => {
@@ -378,7 +378,7 @@ describe('walletApi — edge transport NOT configured (read-only/local tiers)', 
         makeWallet({ transactions: [{ id: 'local-1', type: 'wallet', description: 'local', amount: 5, createdAt: '2026-01-01' }] }),
       );
 
-      const result = await walletApi.getTransactions('user-123');
+      await walletApi.getTransactions('user-123');
       expect(walletLocalMocks.fetchWalletLocal).toHaveBeenCalledWith('user-123');
     });
   });

@@ -182,15 +182,16 @@ function buildGrowthDashboardFromLocal(userId: string): GrowthDashboard {
   };
 }
 
-function readLocalDemandAlerts(): Array<{
+function readLocalDemandAlerts(userId?: string): Array<{
   from: string;
   to: string;
   status: string;
   service: 'ride' | 'bus' | 'package';
 }> {
-  if (typeof window === 'undefined') {return [];}
+  if (typeof window === 'undefined' || !userId) {return [];}
   try {
-    const raw = window.localStorage.getItem(LOCAL_DEMAND_KEY);
+    window.localStorage.removeItem(LOCAL_DEMAND_KEY);
+    const raw = window.localStorage.getItem(`${LOCAL_DEMAND_KEY}:${encodeURIComponent(userId)}`);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -307,8 +308,8 @@ export async function getGrowthDashboard(userId: string): Promise<GrowthDashboar
   }
 }
 
-export function getCorridorDemandLeaders(limit = 3) {
-  const alerts = readLocalDemandAlerts();
+export function getCorridorDemandLeaders(limit = 3, userId?: string) {
+  const alerts = readLocalDemandAlerts(userId);
   const corridorMap = new Map<string, { corridor: string; active: number; serviceLabel: string }>();
 
   for (const alert of alerts.filter(item => item.status === 'active')) {

@@ -199,7 +199,7 @@ export function FindRidePage() {
     }
     return lookup;
   }, [routeIntelligence.allSignals]);
-  const demandStats = getDemandStats();
+  const demandStats = getDemandStats(user?.id);
 
   const searchFromCoord = resolveCityCoord(from);
   const searchToCoord = resolveCityCoord(to);
@@ -474,6 +474,12 @@ export function FindRidePage() {
   }, [bookingInFlightId, showExistingBooking, verifyBookingEligibility, t, ar, resolveSignalForRoute, routeIntelligence.membership, corridorPlan, permission, requestPermission, notifyTripConfirmed]);
 
   const handleDemandCapture = () => {
+    if (!user?.id) {
+      setWaitlistMessage(
+        ar ? 'سجّل الدخول لحفظ تنبيه المسار على حسابك.' : 'Sign in to save this route alert to your account.',
+      );
+      return;
+    }
     const alert = createDemandAlert({
       from,
       to,

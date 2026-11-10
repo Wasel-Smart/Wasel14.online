@@ -17,12 +17,16 @@ export interface DemandAlert {
   backendId?: string;
 }
 
-const DEMAND_KEY = 'wasel-demand-alerts';
+const LEGACY_DEMAND_KEY = 'wasel-demand-alerts';
+const demandKey = (userId: string) => `wasel-demand-alerts:${encodeURIComponent(userId)}`;
 
-function readAlerts(): DemandAlert[] {
-  if (typeof window === 'undefined') {return [];}
+function readAlerts(userId?: string): DemandAlert[] {
+  if (typeof window === 'undefined' || !userId) {return [];}
   try {
-    const raw = window.localStorage.getItem(DEMAND_KEY);
+    // Alerts contain routes and dates. Never reuse the old unscoped cache or
+    // share one account's alerts with another signed-in account.
+    window.localStorage.removeItem(LEGACY_DEMAND_KEY);
+    const raw = window.localStorage.getItem(demandKey(userId));
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -30,25 +34,26 @@ function readAlerts(): DemandAlert[] {
   }
 }
 
-function writeAlerts(alerts: DemandAlert[]) {
-  if (typeof window === 'undefined') {return;}
-  window.localStorage.setItem(DEMAND_KEY, JSON.stringify(alerts.slice(0, 100)));
+function writeAlerts(userId: string | undefined, alerts: DemandAlert[]) {
+  if (typeof window === 'undefined' || !userId) {return;}
+  window.localStorage.setItem(demandKey(userId), JSON.stringify(alerts.slice(0, 100)));
 }
 
-function syncAlerts(alerts: DemandAlert[]) {
-  writeAlerts(alerts);
+function syncAlerts(userId: string | undefined, alerts: DemandAlert[]) {
+  writeAlerts(userId, alerts);
   return alerts;
 }
 
-function updateLocalAlert(id: string, updates: Partial<DemandAlert>) {
-  const next = readAlerts().map(alert => (alert.id === id ? { ...alert, ...updates } : alert));
-  syncAlerts(next);
+function updateLocalAlert(userId: string | undefined, id: string, updates: Partial<DemandAlert>) {
+  const next = readAlerts(userId).map(alert => (alert.id === id ? { ...alert, ...updates } : alert));
+  syncAlerts(userId, next);
 }
 
 export async function hydrateDemandAlerts(userId?: string): Promise<DemandAlert[]> {
+  if (!userId) {return [];}
   try {
     const remote = await getDirectDemandAlerts(userId);
-    const merged = [...readAlerts()];
+    const merged = [...readAlerts(userId)];
 
     for (const item of remote) {
       const normalized: DemandAlert = {
@@ -80,16 +85,16 @@ export async function hydrateDemandAlerts(userId?: string): Promise<DemandAlert[
       else {merged.unshift(normalized);}
     }
 
-    return syncAlerts(merged.slice(0, 100)).sort(
+    return syncAlerts(userId, merged.slice(0, 100)).sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   } catch {
-    return getDemandAlerts();
+    return getDemandAlerts(userId);
   }
 }
 
-export function getDemandAlerts(): DemandAlert[] {
-  return [...readAlerts()].sort(
+export function getDemandAlerts(userId?: string): DemandAlert[] {
+  return [...readAlerts(userId)].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 }
@@ -102,7 +107,10 @@ export function createDemandAlert(input: {
   seatsOrSlots?: number;
   userId?: string;
 }): DemandAlert {
-  const alerts = readAlerts();
+  const alerts = readAlerts(input.userId);
+  if (!input.userId) {
+    throw new Error('Sign in is required to save a private demand alert.');
+  }
   const existing = alerts.find(
     item =>
       item.from === input.from &&
@@ -124,7 +132,7 @@ export function createDemandAlert(input: {
     createdAt: new Date().toISOString(),
   };
 
-  syncAlerts([alert, ...alerts]);
+  syncAlerts(input.userId, [alert, ...alerts]);
   void createDirectDemandAlert({
     from: alert.from,
     to: alert.to,
@@ -134,7 +142,7 @@ export function createDemandAlert(input: {
     userId: input.userId,
   })
     .then(remote => {
-      updateLocalAlert(alert.id, {
+      updateLocalAlert(input.userId, alert.id, {
         backendId: String(remote.id ?? ''),
         syncedAt: new Date().toISOString(),
       });
@@ -155,8 +163,8 @@ export function createDemandAlert(input: {
   return alert;
 }
 
-export function getDemandStats() {
-  const alerts = getDemandAlerts();
+export function getDemandStats(userId?: string) {
+  const alerts = getDemandAlerts(userId);
   return {
     active: alerts.filter(item => item.status === 'active').length,
     rides: alerts.filter(item => item.service === 'ride' && item.status === 'active').length,

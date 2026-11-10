@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/communications/admin/apply-migrations` and `/moderation/admin/apply-migrations` return 410 unless `ALLOW_RUNTIME_MIGRATIONS=true`; schema changes ship through `supabase db push`
 
 ### Changed
-- Documentation now states the coverage gate CI actually enforces (12/15/19/18 ratchet) separately from the 75/80/85/85 target
+- Documentation now states the coverage gate CI actually enforces (20/25/30/28 ratchet) separately from the 75/80/85/85 target
 - `REVIEW_REPORT.md` no longer self-grades 9/10
 
 ### Added

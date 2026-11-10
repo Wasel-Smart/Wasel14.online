@@ -93,8 +93,8 @@ describe('bookingsAPI', () => {
       ];
       const result = normalizeBookingList(input);
       expect(result.bookings).toHaveLength(2);
-      expect(result.bookings?.[0].booking_id).toBe('bk-1');
-      expect(result.bookings?.[1].status).toBe('pending');
+      expect(result.bookings![0]!.booking_id).toBe('bk-1');
+      expect(result.bookings![1]!.status).toBe('pending');
     });
 
     it('returns empty bookings for non-array input', () => {
@@ -180,7 +180,7 @@ describe('bookingsAPI', () => {
       const result = await bookingsAPI.getUserBookings();
 
       expect(mocks.mockGetDirectUserBookings).toHaveBeenCalledWith('user-1');
-      expect(result.bookings?.[0].booking_id).toBe('direct-1');
+      expect(result.bookings![0]!.booking_id).toBe('direct-1');
     });
 
     it('returns empty bookings when both edge and direct fail', async () => {
@@ -200,7 +200,7 @@ describe('bookingsAPI', () => {
 
       const result = await bookingsAPI.getTripBookings('trip-1');
 
-      expect(result.bookings?.[0].trip_id).toBe('trip-1');
+      expect(result.bookings![0]!.trip_id).toBe('trip-1');
     });
 
     it('falls back to direct Supabase for trip bookings', async () => {
@@ -213,15 +213,15 @@ describe('bookingsAPI', () => {
 
       const result = await bookingsAPI.getTripBookings('trip-1');
       expect(mocks.mockGetDirectTripBookings).toHaveBeenCalledWith('trip-1');
-      expect(result.bookings?.[0].booking_id).toBe('direct-trip-1');
+      expect(result.bookings![0]!.booking_id).toBe('direct-trip-1');
     });
   });
 
   describe('updateBookingStatus', () => {
-    it('maps confirmed to accepted for edge API', async () => {
+    it('maps accepted status for edge API', async () => {
       mocks.mockRunBackendWorkflow.mockResolvedValueOnce({ booking_id: 'bk-1', status: 'accepted' });
 
-      const result = await bookingsAPI.updateBookingStatus('bk-1', 'confirmed');
+      const result = await bookingsAPI.updateBookingStatus('bk-1', 'accepted');
 
       expect(result.status).toBe('accepted');
       expect(mocks.mockRunBackendWorkflow).toHaveBeenCalledWith(
@@ -249,7 +249,7 @@ describe('bookingsAPI', () => {
 
     it('throws when runBackendWorkflow throws', async () => {
       mocks.mockRunBackendWorkflow.mockRejectedValueOnce(new Error('Update failed'));
-      await expect(bookingsAPI.updateBookingStatus('bk-1', 'confirmed')).rejects.toThrow('Update failed');
+      await expect(bookingsAPI.updateBookingStatus('bk-1', 'accepted')).rejects.toThrow('Update failed');
     });
   });
 });

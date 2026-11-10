@@ -5,7 +5,7 @@
 ### Test Coverage Thresholds
 
 These are the **targets**. The gate CI actually enforces today is a ratchet floor in
-`vitest.config.ts` (currently 12 / 15 / 19 / 18) set just under measured coverage; it is
+`vitest.config.ts` (currently 20 / 25 / 30 / 28 for branches / functions / lines / statements) set just under measured coverage; it is
 raised whenever coverage improves and must never be lowered.
 
 - **Branches**: 75%

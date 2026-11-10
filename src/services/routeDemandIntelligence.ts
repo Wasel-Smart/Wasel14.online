@@ -144,7 +144,7 @@ function computeSignal(
   const packages = getConnectedPackages().filter(item =>
     corridorMatches(corridor, item.from, item.to),
   );
-  const alerts = getDemandAlerts().filter(
+  const alerts = getDemandAlerts(userId).filter(
     alert => corridorMatches(corridor, alert.from, alert.to) && alert.status === 'active',
   );
   const events = getGrowthEventFeed(userId).filter(event =>
