@@ -37,6 +37,7 @@ export interface GrowthDashboard {
 }
 
 export interface GrowthEventRecord {
+  userId: string;
   eventName: string;
   funnelStage: string;
   serviceType: 'ride' | 'bus' | 'package' | 'referral' | 'wallet';
@@ -66,6 +67,7 @@ const EMPTY_GROWTH_DASHBOARD: GrowthDashboard = {
 
 const LOCAL_REFERRAL_KEY = 'wasel-referral-snapshot';
 const LOCAL_GROWTH_EVENTS_KEY = 'wasel-growth-events';
+const LEGACY_LOCAL_GROWTH_EVENTS_KEY = LOCAL_GROWTH_EVENTS_KEY;
 const LOCAL_DEMAND_KEY = 'wasel-demand-alerts';
 
 function buildFallbackCode(userId?: string, name?: string) {
@@ -92,33 +94,55 @@ function writeLocalSnapshots(snapshots: Record<string, ReferralSnapshot>) {
   window.localStorage.setItem(LOCAL_REFERRAL_KEY, JSON.stringify(snapshots));
 }
 
-function readLocalGrowthEvents(): GrowthEventRecord[] {
-  if (typeof window === 'undefined') {return [];}
+function growthEventsKey(userId: string) {
+  return `${LOCAL_GROWTH_EVENTS_KEY}:${encodeURIComponent(userId)}`;
+}
+
+function clearLegacyGrowthEvents() {
+  if (typeof window === 'undefined') {return;}
   try {
-    const raw = window.localStorage.getItem(LOCAL_GROWTH_EVENTS_KEY);
+    window.localStorage.removeItem(LEGACY_LOCAL_GROWTH_EVENTS_KEY);
+  } catch {
+    // Private browsing or blocked storage should not break the application.
+  }
+}
+
+function readLocalGrowthEvents(userId?: string): GrowthEventRecord[] {
+  clearLegacyGrowthEvents();
+  if (typeof window === 'undefined' || !userId) {return [];}
+  try {
+    const raw = window.localStorage.getItem(growthEventsKey(userId));
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((event): event is GrowthEventRecord => event?.userId === userId)
+      : [];
   } catch {
     return [];
   }
 }
 
-function writeLocalGrowthEvents(events: GrowthEventRecord[]) {
-  if (typeof window === 'undefined') {return;}
-  window.localStorage.setItem(LOCAL_GROWTH_EVENTS_KEY, JSON.stringify(events.slice(0, 300)));
+function writeLocalGrowthEvents(userId: string, events: GrowthEventRecord[]) {
+  if (typeof window === 'undefined' || !userId) {return;}
+  try {
+    window.localStorage.setItem(growthEventsKey(userId), JSON.stringify(events.slice(0, 300)));
+  } catch {
+    // Analytics caching is best effort and must not interrupt user actions.
+  }
 }
 
-export function getGrowthEventFeed(): GrowthEventRecord[] {
-  return readLocalGrowthEvents()
+export function getGrowthEventFeed(userId?: string): GrowthEventRecord[] {
+  return readLocalGrowthEvents(userId)
     .slice()
     .sort(
       (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
     );
 }
 
-function buildGrowthDashboardFromLocal(): GrowthDashboard {
-  const events = readLocalGrowthEvents();
-  const alerts = readLocalDemandAlerts();
+function buildGrowthDashboardFromLocal(userId: string): GrowthDashboard {
+  const events = readLocalGrowthEvents(userId);
+  // Demand alerts in the legacy browser cache are not user-scoped. Do not
+  // fold them into a per-user fallback dashboard.
+  const alerts: ReturnType<typeof readLocalDemandAlerts> = [];
   const corridorMap = new Map<string, { corridor: string; demand: number; conversions: number }>();
 
   for (const event of events) {
@@ -184,8 +208,9 @@ export async function trackGrowthEvent(input: {
   valueJod?: number;
   metadata?: Record<string, unknown>;
 }) {
-  writeLocalGrowthEvents([
+  writeLocalGrowthEvents(input.userId ?? '', [
     {
+      userId: input.userId ?? '',
       eventName: input.eventName,
       funnelStage: input.funnelStage,
       serviceType: input.serviceType,
@@ -194,7 +219,7 @@ export async function trackGrowthEvent(input: {
       valueJod: input.valueJod,
       createdAt: new Date().toISOString(),
     },
-    ...readLocalGrowthEvents(),
+    ...(input.userId ? readLocalGrowthEvents(input.userId) : []),
   ]);
 
   try {
@@ -270,11 +295,12 @@ export async function applyReferralCode(
   return getReferralSnapshot(user);
 }
 
-export async function getGrowthDashboard(userId?: string): Promise<GrowthDashboard> {
+export async function getGrowthDashboard(userId: string): Promise<GrowthDashboard> {
+  if (!userId) {return EMPTY_GROWTH_DASHBOARD;}
   try {
     return await getDirectGrowthAnalytics(userId);
   } catch {
-    const fallback = buildGrowthDashboardFromLocal();
+    const fallback = buildGrowthDashboardFromLocal(userId);
     return JSON.stringify(fallback) === JSON.stringify(EMPTY_GROWTH_DASHBOARD)
       ? EMPTY_GROWTH_DASHBOARD
       : fallback;

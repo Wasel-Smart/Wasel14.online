@@ -1,13 +1,13 @@
 /**
  * Corridor market data service.
- * Builds pricing, demand, and ownership snapshots for active corridors
- * across the Wasel region map, sourcing live signals where available
- * and falling back to a launch model for pre-production markets.
+ * Builds price and demand estimates across the Wasel region map. A corridor is
+ * marked as observed only when the current session has activity evidence;
+ * other rows remain clearly identified as launch-model estimates.
  */
 import { getAllRegions, type CityRoute, type RegionConfig } from '../utils/regionConfig';
 import { getLiveCorridorSignal } from './routeDemandIntelligence';
 
-type CorridorProofMode = 'live-production' | 'launch-model';
+type CorridorProofMode = 'observed-activity' | 'launch-model';
 
 export interface CorridorMarketRow {
   id: string;
@@ -29,7 +29,7 @@ export interface CorridorMarketRow {
 export interface CorridorMarketSnapshot {
   updatedAt: string;
   rows: CorridorMarketRow[];
-  liveOwnedCorridors: number;
+  observedActivityCorridors: number;
   averageSavingsPercent: number;
   averageOwnershipScore: number;
 }
@@ -115,9 +115,17 @@ function buildModeledRow(route: CityRoute, region: RegionConfig): CorridorMarket
   };
 }
 
-function buildLiveRow(route: CityRoute, region: RegionConfig): CorridorMarketRow | null {
-  const signal = getLiveCorridorSignal(route.from, route.to);
-  if (!signal) {return null;}
+function buildLiveRow(route: CityRoute, region: RegionConfig, userId?: string): CorridorMarketRow | null {
+  const signal = getLiveCorridorSignal(route.from, route.to, undefined, userId);
+  if (
+    !signal ||
+    (signal.liveSearches === 0 &&
+      signal.liveBookings === 0 &&
+      signal.livePackages === 0 &&
+      signal.activeDemandAlerts === 0)
+  ) {
+    return null;
+  }
 
   const benchmarkPriceJod = roundMoney(
     Math.max(signal.priceQuote.basePriceJod, buildBenchmarkPrice(route, region)),
@@ -135,7 +143,7 @@ function buildLiveRow(route: CityRoute, region: RegionConfig): CorridorMarketRow
     regionName: region.name,
     corridor: signal.label.replace(' -> ', ' to '),
     launchStatus: region.launchStatus,
-    proofMode: 'live-production',
+    proofMode: 'observed-activity',
     waselSharedPriceJod: signal.priceQuote.finalPriceJod,
     benchmarkPriceJod,
     savingsPercent: clamp(
@@ -148,7 +156,7 @@ function buildLiveRow(route: CityRoute, region: RegionConfig): CorridorMarketRow
     ownershipScore: signal.routeOwnershipScore,
     evidenceLine: `${signal.productionSources[0]}, ${signal.productionSources[1]}, ${signal.productionSources[2]}.`,
     sourceLine:
-      'Live production signals from rides, bookings, packages, alerts, and growth events.',
+      'Observed activity available in this session from searches, bookings, packages, or demand alerts; this is not a platform-wide production aggregate.',
   };
 }
 
@@ -159,19 +167,19 @@ function pickKeyRoutes(region: RegionConfig) {
     .slice(0, 2);
 }
 
-export function buildCorridorMarketSnapshot(limit = 10): CorridorMarketSnapshot {
+export function buildCorridorMarketSnapshot(limit = 10, userId?: string): CorridorMarketSnapshot {
   const rows = getAllRegions()
     .filter(region => MIDDLE_EAST_REGION_CODES.has(region.iso))
     .flatMap(region =>
       pickKeyRoutes(region).map(route =>
         region.iso === 'JO'
-          ? (buildLiveRow(route, region) ?? buildModeledRow(route, region))
+          ? (buildLiveRow(route, region, userId) ?? buildModeledRow(route, region))
           : buildModeledRow(route, region),
       ),
     )
     .sort((left, right) => {
       if (left.proofMode !== right.proofMode) {
-        return left.proofMode === 'live-production' ? -1 : 1;
+        return left.proofMode === 'observed-activity' ? -1 : 1;
       }
       return (
         right.ownershipScore + right.savingsPercent - (left.ownershipScore + left.savingsPercent)
@@ -179,7 +187,7 @@ export function buildCorridorMarketSnapshot(limit = 10): CorridorMarketSnapshot 
     })
     .slice(0, limit);
 
-  const liveOwnedCorridors = rows.filter(row => row.proofMode === 'live-production').length;
+  const observedActivityCorridors = rows.filter(row => row.proofMode === 'observed-activity').length;
   const averageSavingsPercent =
     rows.length > 0
       ? Math.round(rows.reduce((sum, row) => sum + row.savingsPercent, 0) / rows.length)
@@ -192,7 +200,7 @@ export function buildCorridorMarketSnapshot(limit = 10): CorridorMarketSnapshot 
   return {
     updatedAt: new Date().toISOString(),
     rows,
-    liveOwnedCorridors,
+    observedActivityCorridors,
     averageSavingsPercent,
     averageOwnershipScore,
   };

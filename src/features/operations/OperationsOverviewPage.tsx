@@ -9,6 +9,7 @@ import {
 } from '../../components/wasel-ui/WaselPagePrimitives';
 import { useLocation } from 'react-router';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useLocalAuth } from '../../contexts/LocalAuth';
 import {
   buildBusinessAccountSnapshot,
   buildSchoolTransportSnapshot,
@@ -171,8 +172,9 @@ function HeroMetric({
 export default function OperationsOverviewPage() {
   const { pathname } = useLocation();
   const { language, t } = useLanguage();
+  const { user } = useLocalAuth();
   const ar = language === 'ar';
-  const routeIntelligence = useLiveRouteIntelligence();
+  const routeIntelligence = useLiveRouteIntelligence({ userId: user?.id });
   const config = useMemo(
     () =>
       CONFIG[pathname] ?? {
@@ -238,14 +240,23 @@ export default function OperationsOverviewPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setDashboard(null);
+    setBusinessSnapshot(null);
+    setSchoolSnapshot(null);
+    setServiceSnapshot(null);
+    setProofSnapshot(null);
 
-    void getGrowthDashboard()
-      .then(value => {
-        if (!cancelled) {setDashboard(value);}
-      })
-      .catch(() => {
-        if (!cancelled) {setDashboard(null);}
-      });
+    if (user?.id) {
+      void getGrowthDashboard(user.id)
+        .then(value => {
+          if (!cancelled) {setDashboard(value);}
+        })
+        .catch(() => {
+          if (!cancelled) {setDashboard(null);}
+        });
+    } else {
+      setDashboard(null);
+    }
 
     if (pathname === '/app/services/corporate') {
       void buildBusinessAccountSnapshot()
@@ -257,7 +268,7 @@ export default function OperationsOverviewPage() {
         });
 
       setServiceSnapshot(buildServiceProviderWorkflowSnapshot());
-      setProofSnapshot(buildMiddleEastCorridorProof(8));
+      setProofSnapshot(buildMiddleEastCorridorProof(8, user?.id));
       setSchoolSnapshot(null);
       return () => {
         cancelled = true;
@@ -281,7 +292,7 @@ export default function OperationsOverviewPage() {
       };
     }
 
-    setProofSnapshot(buildMiddleEastCorridorProof(10));
+    setProofSnapshot(buildMiddleEastCorridorProof(10, user?.id));
     setBusinessSnapshot(null);
     setSchoolSnapshot(null);
     setServiceSnapshot(null);
@@ -289,7 +300,7 @@ export default function OperationsOverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, user?.id]);
 
   const liveCorridors = routeIntelligence.featuredSignals.slice(0, 5);
   const heroMetrics = useMemo(() => {
@@ -353,27 +364,27 @@ export default function OperationsOverviewPage() {
 
     return [
       {
-        label: ar ? 'عمليات بحث' : 'Searches',
+        label: ar ? 'بحث الحساب' : 'Account searches',
         value: String(dashboard?.funnel.searched ?? 0),
-        detail: ar ? 'اكتشاف مسارات حي' : 'Live route discovery',
+        detail: ar ? 'عمليات بحث مسجلة لهذا الحساب' : 'Searches recorded for this account',
         accent: CYAN,
       },
       {
-        label: ar ? 'حجوزات' : 'Bookings',
+        label: ar ? 'حجوزات الحساب' : 'Account bookings',
         value: String(dashboard?.funnel.booked ?? 0),
-        detail: ar ? 'تحويلات مؤكدة' : 'Confirmed conversions',
+        detail: ar ? 'حجوزات مسجلة لهذا الحساب' : 'Bookings recorded for this account',
         accent: GREEN,
       },
       {
-        label: ar ? 'التوفير' : 'Savings',
+        label: ar ? 'توفير متوقع' : 'Projected savings',
         value: `${proofSnapshot?.averageSavingsPercent ?? 0}%`,
-        detail: ar ? 'ميزة الحركة المشتركة' : 'Shared advantage',
+        detail: ar ? 'تقدير يعتمد على الأدلة المتاحة للمسار' : 'Estimate based on available corridor evidence',
         accent: GOLD,
       },
       {
-        label: ar ? 'مسارات مملوكة' : 'Owned lanes',
-        value: String(proofSnapshot?.liveOwnedCorridors ?? 0),
-        detail: ar ? 'ممرات مدعومة بالإنتاج' : 'Production-backed corridors',
+        label: ar ? 'ممرات بنشاط مرصود' : 'Corridors with observed activity',
+        value: String(proofSnapshot?.observedActivityCorridors ?? 0),
+        detail: ar ? 'إشارات نشاط متاحة لهذه الجلسة' : 'Activity signals available in this session',
         accent: BLUE,
       },
     ];
@@ -705,12 +716,14 @@ export default function OperationsOverviewPage() {
                         </div>
                         <div
                           style={{
-                            color: row.proofMode === 'live-production' ? GREEN : GOLD,
+                            color: row.proofMode === 'observed-activity' ? GREEN : GOLD,
                             fontWeight: 800,
                             fontSize: '0.8rem',
                           }}
                         >
-                          {row.proofMode === 'live-production' ? 'Live production' : 'Launch model'}
+                          {row.proofMode === 'observed-activity'
+                            ? ar ? 'نشاط مرصود' : 'Observed activity'
+                            : ar ? 'نموذج إطلاق' : 'Launch model'}
                         </div>
                       </div>
                     </div>
@@ -853,42 +866,42 @@ export default function OperationsOverviewPage() {
               }}
             >
               <StatCard
-                label={ar ? 'عمليات بحث' : 'Searches'}
+                label={ar ? 'بحث الحساب' : 'Account searches'}
                 value={String(dashboard?.funnel.searched ?? 0)}
                 detail={
                   ar
-                    ? 'طلب ركاب حي داخل اختيار المسار.'
-                    : 'Live rider demand flowing into route selection.'
+                    ? 'عمليات بحث مسجلة لهذا الحساب.'
+                    : 'Searches recorded for this account.'
                 }
                 color={CYAN}
               />
               <StatCard
-                label={ar ? 'حجوزات' : 'Bookings'}
+                label={ar ? 'حجوزات الحساب' : 'Account bookings'}
                 value={String(dashboard?.funnel.booked ?? 0)}
                 detail={
                   ar
-                    ? 'تحويلات مسار مؤكدة من خريطة الحركة النشطة.'
-                    : 'Confirmed route conversions from the active movement graph.'
+                    ? 'حجوزات مسجلة لهذا الحساب.'
+                    : 'Bookings recorded for this account.'
                 }
                 color={GREEN}
               />
               <StatCard
-                label={ar ? 'متوسط التوفير' : 'Average savings'}
+                label={ar ? 'توفير متوقع' : 'Projected savings'}
                 value={`${proofSnapshot?.averageSavingsPercent ?? 0}%`}
                 detail={
                   ar
-                    ? 'ميزة سعر المسار المشترك مقارنة ببدائل الطلب العامة.'
-                    : 'Shared-route price advantage versus generic on-demand alternatives.'
+                    ? 'تقدير يقارن أسعار المسارات بالنماذج المتاحة.'
+                    : 'Estimate comparing corridor prices using available models.'
                 }
                 color={GOLD}
               />
               <StatCard
-                label={ar ? 'ممرات مملوكة حياً' : 'Live-owned corridors'}
-                value={String(proofSnapshot?.liveOwnedCorridors ?? 0)}
+                label={ar ? 'ممرات بنشاط مرصود' : 'Corridors with observed activity'}
+                value={String(proofSnapshot?.observedActivityCorridors ?? 0)}
                 detail={
                   ar
-                    ? 'مسارات أردنية مدعومة بإشارات إنتاج الآن.'
-                    : 'Jordan lanes backed by production signals right now.'
+                    ? 'نشاط حديث متاح ضمن هذه الجلسة.'
+                    : 'Recent activity available in this session.'
                 }
                 color={BLUE}
               />
@@ -1017,9 +1030,9 @@ export default function OperationsOverviewPage() {
                             }}
                           >
                             {row.regionName} | {row.launchStatus} |{' '}
-                            {row.proofMode === 'live-production'
-                              ? 'Live production'
-                              : 'Launch model'}
+                            {row.proofMode === 'observed-activity'
+                              ? ar ? 'نشاط مرصود' : 'Observed activity'
+                              : ar ? 'نموذج إطلاق' : 'Launch model'}
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
@@ -1119,13 +1132,15 @@ export default function OperationsOverviewPage() {
                           </div>
                           <div
                             style={{
-                              color: row.proofMode === 'live-production' ? GREEN : GOLD,
+                              color: row.proofMode === 'observed-activity' ? GREEN : GOLD,
                               fontWeight: 800,
                               fontSize: '0.8rem',
                               marginTop: 5,
                             }}
                           >
-                            {row.proofMode === 'live-production' ? 'Live' : 'Launch'}
+                            {row.proofMode === 'observed-activity'
+                              ? ar ? 'مرصود' : 'Observed'
+                              : ar ? 'إطلاق' : 'Launch'}
                           </div>
                         </div>
                       </div>
@@ -1164,42 +1179,42 @@ export default function OperationsOverviewPage() {
                 }}
               >
                 <StatCard
-                  label={ar ? 'رحلات' : 'Rides'}
+                  label={ar ? 'رحلات الحساب' : 'Account rides'}
                   value={String(dashboard?.serviceMix.rides ?? 0)}
                   detail={
                     ar
-                      ? 'حركة الناس تقوي خريطة المسارات.'
-                      : 'People movement reinforcing the route graph.'
+                      ? 'رحلات مسجلة لهذا الحساب.'
+                      : 'Rides recorded for this account.'
                   }
                   color={CYAN}
                 />
                 <StatCard
-                  label={ar ? 'طرود' : 'Packages'}
+                  label={ar ? 'طرود الحساب' : 'Account packages'}
                   value={String(dashboard?.serviceMix.packages ?? 0)}
                   detail={
                     ar
-                      ? 'بضائع تتحرك على عرض متاح أصلاً.'
-                      : 'Goods moving on already-available supply.'
+                      ? 'طرود مسجلة لهذا الحساب.'
+                      : 'Packages recorded for this account.'
                   }
                   color={GOLD}
                 />
                 <StatCard
-                  label={ar ? 'دعوات' : 'Referrals'}
+                  label={ar ? 'إحالات الحساب' : 'Account referrals'}
                   value={String(dashboard?.serviceMix.referrals ?? 0)}
                   detail={
                     ar
-                      ? 'أثر شبكة يعمّق الحركة المتكررة.'
-                      : 'Network effects that deepen recurring movement.'
+                      ? 'إحالات مسجلة لهذا الحساب.'
+                      : 'Referrals recorded for this account.'
                   }
                   color={GREEN}
                 />
                 <StatCard
-                  label={ar ? 'الإيراد' : 'Revenue'}
+                  label={ar ? 'قيمة مسجلة' : 'Tracked value'}
                   value={`${(dashboard?.revenueJod ?? 0).toFixed(0)} JOD`}
                   detail={
                     ar
-                      ? 'قيمة محققة من الحركة المشتركة عبر الخدمات.'
-                      : 'Captured value from shared movement across services.'
+                      ? 'مجموع القيم المرتبطة بأحداث النشاط؛ لا يمثل مدفوعات مسوّاة.'
+                      : 'Sum of values attached to activity events; not settled revenue.'
                   }
                   color={BLUE}
                 />

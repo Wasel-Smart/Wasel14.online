@@ -2,8 +2,7 @@
  * Production Worker Deployment
  *
  * Bridges the worker framework to the active event broker and implements the
- * five domain workers defined in the service topology:
- *   - matching-worker      (rides.requested)
+ * four browser-side domain workers defined in the service topology:
  *   - package-worker       (packages.created, packages.location-updated)
  *   - payment-worker       (payments.authorized)
  *   - notification-worker  (rides.assigned, packages.delivered, notifications.dispatch)
@@ -52,106 +51,6 @@ function ensureBackend(): boolean {
   }
   return true;
 }
-
-// ============================================================================
-// MATCHING WORKER
-// ============================================================================
-
-interface RideMatchRequest {
-  bookingId: string;
-  rideId: string;
-  routeMode: 'live_post' | 'network_inventory';
-  origin: string;
-  destination: string;
-}
-
-const matchingWorker = createWorker<RideMatchRequest>(
-  {
-    name: 'matching-worker',
-    topics: ['rides.requested'],
-    concurrency: 10,
-    retryPolicy: { maxRetries: 5, backoffMs: 1000 },
-    circuitBreaker: { failureThreshold: 5, resetTimeoutMs: 60000 },
-  },
-  async (message: QueueMessage<RideMatchRequest>) => {
-    if (!ensureBackend()) {return;}
-    const client = supabase;
-    if (!client) {return;}
-    const { payload } = message;
-    const startTime = Date.now();
-
-    const { data: trip } = await client
-      .from('trips')
-      .select('id, trip_id, driver_id, trip_status')
-      .or(`trip_id.eq.${payload.rideId},id.eq.${payload.rideId}`)
-      .maybeSingle();
-
-    if (!trip) {
-      console.warn('[matching-worker] trip not found', sanitizeLogMessage(payload.rideId));
-      return;
-    }
-
-    // Prefer drivers whose last known location is closest to the trip origin.
-    // Falls back to any available driver when PostGIS geo-proximity is unavailable.
-    let driver: { driver_id: string; user_id: string } | null = null;
-    try {
-      const { data: tripGeo } = await client
-        .from('trips')
-        .select('origin_lat, origin_lng')
-        .or(`trip_id.eq.${payload.rideId},id.eq.${payload.rideId}`)
-        .maybeSingle();
-      if (tripGeo?.origin_lat && tripGeo?.origin_lng) {
-        const { data: nearbyDriver } = await client
-          .rpc('find_nearest_available_driver', {
-            p_lat: tripGeo.origin_lat,
-            p_lng: tripGeo.origin_lng,
-            p_radius_km: 50,
-          })
-          .maybeSingle();
-        driver = nearbyDriver as typeof driver;
-      }
-    } catch {
-      // RPC not available — fall through to simple query
-    }
-    if (!driver) {
-      const { data: fallbackDriver } = await client
-        .from('drivers')
-        .select('driver_id, user_id')
-        .in('driver_status', ['online', 'approved'])
-        .limit(1)
-        .maybeSingle();
-      driver = fallbackDriver as typeof driver;
-    }
-
-    if (!driver) {
-      // No supply right now — leave the request unassigned; the poll/fallback
-      // will retry on the next publish.
-      telemetry.recordMetric('matching.no_supply', 1, 'count');
-      return;
-    }
-
-    await client
-      .from('trips')
-      .update({ driver_id: driver.driver_id, trip_status: 'booked' })
-      .eq('id', trip.id);
-
-    domainEventBus.publish(
-      createDomainEvent(
-        'DriverAssigned',
-        {
-          bookingId: payload.bookingId,
-          rideId: payload.rideId,
-          driverId: driver.driver_id,
-          driverName: undefined,
-        },
-        'matching-worker',
-        message.correlationId,
-      ),
-    );
-
-    telemetry.recordSLO('matching-worker', 'ride-matching', Date.now() - startTime, true);
-  },
-);
 
 // ============================================================================
 // PACKAGE WORKER
@@ -419,14 +318,13 @@ const BROWSER_WORKERS_DISABLED =
 export const productionWorkerRegistry = new WorkerRegistry();
 
 if (!BROWSER_WORKERS_DISABLED) {
-  productionWorkerRegistry.register(matchingWorker);
   productionWorkerRegistry.register(packageWorker);
   productionWorkerRegistry.register(paymentWorker);
   productionWorkerRegistry.register(notificationWorker);
   productionWorkerRegistry.register(opsWorker);
 }
 
-export { matchingWorker, packageWorker, paymentWorker, notificationWorker, opsWorker };
+export { packageWorker, paymentWorker, notificationWorker, opsWorker };
 
 export async function startProductionWorkers(): Promise<void> {
   if (BROWSER_WORKERS_DISABLED) {return;}

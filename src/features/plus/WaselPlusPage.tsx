@@ -47,11 +47,12 @@ export default function WaselPlusPage() {
   const routeIntelligence = useLiveRouteIntelligence({
     from: membership.dailyRoute?.from,
     to: membership.dailyRoute?.to,
+    userId: user?.id,
   });
 
   const recurringSuggestions = useMemo(
-    () => getRecurringRouteSuggestions(4),
-    [routeIntelligence.updatedAt],
+    () => getRecurringRouteSuggestions(4, user?.id),
+    [routeIntelligence.updatedAt, user?.id],
   );
 
   const dailySignal = routeIntelligence.selectedSignal;

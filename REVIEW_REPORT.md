@@ -7,6 +7,11 @@
 
 | Area | Change | Verification state |
 |---|---|---|
+| **Client matching safety** | Removed the obsolete browser-side ride matcher that queried dropped trip columns, called an unsupported RPC, and could assign an arbitrary available driver. Matching remains on the dedicated server-side worker. | App TypeScript check passes; no match flow or production worker was executed. |
+| **Growth data privacy** | Growth event cache is now partitioned by user; the legacy unscoped cache is cleared. Analytics resolves a user scope before querying, checks database errors, and selects only fields needed for aggregation. | App TypeScript check passes. No account-switch/browser or live RLS behavior was exercised. |
+| **Deployment safety** | Pinned Supabase CLI to `2.122.1`; pass the selected hosted project ref explicitly; added a migration dry run; select distinct staging credentials without production fallback; deploy the named edge function; scope PR write permission to preview only; smoke-test the selected environment URL. | Workflow YAML and Supabase TOML parse; `git diff --check` clean. No workflow run, migration, or deployment performed. Staging GitHub environment still needs its separate credentials, project ref, and URL. |
+| **Analytics evidence labels** | Corridor rows now require observed activity before using that label; empty corridors use launch estimates. Session-level observations are no longer described as platform-wide production aggregates, and savings/value are labeled as projections or tracked values. | App TypeScript check passes; no test suite or production metrics query run. |
+| **Release guidance** | Replaced outdated branch/release claims with the workflow's actual preview, staging, production, reviewer, and rollback paths. | Documentation reviewed locally; no deployment performed. |
 | **Database privacy** | New migration revokes client access to `public.profiles`, removes broad policies, and adds a restrictive self-read policy. The RLS SQL gate now checks profile table and column privileges. | Migration and live SQL gate not applied locally or in production; Docker unavailable. |
 | **Mobility OS** | Booking UI is disabled until payment authorization/confirmation exists; the endpoint fails closed and client errors no longer create local success records. | E2E regression updated; execution pending. |
 | **CliQ** | Webhook amount conversion now requires an explicit `CLIQ_WEBHOOK_AMOUNT_UNIT` (`jod` or `fils`) and reports held/mismatched payments accurately. | Unit conversion cases added; actual unit must be confirmed in CliQ sandbox. |
@@ -48,6 +53,7 @@
 4. **Deploy the migration and edge-function changes** through the protected deployment workflow, then verify profile reads/writes as anon and authenticated users and run payment smoke tests.
 5. **Configure `CLIQ_WEBHOOK_AMOUNT_UNIT` only after checking an actual signed sandbox event.** Until then, amount-less or unrecognized values remain uncredited for manual review.
 6. **Verify production observability and provider settings** in Vercel and Supabase; this repository review cannot inspect those account values.
+7. **Configure the isolated staging GitHub environment** with its own Supabase project ref, database password, scoped token, and staging URL; then exercise the deployment workflow before relying on it.
 
 ---
 
@@ -61,3 +67,7 @@
 - Keep the 30/25/20/28 coverage ratchet moving toward the 85% release target; current coverage remains substantially below target.
 - Add end-to-end payment authorization and settlement for Mobility OS before re-enabling its booking action.
 - Add OTLP distributed tracing export via `VITE_OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+## Current readiness rating
+
+**6/10 overall; not yet 9+.** The repo has useful security and release safeguards, and the deployment path now fails closed for missing staging configuration. The production rating remains capped by the unresolved credential rotation/history cleanup, unverified production Auth settings, low coverage versus the release target, pending migrations, and the absence of a completed staging-to-production deployment verification. Do not treat local workflow parsing as proof that production is ready.

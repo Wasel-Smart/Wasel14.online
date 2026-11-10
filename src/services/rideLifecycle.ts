@@ -421,7 +421,7 @@ async function resolvePassengerNames ( passengerIds: string[] ): Promise<Map<str
   try {
     if ( supabase ) {
       const { data: profiles } = await supabase
-        .from( 'profiles' )
+        .from( 'users' )
         .select( 'id, full_name, email' )
         .in( 'id', passengerIds );
       if ( Array.isArray( profiles ) ) {

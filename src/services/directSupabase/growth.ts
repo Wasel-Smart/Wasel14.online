@@ -77,25 +77,29 @@ export async function getDirectDemandAlerts(userId?: string) {
   return Array.isArray(data) ? (data as RawDemandAlert[]) : [];
 }
 
-export async function getDirectGrowthAnalytics(userId?: string) {
+export async function getDirectGrowthAnalytics(userId: string) {
+  if (!userId) {throw new Error('A signed-in user is required for growth analytics.');}
   const db = getDb();
-  const context = userId ? await buildUserContext(userId).catch(() => null) : null;
+  const context = await buildUserContext(userId).catch(() => null);
+  if (!context?.user.id) {throw new Error('Unable to resolve a user scope for growth analytics.');}
 
   let eventsQuery = db
     .from('growth_events')
-    .select('*')
+    .select('funnel_stage, service_type, route_from, route_to, monetary_value_jod')
     .order('created_at', { ascending: false })
     .limit(500);
-  if (context?.user.id) {eventsQuery = eventsQuery.eq('user_id', context.user.id);}
-  const { data: events } = await eventsQuery;
+  eventsQuery = eventsQuery.eq('user_id', context.user.id);
+  const { data: events, error: eventsError } = await eventsQuery;
+  if (eventsError) {throw eventsError;}
 
   let demandQuery = db
     .from('demand_alerts')
-    .select('*')
+    .select('origin_city, destination_city, status')
     .order('created_at', { ascending: false })
     .limit(200);
-  if (context?.user.id) {demandQuery = demandQuery.eq('user_id', context.user.id);}
-  const { data: alerts } = await demandQuery;
+  demandQuery = demandQuery.eq('user_id', context.user.id);
+  const { data: alerts, error: alertsError } = await demandQuery;
+  if (alertsError) {throw alertsError;}
 
   const rows = Array.isArray(events) ? (events as RawGrowthEvent[]) : [];
   const alertRows = Array.isArray(alerts) ? (alerts as RawDemandAlert[]) : [];

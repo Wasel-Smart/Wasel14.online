@@ -129,6 +129,7 @@ function buildRecommendedReason(args: {
 function computeSignal(
   corridor: CorridorOpportunity,
   membership = getMovementMembershipSnapshot(),
+  userId?: string,
 ): LiveCorridorSignal {
   const now = Date.now();
   const rides = getConnectedRides().filter(
@@ -146,7 +147,7 @@ function computeSignal(
   const alerts = getDemandAlerts().filter(
     alert => corridorMatches(corridor, alert.from, alert.to) && alert.status === 'active',
   );
-  const events = getGrowthEventFeed().filter(event =>
+  const events = getGrowthEventFeed(userId).filter(event =>
     corridorMatches(corridor, event.from, event.to),
   );
 
@@ -282,10 +283,11 @@ export function buildRouteIntelligenceSnapshot(args?: {
   from?: string | null;
   to?: string | null;
   membership?: ReturnType<typeof getMovementMembershipSnapshot>;
+  userId?: string;
 }) {
   const membership = args?.membership ?? getMovementMembershipSnapshot();
   const allSignals = getAllCorridorOpportunities()
-    .map(corridor => computeSignal(corridor, membership))
+    .map(corridor => computeSignal(corridor, membership, args?.userId))
     .sort((left, right) => {
       const leftScore = left.forecastDemandScore + left.routeOwnershipScore;
       const rightScore = right.forecastDemandScore + right.routeOwnershipScore;
@@ -311,8 +313,9 @@ export function getLiveCorridorSignal(
   from?: string | null,
   to?: string | null,
   membership?: ReturnType<typeof getMovementMembershipSnapshot>,
+  userId?: string,
 ) {
-  return buildRouteIntelligenceSnapshot({ from, to, membership }).selectedSignal;
+  return buildRouteIntelligenceSnapshot({ from, to, membership, userId }).selectedSignal;
 }
 
 /**
@@ -340,11 +343,16 @@ function useContentStableSnapshot(
   return held;
 }
 
-export function useLiveRouteIntelligence(args?: { from?: string | null; to?: string | null }) {
+export function useLiveRouteIntelligence(args?: {
+  from?: string | null;
+  to?: string | null;
+  userId?: string;
+}) {
   const [tick, setTick] = useState(0);
 
   const from = args?.from ?? null;
   const to = args?.to ?? null;
+  const userId = args?.userId ?? null;
 
   useEffect(() => {
     if (typeof window === 'undefined') {return undefined;}
@@ -361,8 +369,8 @@ export function useLiveRouteIntelligence(args?: { from?: string | null; to?: str
   // caller passes an inline literal, so `args` had a new identity on each
   // render and this memo never held.
   const snapshot = useMemo(
-    () => buildRouteIntelligenceSnapshot({ from, to }),
-    [from, to, tick],
+    () => buildRouteIntelligenceSnapshot({ from, to, userId: userId ?? undefined }),
+    [from, to, tick, userId],
   );
 
   return useContentStableSnapshot(snapshot);

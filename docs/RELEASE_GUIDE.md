@@ -80,23 +80,41 @@ Before releasing:
 
 ## Deployment Flow
 
-```
-Commit → Push → CI Checks → Version Bump → Tag → GitHub Release → Vercel Deploy
-```
+The deployment workflow (`.github/workflows/deploy.yml`) runs verification first,
+then applies database migrations and deploys the Supabase functions before it
+deploys the Vercel frontend. Pushes to `main` or `master` target production and
+must pass the GitHub `production` environment reviewer gate. Pull requests only
+create Vercel previews.
+
+Use **Actions → Deploy → Run workflow** to deploy staging. The workflow selects
+the staging Supabase credentials and project ref and fails closed if any are
+missing; it must never share production database credentials. Configure these
+GitHub environment values before using staging:
+
+| GitHub environment | Required values |
+| --- | --- |
+| `production` | Secrets `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`; variable `PRODUCTION_URL` |
+| `staging` | Secrets `SUPABASE_STAGING_ACCESS_TOKEN`, `SUPABASE_STAGING_DB_PASSWORD`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`; variables `SUPABASE_STAGING_PROJECT_REF`, `STAGING_URL` |
+
+The project ref for production is currently `zexlxabdcsjefptmjhuq` in the
+workflow. Keep production reviewers enabled. The workflow pins Supabase CLI
+`2.122.1` because this repository's deployment commands use v2 semantics.
+
+Database migrations run automatically after the environment gate. Review the
+migration diff and run the database/RLS checks in staging before approving a
+production deployment. Database rollback is a forward corrective migration;
+do not force-push an older application commit over the protected branch. For a
+frontend or function regression, redeploy the previous known-good Vercel build
+or function source, then apply a reviewed database correction if needed.
 
 ## Rollback
 
-To rollback a release:
-
-```bash
-# Revert to previous version
-git revert HEAD
-git push origin master
-
-# Or deploy specific tag
-git checkout v1.0.0
-git push origin HEAD:master --force
-```
+For a frontend regression, use Vercel's dashboard to restore the previous known-good
+deployment. Keep the protected Git branch history intact. The current workflow does
+not provide an automatic Supabase rollback: migrations are forward-only in
+production, so prepare and review a corrective migration for database changes.
+Do not delete or rewrite an already-applied migration, run `db reset` against a
+hosted project, or force-push a release tag over `main`/`master`.
 
 ## Version History
 
@@ -138,9 +156,9 @@ git push origin master --tags
 
 ## Environment-Specific Releases
 
-- **Development**: Auto-deploy from `develop` branch
-- **Staging**: Auto-deploy from `staging` branch  
-- **Production**: Auto-deploy from `master` branch tags
+- **Pull requests**: Vercel preview only; no Supabase changes.
+- **Staging**: Manual workflow dispatch with the `staging` environment.
+- **Production**: Push to `main` or `master`, gated by the protected `production` environment.
 
 ## Monitoring Releases
 

@@ -90,7 +90,11 @@ export function OfferRidePage() {
     () => buildDriverRoutePlan(form.from, form.to, form.seats),
     [form.from, form.to, form.seats],
   );
-  const routeIntelligence = useLiveRouteIntelligence({ from: form.from, to: form.to });
+  const routeIntelligence = useLiveRouteIntelligence({
+    from: form.from,
+    to: form.to,
+    userId: user?.id,
+  });
   const selectedSignal = routeIntelligence.selectedSignal;
   const corridorCount = getConnectedRides().filter(
     ride => ride.from === form.from && ride.to === form.to,

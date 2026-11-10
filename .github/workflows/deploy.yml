@@ -24,11 +24,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
-
-env:
-  # Not a secret: the project ref is already in package.json (edge:deploy).
-  SUPABASE_PROJECT_REF: zexlxabdcsjefptmjhuq
 
 jobs:
   # ── Quality gate (shared by every deploy path) ───────────────────────────────
@@ -38,6 +33,7 @@ jobs:
   verify:
     name: Verify (types, lint, unit, edge)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -60,7 +56,11 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: [verify]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: preview
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: amondnet/vercel-action@v25
@@ -81,8 +81,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+      PROD_SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROD_SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      STAGING_SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_STAGING_ACCESS_TOKEN }}
+      STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_STAGING_DB_PASSWORD }}
+      STAGING_SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_STAGING_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,30 +95,48 @@ jobs:
           cache: 'npm'
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Keep the hosted deploy on the v2 semantics used by this repo's CLI.
+          # v3 database commands target local unless explicitly passed --remote.
+          version: 2.122.1
       - run: npm ci --legacy-peer-deps
-      - name: Check Supabase credentials
+      - name: Select Supabase environment and check credentials
         id: creds
         run: |
-          # Fail hard. The frontend job needs this job to succeed, so a silent skip here
-          # would ship a new client against an old API and un-migrated database.
-          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
-            echo "::error::SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD are not set for this environment. Refusing to deploy the frontend without deploying the backend."
+          # Never let a missing staging value fall back to production.
+          if [ "$DEPLOY_ENV" = "staging" ]; then
+            selected_ref="$STAGING_SUPABASE_PROJECT_REF"
+            selected_token="$STAGING_SUPABASE_ACCESS_TOKEN"
+            selected_password="$STAGING_SUPABASE_DB_PASSWORD"
+          else
+            selected_ref="zexlxabdcsjefptmjhuq"
+            selected_token="$PROD_SUPABASE_ACCESS_TOKEN"
+            selected_password="$PROD_SUPABASE_DB_PASSWORD"
+          fi
+          if [ -z "$selected_token" ] || [ -z "$selected_password" ] || [ -z "$selected_ref" ]; then
+            echo "::error::Supabase credentials or project ref are not set for the selected environment. Refusing to deploy the frontend without deploying the backend."
             exit 1
           fi
+          {
+            echo "SUPABASE_PROJECT_REF=$selected_ref"
+            echo "SUPABASE_ACCESS_TOKEN=$selected_token"
+            echo "SUPABASE_DB_PASSWORD=$selected_password"
+          } >> "$GITHUB_ENV"
           echo "ready=true" >> "$GITHUB_OUTPUT"
-      - name: Link project
+      - name: Preview database migrations
         if: steps.creds.outputs.ready == 'true'
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+        run: supabase db push --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --dry-run
       - name: Apply database migrations
         if: steps.creds.outputs.ready == 'true'
-        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
-      - name: Deploy edge function
+        run: supabase db push --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD" --yes
+      - name: Prepare edge function bundles
         if: steps.creds.outputs.ready == 'true'
-        run: npm run edge:deploy
+        run: npm run edge:sync && npm run edge:graph && npm run edge:types
+      - name: Deploy main edge function
+        if: steps.creds.outputs.ready == 'true'
+        run: supabase functions deploy make-server-0b1f4071 --project-ref "$SUPABASE_PROJECT_REF"
       - name: Retire legacy Stripe payment function
         if: steps.creds.outputs.ready == 'true'
-        run: supabase functions deploy stripe-payments-v2
+        run: supabase functions deploy stripe-payments-v2 --project-ref "$SUPABASE_PROJECT_REF"
 
   # ── Frontend (Vercel) ────────────────────────────────────────────────────────
   deploy-frontend:
@@ -122,6 +144,7 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [verify, deploy-backend]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
     steps:
       - uses: actions/checkout@v4
@@ -142,8 +165,11 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [deploy-frontend]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
-      BASE_URL: ${{ vars.PRODUCTION_URL }}
+      DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'production' }}
+      PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+      STAGING_URL: ${{ vars.STAGING_URL }}
     steps:
       - uses: actions/checkout@v4
       # k6 is not preinstalled on GitHub runners; `npm run test:load:smoke`
@@ -151,8 +177,14 @@ jobs:
       - uses: grafana/setup-k6-action@v1
       - name: Run smoke test
         run: |
+          if [ "$DEPLOY_ENV" = "staging" ]; then
+            BASE_URL="$STAGING_URL"
+          else
+            BASE_URL="$PRODUCTION_URL"
+          fi
           if [ -z "$BASE_URL" ]; then
-            echo "::error::PRODUCTION_URL repository variable is not set - post-deploy smoke test cannot run."
+            echo "::error::The URL for the selected deployment environment is not set - post-deploy smoke test cannot run."
             exit 1
           fi
+          export BASE_URL
           npm run test:load:smoke

@@ -164,12 +164,12 @@ export function FindRidePage() {
 
   const marketplaceNodes = useMemo(() => getMarketplaceNodes().slice(0, 3), []);
   const corridorPlan = useMemo(() => getCorridorOpportunity(from, to), [from, to]);
-  const routeIntelligence = useLiveRouteIntelligence({ from, to });
+  const routeIntelligence = useLiveRouteIntelligence({ from, to, userId: user?.id });
   const selectedSignal = routeIntelligence.selectedSignal;
   const featuredSignals = routeIntelligence.featuredSignals.slice(0, 4);
   const recurringSuggestions = useMemo(
-    () => getRecurringRouteSuggestions(3),
-    [],
+    () => getRecurringRouteSuggestions(3, user?.id),
+    [user?.id],
   );
   const bookingByRideId = useMemo(() => {
     const next = new Map<string, RideBookingRecord>();
@@ -250,8 +250,8 @@ export function FindRidePage() {
   const resolveSignalForRoute = useCallback(
     (routeFrom: string, routeTo: string) =>
       signalLookup.get(`${routeFrom}::${routeTo}`) ??
-      getLiveCorridorSignal(routeFrom, routeTo, routeIntelligence.membership),
-    [routeIntelligence.membership, signalLookup],
+      getLiveCorridorSignal(routeFrom, routeTo, routeIntelligence.membership, user?.id),
+    [routeIntelligence.membership, signalLookup, user?.id],
   );
   const openMyTrips = useCallback(() => nav('/app/my-trips?tab=rides'), [nav]);
   const selectedBooking = selected ? (bookingByRideId.get(selected.id) ?? null) : null;

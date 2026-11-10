@@ -160,9 +160,9 @@ export function areRouteRemindersEqual(
   });
 }
 
-export function getRecurringRouteSuggestions(limit = 4) {
-  const snapshot = buildRouteIntelligenceSnapshot();
-  const events = getGrowthEventFeed();
+export function getRecurringRouteSuggestions(limit = 4, userId?: string) {
+  const snapshot = buildRouteIntelligenceSnapshot({ userId });
+  const events = getGrowthEventFeed(userId);
   const bookings = getRideBookings();
   const alerts = getDemandAlerts();
   const usageMap = new Map<string, { count: number; hours: number[] }>();
@@ -295,7 +295,7 @@ export function formatRouteReminderSchedule(reminder: RouteReminder) {
   return `${label} at ${reminder.preferredTime}`;
 }
 
-export async function syncRouteReminders(user?: Pick<WaselUser, 'email' | 'phone'> | null) {
+export async function syncRouteReminders(user?: Pick<WaselUser, 'id' | 'email' | 'phone'> | null) {
   let reminders = readReminders();
   const now = new Date();
   const dueReminders = reminders.filter(
@@ -311,6 +311,7 @@ export async function syncRouteReminders(user?: Pick<WaselUser, 'email' | 'phone
     const signal = buildRouteIntelligenceSnapshot({
       from: reminder.from,
       to: reminder.to,
+      userId: user?.id,
     }).selectedSignal;
     const nextReminderAt = nextReminderDate(
       reminder.frequency,
