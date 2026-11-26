@@ -96,7 +96,7 @@
     "edge:deploy": "npm run edge:sync && npm run edge:graph && npm run edge:types && supabase functions deploy $EDGE_FUNCTION_NAME --project-ref $SUPABASE_PROJECT_REF"
   },
   "dependencies": {
-    "@google/genai": "^2.19.0",
+    "@google/genai": "^3.6.1",
     "@microsoft/applicationinsights-web": "^3.4.4",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
